@@ -169,7 +169,13 @@ function cascadeTrade(): Records {
       anchors: { order: "2026-12-05", delivery: "2027-02-01" }, status: "possible", probability: 0.4, sourceRef: src("email", "rfq-77"),
     },
   );
-  r.evidence = t.evidence;
+  // The chat the Evergreen signal cites, so the review and record screens show the whole message (api/routes/review.ts
+  // and read.ts look it up by the signal's sourceRef.record). Only here: the intake cases ingest this file themselves.
+  const chat: Evidence = {
+    id: "ev-whatsapp-evergreen", channel: "whatsapp", format: "text", receivedAt: "2026-11-28T17:31:47.000Z", extraction: "ok",
+    sourceRef: src("whatsapp", "whatsapp-evergreen.txt"), text: readFileSync(join(root, "fixtures/cascade_trade/intake/whatsapp-evergreen.txt"), "utf8"),
+  };
+  r.evidence = [...t.evidence, chat];
   // A proposed (not applied) signal: Evergreen says early January. It must not change the base forecast until applied.
   // It is exactly what the AI lane extracts from intake/whatsapp-evergreen.txt (ai/extract/signals.ts, cached run): same
   // id, channel, time, date, confidence (capped at 0.5: conditional promise, sender not a confirmed contact, so it stays

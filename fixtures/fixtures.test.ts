@@ -61,4 +61,13 @@ describe("intake base records agree with the engine fixture", () => {
       expect(readFileSync(join(intakeDir, file!), "utf8").slice(x.start, x.end), s.id).toBe(x.text);
     }
   });
+
+  it("every signal's sourceRef resolves to an Evidence record with text, which its excerpt slices", () => {
+    for (const s of records.signals) {
+      const ev = records.evidence.find((e) => e.id === s.sourceRef.record || e.sourceRef.record === s.sourceRef.record);
+      expect(ev?.text, s.id).toBeTruthy();
+      const x = s.sourceRef.excerpt!;
+      expect(ev!.text!.slice(x.start, x.end), s.id).toBe(x.text);
+    }
+  });
 });

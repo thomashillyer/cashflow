@@ -29,7 +29,7 @@ Design targets for the fixture (tune the data until the engine produces roughly 
 - About $60K of free cash above the safety line in late January 2027.
 - A pasted WhatsApp chat from Evergreen ("we'll pay once our customer pays us, early January") moves invoice INV-1187 and deepens the dip, with the message cited.
 
-One source of truth: `scripts/make-engine-fixtures.ts` writes both `fixtures/cascade_trade/records.json` (the engine fixture) and `fixtures/cascade_trade/intake/base_records.json` (the slice the intake cases start from), so the intake files (`fixtures/cascade_trade/intake/`) link to the same INV-1187, INV-104, INV-1203 and Shenzhen bill 0042 instead of adding second copies. The proposed Evergreen signal in `records.json` is what the AI lane extracts from `whatsapp-evergreen.txt`.
+One source of truth: `scripts/make-engine-fixtures.ts` writes both `fixtures/cascade_trade/records.json` (the engine fixture) and `fixtures/cascade_trade/intake/base_records.json` (the slice the intake cases start from), so the intake files (`fixtures/cascade_trade/intake/`) link to the same INV-1187, INV-104, INV-1203 and Shenzhen bill 0042 instead of adding second copies. The proposed Evergreen signal in `records.json` is what the AI lane extracts from `whatsapp-evergreen.txt`. Known gap: that chat (and so the signal) is received on Nov 28, after the fixture's asOf (Nov 16); tracked in #158.
 
 Sample events file:
 

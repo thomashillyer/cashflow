@@ -994,6 +994,18 @@
         "system": "zoho_books",
         "record": "INV-1187"
       }
+    },
+    {
+      "id": "ev-whatsapp-evergreen",
+      "channel": "whatsapp",
+      "format": "text",
+      "receivedAt": "2026-11-28T17:31:47.000Z",
+      "extraction": "ok",
+      "sourceRef": {
+        "system": "whatsapp",
+        "record": "whatsapp-evergreen.txt"
+      },
+      "text": "[11/28/26, 9:14:02 AM] Cascade Trade (Mei): Hi Dana, friendly reminder that INV-1187 for $28,000 is due Dec 10.\n[11/28/26, 9:31:47 AM] Dana Evergreen: Hi Mei, thanks. Honestly we'll pay once our customer pays us, early January. Sorry for the delay.\n[11/28/26, 9:32:15 AM] Dana Evergreen: Same invoice link as before works for us.\n"
     }
   ]
 }
