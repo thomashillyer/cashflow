@@ -65,9 +65,14 @@ async function main(): Promise<void> {
   // Sweep leftovers from a crashed earlier run.
   const { data: old, error: oldError } = await db.from("businesses").select("id").like("id", `${PREFIX}%`).eq("is_synthetic", true);
   if (oldError) throw new Error(`sweep: ${oldError.message}`);
-  if (old?.length) {
-    await deleteSmokeBusinesses(old.map((r) => r.id as string));
-    console.log(`swept ${old.length} leftover smoke-test business(es)`);
+  // Only ids stamped more than an hour ago, so a concurrent run by someone else is left alone.
+  const stale = (old ?? []).map((r) => r.id as string).filter((id) => {
+    const ts = Number(/^smoke-test-(\d+)/.exec(id)?.[1]);
+    return Number.isFinite(ts) && stamp - ts > 60 * 60 * 1000;
+  });
+  if (stale.length) {
+    await deleteSmokeBusinesses(stale);
+    console.log(`swept ${stale.length} leftover smoke-test business(es)`);
   }
 
   if (!(await step("create synthetic businesses", async () => {
@@ -94,7 +99,8 @@ async function main(): Promise<void> {
     check("load: business hash is hash-1", r.inputsHash === "hash-1", String(r.inputsHash));
     const a = r.items[0]!;
     check("load: fields round-trip (lever, cashEffect, neededBy, evidenceRefs, actions)",
-      JSON.stringify(a.lever) === JSON.stringify(lever) && a.cashEffect === 12_345 && a.neededBy === "2026-12-12"
+      // jsonb reorders object keys, so compare fields, not the serialized object.
+      a.lever?.kind === "defer" && a.lever.commitmentId === "c1" && a.lever.days === 10 && a.cashEffect === 12_345 && a.neededBy === "2026-12-12"
       && JSON.stringify(a.evidenceRefs) === '["inv-1","inv-2"]' && a.actions.length === 2 && a.score === 3 && a.confidence === 0.8,
       JSON.stringify(a));
     check("load: no stamp column leaks into items", r.items.every((i) => !("inputsHash" in i) && !("businessId" in i)));

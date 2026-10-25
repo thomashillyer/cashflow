@@ -111,13 +111,13 @@ export type LoadedWorkItems = {
 // Work items (engine/rank.ts output), best first. Pass their id/state back to buildBrief as
 // `prior` so done and dismissed items stay that way across reruns.
 export async function loadWorkItems(db: SupabaseClient, businessId: string): Promise<LoadedWorkItems> {
-  const [itemsRes, businessRes] = await Promise.all([
-    db.from("work_items").select("*").eq("business_id", businessId)
-      .order("score", { ascending: false }).order("id"),
-    db.from("businesses").select("work_items_inputs_hash").eq("id", businessId).maybeSingle(),
-  ]);
-  if (itemsRes.error) throw toStoreError(`load work items ${businessId}`, itemsRes.error);
+  // Hash first, then items: a save landing in between gives new items with an old hash (one extra
+  // re-rank), never old items with a new hash (which would read as current and skip a re-rank).
+  const businessRes = await db.from("businesses").select("work_items_inputs_hash").eq("id", businessId).maybeSingle();
   if (businessRes.error) throw toStoreError(`load work items hash ${businessId}`, businessRes.error);
+  const itemsRes = await db.from("work_items").select("*").eq("business_id", businessId)
+    .order("score", { ascending: false }).order("id");
+  if (itemsRes.error) throw toStoreError(`load work items ${businessId}`, itemsRes.error);
   const rows = (itemsRes.data as Row[]).map((r) => fromRow<WorkItem & { inputsHash?: string }>(r, "work_items"));
   // Compatibility: rows stamped before the per-business hash existed count only when every row agrees.
   const rowHashes = new Set(rows.map((r) => r.inputsHash));
