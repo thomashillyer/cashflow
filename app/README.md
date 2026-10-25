@@ -13,17 +13,10 @@ python3 -m http.server 4300     # or: npx serve -l 4300
 Open http://localhost:4300. It starts in **preview mode** with two fictional businesses (switch in the header):
 Cascade Trade Co. (trading, from `docs/design/10-testing-and-fixtures.md`) and Pike Street Noodle Bar (restaurant).
 
-## Hosting (Cloudflare)
+## Hosting
 
-The app is static files, so it deploys as-is: the `neri-cash` Cloudflare Worker serves `app/` as static assets
-(`wrangler.jsonc`) at **https://neri-cash.trkhillyer.workers.dev** (no custom domain). `.github/workflows/app-deploy.yml`
-runs `wrangler deploy` for `main`, and gives every same-repo pull request that touches `app/` a preview at
-`https://<branch>-neri-cash.trkhillyer.workers.dev`. It needs the repo secrets `CLOUDFLARE_API_TOKEN` (permissions:
-Account → Workers Scripts: Edit) and `CLOUDFLARE_ACCOUNT_ID`, and skips cleanly without them. Do not also connect the
-Worker to Git in the dashboard, or every change deploys twice. `app/_headers` sets the security headers.
-Manual deploy: `npx wrangler deploy`.
-
-The hosted site runs the preview with fictional businesses until `config.js` points at a live API.
+The app is served together with the API from one Node service on Fly.io at **https://neri-cash.fly.dev**
+(see `api/README.md`, "Live demo hosting"). There is no separate static host.
 
 ## Point it at the team API
 

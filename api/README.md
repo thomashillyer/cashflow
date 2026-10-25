@@ -18,7 +18,7 @@ Tests: `npx vitest run api` (Fastify `inject()`, in-memory store, no network, no
 
 ## Live demo hosting (Fly.io)
 
-**https://neri-cash.fly.dev**: this API plus the app on one origin, in `DEMO_MODE` against the shared Supabase project. `Dockerfile` builds it and switches the image's `app/config.js` to `same-origin` (the committed file stays empty for the public static preview). `fly.toml` sets the region (`sjc`), keeps one machine warm, and health-checks `/health`. `.github/workflows/fly-deploy.yml` deploys every push to `main` (repo secret `FLY_API_TOKEN`). Runtime secrets live in Fly: `fly secrets set -a neri-cash SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... [ANTHROPIC_API_KEY=...]`. Manual deploy: `fly deploy --remote-only`. Logs: `fly logs -a neri-cash`.
+**https://neri-cash.fly.dev**: this API plus the app on one origin, in `DEMO_MODE` against the shared Supabase project. `Dockerfile` builds it and switches the image's `app/config.js` to `same-origin` (the committed file stays empty for the local preview). `fly.toml` sets the region (`sjc`), keeps one machine warm, and health-checks `/health`. `.github/workflows/fly-deploy.yml` deploys every push to `main` (repo secret `FLY_API_TOKEN`). Runtime secrets live in Fly: `fly secrets set -a neri-cash SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... [ANTHROPIC_API_KEY=...]`. Manual deploy: `fly deploy --remote-only`. Logs: `fly logs -a neri-cash`.
 
 ## Environment
 
