@@ -619,6 +619,24 @@ function linkedCostCommitments(deal: Commitment, profile: Profile, byId: Map<str
   return out;
 }
 
+// A cancelled or credited sales deal drops its receipt and virtual costs, but a real linked outflow (a supplier PO or
+// bill) that is still open stays in the forecast: it is owed to the supplier regardless. The owner should know, since
+// it may be cancellable too, so each such link raises a needs-review reason naming the deal and the PO.
+function flagLinkedCostsAfterCancel(deal: Commitment, byId: Map<string, Commitment>, warnings: Notes): void {
+  if (deal.type !== "sales_deal" || (deal.settlement !== "cancelled" && deal.settlement !== "credited")) return;
+  const label = deal.reference ?? deal.id;
+  for (const id of deal.linkedCommitmentIds ?? []) {
+    const l = byId.get(id);
+    if (!l || defaultDirection(l) !== "out") continue;
+    if (l.settlement === "paid" || l.settlement === "cancelled" || l.settlement === "credited") continue;
+    warnings.review(
+      "linked_po_after_cancel",
+      `${label}: deal is ${deal.settlement} but linked ${l.reference ?? l.id} (${money(l.outstanding ?? l.amount, l.currency)}) is still open and stays in the forecast as owed; cancel it with the supplier or confirm it (needs review)`,
+      [deal.id, l.id],
+    );
+  }
+}
+
 // countedActuals: see PaymentContext; forecast() passes countedActualIds so uncounted bank lines never cancel a bill.
 export function expand(records: Records, profile: Profile, asOf: string, horizonEnd: string, fx: Record<string, number>, countedActuals?: Set<string>): Expanded {
   const warnings = new Notes();
@@ -631,6 +649,7 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
     const sig = amountSignals.get(c.id)?.claim;
     const dealAmount = sig?.kind === "amount_change" ? sig.newAmount : c.amount;
     for (const virt of linkedCostCommitments(c, profile, byId, dealAmount)) all.push(virt);
+    flagLinkedCostsAfterCancel(c, byId, warnings);
   }
   // Settlements dated before the latest start-of-day snapshot are already inside opening cash (same boundary as
   // forecast.ts openingBalance); without a snapshot, as-of is the boundary.

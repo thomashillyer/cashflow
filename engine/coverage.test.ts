@@ -156,6 +156,27 @@ describe("cancelled overlap: a cancelled or credited link never offsets, and a c
     const run = forecast(r, p, base, AS_OF, {});
     expect(run.events.map((e) => `${e.commitmentId}:${e.date}:${e.amount}`)).toEqual([`po1:2026-11-05:${$(600)}`]);
     expect(run.days.at(-1)?.closing).toBe($(-500));
+    // #117: the owner is told the PO is still owed after the deal fell through
+    const flagged = run.review?.reasons.filter((x) => x.code === "linked_po_after_cancel") ?? [];
+    expect(flagged.map((x) => x.refs)).toEqual([["deal", "po1"]]);
+    expect(run.review?.needed).toBe(true);
+  });
+
+  it("linked_po_after_cancel: credited deals flag too; open deals and paid or cancelled POs do not", () => {
+    const p: Profile = { ...profile, paymentPatterns: [{ id: "deal", appliesTo: "sales_deal", isDefault: true, legs: [{ share: 1, anchor: "due", offsetDays: 0, direction: "in" }] }] };
+    const codes = (dealSettlement: Commitment["settlement"], poSettlement?: Commitment["settlement"]) => {
+      const r = withBal($(100));
+      r.commitments = [
+        com("deal", { type: "sales_deal", amount: $(1000), settlement: dealSettlement, linkedCommitmentIds: ["po1"], anchors: { due: "2026-11-10" } }),
+        com("po1", { type: "purchase_order", direction: "out", amount: $(600), settlement: poSettlement, anchors: { due: "2026-11-05" } }),
+      ];
+      return (forecast(r, p, base, AS_OF, {}).review?.reasons ?? []).filter((x) => x.code === "linked_po_after_cancel").length;
+    };
+    expect(codes("credited")).toBe(1);
+    expect(codes("open")).toBe(0);
+    expect(codes(undefined)).toBe(0);
+    expect(codes("cancelled", "paid")).toBe(0);
+    expect(codes("cancelled", "cancelled")).toBe(0);
   });
 });
 
