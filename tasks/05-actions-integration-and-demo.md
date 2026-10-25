@@ -1,6 +1,6 @@
 # Person 5: Actions, integration, deployment, and demo
 
-Owner: unassigned. Claim this role in [tracking issue #5](https://github.com/thomashillyer/cashflow/issues/5).
+Owner: Kiana. Track progress in [tracking issue #5](https://github.com/thomashillyer/cashflow/issues/5).
 
 ## Outcome
 

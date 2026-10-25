@@ -1,14 +1,14 @@
 # Five-person task board
 
-Claim one role by adding your name to its GitHub issue. The issue checkboxes track live progress; the committed role documents define scope, handoffs, and acceptance criteria. The [technical implementation plan](../docs/TECHNICAL_PLAN.md) defines the two ingestion layers, transaction/API contracts, and current five-owner handoffs. The primary design is [`docs/design/`](../docs/design/01-overview-and-architecture.md); lane ownership is in [09-api-repo-lanes](../docs/design/09-api-repo-lanes.md#five-people). These checklists came from the earlier [seven-hour plan](../docs/HACKATHON_PLAN.md) and still apply where they match the lanes. Event times in [11-plan-demo-risks](../docs/design/11-plan-demo-risks.md) replace the hour-based milestones below.
+The five roles are assigned below. The issue checkboxes track live progress; the committed role documents define scope, handoffs, and acceptance criteria. The [technical implementation plan](../docs/TECHNICAL_PLAN.md) defines the two ingestion layers, transaction/API contracts, and current five-owner handoffs. The primary design is [`docs/design/`](../docs/design/01-overview-and-architecture.md); lane ownership is in [09-api-repo-lanes](../docs/design/09-api-repo-lanes.md#five-people). These checklists came from the earlier [seven-hour plan](../docs/HACKATHON_PLAN.md) and still apply where they match the lanes. Event times in [11-plan-demo-risks](../docs/design/11-plan-demo-risks.md) replace the hour-based milestones below.
 
 | Person | Role | Task list | Tracking issue |
 |---|---|---|---|
-| 1 | Data and source adapters | [Checklist](01-data-and-source-adapters.md) | [#1](https://github.com/thomashillyer/cashflow/issues/1) |
-| 2 | Cash-flow engine | [Checklist](02-cashflow-engine.md) | [#2](https://github.com/thomashillyer/cashflow/issues/2) |
-| 3 | Product UI and onboarding | [Checklist](03-product-ui-and-onboarding.md) | [#3](https://github.com/thomashillyer/cashflow/issues/3) |
-| 4 | Document understanding and reconciliation | [Checklist](04-document-understanding-and-reconciliation.md) | [#4](https://github.com/thomashillyer/cashflow/issues/4) |
-| 5 | Actions, integration, deployment, and demo | [Checklist](05-actions-integration-and-demo.md) | [#5](https://github.com/thomashillyer/cashflow/issues/5) |
+| Niru (1) | Data ingestion and source adapters | [Checklist](01-data-and-source-adapters.md) | [#1](https://github.com/thomashillyer/cashflow/issues/1) |
+| Thomas (2) | Cash-flow engine | [Checklist](02-cashflow-engine.md) | [#2](https://github.com/thomashillyer/cashflow/issues/2) |
+| SilverBeck (3) | UI and UX, including onboarding | [Checklist](03-product-ui-and-onboarding.md) | [#3](https://github.com/thomashillyer/cashflow/issues/3) |
+| Andras (4) | AI ingestion and normalization, document understanding and reconciliation | [Checklist](04-document-understanding-and-reconciliation.md) | [#4](https://github.com/thomashillyer/cashflow/issues/4) |
+| Kiana (5) | Actions/recommendations, integration, deployment, and demo | [Checklist](05-actions-integration-and-demo.md) | [#5](https://github.com/thomashillyer/cashflow/issues/5) |
 
 ## Shared milestones
 
