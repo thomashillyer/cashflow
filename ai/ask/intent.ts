@@ -21,7 +21,7 @@ import type { Commitment, CommitmentDraft, Records, Rule } from "../../schema/re
 import { INTENT_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
 import { fmtDate } from "../brief";
 import { humanizeId } from "../labels";
-import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../config";
+import { INTENT_MODEL, INTENT_PROMPT_VERSION, anthropicOptions } from "../config";
 import { parseAmount } from "../normalize";
 import { resolveDatePhrase } from "../extract/signals";
 import { nameSimilarity, resolveParty } from "../reconcile/parties";
@@ -82,7 +82,7 @@ export async function callIntentModel(
   client: Anthropic | undefined, content: string, model: string,
 ): Promise<{ output: AskIntentRaw } | { problem: string }> {
   try {
-    client ??= new Anthropic(); // configured from ANTHROPIC_API_KEY
+    client ??= new Anthropic(anthropicOptions()); // configured from ANTHROPIC_API_KEY
     const res = await client.messages.create(
       {
         model,

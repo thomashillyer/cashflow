@@ -5,6 +5,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { AiMode } from "./engine";
+import { anthropicOptions } from "../ai/config";
 
 export const ASK_LIVE_TIMEOUT_MS = 12_000;
 export const ASK_LIVE_MAX_PER_HOUR = 200;
@@ -50,7 +51,7 @@ export class AskLiveGuard {
     }
     const started = this.now();
     let calls = 0, inTok = 0, outTok = 0, failed = 0;
-    const real = base ?? new Anthropic({ maxRetries: 0 }); // key from ANTHROPIC_API_KEY
+    const real = base ?? new Anthropic({ ...anthropicOptions(), maxRetries: 0 }); // key from ANTHROPIC_API_KEY
     const timeoutMs = this.timeoutMs;
     const create = async (body: unknown, options?: object) => {
       calls++;

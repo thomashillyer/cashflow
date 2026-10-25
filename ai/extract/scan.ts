@@ -17,7 +17,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod/v4";
 import type { Field, IntakeCandidate } from "../../schema/intake";
 import { cacheKey, DEFAULT_CACHE_DIR, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
-import { EXTRACTION_MODEL, PROMPT_VERSION } from "../config";
+import { EXTRACTION_MODEL, PROMPT_VERSION, anthropicOptions } from "../config";
 import type { SourceSegment } from "../normalize";
 import {
   buildUserContent, ExtractionOutput, reviewCandidate, systemPrompt, toCandidate, type BusinessIdentity,
@@ -62,7 +62,7 @@ export async function callVision(
   client: Anthropic | undefined, bytes: Uint8Array, business: BusinessIdentity, model: string,
 ): Promise<{ output: VisionOutput } | { problem: string }> {
   try {
-    client ??= new Anthropic();
+    client ??= new Anthropic(anthropicOptions());
     const res = await client.messages.create(
       {
         model,
