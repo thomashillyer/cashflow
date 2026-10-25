@@ -1,0 +1,21 @@
+# Never ship secrets or private data in the image (patterns match at any depth).
+**/.env
+**/.env.*
+!.env.example
+**/.dev.vars*
+**/*.pem
+**/*.key
+**/data/private/
+**/private-data/
+**/uploads/
+**/.local/
+supabase/.temp/
+supabase/.branches/
+
+# Not needed at runtime.
+.git
+**/node_modules
+.wrangler
+.claude
+docs/reviews/
+**/*.log

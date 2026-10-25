@@ -3,11 +3,11 @@
 
 import type { ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
-import type { Records, WorkItem } from "../schema/records";
+import type { Override, Records, Scenario, WorkItem } from "../schema/records";
 import { buildBrief } from "../engine/brief";
 import type { Brief } from "../engine/rank";
 import { simulate } from "../engine/simulate";
-import { writeBrief, type BriefContext } from "../ai/brief";
+import { fmtDate, writeBrief, type BriefContext } from "../ai/brief";
 import { fmtMoney } from "../ai/money";
 import type { Business, Store } from "./store";
 
@@ -24,6 +24,19 @@ export function runInputs(b: Business, now: () => Date): RunInputs {
     fxRates: account?.fxRates ?? {},
   };
 }
+
+// The records, their revision and the owner's saved overrides for one run. Every forecast, simulate and
+// brief the API serves goes through here, so saved overrides are never dropped.
+export type Loaded = { records: Records; storeRevision: number; overrides: Override[] };
+
+export async function loadForRun(store: Store, id: string): Promise<Loaded> {
+  const [{ records, storeRevision }, overrides] = await Promise.all([store.load(id), store.loadOverrides(id)]);
+  return { records, storeRevision, overrides };
+}
+
+// The base (or stress) scenario: the owner's saved overrides; stress adds the profile's stress rules in forecast().
+export const savedScenario = (overrides: Override[], kind: "base" | "stress" = "base"): Scenario =>
+  ({ id: kind, kind, overrides });
 
 export const businessIdentity = (b: Business) => ({ name: b.name, ...(b.profile.account?.aliases?.length ? { aliases: b.profile.account.aliases } : {}) });
 
@@ -49,27 +62,27 @@ export type BriefResult = {
   usedFallback: string[];
 };
 
-export type Computed = { run: ForecastRun; brief: Brief; records: Records; storeRevision: number; inputs: RunInputs; ctx: BriefContext };
+export type Computed = { run: ForecastRun; brief: Brief; records: Records; overrides: Override[]; storeRevision: number; inputs: RunInputs; ctx: BriefContext };
 
 // One engine run for the business, with saved work-item states carried over; saves the fresh
 // ranking when the run changed (best effort: a failed save never blocks the brief).
 export async function compute(store: Store, b: Business, mode: AiMode, now: () => Date): Promise<Computed> {
-  const { records, storeRevision } = await store.load(b.id);
+  const { records, storeRevision, overrides } = await loadForRun(store, b.id);
   const inputs = runInputs(b, now);
   const saved = await store.loadWorkItems(b.id).catch(() => ({ items: [] as WorkItem[], inputsHash: undefined }));
-  const { run, brief } = buildBrief({ ...inputs, records, prior: saved.items.map((i) => ({ id: i.id, state: i.state })) });
+  const { run, brief } = buildBrief({ ...inputs, records, baseOverrides: overrides, prior: saved.items.map((i) => ({ id: i.id, state: i.state })) });
   if (saved.inputsHash !== run.inputsHash) {
     await store.saveWorkItems(b.id, brief.all, run.inputsHash).catch(() => undefined);
   }
   const ctx: BriefContext = { run, records, profile: inputs.profile, business: { name: b.name }, mode };
-  return { run, brief, records, storeRevision, inputs, ctx };
+  return { run, brief, records, overrides, storeRevision, inputs, ctx };
 }
 
 const PARTNER_DISCLOSURE = "Sample card. If Neri lists partners, they pay a referral fee, and Neri is paid the same whichever you choose.";
 
 export async function briefFor(store: Store, b: Business, mode: AiMode, now: () => Date): Promise<BriefResult> {
   const c = await compute(store, b, mode, now);
-  const { run, brief, records, inputs } = c;
+  const { run, brief, records, overrides, inputs } = c;
   const { items: worded, usedFallback } = await writeBrief(brief.today, c.ctx);
   const three = worded.map((i) => decorate(i, records));
   const todayIds = new Set(three.map((i) => i.id));
@@ -80,9 +93,11 @@ export async function briefFor(store: Store, b: Business, mode: AiMode, now: () 
   const levers = three.filter((i) => i.state === "open" && i.lever).map((i) => i.lever!);
   let combined: BriefResult["combined"] = null;
   let after = run.lowPoint.amount;
+  let afterDate = run.lowPoint.date; // the gap and its date come from the same (simulated) run
   if (levers.length) {
-    const sim = simulate(records, inputs.profile, [], levers, inputs.asOf, inputs.fxRates);
+    const sim = simulate(records, inputs.profile, overrides, levers, inputs.asOf, inputs.fxRates);
     after = sim.run.lowPoint.amount;
+    afterDate = sim.run.lowPoint.date;
     if (levers.length > 1) combined = { lowPointDelta: sim.lowPointDelta, lowPoint: sim.run.lowPoint };
   }
   // No opening balance yet (a new business before its first import): no gap to show.
@@ -91,7 +106,7 @@ export async function briefFor(store: Store, b: Business, mode: AiMode, now: () 
   const shortfall: BriefResult["shortfall"] = residual > 0
     ? {
         amount: residual,
-        title: `Even with these, you'd be ${fmtMoney(residual, currency)} under your line around ${run.lowPoint.date}`,
+        title: `Even with these, you'd be ${fmtMoney(residual, currency)} under your line around ${fmtDate(afterDate, inputs.asOf)}`,
         why: "If chasing and timing can't close the rest, you could look at short-term working capital. Whether to borrow is your call; Neri only shows the gap and the dates.",
         partnerAction: { label: "See sample working-capital options", sample: true, disclosure: PARTNER_DISCLOSURE },
       }

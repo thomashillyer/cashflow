@@ -1,0 +1,19 @@
+{
+  "key": "e67324348ec968ad1dc0084afd4af04b614f7435569898da0c6056ea15adb3bd",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "fix_gap",
+    "partyPhrase": null,
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": null,
+    "windowPhrase": null,
+    "commitmentType": null,
+    "direction": null,
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

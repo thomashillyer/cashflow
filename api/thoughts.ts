@@ -5,7 +5,7 @@
 // readThought for it and keep the shapes.
 
 import type { Profile } from "../schema/profile";
-import type { CommitmentDraft, Records, Signal } from "../schema/records";
+import type { CommitmentDraft, Override, Records, Signal } from "../schema/records";
 import { forecast } from "../engine/forecast";
 import type { Thought, ThoughtReading } from "./store";
 
@@ -123,10 +123,10 @@ export function ownerSignal(
 }
 
 // What adding the note would do to the low point: base run vs the run with a trial applied signal.
-export function priceThought(t: Thought, records: Records, profile: Profile, asOf: string, fxRates: Record<string, number>) {
+export function priceThought(t: Thought, records: Records, profile: Profile, asOf: string, fxRates: Record<string, number>, overrides: Override[] = []) {
   const r = t.reading;
   if (r.kind === "note" || !r.date || (r.amount == null && !r.invoiceId)) return null;
-  const scenario = { id: "base", kind: "base" as const, overrides: [] };
+  const scenario = { id: "base", kind: "base" as const, overrides };
   const base = forecast(records, profile, scenario, asOf, fxRates);
   if (r.date > (base.days[base.days.length - 1]?.date ?? r.date)) return { outside: true };
   if (r.status === "possible" && r.amount != null) return { pipeline: Math.round(r.amount * (r.probability ?? 0.4)) };

@@ -313,14 +313,17 @@ describe("purchase orders", () => {
         .filter((ev) => ev.commitmentId === commitmentId).reduce((sum, ev) => sum + ev.amount, 0);
     expect(contributed(r, invoice.id)).toBe(e.invoice.amount);
 
-    // The PO's remainder: the engine has no customer-PO pattern yet (issue #2), so this PO falls back to
-    // the supplier-PO legs, whose "ship" leg has no date here and is left unscheduled. Give it a ship date
-    // so expand() schedules the remainder, and check only the amount: coverage is subtracted exactly once
-    // (600,000), not twice (200,000, the double-subtraction bug) and not zero times (1,000,000).
+    // The PO's remainder: the trading profile has no customer-PO pattern (issue #2), and its supplier-PO
+    // default pays out, so this money-in PO is paid in a single due-date leg in its own direction (#157).
+    // It has no due date here and is left unscheduled. Give it one so expand() schedules the remainder,
+    // and check the amount: coverage is subtracted exactly once (600,000), not twice (200,000, the
+    // double-subtraction bug) and not zero times (1,000,000).
     const scheduled = structuredClone(r);
-    byId(scheduled, po.id).anchors = { ...po.anchors, ship: "2026-12-20" };
+    byId(scheduled, po.id).anchors = { ...po.anchors, due: "2026-12-20" };
     const poRemainder = contributed(scheduled, po.id);
     expect(poRemainder).toBe(e.poRemaining);
+    const poEvents = expand(scheduled, profile, meta.asOf, horizonEnd(profile, meta.asOf), meta.fxRates).events.filter((ev) => ev.commitmentId === po.id);
+    expect(poEvents.map((ev) => [ev.direction, ev.date])).toEqual([["in", "2026-12-20"]]);
     const total = contributed(scheduled, invoice.id) + poRemainder;
     expect(total).toBe(e.totalForecastIn);
     expect(total).not.toBe(1400000);

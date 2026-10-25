@@ -9,6 +9,7 @@ import type { CashEvent, Commitment, Direction, Override, Records } from "../sch
 import { isNonDeferrable } from "./adjust";
 import { smallestUpfrontShare } from "./affordability";
 import { addDays } from "./dates";
+import { pickPattern } from "./expand";
 import { ENGINE_DEFAULTS, engineSettings } from "./settings";
 
 // Design 07 default when a payable has no confirmed `flexibility` rule; profile engine.deferDays overrides it.
@@ -61,9 +62,7 @@ function flexibilityRule(c: Commitment, records: Records) {
 // pending, so a WorkItem id doesn't change when an earlier leg is paid. Recurring items always have several.
 function isMultiLeg(c: Commitment, profile: Profile, dir: Direction): boolean {
   if (c.type === "recurring") return true;
-  const pattern = c.patternId
-    ? profile.paymentPatterns.find((p) => p.id === c.patternId)
-    : profile.paymentPatterns.find((p) => p.appliesTo === c.type && p.isDefault);
+  const pattern = pickPattern(c, profile);
   return (pattern?.legs.filter((l) => l.direction === dir).length ?? 1) > 1;
 }
 

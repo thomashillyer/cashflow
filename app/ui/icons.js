@@ -25,5 +25,6 @@ export const icon = {
   doc: s('<path d="M7 3.5h7l4.5 4.5v12H7z"/><path d="M14 3.5V8h4.5"/>'),
 };
 
-// Neri mark: ribbon rising to a sun (from the Neri logo).
-export const logo = `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="nr" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#4A5FD9"/><stop offset="1" stop-color="#AEB9FF"/></linearGradient><radialGradient id="ns" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFE1A8"/><stop offset="1" stop-color="#F5A93F"/></radialGradient></defs><path d="M8 46C10 30 20 18 30 30s18 14 24-10" fill="none" stroke="url(#nr)" stroke-width="9" stroke-linecap="round"/><circle cx="54" cy="15" r="6" fill="url(#ns)"/></svg>`;
+// Neri mark: the brand artwork (ribbon rising to a sun on deep navy), as a square tile.
+export const logo = `<img class="mark" src="./assets/neri-mark-96.png" srcset="./assets/neri-mark-64.png 1x, ./assets/neri-mark-96.png 2x, ./assets/neri-mark-192.png 3x" width="32" height="32" alt="" decoding="async" />`;
+export const logoLarge = `<img class="mark mark-lg" src="./assets/neri-mark-192.png" srcset="./assets/neri-mark-192.png 1x, ./assets/neri-mark-512.png 2x" width="72" height="72" alt="" decoding="async" />`;

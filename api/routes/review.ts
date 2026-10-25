@@ -4,15 +4,16 @@
 
 import type { FastifyInstance } from "fastify";
 import type { ChangeProposal, CommitmentFieldChange } from "../../schema/intake";
-import type { Commitment, Records, Signal } from "../../schema/records";
+import type { Commitment, Override, Records, Signal } from "../../schema/records";
 import { forecast } from "../../engine/forecast";
 import { ingest, type IntakeInput, type IntakeNote } from "../../ai/intake";
 import { ApplyError, applyProposal, type ApplyErrorCode } from "../../ai/reconcile/apply";
 import { propose } from "../../ai/reconcile/match";
+import { fmtDate } from "../../ai/brief";
 import { fmtMoney } from "../../ai/money";
 import { enrichEvidence, prepareFileImport, type PreparedImport } from "../../adapters/prepare";
 import type { Deps } from "../app";
-import { businessIdentity, runInputs } from "../engine";
+import { businessIdentity, loadForRun, runInputs, savedScenario } from "../engine";
 import { businessOf, HttpError, isIsoDate } from "../http";
 import type { Business, Store } from "../store";
 
@@ -45,11 +46,17 @@ export async function refreshPending(store: Store, businessId: string, records: 
   if (next.length) await store.saveProposals(businessId, next);
 }
 
-function signalItem(b: Business, records: Records, s: Signal, deps: Deps) {
+// Evidence has no sender field; its record id is a sender only when it is an address or a phone number
+// (not a file name or message id). Otherwise "" and the app leaves "from" out.
+function senderOf(record: string | undefined): string {
+  return record && /^[^\s@]+@[^\s@]+$|^\+?\d[\d\s().-]{6,}$/.test(record) ? record : "";
+}
+
+function signalItem(b: Business, records: Records, overrides: Override[], s: Signal, deps: Deps) {
   const c = records.commitments.find((x) => x.id === s.commitmentId);
   if (!c) return null;
   const { profile, asOf, fxRates } = runInputs(b, deps.now);
-  const scenario = { id: "base", kind: "base" as const, overrides: [] };
+  const scenario = savedScenario(overrides);
   const withState = (state: Signal["state"]): Records => ({ ...records, signals: records.signals.map((x) => (x.id === s.id ? { ...x, state } : x)) });
   const before = forecast(withState("proposed"), profile, scenario, asOf, fxRates);
   const after = forecast(withState("applied"), profile, scenario, asOf, fxRates);
@@ -60,7 +67,7 @@ function signalItem(b: Business, records: Records, s: Signal, deps: Deps) {
   return {
     signal: { ...s, effect: { lowPointDelta: after.lowPoint.amount - before.lowPoint.amount, week: after.lowPoint.week } },
     // Message text is data: shown as text, never interpreted.
-    message: { id: s.sourceRef.record, channel: s.channel, from: ev?.sourceRef.record ?? "", receivedAt: s.receivedAt, body: ev?.text ?? excerpt, excerpt },
+    message: { id: s.sourceRef.record, channel: s.channel, from: senderOf(ev?.sourceRef.record), receivedAt: s.receivedAt, body: ev?.text ?? excerpt, excerpt },
     commitment: c,
     party: records.parties.find((p) => p.id === (s.partyId ?? c.partyId)) ?? null,
     from,
@@ -163,6 +170,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   app.post("/import/:adapter", async (req) => {
     const b = businessOf(req);
+    // On the public demo the samples are shared: an upload would publish the file to every visitor, signed in or not.
+    if (b.isSynthetic && deps.demoMode) throw new HttpError(403, "FORBIDDEN", "The sample already has its documents. Set up your business to upload your own files.");
     const { adapter } = req.params as { adapter: string };
     const { records, storeRevision } = await deps.store.load(b.id);
     const prep = await toInput(adapter, (req.body ?? {}) as Record<string, unknown>, nowIso(), records, businessIdentity(b), b.profile.baseCurrency);
@@ -205,8 +214,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   // The app's Review list: proposed signals with the words, the invoice, and the priced effect.
   app.get("/review", async (req) => {
     const b = businessOf(req);
-    const { records } = await deps.store.load(b.id);
-    return records.signals.filter((s) => s.state === "proposed").map((s) => signalItem(b, records, s, deps)).filter((x) => x !== null);
+    const { records, overrides } = await loadForRun(deps.store, b.id);
+    return records.signals.filter((s) => s.state === "proposed").map((s) => signalItem(b, records, overrides, s, deps)).filter((x) => x !== null);
   });
 
   // Everything pending from imports: change proposals with their candidate fields, evidence and notes,
@@ -315,7 +324,7 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (decision === "dismiss") return { signal: next, storeRevision: revision, alert: null };
 
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
-    const scenario = { id: "base", kind: "base" as const, overrides: [] };
+    const scenario = savedScenario(await deps.store.loadOverrides(b.id));
     const before = forecast(records, profile, scenario, asOf, fxRates).lowPoint;
     const after = forecast(nextRecords, profile, scenario, asOf, fxRates).lowPoint;
     const c = nextRecords.commitments.find((x) => x.id === next.commitmentId);
@@ -324,8 +333,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     return {
       signal: next, storeRevision: revision, lowPoint: after,
       alert: {
-        title: `${who}: ${c?.reference ?? c?.sourceRef.record ?? "the change"}${next.claim.kind === "date_change" ? ` moves to ${next.claim.newDate}` : " updated"}`,
-        detail: `Your low point is now ${money(after.amount)} on ${after.date}${after.amount < before.amount ? `, down ${money(before.amount - after.amount)}` : ""}.`,
+        title: `${who}: ${c?.reference ?? c?.sourceRef.record ?? "the change"}${next.claim.kind === "date_change" ? ` moves to ${fmtDate(next.claim.newDate, asOf)}` : " updated"}`,
+        detail: `Your low point is now ${money(after.amount)} on ${fmtDate(after.date, asOf)}${after.amount < before.amount ? `, down ${money(before.amount - after.amount)}` : ""}.`,
       },
     };
   });

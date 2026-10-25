@@ -1,7 +1,7 @@
 {
-  "id": "run-base-2459ce5bd446",
+  "id": "run-base-344c1549c67a",
   "asOf": "2026-11-16",
-  "inputsHash": "2459ce5bd446160d8538913962e21c4227f0d17005e90c89ac32afff0613dc8c",
+  "inputsHash": "344c1549c67aafce0197ab1248ca21660199ef232d2be537339d8daea179a4da",
   "scenarioId": "base",
   "fxRates": {
     "USD": 1,
@@ -221,7 +221,7 @@
       "outflow": 4200000,
       "closing": 3850000,
       "eventIds": [
-        "evt-po-PO-2291-1"
+        "evt-bill-SC-0042-0"
       ]
     },
     {
@@ -310,53 +310,54 @@
     },
     {
       "date": "2026-12-26",
-      "inflow": 2800000,
+      "inflow": 3200000,
       "outflow": 0,
-      "closing": 2250000,
+      "closing": 2650000,
       "eventIds": [
-        "evt-inv-INV-1187-0"
+        "evt-inv-INV-1187-0",
+        "evt-inv-INV-1203-0"
       ]
     },
     {
       "date": "2026-12-27",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2250000,
+      "closing": 2650000,
       "eventIds": []
     },
     {
       "date": "2026-12-28",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2250000,
+      "closing": 2650000,
       "eventIds": []
     },
     {
       "date": "2026-12-29",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2250000,
+      "closing": 2650000,
       "eventIds": []
     },
     {
       "date": "2026-12-30",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2250000,
+      "closing": 2650000,
       "eventIds": []
     },
     {
       "date": "2026-12-31",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2250000,
+      "closing": 2650000,
       "eventIds": []
     },
     {
       "date": "2027-01-01",
       "inflow": 0,
       "outflow": 650000,
-      "closing": 1600000,
+      "closing": 2000000,
       "eventIds": [
         "evt-rec-rent-1"
       ]
@@ -365,38 +366,38 @@
       "date": "2027-01-02",
       "inflow": 0,
       "outflow": 0,
-      "closing": 1600000,
+      "closing": 2000000,
       "eventIds": []
     },
     {
       "date": "2027-01-03",
       "inflow": 0,
       "outflow": 0,
-      "closing": 1600000,
+      "closing": 2000000,
       "eventIds": []
     },
     {
       "date": "2027-01-04",
       "inflow": 0,
       "outflow": 0,
-      "closing": 1600000,
+      "closing": 2000000,
       "eventIds": []
     },
     {
       "date": "2027-01-05",
-      "inflow": 0,
-      "outflow": 0,
-      "closing": 1600000,
-      "eventIds": []
-    },
-    {
-      "date": "2027-01-06",
-      "inflow": 1200000,
+      "inflow": 800000,
       "outflow": 0,
       "closing": 2800000,
       "eventIds": [
-        "evt-inv-INV-1203-0"
+        "evt-inv-INV-1196-0"
       ]
+    },
+    {
+      "date": "2027-01-06",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2800000,
+      "eventIds": []
     },
     {
       "date": "2027-01-07",
@@ -736,7 +737,7 @@
       "minClosing": 850000,
       "pipelineClosing": 1174000,
       "eventIds": [
-        "evt-po-PO-2291-1",
+        "evt-bill-SC-0042-0",
         "evt-po-PO-2302-1",
         "evt-rec-est-tax-0",
         "evt-bill-duties-2291-0"
@@ -744,36 +745,37 @@
     },
     {
       "start": "2026-12-21",
-      "inflow": 2800000,
+      "inflow": 3200000,
       "outflow": 1400000,
-      "closing": 2250000,
+      "closing": 2650000,
       "minClosing": -550000,
-      "pipelineClosing": 2574000,
+      "pipelineClosing": 2974000,
       "eventIds": [
         "evt-rec-payroll-3",
-        "evt-inv-INV-1187-0"
+        "evt-inv-INV-1187-0",
+        "evt-inv-INV-1203-0"
       ]
     },
     {
       "start": "2026-12-28",
       "inflow": 0,
       "outflow": 650000,
-      "closing": 1600000,
-      "minClosing": 1600000,
-      "pipelineClosing": 1924000,
+      "closing": 2000000,
+      "minClosing": 2000000,
+      "pipelineClosing": 2324000,
       "eventIds": [
         "evt-rec-rent-1"
       ]
     },
     {
       "start": "2027-01-04",
-      "inflow": 1200000,
+      "inflow": 800000,
       "outflow": 1400000,
       "closing": 1400000,
       "minClosing": 1400000,
       "pipelineClosing": 800000,
       "eventIds": [
-        "evt-inv-INV-1203-0",
+        "evt-inv-INV-1196-0",
         "evt-rec-payroll-4"
       ]
     },
@@ -912,16 +914,16 @@
     }
   ],
   "warnings": [
-    "Unconfirmed: email message says INV-1187 moves to 2027-01-08; not in the forecast until approved."
+    "Unconfirmed: whatsapp message says INV-1187 moves to 2027-01-05; not in the forecast until approved."
   ],
   "review": {
     "needed": true,
     "reasons": [
       {
         "code": "unconfirmed_signal",
-        "message": "Unconfirmed: email message says INV-1187 moves to 2027-01-08; not in the forecast until approved.",
+        "message": "Unconfirmed: whatsapp message says INV-1187 moves to 2027-01-05; not in the forecast until approved.",
         "refs": [
-          "sig-evergreen-jan",
+          "sig-ev-whatsapp-evergreen-2",
           "inv-INV-1187"
         ]
       }
@@ -1051,9 +1053,9 @@
       }
     },
     {
-      "id": "evt-po-PO-2291-1",
-      "commitmentId": "po-PO-2291",
-      "legIndex": 1,
+      "id": "evt-bill-SC-0042-0",
+      "commitmentId": "bill-SC-0042",
+      "legIndex": 0,
       "date": "2026-12-14",
       "amount": 4200000,
       "currency": "USD",
@@ -1061,10 +1063,10 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "ship 2026-12-14",
+      "basis": "due 2026-12-14",
       "sourceRef": {
-        "system": "generic_file",
-        "record": "po-2291.pdf"
+        "system": "zoho_books",
+        "record": "0042"
       }
     },
     {
@@ -1156,6 +1158,23 @@
       }
     },
     {
+      "id": "evt-inv-INV-1203-0",
+      "commitmentId": "inv-INV-1203",
+      "legIndex": 0,
+      "date": "2026-12-26",
+      "amount": 400000,
+      "currency": "USD",
+      "amountBase": 400000,
+      "direction": "in",
+      "status": "committed",
+      "confidence": 0.5241379310344826,
+      "basis": "due 2026-12-16 + 10 days (median 2 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1203"
+      }
+    },
+    {
       "id": "evt-rec-rent-1",
       "commitmentId": "rec-rent",
       "legIndex": 1,
@@ -1191,20 +1210,20 @@
       }
     },
     {
-      "id": "evt-inv-INV-1203-0",
-      "commitmentId": "inv-INV-1203",
+      "id": "evt-inv-INV-1196-0",
+      "commitmentId": "inv-INV-1196",
       "legIndex": 0,
-      "date": "2027-01-06",
-      "amount": 1200000,
+      "date": "2027-01-05",
+      "amount": 800000,
       "currency": "USD",
-      "amountBase": 1200000,
+      "amountBase": 800000,
       "direction": "in",
       "status": "committed",
-      "confidence": 0.5333333333333333,
-      "basis": "due 2026-12-28 + 9 days (median 0 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "confidence": 0.6649999999999999,
+      "basis": "due 2027-01-05 + 0 days (median -7 of last 9 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
       "sourceRef": {
         "system": "zoho_books",
-        "record": "INV-1203"
+        "record": "INV-1196"
       }
     },
     {
@@ -1235,8 +1254,8 @@
       "amountBase": 11500000,
       "direction": "in",
       "status": "committed",
-      "confidence": 0.6670846394984326,
-      "basis": "due 2027-01-12 + 0 days (median -7 of last 8 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "confidence": 0.6649999999999999,
+      "basis": "due 2027-01-12 + 0 days (median -7 of last 9 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
       "sourceRef": {
         "system": "zoho_books",
         "record": "INV-1215"
@@ -1317,14 +1336,14 @@
       "id": "evt-rfq-harbor-spring-1",
       "commitmentId": "rfq-harbor-spring",
       "legIndex": 1,
-      "date": "2027-04-11",
+      "date": "2027-04-12",
       "amount": 4200000,
       "currency": "USD",
       "amountBase": 4200000,
       "direction": "in",
       "status": "possible",
-      "confidence": 0.22456140350877193,
-      "basis": "delivery 2027-02-01 + 60 days + 9 days (median 0 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "confidence": 0.22068965517241376,
+      "basis": "delivery 2027-02-01 + 60 days + 10 days (median 2 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
       "sourceRef": {
         "system": "email",
         "record": "rfq-77"
