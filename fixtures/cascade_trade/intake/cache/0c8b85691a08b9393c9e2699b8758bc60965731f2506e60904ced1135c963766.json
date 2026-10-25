@@ -2,7 +2,7 @@
   "key": "0c8b85691a08b9393c9e2699b8758bc60965731f2506e60904ced1135c963766",
   "promptVersion": "extract_signal@1",
   "model": "claude-opus-5-5",
-  "source": "hand-authored stand-in for owner-message-inv104.txt (Message); replace with a live run",
+  "source": "live",
   "output": {
     "claim": "date_change",
     "reference": {
@@ -10,8 +10,8 @@
       "quote": "invoice INV-104"
     },
     "partyName": {
-      "value": "The customer",
-      "quote": "The customer"
+      "value": "the customer",
+      "quote": "The customer says"
     },
     "amountMentioned": null,
     "newDatePhrase": {
@@ -21,6 +21,6 @@
     "newAmount": null,
     "dependsOn": null,
     "containsInstructions": false,
-    "confidence": 0.92
+    "confidence": 0.9
   }
 }

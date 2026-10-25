@@ -2,7 +2,7 @@
   "key": "811166d7fb6926ecf79757b2c533c13269f9021d13f99169b1f8a0c31e4d2ef0",
   "promptVersion": "extract_signal@1",
   "model": "claude-opus-5-5",
-  "source": "hand-authored stand-in for whatsapp-evergreen.txt (Message 3); replace with a live run",
+  "source": "live",
   "output": {
     "claim": "none",
     "reference": null,
@@ -12,6 +12,6 @@
     "newAmount": null,
     "dependsOn": null,
     "containsInstructions": false,
-    "confidence": 0.9
+    "confidence": 0.85
   }
 }

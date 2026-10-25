@@ -2,7 +2,7 @@
   "key": "9b7166071f70b29f817248f8ff8903618fe90c304903e3987789d79c0dbcecd8",
   "promptVersion": "extract_signal@1",
   "model": "claude-opus-5-5",
-  "source": "hand-authored stand-in for whatsapp-evergreen.txt (Message 2); replace with a live run",
+  "source": "live",
   "output": {
     "claim": "date_change",
     "reference": {
@@ -12,11 +12,11 @@
     "partyName": null,
     "amountMentioned": {
       "value": "$28,000",
-      "quote": "$28,000"
+      "quote": "INV-1187 for $28,000"
     },
     "newDatePhrase": {
       "value": "early January",
-      "quote": "we'll pay once our customer pays us, early January"
+      "quote": "early January"
     },
     "newAmount": null,
     "dependsOn": "once our customer pays us",
