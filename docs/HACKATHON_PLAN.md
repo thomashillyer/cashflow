@@ -1,5 +1,7 @@
 # Cashflow: seven-hour hackathon plan
 
+> **Superseded.** The primary design is now [`docs/design/`](design/01-overview-and-architecture.md) (Neri Cash). Its reconciliation rules, stress scenario, honesty rules, and five-person split were carried over from this plan. Keep this file for the duplicate-evidence demo story and the daily fixture arithmetic below.
+
 Date: October 25, 2026. Status: proposed execution plan. Team: five people.
 
 ## Product decision
