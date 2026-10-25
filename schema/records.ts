@@ -179,7 +179,7 @@ export type ExtractionState = "ok" | "partial" | "unreadable" | "unsupported";
 export type Override = {
   id: string;
   target: { commitmentId: string; legIndex?: number };
-  change: { date?: string; shiftDays?: number; amount?: number; exclude?: true };
+  change: { date?: string; shiftDays?: number; amount?: number; exclude?: true; stillOpen?: true };   // stillOpen: owner says an overdue item is still unpaid; changes no line, but keeps it out of the assumed-paid rule and the overdue flags
   origin: "rule" | "signal" | "lever" | "owner";
   originId?: string;
 };

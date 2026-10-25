@@ -19,6 +19,7 @@ const app = {
   brief: null,
   review: [],
   reviewDocs: { proposals: [], storeRevision: null },
+  decisions: [],
   decidingProposal: false,
   notes: [],
   scenario: "base",
@@ -76,6 +77,7 @@ async function refresh() {
     api.mode === "live" && api.connections ? api.connections().catch(() => []) : [],
     api.mode === "live" && api.reviewProposals ? api.reviewProposals() : { proposals: [], storeRevision: null },
   ]);
+  app.decisions = api.mode === "live" && api.overrides ? await api.overrides().then((r) => (r.overrides ?? []).filter((o) => /^owner-(done|open)-/.test(o.id)), () => []) : [];
   app.ctx.safetyLine = app.brief.run.safetyLine;
   if (app.scenario === "stress") app.stressRun = await api.forecast("stress");
   if (prevThree.size) {
@@ -124,12 +126,46 @@ function forecastReview(run = app.brief.run) {
   };
 }
 
+// Overdue items the owner can settle in one tap. "Paid / done" takes the item out of the forecast and the flags;
+// "Still open" keeps it in as expected now and stops flagging it. Both are saved owner choices and can be undone.
+const OVERDUE_CODES = ["overdue_payment", "overdue_receipt"];
+function overdueTarget(run, reason) {
+  const ev = (run.events ?? []).find((e) => e.id === reason.refs[0]);
+  return ev?.commitmentId ? { commitmentId: ev.commitmentId, legIndex: ev.legIndex } : null;
+}
+function overdueButton(t, decision, label, cls = "") {
+  const leg = t.legIndex !== undefined ? ` data-leg="${t.legIndex}"` : "";
+  return `<button class="btn small ${cls}" data-action="overdue" data-decision="${decision}" data-cid="${esc(t.commitmentId)}"${leg}>${label}</button>`;
+}
+function overdueExtras(run) {
+  if (api.mode !== "live") return "";
+  const assumed = run.assumedPaid ?? [];
+  const label = (a) => `${esc(refLabel(a.commitmentId))} ${money(a.amountBase)}, due ${shortDate(a.date)}`;
+  const line = assumed.length
+    ? `<details class="assumed-paid"><summary>${assumed.length} older item${assumed.length === 1 ? "" : "s"} assumed paid. Review</summary><ul>${assumed.map((a) => `<li>${label(a)} <span class="muted">${esc(a.basis.split("; ").pop())}</span> <span class="overdue-actions">${overdueButton({ commitmentId: a.commitmentId, legIndex: a.legIndex }, "open", "Still open")}</span></li>`).join("")}</ul></details>`
+    : "";
+  const mine = (app.decisions ?? []).map((o) => {
+    const t = { commitmentId: o.target.commitmentId, legIndex: o.target.legIndex };
+    const leg = t.legIndex !== undefined ? ` data-leg="${t.legIndex}"` : "";
+    const name = refLabel(t.commitmentId) === "Source" ? humanizeId(t.commitmentId) : refLabel(t.commitmentId);
+    return `<li>${esc(name)}: marked ${o.change.exclude === true ? "paid / done" : "still open"}. <button class="linklike" data-action="overdue" data-decision="clear" data-cid="${esc(t.commitmentId)}"${leg}>Undo</button></li>`;
+  });
+  const choices = mine.length ? `<details class="assumed-paid"><summary>${mine.length} overdue choice${mine.length === 1 ? "" : "s"} you made</summary><ul>${mine.join("")}</ul></details>` : "";
+  return line + choices;
+}
+
 function forecastReviewPanel(run = app.brief.run) {
   const review = forecastReview(run);
-  if (!review) return "";
+  const extras = overdueExtras(run);
+  if (!review) return extras ? `<section class="panel forecast-review quiet" aria-label="Overdue items">${extras}</section>` : "";
+  const item = (r) => {
+    const t = api.mode === "live" && OVERDUE_CODES.includes(r.code) ? overdueTarget(run, r) : null;
+    return `<li>${esc(r.message)}${t ? ` <span class="overdue-actions">${overdueButton(t, "done", "Paid / done")}${overdueButton(t, "open", "Still open", "quiet")}</span>` : ""}</li>`;
+  };
   return `<section class="panel forecast-review" aria-label="Forecast checks">
     <h2>${esc(review.title)}</h2><p>${esc(review.message)}</p>
-    ${review.reasons.length ? `<ul>${review.reasons.map((r) => `<li>${esc(r.message)}</li>`).join("")}</ul>` : ""}
+    ${review.reasons.length ? `<ul>${review.reasons.map(item).join("")}</ul>` : ""}
+    ${extras}
     <div class="forecast-review-actions">${review.messages ? `<a class="btn small" href="#/review">Review messages</a>` : ""}${review.sources ? `<a class="btn small" href="#/sources">Check your sources</a>` : ""}</div>
   </section>`;
 }
@@ -1649,6 +1685,25 @@ async function onClick(ev) {
     app.whatIf = null;
     await refresh();
     toast("Added to your forecast", `${money(t.a.proposal.amount)} on ${shortDate(t.a.proposal.date)}. Today's list is updated.`);
+    return;
+  }
+  if (a === "overdue") {
+    if (app.deciding) return;
+    app.deciding = true;
+    const cid = el.dataset.cid;
+    const leg = el.dataset.leg !== undefined ? Number(el.dataset.leg) : undefined;
+    const decision = el.dataset.decision;
+    try {
+      await api.overdueDecision(cid, leg, decision, app.reviewDocs.storeRevision);
+      await refresh();
+      if (decision === "clear") toast("Choice undone", "The item is back as Neri first saw it.");
+      else toast(decision === "done" ? "Marked paid / done" : "Kept as still open", decision === "done" ? "It is out of your forecast and checks. This is your note, not a bank record." : "It stays in your forecast as expected now.", "Undo", () => { api.overdueDecision(cid, leg, "clear", app.reviewDocs.storeRevision).then(refresh, () => {}); });
+    } catch (err) {
+      if (err.status === 409) { await refresh(); toast("Your books changed", "We reloaded. Choose again."); }
+      else toast("Couldn't save that", err.message);
+    } finally {
+      app.deciding = false;
+    }
     return;
   }
   if (a === "proposal") {

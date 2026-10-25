@@ -3,6 +3,7 @@
   "displayName": "Restaurant and retail",
   "baseCurrency": "USD",
   "horizonWeeks": 13,
+  "assumeSettledBeforeWeeks": 1,
   "freeCashLookaheadWeeks": 6,
   "defaultLagDays": 0,
   "lagShrinkageK": 3,

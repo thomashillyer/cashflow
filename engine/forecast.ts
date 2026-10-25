@@ -4,13 +4,27 @@
 import { createHash } from "node:crypto";
 import type { CashEvent, Commitment, Records, Scenario } from "../schema/records";
 import type { Profile } from "../schema/profile";
-import type { ForecastRun } from "../schema/forecast";
+import type { AssumedPaid, ForecastRun } from "../schema/forecast";
 import { addDays, dateRange, diffDays, mondayOf } from "./dates";
-import { expand, money, toBase } from "./expand";
+import { DAILY_SALES_ID, expand, money, toBase } from "./expand";
 import { fmtDate, ownerLabel } from "../ai/labels";
 import { adjust } from "./adjust";
 import { Notes } from "./review";
 import { engineSettings, engineSettingsIssues } from "./settings";
+
+export const DEFAULT_ASSUME_SETTLED_BEFORE_WEEKS = 1;
+
+// First date NOT assumed settled: the Monday `weeks` weeks before asOf's week. Pure UTC date math.
+export function settledCutoff(profile: Profile, asOf: string): string {
+  const w = profile.assumeSettledBeforeWeeks;
+  const weeks = typeof w === "number" && Number.isInteger(w) && w >= 0 ? w : DEFAULT_ASSUME_SETTLED_BEFORE_WEEKS;
+  return addDays(mondayOf(asOf), -7 * weeks);
+}
+
+// The owner said "still open" for this event (commitment-wide, or one leg).
+function ownerStillOpen(scenario: Scenario, e: CashEvent): boolean {
+  return scenario.overrides.some((o) => o.change.stillOpen === true && o.target.commitmentId === e.commitmentId && (o.target.legIndex === undefined || o.target.legIndex === e.legIndex));
+}
 
 export const ENGINE_VERSION = "engine-1";
 
@@ -218,7 +232,7 @@ function normalize(r: Records): Records {
 // (matchPayments/paidSoFar), so what is left here is unpaid.
 // Not rolled, kept past-dated with a warning: virtual linked costs (`deal~pattern`) and legs dated from an estimated
 // anchor, since no source document says they are due.
-function rollOverdueOutflows(events: CashEvent[], profile: Profile, asOf: string, warnings: Notes): CashEvent[] {
+function rollOverdueOutflows(events: CashEvent[], profile: Profile, asOf: string, warnings: Notes, open: (e: CashEvent) => boolean): CashEvent[] {
   const label = (e: CashEvent) => `${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} payment dated ${e.date}`;
   const overdue = (e: CashEvent) => e.date < asOf && e.direction === "out" && e.status !== "actual" && e.status !== "possible";
   // Warn in date order so the run reads chronologically.
@@ -230,8 +244,9 @@ function rollOverdueOutflows(events: CashEvent[], profile: Profile, asOf: string
       warnings.review("linked_cost_unscheduled", `Overdue: ${label(e)} is before ${asOf}; past-dated linked/estimated cost, not counted (needs review).`, [e.id, e.commitmentId]);
       continue;
     }
-    warnings.review("overdue_payment", `Overdue: ${label(e)} is before ${asOf}; assumed payable now and counted on ${asOf} (needs review).`, [e.id, e.commitmentId]);
-    rolled.set(e, { ...e, date: asOf, basis: `${e.basis}; overdue since ${e.date}, assumed payable now` });
+    const stillOpen = open(e);
+    if (!stillOpen) warnings.review("overdue_payment", `Overdue: ${label(e)} is before ${asOf}; assumed payable now and counted on ${asOf} (needs review).`, [e.id, e.commitmentId]);
+    rolled.set(e, { ...e, date: asOf, basis: `${e.basis}; overdue since ${e.date}, ${stillOpen ? "owner says still open, expected now" : "assumed payable now"}` });
   }
   return events.map((e) => rolled.get(e) ?? e);
 }
@@ -285,11 +300,20 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     commitments: expanded.commitments,
     warnings,
   });
-  const rolled = rollOverdueOutflows(all, profile, asOf, warnings);
+  // Old open items are assumed paid unless the owner said they are still open. An assumption, not an actual:
+  // they leave the forecast and the flags, and are listed in run.assumedPaid so the owner can reverse each.
+  const cutoff = settledCutoff(profile, asOf);
+  const assumedPaid: AssumedPaid[] = [];
+  const live = all.filter((e) => {
+    const old = e.date < cutoff && e.status !== "actual" && e.status !== "possible" && !!e.commitmentId && e.commitmentId !== DAILY_SALES_ID && !ownerStillOpen(scenario, e);
+    if (old) assumedPaid.push({ eventId: e.id, commitmentId: e.commitmentId!, legIndex: e.legIndex, date: e.date, direction: e.direction, amount: e.amount, currency: e.currency, amountBase: e.amountBase, basis: `${e.basis}; assumed paid (due before ${cutoff})` });
+    return !old;
+  });
+  const rolled = rollOverdueOutflows(live, profile, asOf, warnings, (e) => ownerStillOpen(scenario, e));
   const events = [...rolled].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1));
 
   for (const e of events) {
-    if (e.date < asOf && e.direction === "in" && e.status !== "actual" && e.status !== "possible") {
+    if (e.date < asOf && e.direction === "in" && e.status !== "actual" && e.status !== "possible" && !ownerStillOpen(scenario, e)) {
       warnings.review("overdue_receipt", `Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} receipt dated ${e.date} is before ${asOf}; kept at its date, not moved to today (needs review).`, [e.id, e.commitmentId]);
     }
   }
@@ -380,5 +404,6 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     warnings: warnings.list,
     review: warnings.summary,
     events,
+    ...(assumedPaid.length ? { assumedPaid } : {}),
   };
 }

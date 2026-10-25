@@ -30,6 +30,15 @@ export type ForecastRun = {
   // unresolved, so the brief and UI can never go green by accident without parsing `warnings`. needed = reasons.length > 0.
   review?: { needed: boolean; reasons: ReviewReason[] };
   events: CashEvent[];         // fully dated, with basis and overriddenBy
+  // Open items assumed paid because they are older than profile.assumeSettledBeforeWeeks. They are left out of
+  // `events`, the balance and the review flags. An assumption, not an actual; the owner can mark each "still open".
+  assumedPaid?: AssumedPaid[];
+};
+
+export type AssumedPaid = {
+  eventId: string; commitmentId: string; legIndex: number; date: string; direction: "in" | "out";
+  amount: number; currency: string; amountBase: number;
+  basis: string;               // "...; assumed paid (due before 2026-10-19)"
 };
 
 // code: stable machine key (no_opening_balance, stale_balance, overdue_receipt, overdue_payment, missing_fx,

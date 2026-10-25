@@ -88,7 +88,7 @@ const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals", "/rules",
-  "/notes", "/plans", "/balance", "/work-items", "/records", "/demo", "/ask", "/overrides", "/connections", "/sources", "/evidence"];
+  "/notes", "/plans", "/balance", "/work-items", "/records", "/demo", "/ask", "/overrides", "/overdue-decision", "/connections", "/sources", "/evidence"];
 
 const isApiPath = (url: string) => {
   const path = url.split("?")[0]!;
