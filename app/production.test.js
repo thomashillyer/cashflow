@@ -134,15 +134,16 @@ describe("production uses the owner's data", () => {
     expect(html).toContain('data-submit="source-paste"');
   });
 
-  it("enables Gmail only when the server reports it available and never promises Calendar", () => {
-    const unavailable = screen("viewSources()", { connections: [{ id: "google", available: false, state: "waiting" }] });
-    expect(unavailable).toContain('class="conn is-unavailable" data-connector="google"');
-    expect(unavailable).not.toContain('data-action="connection-sync" data-id="google"');
-    const available = screen("viewSources()", { connections: [{ id: "google", available: true, state: "waiting" }] });
-    expect(available).toContain('data-action="connection-sync" data-id="google"');
-    expect(available).toContain('data-connector="google"');
-    expect(available).toContain('<b>Gmail</b>');
-    expect(available).not.toContain("Google Calendar");
+  it("omits the Google email connector from Sources and setup even if a server advertises it", () => {
+    const sources = screen("viewSources()", { connections: [{ id: "google", available: true, state: "waiting" }] });
+    expect(sources).not.toContain('data-connector="google"');
+    expect(sources).not.toContain('data-action="connection-sync" data-id="google"');
+    expect(sources).not.toContain("Gmail");
+    for (const kind of ["trading", "restaurant", "services", "other"]) {
+      const setup = screen(`app.setup.kind = '${kind}'; viewSetup()`);
+      expect(setup).not.toContain('data-action="pick" data-id="google"');
+      expect(setup).not.toContain("Gmail");
+    }
   });
 
   it("disables planned setup choices and ignores attempts to select them", async () => {

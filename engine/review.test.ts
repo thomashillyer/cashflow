@@ -18,6 +18,7 @@ const profile: Profile = {
   displayName: "Test Co",
   baseCurrency: "USD",
   horizonWeeks: 13,
+  assumeSettledBeforeWeeks: 520,   // these cases exercise overdue flags on old dates; the assumed-paid rule has its own tests
   freeCashLookaheadWeeks: 6,
   defaultLagDays: 0,
   lagShrinkageK: 3,

@@ -3,6 +3,7 @@
   "displayName": "Trading and import",
   "baseCurrency": "USD",
   "horizonWeeks": 13,
+  "assumeSettledBeforeWeeks": 1,
   "freeCashLookaheadWeeks": 6,
   "defaultLagDays": 20,
   "lagShrinkageK": 3,

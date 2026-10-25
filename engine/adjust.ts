@@ -238,7 +238,8 @@ export function adjust(events: CashEvent[], scenario: Scenario, ctx: Ctx): CashE
     }
   }
 
-  for (const o of scenario.overrides) out = applyOverride(out, o, ctx);
+  // stillOpen overrides are markers read by forecast() (no line changes), so they never warn as unmatched.
+  for (const o of scenario.overrides) if (!o.change.stillOpen) out = applyOverride(out, o, ctx);
 
   for (const l of scenario.levers ?? []) {
     if (l.kind === "ask_advance") {

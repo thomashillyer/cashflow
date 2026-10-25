@@ -33,6 +33,7 @@ export type Profile = {
     nonDeferrable?: true;             // payroll, taxes: never offered as a defer lever
   }[];
   leadTimes?: { transitDays?: number; productionDays?: number };
+  assumeSettledBeforeWeeks?: number;  // open invoices/bills due before the Monday this many weeks before asOf's week are assumed paid (default 1) unless the owner marks them still open
   thresholds: {
     idleBalanceOver?: { amount: number; minWeeks: number };
     arConcentrationPct?: number;      // omit to disable the check

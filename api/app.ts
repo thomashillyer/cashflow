@@ -3,7 +3,7 @@
 // service-role read or write. Nothing here sends a message, pays a bill or moves money.
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { HttpError, sendError, type NeriRequest, type User } from "./http";
@@ -88,7 +88,7 @@ const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals", "/rules",
-  "/notes", "/plans", "/balance", "/work-items", "/records", "/demo", "/ask", "/overrides", "/connections", "/sources", "/evidence"];
+  "/notes", "/plans", "/balance", "/work-items", "/records", "/demo", "/ask", "/overrides", "/overdue-decision", "/connections", "/sources", "/evidence"];
 
 const isApiPath = (url: string) => {
   const path = url.split("?")[0]!;
@@ -242,7 +242,13 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       app.get("/config.js", async (_req, reply) =>
         reply.type("application/javascript; charset=utf-8").header("cache-control", "no-cache").send(served));
     }
-    await app.register(fastifyStatic, { root: opts.staticDir, prefix: "/", index: ["index.html"] });
+    await app.register(fastifyStatic, {
+      root: opts.staticDir, prefix: "/", index: ["index.html"],
+      // The sample files (app/samples/) are downloads; their README.txt stays readable in the browser.
+      setHeaders: (res, path) => {
+        if (/[\\/]samples[\\/]/.test(path) && !/README\.txt$/.test(path)) res.setHeader("content-disposition", `attachment; filename="${basename(path)}"`);
+      },
+    });
   }
   return app;
 }

@@ -70,7 +70,6 @@ export const CONNECTORS = [
   // Comms
   { id: "m365", name: "Outlook email", mark: "MS", category: "comms", availability: "live", reads: "Email messages and attachments" },
   { id: "whatsapp", name: "WhatsApp Business", mark: "WA", category: "comms", availability: "planned", reads: "Customer and supplier messages" },
-  { id: "google", name: "Gmail", mark: "G", category: "comms", availability: "live", reads: "Email messages and attachments" },
   { id: "slack", name: "Slack", category: "comms", availability: "planned", reads: "Channel and DM messages you choose" },
 
   // Documents

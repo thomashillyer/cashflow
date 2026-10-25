@@ -19,6 +19,7 @@ const app = {
   brief: null,
   review: [],
   reviewDocs: { proposals: [], storeRevision: null },
+  decisions: [],
   decidingProposal: false,
   notes: [],
   scenario: "base",
@@ -76,6 +77,7 @@ async function refresh() {
     api.mode === "live" && api.connections ? api.connections().catch(() => []) : [],
     api.mode === "live" && api.reviewProposals ? api.reviewProposals() : { proposals: [], storeRevision: null },
   ]);
+  app.decisions = api.mode === "live" && api.overrides ? await api.overrides().then((r) => (r.overrides ?? []).filter((o) => /^owner-(done|open)-/.test(o.id)), () => []) : [];
   app.ctx.safetyLine = app.brief.run.safetyLine;
   if (app.scenario === "stress") app.stressRun = await api.forecast("stress");
   if (prevThree.size) {
@@ -124,14 +126,63 @@ function forecastReview(run = app.brief.run) {
   };
 }
 
+// Overdue items the owner can settle in one tap. "Paid / done" takes the item out of the forecast and the flags;
+// "Still open" keeps it in as expected now and stops flagging it. Both are saved owner choices and can be undone.
+const OVERDUE_CODES = ["overdue_payment", "overdue_receipt"];
+function overdueTarget(run, reason) {
+  const ev = (run.events ?? []).find((e) => e.id === reason.refs[0]);
+  return ev?.commitmentId ? { commitmentId: ev.commitmentId, legIndex: ev.legIndex } : null;
+}
+function overdueButton(t, decision, label, cls = "") {
+  const leg = t.legIndex !== undefined ? ` data-leg="${t.legIndex}"` : "";
+  return `<button class="btn small ${cls}" data-action="overdue" data-decision="${decision}" data-cid="${esc(t.commitmentId)}"${leg}>${label}</button>`;
+}
+function overdueExtras(run) {
+  if (api.mode !== "live") return "";
+  const assumed = run.assumedPaid ?? [];
+  const label = (a) => `${esc(refLabel(a.commitmentId))} ${money(a.amountBase)}, due ${shortDate(a.date)}`;
+  const line = assumed.length
+    ? `<details class="assumed-paid"><summary>${assumed.length} older item${assumed.length === 1 ? "" : "s"} assumed paid. Review</summary><ul>${assumed.map((a) => `<li>${label(a)} <span class="muted">${esc(a.basis.split("; ").pop())}</span> <span class="overdue-actions">${overdueButton({ commitmentId: a.commitmentId, legIndex: a.legIndex }, "open", "Still open")}</span></li>`).join("")}</ul></details>`
+    : "";
+  const mine = (app.decisions ?? []).map((o) => {
+    const t = { commitmentId: o.target.commitmentId, legIndex: o.target.legIndex };
+    const leg = t.legIndex !== undefined ? ` data-leg="${t.legIndex}"` : "";
+    const name = refLabel(t.commitmentId) === "Source" ? humanizeId(t.commitmentId) : refLabel(t.commitmentId);
+    return `<li>${esc(name)}: marked ${o.change.exclude === true ? "paid / done" : "still open"}. <button class="linklike" data-action="overdue" data-decision="clear" data-cid="${esc(t.commitmentId)}"${leg}>Undo</button></li>`;
+  });
+  const choices = mine.length ? `<details class="assumed-paid"><summary>${mine.length} overdue choice${mine.length === 1 ? "" : "s"} you made</summary><ul>${mine.join("")}</ul></details>` : "";
+  return line + choices;
+}
+
 function forecastReviewPanel(run = app.brief.run) {
   const review = forecastReview(run);
-  if (!review) return "";
+  const extras = overdueExtras(run);
+  if (!review) return extras ? `<section class="panel forecast-review quiet" aria-label="Overdue items">${extras}</section>` : "";
+  const item = (r) => {
+    const t = api.mode === "live" && OVERDUE_CODES.includes(r.code) ? overdueTarget(run, r) : null;
+    return `<li>${esc(r.message)}${t ? ` <span class="overdue-actions">${overdueButton(t, "done", "Paid / done")}${overdueButton(t, "open", "Still open", "quiet")}</span>` : ""}</li>`;
+  };
   return `<section class="panel forecast-review" aria-label="Forecast checks">
     <h2>${esc(review.title)}</h2><p>${esc(review.message)}</p>
-    ${review.reasons.length ? `<ul>${review.reasons.map((r) => `<li>${esc(r.message)}</li>`).join("")}</ul>` : ""}
+    ${review.reasons.length ? `<ul>${review.reasons.map(item).join("")}</ul>` : ""}
+    ${extras}
     <div class="forecast-review-actions">${review.messages ? `<a class="btn small" href="#/review">Review messages</a>` : ""}${review.sources ? `<a class="btn small" href="#/sources">Check your sources</a>` : ""}</div>
   </section>`;
+}
+
+// Home keeps the checks out of the way: one quiet line under today's things that opens the full list.
+function forecastChecksCompact(run = app.brief.run) {
+  const review = forecastReview(run);
+  if (!review) return "";
+  const n = review.reasons.length;
+  return `<details class="checks">
+    <summary><span class="sunmark" aria-hidden="true"></span><span>${n ? `${n} ${n === 1 ? "item needs" : "items need"} a check` : esc(review.title.replace(/\.$/, ""))}</span><span class="checks-more">Show</span></summary>
+    <div class="checks-body">
+      <p>${esc(review.message)}</p>
+      ${n ? `<ul>${review.reasons.map((r) => `<li>${esc(r.message)}</li>`).join("")}</ul>` : ""}
+      <div class="forecast-review-actions">${review.messages ? `<a class="btn small" href="#/review">Review messages</a>` : ""}${review.sources ? `<a class="btn small" href="#/sources">Check your sources</a>` : ""}<a class="btn small quiet" href="#/details">See the numbers</a></div>
+    </div>
+  </details>`;
 }
 
 function forecastEmpty(run = app.brief.run) {
@@ -171,6 +222,7 @@ function viewEmptyForecast(title = "Add your business data") {
     <section class="panel" style="max-width:760px"><h2>No forecast yet</h2>
       <p>Upload your bank statement and books export, paste a message, or sync an available source. Review anything that needs your OK.</p>
       <a class="btn primary" href="#/sources">Add your first source</a>
+      <p class="fineprint">No files handy? <a href="/samples/"><b>Download sample files</b></a></p>
       ${waitingCount() ? `<a class="btn" href="#/review">Review imported items</a>` : ""}
     </section>${bankBalanceForm()}`;
 }
@@ -188,25 +240,32 @@ function summary() {
     const holdsUntil = addDays(run.firstBelowSafety, -1);
     // what causes the dip: the biggest outflows in the week up to the low point
     const window = run.events.filter((e) => e.direction === "out" && e.date <= low.date && e.date > addDays(low.date, -8));
-    const causes = window.sort((a, b2) => b2.amountBase - a.amountBase).slice(0, 2).map((e) => {
+    // Name each cause the way the owner knows it. Payments with no supplier name (from a note or a message)
+    // are grouped by where they came from, never shown as internal ids.
+    const named = [];
+    const unnamed = new Map();
+    for (const e of window.sort((a, b2) => b2.amountBase - a.amountBase).slice(0, 2)) {
       const rec = e.sourceRef?.record ?? "";
-      const pn = name(commitmentParty(e.commitmentId));
-      const c = app.ctx.profile?.recurring?.find((r) => r.id === rec)?.name?.toLowerCase() ?? humanizeId(rec);
-      return pn ? `${pn} (${money(e.amountBase)})` : `${c} (${money(e.amountBase)})`;
-    });
+      const label = name(commitmentParty(e.commitmentId)) ?? app.ctx.profile?.recurring?.find((r) => r.id === rec)?.name?.toLowerCase();
+      if (label) { named.push(`${label} (${money(e.amountBase)})`); continue; }
+      const sys = e.sourceRef?.system ?? "";
+      const from = sys === "owner" ? "from your notes" : ["email", "whatsapp", "crm"].includes(sys) ? "from your messages" : "you added";
+      unnamed.set(from, [...(unnamed.get(from) ?? []), money(e.amountBase)]);
+    }
+    const causes = [...named, ...[...unnamed].map(([from, amts]) => amts.length === 1 ? `a payment ${from} (${amts[0]})` : `${amts.length === 2 ? "two" : amts.length} payments ${from} (${amts.join(" and ")})`)];
     return {
       headline: holdsUntil <= run.asOf
         ? `Cash is ${money(short)} below your line right now.`
         : `Cash holds until ${shortDate(holdsUntil)}, then drops ${money(short)} below your line.`,
       sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}${causes.length ? `, when ${causes.join(" and ")} go out` : ""}.`,
-      take: review ? `${review.message}${review.reasons[0] ? ` ${review.reasons[0].message}` : ""}` : cfoTake(),
+      take: cfoTake(), // the check count lives once, in the fold-out under today's things
       tone: "short",
     };
   }
   if (review) return {
     headline: review.title,
     sub: `The current forecast shows a low point of ${money(low.amount)} on ${dayDate(low.date)}.`,
-    take: `${review.message}${review.reasons[0] ? ` ${review.reasons[0].message}` : ""}`,
+    take: null, // the headline already says it; the fold-out lists the items
     tone: "review",
   };
   const idle = b.watch.find((w) => w.warning === "idle_balance_over");
@@ -358,7 +417,8 @@ function viewToday() {
   if (forecastEmpty()) return viewEmptyForecast();
   const b = app.brief;
   const s = summary();
-  const n = b.three.length;
+  const sales = forecastEmpty() ? [] : salesActions(3 - b.three.length);
+  const n = b.three.length + sales.length;
   const waitingRev = waitingCount();
   const waitingNotes = notesWaiting();
   const waiting = [waitingRev ? `${waitingRev} ${waitingRev === 1 ? "message" : "messages"}` : "", waitingNotes ? `${waitingNotes} ${waitingNotes === 1 ? "note" : "notes"}` : ""].filter(Boolean).join(" and ");
@@ -375,15 +435,15 @@ function viewToday() {
       </div>
     </section>
 
-    ${forecastReviewPanel()}
     <section class="today-list" aria-labelledby="today-h">
       <div class="deck-head">
         <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
         ${n > 1 ? `<div class="deck-nav"><button class="deck-arrow" data-action="deck" data-dir="-1" aria-label="Previous">${arrow("left")}</button><button class="deck-arrow" data-action="deck" data-dir="1" aria-label="Next">${arrow("right")}</button></div>` : ""}
       </div>
-      ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}</ol>
-        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the forecast items above first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
+      ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}${sales.map((x, k) => salesCard(x, b.three.length + k, n)).join("")}</ol>
+        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${Array.from({ length: n }, (_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the flagged items below first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
+      ${forecastChecksCompact()}
     </section>
 
     <section class="convo" aria-label="Conversation with Neri">${app.askLog.map(turnHtml).join("")}</section>
@@ -417,6 +477,40 @@ function homeCard(i, k, n) {
     </div>
   </li>`;
 }
+// Sales moves for the days the cash list is short: open deals and quoted RFQs from the CRM (the forecast's
+// "possible" money, never in the main line). Cash actions always come first; these only fill empty slots.
+// Every figure is the forecast event's own amount and date; nothing is estimated here.
+function salesActions(limit) {
+  if (limit <= 0) return [];
+  const run = app.brief.run;
+  const byDeal = new Map();
+  for (const e of run.events ?? []) {
+    if (e.status !== "possible" || e.direction !== "in" || !e.commitmentId || e.date < run.asOf) continue;
+    if (!byDeal.has(e.commitmentId)) byDeal.set(e.commitmentId, e);
+  }
+  const partyName = (cid) => app.ctx.parties.find((p) => p.id === app.ctx.partyOf?.(cid))?.name;
+  return [...byDeal.values()]
+    .sort((a, b2) => a.date.localeCompare(b2.date) || b2.amountBase - a.amountBase)
+    .slice(0, limit)
+    .map((e) => {
+      const who = partyName(e.commitmentId);
+      const deal = (e.sourceRef?.record ?? "").replace(/\s*\(.*\)\s*$/, "") || "this deal";
+      return { id: `sales-${e.commitmentId}`, ref: e.commitmentId, who, deal, amount: e.amountBase, date: e.date, basis: e.basis };
+    });
+}
+function salesCard(s, k, n) {
+  return `
+  <li class="card sales" aria-label="Thing ${k + 1} of ${n}">
+    <p class="card-effect"><b>${money(s.amount)}</b><span>if it closes</span><em class="card-tag">Sales</em></p>
+    <h3 class="card-title">Follow up ${s.who ? `with ${esc(s.who)} ` : ""}on ${esc(s.deal)}</h3>
+    <p class="card-why">${esc(s.basis.charAt(0).toUpperCase() + s.basis.slice(1))}. Possible money: it stays off your main forecast until the deal is won.</p>
+    <div class="card-actions">
+      <span class="card-by">Expected <b>${shortDate(s.date)}</b></span>
+      <button class="src" data-action="record" data-id="${esc(s.ref)}" title="Open the deal">${esc(s.deal)}</button>
+    </div>
+  </li>`;
+}
+
 function arrow(dir) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"}"/></svg>`;
 }
@@ -766,6 +860,7 @@ function viewSources() {
   <div class="upload-band">
     <p><b>Start with a file.</b> Upload a bank statement, invoices, bills or a books export.</p>
     <label class="btn">${icon.upload}Upload a file<input type="file" accept=".csv,.xlsx,.pdf,.eml,.txt,.zip" data-change="upload" hidden /></label>
+    <p class="fineprint">No files handy? <a href="/samples/"><b>Download sample files</b></a></p>
   </div>
   ${app.ctx.business.sources.length ? `<section class="panel" style="max-width:760px;margin-block:24px"><h2>Your source records</h2>${app.ctx.business.sources.map((src) => `<p><b>${esc(src.id === "owner" ? "Owner-entered records" : src.label)}</b> — ${esc(src.state === "ok" ? src.detail || "Records imported" : "Waiting for data")}</p>`).join("")}</section>` : ""}
   ${api.mode === "live" ? bankBalanceForm() : ""}
@@ -1009,9 +1104,9 @@ const KINDS = [
 ];
 const SUGGESTED = {
   trading: ["zoho_books", "quickbooks", "bank_feed", "zoho_crm", "m365", "whatsapp"],
-  restaurant: ["quickbooks", "bank_feed", "square", "toast", "gusto", "google"],
-  services: ["quickbooks", "xero", "bank_feed", "hubspot", "gusto", "google"],
-  other: ["quickbooks", "bank_feed", "google"],
+  restaurant: ["quickbooks", "bank_feed", "square", "toast", "gusto"],
+  services: ["quickbooks", "xero", "bank_feed", "hubspot", "gusto"],
+  other: ["quickbooks", "bank_feed"],
 };
 function viewSetup() {
   const st = app.setup;
@@ -1590,6 +1685,25 @@ async function onClick(ev) {
     app.whatIf = null;
     await refresh();
     toast("Added to your forecast", `${money(t.a.proposal.amount)} on ${shortDate(t.a.proposal.date)}. Today's list is updated.`);
+    return;
+  }
+  if (a === "overdue") {
+    if (app.deciding) return;
+    app.deciding = true;
+    const cid = el.dataset.cid;
+    const leg = el.dataset.leg !== undefined ? Number(el.dataset.leg) : undefined;
+    const decision = el.dataset.decision;
+    try {
+      await api.overdueDecision(cid, leg, decision, app.reviewDocs.storeRevision);
+      await refresh();
+      if (decision === "clear") toast("Choice undone", "The item is back as Neri first saw it.");
+      else toast(decision === "done" ? "Marked paid / done" : "Kept as still open", decision === "done" ? "It is out of your forecast and checks. This is your note, not a bank record." : "It stays in your forecast as expected now.", "Undo", () => { api.overdueDecision(cid, leg, "clear", app.reviewDocs.storeRevision).then(refresh, () => {}); });
+    } catch (err) {
+      if (err.status === 409) { await refresh(); toast("Your books changed", "We reloaded. Choose again."); }
+      else toast("Couldn't save that", err.message);
+    } finally {
+      app.deciding = false;
+    }
     return;
   }
   if (a === "proposal") {
