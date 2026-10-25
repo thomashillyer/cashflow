@@ -2,9 +2,9 @@
   "key": "995985558167c438e80a6b3a52a49c8f117ff48e95b79a3db55cb6e97b8f5791",
   "promptVersion": "write_brief@1",
   "model": "claude-opus-5-5",
-  "source": "hand-authored stand-in; replace with a live run (scripts/refresh-brief-cache.ts)",
+  "source": "live",
   "output": {
     "title": "Chase Evergreen Home on INV-1187",
-    "why": "Evergreen Home's $28,000 is expected Dec 26, after your lowest week. Getting it by Dec 18 lifts your lowest point from −$5,500 to $14,000."
+    "why": "Evergreen Home's $28,000 on INV-1187 was due Dec 10 but is expected Dec 26, after your lowest week. Getting it by Dec 18 lifts your lowest point from -$5,500 to $14,000."
   }
 }
