@@ -1,0 +1,17 @@
+{
+  "key": "27ac2b8b898ecc267e873c8e784cc21fd675198668e3754797b8bf8ad53882ec",
+  "promptVersion": "extract_signal@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in for email-injection.eml (Message); replace with a live run",
+  "output": {
+    "claim": "none",
+    "reference": null,
+    "partyName": null,
+    "amountMentioned": null,
+    "newDatePhrase": null,
+    "newAmount": null,
+    "dependsOn": null,
+    "containsInstructions": true,
+    "confidence": 0.1
+  }
+}
