@@ -6,9 +6,11 @@ import type { Profile } from "../schema/profile";
 import { addDays, diffDays } from "./dates";
 import { DAILY_SALES_ID, defaultDirection, money, toBase } from "./expand";
 import type { Notes } from "./review";
+import { ENGINE_DEFAULTS, engineSettings } from "./settings";
 
-export const DEFAULT_STRESS_DELAY_DAYS = 7;
-export const DEFAULT_SPLIT_INTERVAL_DAYS = 30;
+// Defaults of profile.thresholds.stressDelayDays / splitIntervalDays; code reads engineSettings(profile).
+export const DEFAULT_STRESS_DELAY_DAYS = ENGINE_DEFAULTS.stressDelayDays;
+export const DEFAULT_SPLIT_INTERVAL_DAYS = ENGINE_DEFAULTS.splitIntervalDays;
 
 // Lever overrides can pin one event: after a split, several installments share the pattern's legIndex, so a later
 // chase/defer/pay_early must not hit them all. Internal only; the shared Override record is unchanged.
@@ -190,7 +192,7 @@ function applySplit(events: CashEvent[], l: Extract<Lever, { kind: "split" }>, c
   if (dir === "out" && e.date < ctx.asOf) return skip("overdue payment; split skipped — check whether it is already paid");
   if (l.shares.length === 1) return events;
 
-  const interval = ctx.profile.thresholds.splitIntervalDays ?? DEFAULT_SPLIT_INTERVAL_DAYS;
+  const interval = engineSettings(ctx.profile).splitIntervalDays;
   // A named overdue receipt never becomes instant cash: its first installment lands one interval after asOf.
   const start = e.date < ctx.asOf ? addDays(ctx.asOf, interval) : e.date;
   const n = l.shares.length;
@@ -251,7 +253,7 @@ export function adjust(events: CashEvent[], scenario: Scenario, ctx: Ctx): CashE
   }
 
   if (scenario.kind === "stress") {
-    const delay = ctx.profile.thresholds.stressDelayDays ?? DEFAULT_STRESS_DELAY_DAYS;
+    const delay = engineSettings(ctx.profile).stressDelayDays;
     const funding = new Set(ctx.commitments.filter((c) => c.funding).map((c) => c.id));
     // Only unsettled customer receipts still ahead of asOf are delayed. Overdue receipts stay overdue (shifting them
     // could pull them back into the horizon and make stress look better than base), and card/POS daily sales are

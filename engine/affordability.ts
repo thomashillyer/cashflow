@@ -11,8 +11,10 @@ import type { CashEvent, Commitment, Override, Records, Scenario } from "../sche
 import type { Profile } from "../schema/profile";
 import type { ForecastRun } from "../schema/forecast";
 import { forecast } from "./forecast";
+import { ENGINE_DEFAULTS, engineSettings } from "./settings";
 
-export const DEFAULT_SHARE_STEP = 0.05;
+// Default of profile engine.affordabilityStep; opts.step wins over the profile.
+export const DEFAULT_SHARE_STEP = ENGINE_DEFAULTS.affordabilityStep;
 
 type Terms = {
   currentShare: number;   // the deal's upfront share today
@@ -31,7 +33,7 @@ export type AffordabilityResult =
   | ({ kind: "not_achievable"; bestShare: 1; run: ForecastRun; lowPoint: number } & Terms);
 
 export type AffordabilityOptions = {
-  step?: number; // grid step for the share search, default 0.05
+  step?: number; // grid step for the share search; default profile engine.affordabilityStep (0.05)
 };
 
 // Basis points keep the share grid exact (no 0.1 + 0.2 drift).
@@ -144,8 +146,9 @@ export function smallestUpfrontShare(
   fxRates: Record<string, number>,
   opts: AffordabilityOptions = {},
 ): AffordabilityResult {
-  const stepBp = toBp(opts.step ?? DEFAULT_SHARE_STEP);
-  if (!(stepBp > 0 && stepBp <= BP)) throw new Error(`smallestUpfrontShare: step must be in (0, 1], got ${opts.step}`);
+  const step = opts.step ?? engineSettings(profile).affordabilityStep;
+  const stepBp = toBp(step);
+  if (!(stepBp > 0 && stepBp <= BP)) throw new Error(`smallestUpfrontShare: step must be in (0, 1], got ${step}`);
   const { base, terms, currentBp, monotone, run, atShare } = setup(records, profile, baseOverrides, dealId, asOf, fxRates);
 
   if (base.lowPoint.amount >= base.safetyLine) {

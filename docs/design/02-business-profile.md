@@ -70,6 +70,7 @@ type Profile = {
   };
   signalSources: ("email" | "whatsapp" | "crm" | "owner")[];
   vocabulary: Record<string, string>;
+  engine?: EngineTunables;            // see "Engine tunables" below; every field optional
 };
 
 type PaymentPattern = {
@@ -83,6 +84,29 @@ type Anchor = "order" | "ship" | "delivery" | "invoice" | "due" | "month_end" | 
 ```
 
 Validation: the shares of a pattern's legs must sum to 1.0.
+
+## Engine tunables (`engine`, optional)
+
+Every number the engine uses that depends on the business reads from the profile. The optional `engine` group holds the ones that do not already live in `thresholds` (`stressDelayDays`, `splitIntervalDays`, `staleAfterHours` stay there). Omit any field for its default; the defaults reproduce the engine's behavior before the group existed. Code reads them only through `engineSettings(profile)` in `engine/settings.ts`.
+
+| Field | Controls | Default |
+|---|---|---|
+| `statusConfidence.committed` / `.likely` / `.possible` | Confidence of an event by status (a commitment's own `probability` wins for `possible`; `actual` is always 1) | 0.95 / 0.7 / 0.3 |
+| `dailySalesConfidence` | Confidence of each forecast daily-sales event | 0.6 |
+| `salesHistoryDays` | Days of actual sales receipts averaged by the daily-sales model | 28 |
+| `lag.maxSamples` | Most recent paid receivables per customer used by the lag model | 12 |
+| `lag.noHistoryConfidence` | Lag confidence for a customer with no payment history (uses `defaultLagDays`) | 0.1 |
+| `lag.iqrScaleDays` | Spread that halves lag confidence: `n/(n+k) × 1/(1 + IQR/iqrScaleDays)` | 14 |
+| `lag.laggedAnchors` | Inflow-leg anchors that wait for the customer, so the customer's lag applies | `due`, `invoice`, `delivery`, `month_end` |
+| `lag.laggedTypes` | Commitment types whose inflow legs get the customer's lag | `invoice`, `sales_deal` |
+| `settlementMatchDays` | A books settlement and a bank line (same amount) this many days apart are one payment | 3 |
+| `staleFallbackDays` | Balance age that needs review when `thresholds.staleAfterHours` is not set | 7 |
+| `noSnapshotLookbackDays` | With no balance snapshot, how far back left-out actuals are reported | 90 |
+| `deferDays` | Defer lever length for a payable with no confirmed flexibility rule | 10 |
+| `affordabilityStep` | Grid step of the "smallest upfront share" search for a deal | 0.05 |
+| `urgencyScaleDays` | Ranking decay: `score = value / (1 + daysUntilNeeded / urgencyScaleDays) × confidence × relationship` | 7 |
+
+Kept as engine constants (math, not business choices): `actual` confidence 1 and owner-rule lag confidence 1, median and quartiles (0.25/0.75) in the lag model, round-half-up of lag days, the basis-point grid of the affordability search, and the three items of "three things to do today". `restaurant.json` shows `salesHistoryDays` and `dailySalesConfidence` explicitly; the other templates use the defaults.
 
 ## Starter templates to ship
 

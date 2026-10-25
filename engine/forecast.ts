@@ -9,6 +9,7 @@ import { addDays, dateRange, diffDays, mondayOf } from "./dates";
 import { expand, money, toBase } from "./expand";
 import { adjust } from "./adjust";
 import { Notes } from "./review";
+import { engineSettings } from "./settings";
 
 export const ENGINE_VERSION = "engine-1";
 
@@ -49,8 +50,6 @@ export function inputsHash(records: Records, profile: Profile, scenario: Scenari
   return createHash("sha256").update(JSON.stringify(body)).digest("hex");
 }
 
-// Balance age that needs review when the profile sets no thresholds.staleAfterHours (#44 moves this to the profile).
-const FALLBACK_STALE_DAYS = 7;
 
 export function horizonEnd(profile: Profile, asOf: string): string {
   return addDays(mondayOf(asOf), profile.horizonWeeks * 7);
@@ -72,7 +71,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 // left out, with a needs-review warning.
 // Actuals tagged to an account with no snapshot on/before asOf are left out of opening cash AND of the main line
 // (the account's starting balance is unknown, so its movements alone would mislead), with one warning per account
-// covering actuals on/after the oldest snapshot date (asOf - 90 days when there is no snapshot at all).
+// covering actuals on/after the oldest snapshot date (asOf - engine.noSnapshotLookbackDays, default 90, when there is no snapshot at all).
 export function openingCash(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: Notes): OpeningCash {
   const latest = new Map<string, Records["balances"][number]>();
   for (const b of records.balances) {
@@ -87,6 +86,7 @@ export function openingCash(records: Records, profile: Profile, asOf: string, fx
   let oldest = "";
   if (latest.size === 0) warnings.review("no_opening_balance", "No opening balance on or before the as-of date; the forecast starts from $0.00 and cannot be trusted.");
   const staleHours = profile.thresholds.staleAfterHours;
+  const { staleFallbackDays, noSnapshotLookbackDays } = engineSettings(profile);
   for (const b of [...latest.values()].sort((x, y) => (x.account < y.account ? -1 : 1))) {
     const base = toBase(b.amount, b.currency, profile, fx);
     if (base === undefined) warnings.review("missing_fx", `Balance for ${b.account} is in ${b.currency} with no FX rate; left out of opening cash.`, [b.id]);
@@ -94,12 +94,12 @@ export function openingCash(records: Records, profile: Profile, asOf: string, fx
     if (b.asOf > newest) newest = b.asOf;
     if (oldest === "" || b.asOf < oldest) oldest = b.asOf;
     if (staleHours !== undefined && diffDays(asOf, b.asOf) * 24 > staleHours) warnings.review("stale_balance", `Bank balance for ${b.account} is from ${b.asOf}, older than ${staleHours} hours; refresh before relying on this.`, [b.id]);
-    // Fallback until the profile always carries a threshold (#44): with none set, a balance older than 7 days still
-    // needs review rather than passing silently.
-    if (staleHours === undefined && diffDays(asOf, b.asOf) > FALLBACK_STALE_DAYS)
-      warnings.review("no_staleness_threshold", `Bank balance for ${b.account} is from ${b.asOf}, more than ${FALLBACK_STALE_DAYS} days old, and the profile sets no staleness threshold; refresh before relying on this.`, [b.id]);
+    // With no staleAfterHours, a balance older than engine.staleFallbackDays (default 7) still needs review rather
+    // than passing silently.
+    if (staleHours === undefined && diffDays(asOf, b.asOf) > staleFallbackDays)
+      warnings.review("no_staleness_threshold", `Bank balance for ${b.account} is from ${b.asOf}, more than ${staleFallbackDays} days old, and the profile sets no staleness threshold; refresh before relying on this.`, [b.id]);
   }
-  const windowStart = latest.size > 0 ? oldest : addDays(asOf, -90);
+  const windowStart = latest.size > 0 ? oldest : addDays(asOf, -noSnapshotLookbackDays);
   const only = latest.size === 1 ? [...latest.keys()][0] : undefined;
   const signed = (e: CashEvent, base: number) => (e.direction === "in" ? base : -base);
   const orphans = new Map<string, { n: number; net: number; noFx: number; ids: string[] }>();
