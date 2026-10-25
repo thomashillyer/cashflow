@@ -330,6 +330,11 @@ create table aliases (
 --     do their own scoping. search_path is empty and every name is schema-qualified,
 --     so a caller cannot shadow a table or function.
 --
+-- Later migrations: new tables and functions are NOT reachable by anon/authenticated
+-- (the default privileges are revoked at the end of this file). Every new table needs an
+-- explicit grant select plus a hackathon_read_synthetic-style policy, and every new RPC
+-- needs an explicit grant execute and its own synthetic-scope check.
+--
 -- Anyone holding the public anon key can still call confirm_change_proposal on a
 -- synthetic business, so one visitor can confirm another visitor's pending proposals.
 -- Per-session isolation (docs/TECHNICAL_PLAN.md section 9) is a TODO. Before any real
@@ -465,7 +470,7 @@ begin
   select store_revision into v_revision from public.businesses
    where id = p_business_id
      and (is_synthetic or public.is_service_caller())
-   for update;
+   for no key update;  -- not "for update": that would block child-table inserts (FK key share locks)
   if not found then
     raise exception 'NOT_FOUND' using errcode = 'PT404';
   end if;

@@ -39,7 +39,7 @@ describe("row mappers", () => {
       ...row, pattern_id: null, probability: null, category: null, funding: null,
       created_at: "2026-10-25T18:00:00+00:00", source_system: "zoho_books", source_record: "INV-1187",
     };
-    expect(fromRow<Commitment>(fromDb)).toEqual(c);
+    expect(fromRow<Commitment>(fromDb, "commitments")).toEqual(c);
   });
 
   it("round-trips an unmatched bank actual (no commitmentId)", () => {
@@ -62,7 +62,7 @@ describe("row mappers", () => {
       ...row, commitment_id: null, category: null,
       created_at: "2026-10-25T18:00:00+00:00", source_system: "bank_csv", source_record: "a1b2c3",
     };
-    expect(fromRow<CashEvent>(fromDb)).toEqual(e);
+    expect(fromRow<CashEvent>(fromDb, "cash_events")).toEqual(e);
   });
 
   it("round-trips Evidence with file metadata", () => {
@@ -86,7 +86,7 @@ describe("row mappers", () => {
       ...row, url: null, created_at: "2026-10-25T18:00:00+00:00", source_system: "email", source_record: "x",
       received_at: "2026-11-27T00:42:10.123456+00:00",  // what PostgREST returns for timestamptz
     };
-    expect(fromRow<Evidence>(fromDb)).toEqual(ev);
+    expect(fromRow<Evidence>(fromDb, "evidence")).toEqual(ev);
   });
 
   it("keeps created_at on change_proposals (ChangeProposal.createdAt) and normalizes timestamps", () => {

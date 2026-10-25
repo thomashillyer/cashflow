@@ -73,7 +73,21 @@ export async function loadRecords(db: SupabaseClient, businessId: string): Promi
   };
 }
 
-export const upsertParties = (db: SupabaseClient, b: string, r: Party[]) => upsert(db, TABLES.parties, b, r);
+// Service-role only: create (or update) a business. is_synthetic must be passed explicitly;
+// only synthetic businesses are visible to the anon key.
+export async function upsertBusiness(
+  db: SupabaseClient, b: { id: string; name: string; profile?: object; isSynthetic: boolean },
+): Promise<void> {
+  const { error } = await db.from("businesses").upsert(
+    { id: b.id, name: b.name, ...(b.profile ? { profile: b.profile } : {}), is_synthetic: b.isSynthetic },
+    { onConflict: "id" },
+  );
+  if (error) throw new Error(`upsert business ${b.id}: ${error.message}`);
+}
+
+// The individual upsertX helpers below do NOT bump the business revision. For imports and
+// fixtures use upsertRecords, so open proposals computed before the write go stale.
+export const upsertParties =(db: SupabaseClient, b: string, r: Party[]) => upsert(db, TABLES.parties, b, r);
 export const upsertCommitments = (db: SupabaseClient, b: string, r: Commitment[]) => upsert(db, TABLES.commitments, b, r);
 export const upsertCashEvents = (db: SupabaseClient, b: string, r: CashEvent[]) => upsert(db, TABLES.events, b, r);
 export const upsertSignals = (db: SupabaseClient, b: string, r: Signal[]) => upsert(db, TABLES.signals, b, r);

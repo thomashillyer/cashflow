@@ -46,9 +46,9 @@ export function toRow<T extends object>(record: T, businessId: string): Row {
 }
 
 // Nulls become absent so optional fields read back as undefined, matching the types.
-// Pass the table name so per-table DB-only columns are stripped correctly.
-export function fromRow<T>(row: Row, table?: string): T {
-  const dbOnly = (table && DB_ONLY[table]) || DB_ONLY_DEFAULT;
+// The table name is required: created_at is stripped everywhere except change_proposals.
+export function fromRow<T>(row: Row, table: string): T {
+  const dbOnly = DB_ONLY[table] ?? DB_ONLY_DEFAULT;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(row)) {
     if (dbOnly.has(k) || v === null) continue;
