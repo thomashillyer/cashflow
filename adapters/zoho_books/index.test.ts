@@ -118,6 +118,16 @@ describe("pullZoho", () => {
     expect(r.data.settlements.some((s) => s.sourceRef.record.startsWith("va"))).toBe(false);
   });
 
+  it("a payment whose detail cannot be read is not reported as unallocated", async () => {
+    const base = fakeZoho().fetch;
+    const f: Fetch = async (url, init) => (/vendorpayments\/va1/.test(url) ? { status: 404, json: async () => ({}) } : base(url, init));
+    const r = await pullZoho({ region: "com", token, now: NOW, fetch: f });
+    // A failed detail read stops payment history (a plain warning), and invents no unallocated payment.
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.unallocatedPayments.map((u) => u.providerId)).not.toContain("va1");
+    expect(r.data.diagnostics.warnings.join(" ")).toMatch(/Payment history could not be fully read|Only the first/);
+  });
+
   it("a repeat pull is unchanged evidence, and an edited invoice supersedes", async () => {
     const first = await pullZoho({ region: "com", token, now: NOW, fetch: fakeZoho().fetch });
     if (!first.ok) throw new Error("expected ok");

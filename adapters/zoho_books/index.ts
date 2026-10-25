@@ -96,7 +96,9 @@ async function pull(input: ZohoPullInput): Promise<ZohoPull> {
       const pparty = str(pay[isIn ? "customer_id" : "vendor_id"]);
       const pname = str(pay[isIn ? "customer_name" : "vendor_name"]);
       payments.push({
-        providerId, date, kind, amount: detail?.amount ?? pay.amount, ...(pcur ? { currency: pcur } : {}),
+        providerId, date, kind, amount: detail?.amount ?? pay.amount, appliedKnown: detail !== undefined,
+        ...(detail?.unused_amount !== undefined || pay.unused_amount !== undefined ? { unapplied: detail?.unused_amount ?? pay.unused_amount } : {}),
+        ...(pcur ? { currency: pcur } : {}),
         ...(pparty ? { partyId: pparty } : {}), ...(pname ? { partyName: pname } : {}),
         applied: applied.map((a) => ({
           kind, ...(str(a[isIn ? "invoice_id" : "bill_id"]) ? { docProviderId: str(a[isIn ? "invoice_id" : "bill_id"])! } : {}),

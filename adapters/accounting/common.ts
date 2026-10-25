@@ -36,6 +36,8 @@ export type AccountingPayment = {
   date: string;                    // YYYY-MM-DD, actual paid date
   kind?: DocKind;                  // which side, when the payment applied to nothing
   amount?: unknown;                // the payment's full amount, when the provider states it
+  unapplied?: unknown;             // the provider's own "unapplied/unused amount": preferred over subtracting
+  appliedKnown?: boolean;          // true only when `applied` is the complete list (the detail was read)
   currency?: string;
   partyId?: string;
   partyName?: string;
@@ -180,15 +182,27 @@ export function buildAccounting(input: AccountingBuildInput): AccountingImport {
   const unallocatedPayments: UnallocatedPayment[] = [];
   const history = new Map<string, AccountingImport["paymentHistory"][number]>();   // one row per invoice: the date it was fully paid
   for (const p of input.payments) {
-    // Whatever a payment did not apply to a document stays visible as an unallocated payment.
-    if (p.amount !== undefined && p.currency) {
-      const total = toMinor(p.amount, p.currency);
-      const applied = p.applied.reduce((n, a) => n + (toMinor(a.amount, p.currency!) ?? 0), 0);
+    // Whatever a payment did not apply to a document stays visible as an unallocated payment. Only from
+    // the provider's own unapplied amount, or from a complete applied list in one currency: never
+    // inferred from a failed read, an unparseable line, or a mix of currencies.
+    if (p.currency) {
       const kind = p.applied[0]?.kind ?? p.kind;
-      if (total !== undefined && total - applied > 0 && kind) {
+      let left: number | undefined;
+      if (p.unapplied !== undefined) {
+        left = toMinor(p.unapplied, p.currency);
+      } else if (p.amount !== undefined && p.appliedKnown) {
+        const total = toMinor(p.amount, p.currency);
+        const parts = p.applied.map((a) => toMinor(a.amount, p.currency!));
+        const mixed = p.applied.some((a) => {
+          const t = byProviderId.get(`${a.kind}:${a.docProviderId ?? ""}`) ?? byProviderId.get(`${a.kind}:${a.docNumber ?? ""}`);
+          return t !== undefined && t.currency !== p.currency;
+        });
+        if (total !== undefined && !mixed && parts.every((x): x is number => x !== undefined)) left = total - parts.reduce((n, x) => n + x, 0);
+      }
+      if (left !== undefined && left > 0 && kind) {
         unallocatedPayments.push({
           id: `unalloc-${system}-${segment(p.providerId)}`, system, providerId: p.providerId, direction: kind === "invoice" ? "in" : "out",
-          date: p.date, amount: total - applied, currency: p.currency,
+          date: p.date, amount: left, currency: p.currency,
           ...(p.partyId ? { partyId: `party-${system}-${segment(p.partyId)}` } : {}), ...(p.partyName ? { partyName: p.partyName } : {}),
         });
       }
