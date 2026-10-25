@@ -134,6 +134,18 @@ describe("production uses the owner's data", () => {
     expect(syncConnection).not.toHaveBeenCalled();
   });
 
+  it("reports HTTP-200 partial message failures without claiming a completed sync", async () => {
+    const syncConnection = vi.fn().mockResolvedValue({ connection: { state: "error", message: "Two messages could not be interpreted." }, counts: { proposals: 1, signals: 0, failed: 2, evidence: 3 } });
+    const reports = await screen(`render = () => {}; closeSheet = () => {}; refresh = async () => {}; const reports = []; toast = (...args) => reports.push(args);
+      (async () => { await onClick({ target: { closest: () => ({ dataset: { action: 'connection-sync', id: 'outlook' } }) } }); return reports; })()`, {
+      api: { syncConnection }, connections: [{ id: "outlook", available: true }],
+    });
+    expect(reports[0][0]).toBe("Some source records need attention");
+    expect(reports[0][1]).toContain("1 imported item is waiting for review");
+    expect(reports[0][1]).toContain("Two messages could not be interpreted");
+    expect(reports[0][0]).not.toBe("Source sync completed");
+  });
+
   it("clears sync progress and reports no success when a real sync fails", async () => {
     const syncConnection = vi.fn().mockRejectedValue(new Error("Provider unavailable"));
     const output = screen(`render = () => {}; closeSheet = () => {}; const reports = []; toast = (...args) => reports.push(args);

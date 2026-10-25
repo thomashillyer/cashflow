@@ -1635,7 +1635,13 @@ async function onClick(ev) {
       const result = await api.syncConnection(id);
       await refresh();
       const pending = (result.counts?.proposals ?? 0) + (result.counts?.signals ?? 0);
-      toast("Source sync completed", pending ? `${pending} imported ${pending === 1 ? "item is" : "items are"} waiting for your review.` : result.summary?.written === false ? "No new or changed records were found." : "Open Review to check anything that needs your OK.", "Open Review", () => (location.hash = "#/review"));
+      const incomplete = result.connection?.state === "error" || (result.counts?.failed ?? 0) > 0 || (result.counts?.rejected ?? 0) > 0;
+      const hasData = pending > 0 || (result.counts?.commitments ?? 0) > 0 || (result.counts?.settlements ?? 0) > 0;
+      const title = incomplete ? (hasData ? "Some source records need attention" : "Source sync needs attention") : "Source sync completed";
+      const detail = incomplete
+        ? `${pending ? `${pending} imported ${pending === 1 ? "item is" : "items are"} waiting for review. ` : ""}${result.connection?.message || "Some source records could not be read. Check the source and try again."}`
+        : pending ? `${pending} imported ${pending === 1 ? "item is" : "items are"} waiting for your review.` : result.summary?.written === false ? "No new or changed records were found." : "Open Review to check anything that needs your OK.";
+      toast(title, detail, "Open Review", () => (location.hash = "#/review"));
     } finally {
       app.syncing = null;
       render();
