@@ -52,6 +52,7 @@ const app = await buildApp({
   // Ask Neri alone may use live Claude on the demo (cache first, capped per hour):
   // fly secrets set ANTHROPIC_API_KEY=... NERI_ASK_MODE=live
   ...(env.ANTHROPIC_API_KEY && env.NERI_ASK_MODE === "live" ? { askMode: "live" as const } : {}),
+  ...(env.NERI_ASK_MODEL?.trim() ? { askModel: env.NERI_ASK_MODEL.trim() } : {}), // default ASK_LIVE_MODEL
   askLive: { maxPerHour: Number(env.NERI_ASK_LIVE_MAX_PER_HOUR) > 0 ? Number(env.NERI_ASK_LIVE_MAX_PER_HOUR) : 200 },
   staticDir: env.NERI_STATIC_DIR ?? join(import.meta.dirname, "../app"),
   ...(demoMode || (env.SUPABASE_URL && env.SUPABASE_ANON_KEY)

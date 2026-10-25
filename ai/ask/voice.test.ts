@@ -144,7 +144,8 @@ describe("voice in live mode: checks, one retry, then the code-built voice", () 
     expect(requests).toHaveLength(1);
     expect(requests[0].output_config.format.type).toBe("json_schema");
     expect(requests[0].messages[0].content).toContain("<facts>");
-    expect(readCache(ctx.cacheDir!, voiceCacheKey(harbor, base))?.source).toBe("live");
+    expect(requests[0].model).toBe("claude-sonnet-5-5");
+    expect(readCache(ctx.cacheDir!, voiceCacheKey(harbor, { ...base, model: "claude-sonnet-5-5" }))?.source).toBe("live");
     // The second call is a cache hit.
     const again = await voice(harbor, { ...ctx, client: fakeClient([new Error("no calls expected")]).client });
     expect(again.usedFallback).toBe(false);

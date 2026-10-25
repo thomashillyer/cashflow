@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import { describe, expect, it, vi } from "vitest";
+import { ASK_LIVE_MODEL } from "../ai/config";
 import { buildApp, type AppOptions } from "./app";
 import { loadSamples } from "./demo";
 import { MemoryStore } from "./store";
@@ -55,6 +56,27 @@ describe("live Ask Neri", () => {
     expect(res.statusCode).toBe(200);
     expect(s.create).toHaveBeenCalled();
     expect(res.json().proposal).toMatchObject({ kind: "plan", amount: 1200000 });
+  });
+
+  it("cache miss sends the Sonnet model on every call; a hit sends nothing", async () => {
+    const s = stub(async () => reply);
+    const app = await appWith({ aiMode: "cache_only", askMode: "live", askClient: s.client, tempCache: true });
+    await ask(app, NOVEL);
+    expect(s.create.mock.calls.length).toBeGreaterThan(0);
+    for (const [body] of s.create.mock.calls) expect((body as { model: string }).model).toBe("claude-sonnet-5-5");
+    expect(ASK_LIVE_MODEL).toBe("claude-sonnet-5-5");
+    const hit = stub(async () => reply);
+    const cached = await appWith({ askMode: "live", askClient: hit.client });
+    expect((await ask(cached, SUGGESTED)).statusCode).toBe(200);
+    expect(hit.create).not.toHaveBeenCalled();
+  });
+
+  it("askModel (NERI_ASK_MODEL) overrides the live model", async () => {
+    const s = stub(async () => reply);
+    const app = await appWith({ aiMode: "cache_only", askMode: "live", askClient: s.client, tempCache: true, askModel: "claude-haiku-5-5" });
+    await ask(app, NOVEL);
+    expect(s.create.mock.calls.length).toBeGreaterThan(0);
+    for (const [body] of s.create.mock.calls) expect((body as { model: string }).model).toBe("claude-haiku-5-5");
   });
 
   it("client throws: deterministic answer, status 200", async () => {
