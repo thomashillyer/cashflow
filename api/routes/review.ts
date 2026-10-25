@@ -128,6 +128,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   app.post("/import/:adapter", async (req) => {
     const b = businessOf(req);
+    // On the public demo the samples are shared: an upload would publish the file to every visitor, signed in or not.
+    if (b.isSynthetic && deps.demoMode) throw new HttpError(403, "FORBIDDEN", "The sample already has its documents. Set up your business to upload your own files.");
     const { adapter } = req.params as { adapter: string };
     const input = toInput(adapter, (req.body ?? {}) as Record<string, unknown>, nowIso());
     const { records, storeRevision } = await deps.store.load(b.id);

@@ -11,11 +11,7 @@ RUN npm ci --include=dev --ignore-scripts && npm cache clean --force
 
 COPY . .
 
-# The committed app/config.js stays empty (the public static preview deploys it). In this image the API serves
-# the app, so switch the app to live mode against the same origin.
-RUN sed -i 's/^window\.NERI_API_BASE = "";/window.NERI_API_BASE = "same-origin";/' app/config.js \
- && grep -q 'NERI_API_BASE = "same-origin"' app/config.js
-
+# The server serves app/config.js live (same-origin API + public Supabase values from env); see api/app.ts.
 ENV HOST=0.0.0.0 PORT=8080
 EXPOSE 8080
 USER node
