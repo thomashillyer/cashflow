@@ -34,6 +34,7 @@ import { extractScan } from "./extract/scan";
 import { classifySheet, documentToCandidate, tableToCandidates, type ColumnMapping, type SheetContent } from "./extract/sheet";
 import { extractSignals } from "./extract/signals";
 import type { SourceSegment } from "./normalize";
+import { humanizeId } from "./labels";
 import { propose } from "./reconcile/match";
 import { nameSimilarity, nameTokens, resolveParty } from "./reconcile/parties";
 
@@ -630,6 +631,6 @@ function linkMessageToCommitment(
     action: "link",
     targetCommitmentId: target.id,
     ops: [{ op: "linkEvidence", commitmentId: target.id, evidenceIds: fresh }],
-    reasons: [...proposal.reasons, `The message is about ${target.reference ?? target.id}; confirm to keep it with that invoice as evidence (no cash change).`].filter((r) => !r.startsWith("Message updates")),
+    reasons: [...proposal.reasons, `The message is about ${target.reference ?? humanizeId(target.id)}; confirm to keep it with that invoice as evidence (no cash change).`].filter((r) => !r.startsWith("Message updates")),
   };
 }

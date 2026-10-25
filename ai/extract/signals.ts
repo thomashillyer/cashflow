@@ -18,6 +18,7 @@ import type { Commitment, Records, Signal, SignalClaim } from "../../schema/reco
 import { cacheKey, DEFAULT_CACHE_DIR, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
 import { EXTRACTION_MODEL, SIGNAL_PROMPT_VERSION } from "../config";
 import { locateQuote, parseAmount, parseDate } from "../normalize";
+import { humanizeId } from "../labels";
 import { resolveParty, type PartyHint } from "../reconcile/parties";
 import type { BundleMessage, MessageBundle } from "./message";
 
@@ -385,7 +386,7 @@ export function toSignal(
         const n = parseAmount(amountMentioned.value, c.currency);
         return n !== undefined && basis(c) > 0 && Math.abs(n - basis(c)) <= basis(c) * 0.02;
       });
-      candidates = hits.map((c) => ({ commitmentId: c.id, reasons: [`same party; amount ${amountMentioned.value} is within 2% of ${c.reference ?? c.id}`] }));
+      candidates = hits.map((c) => ({ commitmentId: c.id, reasons: [`same party; amount ${amountMentioned.value} is within 2% of ${c.reference ?? humanizeId(c.id)}`] }));
     }
     // Tier 3 is for messages that name no invoice; a stated reference that matches nothing is not fixed by guessing.
     if (!candidates.length && partyId && pool.length && !reference) {

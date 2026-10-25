@@ -23,7 +23,10 @@ import type { Commitment, Lever, Party, Records, WorkItem } from "../schema/reco
 import { BRIEF_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "./cache";
 import { BRIEF_MODEL, BRIEF_PROMPT_VERSION, DRAFT_MODEL, DRAFT_PROMPT_VERSION } from "./config";
 import { toBase } from "../engine/expand";
+import { fmtDate } from "./labels";
 import { fmtMoney, fmtWithBase } from "./money";
+
+export { fmtDate };
 import { allowedFromToolResults, checkText, extractDates, type Allowed, type CheckOpts } from "./number_check";
 
 export { fmtMoney } from "./money";
@@ -226,15 +229,6 @@ export function draftFacts(f: Facts): DraftFacts {
 
 // ---------------------------------------------------------------------------
 // Formatting for code-built text
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-// "2026-12-18" -> "Dec 18"; "Jan 8, 2027" when the year differs from asOf's.
-export function fmtDate(iso: string, asOf: string): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const base = `${MONTHS[(m ?? 1) - 1]} ${d}`;
-  return iso.slice(0, 4) === asOf.slice(0, 4) ? base : `${base}, ${y}`;
-}
 
 // ---------------------------------------------------------------------------
 // Deterministic fallbacks (code only; no model)
