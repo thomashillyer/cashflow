@@ -23,6 +23,7 @@ const app = {
   stressRun: null,
   whatIf: null,
   askLog: [],
+  attach: [], // files the owner added in the Ask bar, waiting to be sent
   mask: false,
   fresh: new Set(),
   noteFilter: "all",
@@ -448,9 +449,12 @@ function spokenLength() {
 }
 
 function askBar(placeholder, hints = [], branded = false) {
-  return `
+  const files = branded && app.attach.length
+    ? `<ul class="attach-list" aria-label="Files to send">${app.attach.map((f, k) => `<li class="attach-chip"><span>${esc(f.name)}</span><button type="button" data-action="unattach" data-k="${k}" aria-label="Remove ${esc(f.name)}">×</button></li>`).join("")}</ul>`
+    : "";
+  return `${files}
   <form class="askbar ${branded ? "branded" : ""}" data-submit="ask">
-    ${branded ? `<span class="ask-mark" aria-hidden="true">${logo}</span>` : ""}
+    ${branded ? `<label class="attach-btn" title="Add photos or files"><span class="sr">Add photos or files</span>${icon.plus}<input type="file" multiple accept="image/*,.pdf,.csv,.xlsx,.xls,.doc,.docx,.eml,.txt" data-change="attach" hidden /></label>` : ""}
     <label class="sr" for="askq">Ask Neri</label>
     <input id="askq" name="q" placeholder="${esc(placeholder)}" autocomplete="off" />
     ${canListen ? `<button type="button" class="mic" data-action="mic-ask" aria-pressed="${app.stopListen ? "true" : "false"}" title="Speak">${icon.mic}<span class="sr">Speak</span></button>` : ""}
@@ -1208,6 +1212,38 @@ function readingSentence(n) {
 }
 
 // ---------------------------------------------------------------- actions
+// Re-render without losing what the owner was typing in the Ask bar.
+function keepTyped(fn) {
+  const typed = $("#askq")?.value ?? "";
+  fn();
+  const box = $("#askq");
+  if (box && typed) box.value = typed;
+}
+
+// Files from the Ask bar's + or an Upload button. The server reads them and anything that could move cash
+// waits in Review; the preview has no server, so it says so instead of pretending.
+async function sendFiles(files) {
+  const label = files.length === 1 ? files[0].name : `${files.length} files`;
+  if (api.mode === "preview") {
+    toast(`${label} not read`, "This preview runs on sample data, so files stay in your browser. On your Neri server they're read and wait in Review.");
+    return;
+  }
+  let sent = 0;
+  for (const f of files) {
+    try {
+      await api.uploadFile(f);
+      sent++;
+    } catch (e) {
+      toast(`${f.name} wasn't read`, e.message);
+    }
+  }
+  if (sent) {
+    app.review = await api.review().catch(() => app.review);
+    toast(sent === files.length ? `${label} read` : `${sent} of ${files.length} files read`, "Anything that could move your cash is waiting in Review.", "Open Review", () => (location.hash = "#/review"));
+    render();
+  }
+}
+
 async function doAsk(q, via = "typed") {
   q = q.trim();
   if (!q) return;
@@ -1373,6 +1409,10 @@ async function onClick(ev) {
   if (a === "listen") return toggleListen();
   if (a === "drive") return openDrive();
   if (a === "drive-close") return closeDrive();
+  if (a === "unattach") {
+    app.attach.splice(Number(el.dataset.k), 1);
+    return keepTyped(render);
+  }
   if (a === "mic-ask") return startCapture("ask");
   if (a === "mic-note") return startCapture("note");
   if (a === "mic-drive") return startCapture("drive");
@@ -1495,7 +1535,16 @@ async function onSubmit(ev) {
   if (!f) return;
   ev.preventDefault();
   const kind = f.dataset.submit;
-  if (kind === "ask") return doAsk(new FormData(f).get("q") ?? "");
+  if (kind === "ask") {
+    const q = new FormData(f).get("q") ?? "";
+    if (app.attach.length) {
+      const files = app.attach;
+      app.attach = [];
+      await sendFiles(files);
+      if (!String(q).trim()) return render();
+    }
+    return doAsk(q);
+  }
   if (kind === "talk-typed") {
     const q = String(new FormData(f).get("q") ?? "");
     closeTalk();
@@ -1569,10 +1618,17 @@ async function onChange(ev) {
     await load();
     return;
   }
-  if (el.dataset.change === "upload") {
-    const file = el.files?.[0];
-    if (file) toast(`${file.name} received`, api.mode === "preview" ? "This preview uses sample data, so the file isn't imported. On your Neri server it goes to Review first." : "Reading it now. New items will wait in Review.");
+  if (el.dataset.change === "attach") {
+    app.attach.push(...Array.from(el.files ?? []));
     el.value = "";
+    keepTyped(render);
+    $("#askq")?.focus();
+    return;
+  }
+  if (el.dataset.change === "upload") {
+    const files = Array.from(el.files ?? []);
+    el.value = "";
+    if (files.length) await sendFiles(files);
     return;
   }
   if (el.dataset.noteField) {

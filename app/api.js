@@ -142,6 +142,10 @@ const preview = {
   async setSafetyLine(cents) {
     engine.setSafetyLine(cents);
   },
+  // The preview has no server, so files stay in this browser and are never read.
+  async uploadFile() {
+    return { preview: true };
+  },
   // Parked thoughts (owner notes). Neri proposes a reading; owner confirms before it touches cash.
   async notes() {
     return engine.thoughts();
@@ -257,6 +261,13 @@ const live = {
   // null for an id the books don't have, so the "Not found" sheet shows.
   async record(id) {
     return http(`/records/${encodeURIComponent(id)}`).catch((e) => (e.status === 404 ? null : Promise.reject(e)));
+  },
+  // Sends one file to the server's import route; anything it finds waits in Review for the owner's OK.
+  async uploadFile(file) {
+    const buf = new Uint8Array(await file.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+    return http("/import/upload", { method: "POST", body: JSON.stringify({ fileName: file.name, base64: btoa(bin) }) });
   },
   async setSafetyLine(cents) {
     return http("/profile", { method: "PUT", body: JSON.stringify({ safetyLine: { kind: "fixed", amount: cents } }) });
