@@ -66,6 +66,15 @@
       "notes": [
         "Quality issues last year"
       ]
+    },
+    {
+      "id": "party-cascade-customs",
+      "name": "Cascade Customs Brokerage",
+      "kind": "supplier",
+      "tags": [],
+      "notes": [
+        "Bills duties and landing costs when a container clears"
+      ]
     }
   ],
   "commitments": [
@@ -478,8 +487,8 @@
       "amount": 1200000,
       "currency": "USD",
       "anchors": {
-        "invoice": "2026-11-20",
-        "due": "2026-12-20"
+        "invoice": "2026-11-24",
+        "due": "2026-12-24"
       },
       "status": "committed",
       "outstanding": 1200000,
@@ -554,6 +563,7 @@
       "type": "bill",
       "direction": "out",
       "reference": "DUTIES-2291",
+      "partyId": "party-cascade-customs",
       "category": "duties",
       "amount": 900000,
       "currency": "USD",
@@ -564,7 +574,7 @@
       "settlement": "open",
       "sourceRef": {
         "system": "generic_file",
-        "record": "po-2291.pdf"
+        "record": "broker-inv-2291.pdf"
       }
     },
     {

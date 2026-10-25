@@ -92,6 +92,12 @@ describe.each(names)("fixture %s", (name) => {
     expect(s.lowPoint.amount).toBeLessThanOrEqual(b.lowPoint.amount);
   });
 
+  it("source-system commitments have a unique (system, record) source, as the database requires", () => {
+    const keyed = records.commitments.filter((c) => ["zoho_books", "bank_csv", "generic_file"].includes(c.sourceRef.system));
+    const keys = keyed.map((c) => `${c.sourceRef.system}|${c.sourceRef.record}`);
+    expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
+  });
+
   it("simulate leaves the base untouched", () => {
     const c = records.commitments.find((x) => x.direction === "out" && x.settlement !== "paid");
     if (!c) return;
@@ -133,13 +139,18 @@ describe.each(names)("fixture %s", (name) => {
       expect(sig.state).toBe("proposed");
       const moved = (r: Records) => forecast(r, profile, base, meta.asOf, meta.fxRates).events.find((e) => e.commitmentId === expected.signal.commitmentId)!;
       expect(moved(records).overriddenBy ?? []).not.toContain(sig.id);
-      const applied = moved({ ...records, signals: records.signals.map((s) => (s.id === sig.id ? { ...s, state: "applied" as const } : s)) });
+      const withApplied: Records = { ...records, signals: records.signals.map((s) => (s.id === sig.id ? { ...s, state: "applied" as const } : s)) };
+      const applied = moved(withApplied);
       expect(applied.date).toBe(expected.signal.newDate);
       expect(applied.overriddenBy).toContain(sig.id);
       expect(sig.sourceRef.excerpt?.text).toBeTruthy();
       const eff = signalEffect(records, profile, [], sig.id, meta.asOf, meta.fxRates)!;
       const appliedRun = forecast({ ...records, signals: records.signals.map((s) => (s.id === sig.id ? { ...s, state: "applied" as const } : s)) }, profile, base, meta.asOf, meta.fxRates);
       expect(eff).toEqual({ lowPointDelta: appliedRun.lowPoint.amount - run().lowPoint.amount, week: appliedRun.lowPoint.week });
+      if (expected.signal.deepensLowPoint) {
+        const after = forecast(withApplied, profile, base, meta.asOf, meta.fxRates).lowPoint.amount;
+        expect(after, "applying the signal lowers the low point").toBeLessThan(run().lowPoint.amount);
+      }
     });
   }
 

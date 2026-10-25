@@ -132,6 +132,13 @@ if (($userPath -split ';') -notcontains $BinDir) {
   Ok "$BinDir is already on your PATH"
 }
 
+# Enable the repo's pre-push hook (blocks pushes to main) when this script runs from the repo checkout.
+$RepoDir = Split-Path -Parent $PSScriptRoot
+if ((Get-Command git -ErrorAction SilentlyContinue) -and (Test-Path (Join-Path $RepoDir 'scripts\hooks\pre-push'))) {
+  git -C "$RepoDir" config core.hooksPath scripts/hooks
+  Ok "Enabled the pre-push hook (git config core.hooksPath scripts/hooks)"
+}
+
 # ---------------------------------------------------------------------------
 Say "Done"
 @"

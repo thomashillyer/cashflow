@@ -6,6 +6,7 @@
   "scripts": {
     "test": "tsc --noEmit && vitest run",
     "typecheck": "tsc --noEmit",
+    "prepare": "git config core.hooksPath scripts/hooks || true",
     "setup:supabase": "node scripts/setup-supabase.mjs"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 {
-  "id": "run-base-4c3b0c31431c",
+  "id": "run-base-045b2968caae",
   "asOf": "2026-11-16",
-  "inputsHash": "4c3b0c31431c31926b8fc93c04f03fb421a58adb301870a918dc453a467c1887",
+  "inputsHash": "045b2968caaea73514d1164d1aec5b8bddef7f6067fdf8de82441edea07487b8",
   "scenarioId": "base",
   "fxRates": {
     "USD": 1,
@@ -333,42 +333,42 @@
     },
     {
       "date": "2026-12-29",
-      "inflow": 1200000,
+      "inflow": 0,
       "outflow": 0,
-      "closing": 3450000,
-      "eventIds": [
-        "evt-inv-INV-1203-0"
-      ]
+      "closing": 2250000,
+      "eventIds": []
     },
     {
       "date": "2026-12-30",
       "inflow": 0,
       "outflow": 0,
-      "closing": 3450000,
+      "closing": 2250000,
       "eventIds": []
     },
     {
       "date": "2026-12-31",
       "inflow": 0,
       "outflow": 0,
-      "closing": 3450000,
+      "closing": 2250000,
       "eventIds": []
     },
     {
       "date": "2027-01-01",
       "inflow": 0,
       "outflow": 650000,
-      "closing": 2800000,
+      "closing": 1600000,
       "eventIds": [
         "evt-rec-rent-1"
       ]
     },
     {
       "date": "2027-01-02",
-      "inflow": 0,
+      "inflow": 1200000,
       "outflow": 0,
       "closing": 2800000,
-      "eventIds": []
+      "eventIds": [
+        "evt-inv-INV-1203-0"
+      ]
     },
     {
       "date": "2027-01-03",
@@ -759,11 +759,11 @@
       "inflow": 1200000,
       "outflow": 650000,
       "closing": 2800000,
-      "minClosing": 2250000,
+      "minClosing": 1600000,
       "pipelineClosing": 3124000,
       "eventIds": [
-        "evt-inv-INV-1203-0",
-        "evt-rec-rent-1"
+        "evt-rec-rent-1",
+        "evt-inv-INV-1203-0"
       ]
     },
     {
@@ -1102,7 +1102,7 @@
       "category": "duties",
       "sourceRef": {
         "system": "generic_file",
-        "record": "po-2291.pdf"
+        "record": "broker-inv-2291.pdf"
       }
     },
     {
@@ -1141,23 +1141,6 @@
       }
     },
     {
-      "id": "evt-inv-INV-1203-0",
-      "commitmentId": "inv-INV-1203",
-      "legIndex": 0,
-      "date": "2026-12-29",
-      "amount": 1200000,
-      "currency": "USD",
-      "amountBase": 1200000,
-      "direction": "in",
-      "status": "committed",
-      "confidence": 0.5333333333333333,
-      "basis": "due 2026-12-20 + 9 days (median 0 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
-      "sourceRef": {
-        "system": "zoho_books",
-        "record": "INV-1203"
-      }
-    },
-    {
       "id": "evt-rec-rent-1",
       "commitmentId": "rec-rent",
       "legIndex": 1,
@@ -1173,6 +1156,23 @@
       "sourceRef": {
         "system": "profile",
         "record": "rec-rent"
+      }
+    },
+    {
+      "id": "evt-inv-INV-1203-0",
+      "commitmentId": "inv-INV-1203",
+      "legIndex": 0,
+      "date": "2027-01-02",
+      "amount": 1200000,
+      "currency": "USD",
+      "amountBase": 1200000,
+      "direction": "in",
+      "status": "committed",
+      "confidence": 0.5333333333333333,
+      "basis": "due 2026-12-24 + 9 days (median 0 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1203"
       }
     },
     {
