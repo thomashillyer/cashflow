@@ -111,9 +111,9 @@ describe("passwordless email sign-in", () => {
   });
 
   it.each([
-    [{ code: "email_address_not_authorized", message: "Email address not authorized" }, "only to its Supabase team"],
-    [{ message: "email rate limit exceeded" }, "two emails an hour"],
-  ])("explains the built-in sender restriction %j", async (error, message) => {
+    [{ code: "email_address_not_authorized", message: "Email address not authorized" }, "isn't enabled for demo sign-in"],
+    [{ message: "email rate limit exceeded" }, "Try later, or explore a sample business"],
+  ])("explains the sender restriction with an actionable next step %j", async (error, message) => {
     auth.signInWithOtp.mockResolvedValue({ error });
     const { sendCode } = await import("./auth.js");
     await expect(sendCode("owner@example.com")).rejects.toThrow(message);

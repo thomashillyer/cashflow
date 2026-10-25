@@ -104,8 +104,8 @@ export async function signOut({ everywhere = false } = {}) {
 
 function friendly(error) {
   const m = String(error?.message ?? "");
-  if (error?.code === "email_address_not_authorized" || /email address not authorized|only.*authorized.*email/i.test(m)) return "This demo sends sign-in emails only to its Supabase team. Use a sample business, or ask the team for access.";
-  if (/rate|too many|security purposes/i.test(m)) return "The sign-in email limit was reached. The built-in demo sender allows two emails an hour. Try later, or use a sample business.";
+  if (error?.code === "email_address_not_authorized" || /email address not authorized|only.*authorized.*email/i.test(m)) return "This email address isn't enabled for demo sign-in. Use a sample business, or ask the team for access.";
+  if (/rate|too many|security purposes/i.test(m)) return "The sign-in email limit was reached. Try later, or explore a sample business without signing in.";
   if (/expired|invalid|token/i.test(m)) return "That code didn't work or has expired. Ask for a new one.";
   if (/email/i.test(m)) return "Check the email address and try again.";
   return "Sign-in didn't go through. Try again in a moment.";

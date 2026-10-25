@@ -784,7 +784,7 @@ function viewWelcome() {
         <button class="btn primary big" type="submit">${authLive ? "Continue with code" : "Create account"}</button>
       </form>
       ${authLive ? `</details>` : ""}
-      <p class="portal-fine">${authLive ? "The demo's built-in sender is for the Supabase team only, with two emails an hour. Everyone can explore the samples without signing in." : "Preview: any 6 digits work."}</p>
+      <p class="portal-fine">${authLive ? "The link or code works once and expires soon. You can also explore a sample business without signing in." : "Preview: any 6 digits work."}</p>
       <p class="portal-fine"><button class="linklike" data-action="resend" ${resendWait() ? "disabled" : ""}>${resendWait() ? `Send a new email in ${resendWait()}s` : "Send a new email"}</button> <span aria-hidden="true">&nbsp;</span> <button class="linklike" data-action="signup-back">Use a different email</button></p>
       <p class="portal-fine"><button class="linklike" data-action="sample">Explore a sample business</button></p>
     </div>`;
@@ -800,7 +800,7 @@ function viewWelcome() {
       ${err}
       <button class="btn primary big" type="submit">Continue</button>
     </form>
-    <p class="portal-fine">${authLive ? "We email you a one-time sign-in link. This demo's built-in sender is limited to the Supabase team and two emails an hour." : "No password to remember or leak: preview sign-up uses any 6-digit code."}</p>
+    <p class="portal-fine">${authLive ? "No password to remember or leak: we email you a one-time sign-in link or code." : "No password to remember or leak: preview sign-up uses any 6-digit code."}</p>
     <p class="portal-fine"><button class="linklike" data-action="sample">Look around with a sample business first</button></p>
   </div>`;
 }
