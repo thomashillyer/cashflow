@@ -199,55 +199,26 @@ function normalize(r: Records): Records {
 
 // Overdue unpaid payments are still owed, so they count on asOf instead of falling out of the balance.
 // Overdue receipts keep their date and stay out of the balance (TECHNICAL_PLAN section 6), warned in forecast().
-// Not rolled, kept past-dated with a warning:
-//   - virtual linked costs (`deal~pattern`) and legs dated from an estimated anchor: no source document says they are due;
-//   - legs already covered by bank actuals tagged to the commitment that the books do not reflect yet (possibly paid).
-function rollOverdueOutflows(
-  events: CashEvent[],
-  records: Records,
-  commitments: Commitment[],
-  profile: Profile,
-  asOf: string,
-  fx: Record<string, number>,
-  warnings: string[],
-): CashEvent[] {
+// Payments already made (Settlements and tagged bank actuals, counted once) were deducted from every leg in expand
+// (matchPayments/paidSoFar), so what is left here is unpaid.
+// Not rolled, kept past-dated with a warning: virtual linked costs (`deal~pattern`) and legs dated from an estimated
+// anchor, since no source document says they are due.
+function rollOverdueOutflows(events: CashEvent[], profile: Profile, asOf: string, warnings: string[]): CashEvent[] {
   const label = (e: CashEvent) => `${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} payment dated ${e.date}`;
-  // Bank-side cover per commitment: tagged outflow actuals on/before asOf beyond what the books already count as paid.
-  const cover = new Map<string, { left: number; ids: string[] }>();
-  for (const c of commitments) {
-    const actuals = records.events.filter((x) => x.commitmentId === c.id && x.direction === "out" && x.date <= asOf);
-    if (actuals.length === 0) continue;
-    const bank = actuals.reduce((a, x) => a + (toBase(x.amount, x.currency, profile, fx) ?? 0), 0);
-    const booksPaid = toBase(c.amount - (c.outstanding ?? c.amount), c.currency, profile, fx) ?? 0;
-    const left = bank - booksPaid;
-    if (left > 0) cover.set(c.id, { left, ids: actuals.map((x) => x.id) });
-  }
   const overdue = (e: CashEvent) => e.date < asOf && e.direction === "out" && e.status !== "actual" && e.status !== "possible";
+  // Warn in date order so the run reads chronologically.
   const order = [...events].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.legIndex - b.legIndex));
-  const out = new Map<CashEvent, CashEvent | undefined>();
+  const rolled = new Map<CashEvent, CashEvent>();
   for (const e of order) {
     if (!overdue(e)) continue;
     if (e.commitmentId?.includes("~") || /estimated/.test(e.basis.split(";")[0]!)) {
       warnings.push(`Overdue: ${label(e)} is before ${asOf}; past-dated linked/estimated cost, not counted (needs review).`);
       continue;
     }
-    const cv = e.commitmentId ? cover.get(e.commitmentId) : undefined;
-    let rest = e;
-    if (cv && cv.left > 0) {
-      const take = Math.min(cv.left, e.amountBase);
-      cv.left -= take;
-      warnings.push(`Overdue: ${label(e)} is possibly paid already (bank line ${cv.ids.join(", ")}), needs reconciliation.`);
-      if (take >= e.amountBase) {
-        out.set(e, undefined); // keep it out: stays past-dated
-        continue;
-      }
-      const restBase = e.amountBase - take;
-      rest = { ...e, amountBase: restBase, amount: Math.round((e.amount * restBase) / e.amountBase), basis: `${e.basis}; ${money(take, profile.baseCurrency)} possibly paid already per bank` };
-    }
     warnings.push(`Overdue: ${label(e)} is before ${asOf}; assumed payable now and counted on ${asOf} (needs review).`);
-    out.set(e, { ...rest, date: asOf, basis: `${rest.basis}; overdue since ${e.date}, assumed payable now` });
+    rolled.set(e, { ...e, date: asOf, basis: `${e.basis}; overdue since ${e.date}, assumed payable now` });
   }
-  return events.map((e) => (out.has(e) ? (out.get(e) ?? e) : e));
+  return events.map((e) => rolled.get(e) ?? e);
 }
 
 export function forecast(input: Records, profile: Profile, scenario: Scenario, asOf: string, fxRates: Record<string, number>): ForecastRun {
@@ -276,7 +247,7 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     commitments: expanded.commitments,
     warnings,
   });
-  const rolled = rollOverdueOutflows(all, records, expanded.commitments, profile, asOf, fx, warnings);
+  const rolled = rollOverdueOutflows(all, profile, asOf, warnings);
   const events = [...rolled].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1));
 
   for (const e of events) {
