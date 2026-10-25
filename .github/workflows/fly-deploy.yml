@@ -29,7 +29,7 @@ jobs:
         if: env.HAS_TOKEN != 'true'
         run: echo "::notice::FLY_API_TOKEN not set; skipping deploy."
 
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be  # 1.5
         if: env.HAS_TOKEN == 'true'
 
       - name: Deploy
