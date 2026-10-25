@@ -105,7 +105,14 @@ async function pull(input: QuickBooksPullInput): Promise<AccountingImport> {
           if (l.TxnType === txnType && id) applied.push({ kind, docProviderId: id, amount: line.Amount });
         }
       }
-      payments.push({ providerId, date, applied });
+      const pcur = str(ref(p.CurrencyRef).value) ?? input.defaultCurrency;
+      const who = ref(kind === "invoice" ? p.CustomerRef : p.VendorRef);
+      payments.push({
+        providerId, date, kind, amount: p.TotalAmt,
+        ...(p.UnappliedAmt !== undefined ? { unapplied: p.UnappliedAmt } : {}),   // QBO states it; TotalAmt minus lines would ignore credit memos
+        ...(pcur ? { currency: pcur } : {}),
+        ...(who.value ? { partyId: who.value } : {}), ...(who.name ? { partyName: who.name } : {}), applied,
+      });
     }
   }
   return buildAccounting({ system: "quickbooks", docs, payments, now: input.now, warnings, ...(input.existingEvidence ? { existingEvidence: input.existingEvidence } : {}) });

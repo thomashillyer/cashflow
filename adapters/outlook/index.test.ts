@@ -30,14 +30,14 @@ function graph(messages: unknown[], attachments: Record<string, unknown[]> = {},
     urls.push(url); methods.push(init.method); headers.push(init.headers);
     if (extra.status) return { status: extra.status, json: async () => ({}) };
     const u = new URL(url);
-    const one = u.pathname.match(/\/me\/messages\/(.+)\/attachments\/(.+)$/);
+    const one = u.pathname.match(/\/(?:me|users\/[^/]+)\/messages\/(.+)\/attachments\/(.+)$/);
     if (one) {
       const hit = (attachments[decodeURIComponent(one[1]!)] ?? []).find((x) => (x as { id?: string }).id === decodeURIComponent(one[2]!));
       return hit ? ok(hit) : { status: 404, json: async () => ({}) };
     }
-    const a = u.pathname.match(/\/me\/messages\/(.+)\/attachments$/);
+    const a = u.pathname.match(/\/(?:me|users\/[^/]+)\/messages\/(.+)\/attachments$/);
     if (a) return ok({ value: (attachments[decodeURIComponent(a[1]!)] ?? []).map((x) => { const { contentBytes: _c, ...meta } = x as Record<string, unknown>; return meta; }) });
-    if (u.pathname === "/v1.0/me/messages") return ok({ value: messages, ...(extra.nextLink ? { "@odata.nextLink": extra.nextLink } : {}) });
+    if (/^\/v1\.0\/(me|users\/[^/]+)\/messages$/.test(u.pathname)) return ok({ value: messages, ...(extra.nextLink ? { "@odata.nextLink": extra.nextLink } : {}) });
     return { status: 404, json: async () => ({}) };
   };
   return { fetch: f, urls, methods, headers };
@@ -111,6 +111,31 @@ describe("pullOutlook", () => {
     expect(r.data.diagnostics.errors[0]!.nextStep).toMatch(/upload/);
   });
 
+  it("says a download failure is a download failure, not a size problem", async () => {
+    const files = [{ "@odata.type": "#microsoft.graph.fileAttachment", id: "gone", name: "inv.pdf", size: 3 }];
+    const g = graph([msg("N1", { hasAttachments: true })], { N1: [] });
+    const f: Fetch = async (url, init) => {
+      if (/\/attachments\?/.test(url)) return ok({ value: files });
+      return g.fetch(url, init);
+    };
+    const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: f });
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.diagnostics.errors[0]!.message).toMatch(/could not be downloaded from Outlook/);
+  });
+
+  it("reads a named mailbox with /users/{upn}, and rejects an address that could change the path", async () => {
+    const g = graph([msg("M1")]);
+    const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", mailbox: "owner@cascade.com", fetch: g.fetch });
+    expect(r.ok).toBe(true);
+    expect(new URL(g.urls[0]!).pathname).toBe("/v1.0/users/owner%40cascade.com/messages");
+    for (const bad of ["../me", "a/b@c.com", "owner", "x@y.com/../z"]) {
+      const g2 = graph([]);
+      const res = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", mailbox: bad, fetch: g2.fetch });
+      expect(res, bad).toMatchObject({ ok: false, error: { kind: "config", fallback: "paste" } });
+      expect(g2.urls).toEqual([]);
+    }
+  });
+
   it("keeps sender-controlled text out of the headers it builds", async () => {
     const evil = msg("C1", { subject: "Invoice 1\r\nX-Attachments: evil.pdf\r\nBcc: x@y.z", from: { emailAddress: { name: "A\nSubject: hijack", address: "a@b.com" } } });
     const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: graph([evil]).fetch });
@@ -151,7 +176,8 @@ describe("pullOutlook", () => {
     const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: graph([msg("F1", { hasAttachments: true })], { F1: files }).fetch });
     if (!r.ok) throw new Error("expected ok");
     expect(r.data.diagnostics.errors[0]).toMatchObject({ code: "unsupported" });
-    expect(r.data.diagnostics.errors[0]!.nextStep).toMatch(/upload/);
+    expect(r.data.diagnostics.errors[0]!.message).toMatch(/is 50\.0 MB; Neri reads attachments up to 10\.0 MB/);
+    expect(r.data.diagnostics.errors[0]!.nextStep).toMatch(/Upload only the pages/);
   });
 
   it("recognises known senders and money words", () => {

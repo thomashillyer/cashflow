@@ -92,8 +92,14 @@ async function pull(input: ZohoPullInput): Promise<ZohoPull> {
       // The list names invoices; the detail says how much went to each.
       const detail = await client.detail(path, providerId, "payment");
       const applied = Array.isArray(detail?.[appliedKey]) ? (detail![appliedKey] as ZohoRecord[]) : [];
+      const pcur = str(pay.currency_code) ?? str(detail?.currency_code);
+      const pparty = str(pay[isIn ? "customer_id" : "vendor_id"]);
+      const pname = str(pay[isIn ? "customer_name" : "vendor_name"]);
       payments.push({
-        providerId, date,
+        providerId, date, kind, amount: detail?.amount ?? pay.amount, appliedKnown: detail !== undefined,
+        ...(detail?.unused_amount !== undefined || pay.unused_amount !== undefined ? { unapplied: detail?.unused_amount ?? pay.unused_amount } : {}),
+        ...(pcur ? { currency: pcur } : {}),
+        ...(pparty ? { partyId: pparty } : {}), ...(pname ? { partyName: pname } : {}),
         applied: applied.map((a) => ({
           kind, ...(str(a[isIn ? "invoice_id" : "bill_id"]) ? { docProviderId: str(a[isIn ? "invoice_id" : "bill_id"])! } : {}),
           ...(str(a[isIn ? "invoice_number" : "bill_number"]) ? { docNumber: str(a[isIn ? "invoice_number" : "bill_number"])! } : {}),

@@ -66,4 +66,52 @@ describe("buildAccounting", () => {
     expect(r.settlements).toHaveLength(2);
     expect(r.paymentHistory).toEqual([expect.objectContaining({ invoiceId: "inv-INV-1", paid: "2026-10-05" })]);
   });
+
+  it("keeps a payment that applied to no document as an unallocated payment, never matched by guess", () => {
+    const r = buildAccounting({
+      system: "zoho_books", now: NOW, docs: [],
+      payments: [
+        { providerId: "adv1", date: "2026-06-03", kind: "bill", amount: 9639, appliedKnown: true, currency: "USD", partyId: "v9", partyName: "Carry Well Packaging", applied: [] },
+        { providerId: "adv2", date: "2026-07-01", kind: "bill", amount: "22491.00", appliedKnown: true, currency: "USD", partyId: "v9", partyName: "Carry Well Packaging", applied: [] },
+      ],
+    });
+    expect(r.settlements).toEqual([]);
+    expect(r.unallocatedPayments).toEqual([
+      expect.objectContaining({ providerId: "adv1", direction: "out", date: "2026-06-03", amount: 963900, currency: "USD", partyName: "Carry Well Packaging" }),
+      expect.objectContaining({ providerId: "adv2", amount: 2249100 }),
+    ]);
+  });
+
+  it("a partly applied payment leaves only the remainder unallocated; a fully applied one leaves none", () => {
+    const docs = [doc({ providerId: "b1", number: "B-1", total: 100, balance: 0, status: "paid" })];
+    const r = buildAccounting({
+      system: "xero", now: NOW, docs,
+      payments: [
+        { providerId: "p1", date: "2026-10-01", kind: "bill", amount: 100, appliedKnown: true, currency: "USD", applied: [{ kind: "bill", docProviderId: "b1", amount: 60 }] },
+        { providerId: "p2", date: "2026-10-02", kind: "bill", amount: 100, appliedKnown: true, currency: "USD", applied: [{ kind: "bill", docProviderId: "b1", amount: 100 }] },
+      ],
+    });
+    expect(r.unallocatedPayments.map((u) => [u.providerId, u.amount])).toEqual([["p1", 4000]]);
+  });
+
+  it("never reports a payment as unallocated from a failed read, an unparseable line, or mixed currencies", () => {
+    const docs = [doc({ providerId: "b1", number: "B-1", total: 100, balance: 0, status: "paid", currency: "USD" })];
+    const r = buildAccounting({
+      system: "zoho_books", now: NOW, docs,
+      payments: [
+        { providerId: "unread", date: "2026-10-01", kind: "bill", amount: 300, appliedKnown: false, currency: "USD", applied: [] },
+        { providerId: "garbled", date: "2026-10-01", kind: "bill", amount: 300, appliedKnown: true, currency: "USD", applied: [{ kind: "bill", docProviderId: "b1", amount: "n/a" }] },
+        { providerId: "fx", date: "2026-10-01", kind: "bill", amount: 300, appliedKnown: true, currency: "EUR", applied: [{ kind: "bill", docProviderId: "b1", amount: 100 }] },
+      ],
+    });
+    expect(r.unallocatedPayments).toEqual([]);
+  });
+
+  it("uses the provider's own unapplied amount when it states one", () => {
+    const r = buildAccounting({
+      system: "quickbooks", now: NOW, docs: [],
+      payments: [{ providerId: "q1", date: "2026-10-01", kind: "invoice", amount: 500, unapplied: 120.5, currency: "USD", applied: [] }, { providerId: "q2", date: "2026-10-01", kind: "invoice", amount: 500, unapplied: 0, currency: "USD", applied: [] }],
+    });
+    expect(r.unallocatedPayments.map((u) => [u.providerId, u.amount, u.direction])).toEqual([["q1", 12050, "in"]]);
+  });
 });

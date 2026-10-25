@@ -19,6 +19,7 @@ export type OutlookPullInput = {
   now: string;
   since: string;                      // ISO instant; how far back to read
   knownDomains?: string[];            // sender domains of known customers and suppliers
+  mailbox?: string;                   // read this user's mail (app-only token); default: the signed-in user
   fetch?: Fetch;
 };
 
@@ -54,7 +55,7 @@ export async function pullOutlook(input: OutlookPullInput): Promise<PullResult<O
 }
 
 async function pull(input: OutlookPullInput): Promise<OutlookPull> {
-  const client = new OutlookClient(input.token, input.fetch);
+  const client = new OutlookClient(input.token, input.fetch, input.mailbox);
   const known = new Set((input.knownDomains ?? []).map((d) => d.toLowerCase()));
   const { records, truncated } = await client.messages(input.since);
   const errors: RowError[] = [];
@@ -98,8 +99,13 @@ async function pull(input: OutlookPullInput): Promise<OutlookPull> {
         }
       }
       if (f.isInline && !b64) continue;
-      if (size > MAX_ATTACHMENT_BYTES || !b64) {
-        errors.push({ row, code: "unsupported", message: `"${name}" on "${subject}" was too large or could not be downloaded.`, nextStep: "Download it from Outlook and upload it on the import screen." });
+      if (size > MAX_ATTACHMENT_BYTES) {
+        const mb = (n: number) => `${(n / 1_000_000).toFixed(1)} MB`;
+        errors.push({ row, code: "unsupported", message: `"${name}" on "${subject}" is ${mb(size)}; Neri reads attachments up to ${mb(MAX_ATTACHMENT_BYTES)}.`, nextStep: "Upload only the pages or sheets you need on the import screen, or a smaller export." });
+        continue;
+      }
+      if (!b64) {
+        errors.push({ row, code: "unsupported", message: `"${name}" on "${subject}" could not be downloaded from Outlook.`, nextStep: "Download it from Outlook and upload it on the import screen." });
         continue;
       }
       const bytes = new Uint8Array(Buffer.from(b64, "base64"));
