@@ -3,7 +3,7 @@ import { currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
 import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
-import { icon, logo, logoLarge } from "./ui/icons.js?v=2";
+import { icon, logo, logoLarge } from "./ui/icons.js";
 import { speak, listen, canSpeak, canListen, speakable, spokenMoney } from "./ui/speech.js";
 import { addDays, dayDate, esc, greeting, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
 
