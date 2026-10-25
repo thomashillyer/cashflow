@@ -161,8 +161,8 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
   };
 }
 
-// Email messages become proposed intake only. Each pull is capped at ten recent messages so a click
-// cannot silently process an entire mailbox or trigger an unbounded set of model calls.
+// Email messages become proposed intake only. Scan at most 50 recent messages, then process at most
+// ten financial messages so a click cannot trigger an unbounded set of model calls.
 export function buildConnectionService(env: NodeJS.ProcessEnv, options: ConnectionOptions = {}): ConnectionService {
   const zoho = buildZohoConnectionService(env, options);
   const businessId = env.NERI_CONNECTOR_BUSINESS_ID?.trim();
@@ -187,7 +187,7 @@ export function buildConnectionService(env: NodeJS.ProcessEnv, options: Connecti
     const prior = b.profile.account?.connections?.find((c) => c.id === "outlook") as { state: string; lastSyncedAt?: string } | undefined;
     return { ...name, available: true, state: errorMessage || prior?.state === "error" ? "error" : prior?.state === "ok" ? "ok" : "waiting",
       ...(prior?.lastSyncedAt ? { lastSyncedAt: prior.lastSyncedAt } : {}),
-      message: errorMessage ?? "Sync reads up to 10 recent messages from the last 30 days. Changes wait for your review." };
+      message: errorMessage ?? "Sync scans up to 50 recent messages from the last 30 days and processes up to 10 financial messages. Changes wait for your review." };
   }
   async function token(): Promise<string> {
     if (access && access.expiresAt > Date.now()) return access.value;
@@ -215,13 +215,13 @@ export function buildConnectionService(env: NodeJS.ProcessEnv, options: Connecti
         const url = new URL(raw);
         if (url.origin !== "https://graph.microsoft.com") throw new Error("unsupported host");
         const list = /\/messages$/.test(url.pathname);
-        if (list) url.searchParams.set("$top", "10");
+        if (list) url.searchParams.set("$top", "50");
         const response = await fetchImpl(url.toString(), { ...init, redirect: "error" });
         return { status: response.status, json: async () => {
           const body = await response.json() as Record<string, unknown>;
           if (list && body && typeof body === "object") {
             delete body["@odata.nextLink"];
-            if (Array.isArray(body.value)) body.value = body.value.slice(0, 10);
+            if (Array.isArray(body.value)) body.value = body.value.slice(0, 50);
           }
           return body;
         } };
