@@ -18,32 +18,63 @@ export function minorUnitDigits(currency: string): number {
 }
 
 // "28,000.00" | "USD 6,200.00" | "$4,000" | "1.234,56" -> integer minor units, without floats.
+//
+// The same digits mean different things in different locales, so the rules are explicit:
+//  - "." and "," both present: the last one is the decimal mark, the other groups thousands.
+//  - one kind, repeated ("1,234,567"): thousands, groups of exactly 3 digits.
+//  - one kind, once, 1-2 digits after ("12,5", "12.50"): decimal mark.
+//  - one kind, once, exactly 3 digits after ("1,234", "1.234"): thousands when the head is 1-3 digits
+//    (so "1,234" USD is 123400), except "." in a 3-decimal currency (KWD, BHD), which is the decimal mark.
+//    "1.234" EUR vs USD is genuinely ambiguous; we read it as thousands.
+//  - stray text around the number ("28,000.00 (net 30)") or malformed grouping is undefined.
+// Returns undefined rather than guessing. 0 comes only from an explicit zero amount.
 export function parseAmount(raw: string, currency: string): number | undefined {
-  const negative = /^\s*-|\(\s*[\d.,]+\s*\)|-\s*$/.test(raw);
-  const digits = raw.replace(/[^\d.,]/g, "");
-  if (!/\d/.test(digits)) return undefined;
-  // The decimal separator is the last "." or "," followed by 1-3 digits at the end,
-  // unless that group is exactly 3 digits and another separator of the same kind appears earlier (thousands).
-  const m = digits.match(/^(.*?)([.,])(\d{1,3})$/);
-  let intPart = digits;
-  let frac = "";
-  if (m) {
-    const [, head = "", sep, tail = ""] = m;
-    const isThousands = tail.length === 3 && (head.includes(sep!) || !/[.,]/.test(head)) && sep === "," ;
-    if (!isThousands) {
-      intPart = head;
-      frac = tail;
-    }
-  }
-  intPart = intPart.replace(/[.,]/g, "");
-  if (!/^\d+$/.test(intPart || "0")) return undefined;
+  // Sign first, on what is left after the ISO code and currency symbol are removed:
+  // "USD -100.00" and "$-100" are negative too.
+  let s = raw.replace(/\b[A-Z]{3}\b/g, "").replace(/\p{Sc}/gu, "").trim();
+  let negative = false;
+  const paren = /^\(([^()]*)\)$/.exec(s);                            // accounting negative: "(1,200.00)"
+  if (paren) { negative = true; s = paren[1]!.trim(); }
+  const lead = /^([-+\u2212])\s*/.exec(s);
+  if (lead) { negative ||= lead[1] !== "+"; s = s.slice(lead[0].length); }
+  if (/[-\u2212]$/.test(s)) { negative = true; s = s.slice(0, -1).trim(); }
+  const body = s
+    .replace(/(?<=\d)[\s\x27\u2019\u00a0\u202f](?=\d)/g, "")  // space or apostrophe grouping: "28 000,00"
+    .replace(/[.,]$/, "");                                           // sentence punctuation: "28,000.00."
+  if (!/^[\d.,]*\d[\d.,]*$/.test(body)) return undefined;
+
   const exp = minorUnitDigits(currency);
+  const dot = body.lastIndexOf(".");
+  const comma = body.lastIndexOf(",");
+  let decimalSep: "." | "," | undefined;
+  if (dot >= 0 && comma >= 0) {
+    decimalSep = dot > comma ? "." : ",";
+  } else if (dot >= 0 || comma >= 0) {
+    const sep = dot >= 0 ? "." : ",";
+    const parts = body.split(sep);
+    if (parts.length === 2) {
+      const [head = "", tail = ""] = parts;
+      const grouped = tail.length === 3 && /^[1-9]\d{0,2}$/.test(head) && (sep === "," || exp !== 3);
+      decimalSep = grouped ? undefined : sep;
+    } // repeated separator: thousands only
+  }
+
+  const at = decimalSep ? body.lastIndexOf(decimalSep) : -1;
+  let intPart = at >= 0 ? body.slice(0, at) : body;
+  let frac = at >= 0 ? body.slice(at + 1) : "";
+  const groupSep = decimalSep === "." ? "," : decimalSep === "," ? "." : body.includes(",") ? "," : ".";
+  if (intPart.includes(groupSep)) {
+    const groups = intPart.split(groupSep);
+    if (!groups.every((g, i) => (i === 0 ? /^\d{1,3}$/.test(g) : /^\d{3}$/.test(g)))) return undefined; // "12,34,567"
+    intPart = groups.join("");
+  }
+  if (!/^\d+$/.test(intPart) || !/^\d*$/.test(frac)) return undefined;
   if (frac.length > exp) {
     // More decimals than the currency allows: only accept if the extra digits are zeros.
     if (!/^0*$/.test(frac.slice(exp))) return undefined;
     frac = frac.slice(0, exp);
   }
-  const minor = BigInt(intPart || "0") * 10n ** BigInt(exp) + BigInt((frac + "0".repeat(exp)).slice(0, exp) || "0");
+  const minor = BigInt(intPart) * 10n ** BigInt(exp) + BigInt(frac.padEnd(exp, "0") || "0");
   if (minor > BigInt(Number.MAX_SAFE_INTEGER)) return undefined;
   const n = Number(minor);
   return negative ? -n : n;
@@ -51,9 +82,15 @@ export function parseAmount(raw: string, currency: string): number | undefined {
 
 // ---------- dates ----------
 
-const MONTHS: Record<string, number> = {
-  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12,
-};
+const MONTH_NAMES = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+// "Dec", "Sept", "December" -> 12; anything that is not a 3+ letter prefix of a month name is undefined.
+function monthNumber(word: string): number | undefined {
+  const w = word.toLowerCase();
+  if (w.length < 3) return undefined;
+  const i = MONTH_NAMES.findIndex((name) => name.startsWith(w));
+  return i >= 0 ? i + 1 : undefined;
+}
 
 const iso = (y: number, m: number, d: number): string | undefined => {
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -67,20 +104,20 @@ export type ParsedDate = { date: string; ambiguous: boolean };
 // the signals pipeline resolves those against receivedAt.
 export function parseDate(raw: string, opts: { dayFirst?: boolean } = {}): ParsedDate | undefined {
   const s = raw.trim().replace(/(\d)(st|nd|rd|th)\b/gi, "$1").replace(/,/g, " ").replace(/\s+/g, " ");
-  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$/);
   if (m) {
     const date = iso(+m[1]!, +m[2]!, +m[3]!);
     return date ? { date, ambiguous: false } : undefined;
   }
   m = s.match(/^([A-Za-z]{3,9})\.? (\d{1,2}) (\d{4})$/);           // December 10 2026
   if (m) {
-    const mon = MONTHS[m[1]!.toLowerCase().slice(0, m[1]!.toLowerCase().startsWith("sept") ? 4 : 3)];
+    const mon = monthNumber(m[1]!);
     const date = mon ? iso(+m[3]!, mon, +m[2]!) : undefined;
     return date ? { date, ambiguous: false } : undefined;
   }
   m = s.match(/^(\d{1,2}) ([A-Za-z]{3,9})\.? (\d{4})$/);           // 10 December 2026
   if (m) {
-    const mon = MONTHS[m[2]!.toLowerCase().slice(0, 3)];
+    const mon = monthNumber(m[2]!);
     const date = mon ? iso(+m[3]!, mon, +m[1]!) : undefined;
     return date ? { date, ambiguous: false } : undefined;
   }
@@ -110,7 +147,10 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
     if (/\s/.test(ch)) {
       if (!lastSpace) { norm += " "; map.push(i); lastSpace = true; }
     } else {
-      norm += ch.toLowerCase(); map.push(i); lastSpace = false;
+      const lower = ch.toLowerCase(); // can be longer than one char (e.g. "İ"); keep norm and map aligned
+      for (let k = 0; k < lower.length; k++) map.push(i);
+      norm += lower;
+      lastSpace = false;
     }
   }
   return { norm, map };
@@ -158,6 +198,11 @@ export function fieldFrom<T>(
   if (!raw || raw.value === null || raw.value.trim() === "") return missing(`${label} not stated`);
   const evidence = locateQuote(segments, raw.quote ?? raw.value);
   if (!evidence) return missing(`${label} "${raw.value}" not found in the source`);
+  // The quote must actually contain the value, or a real quote could vouch for a different number.
+  const quoted = normalizeWithMap(evidence.text).norm;
+  if (!quoted.includes(normalizeWithMap(raw.value).norm.trim())) {
+    return missing(`${label} "${raw.value}" is not in its quote "${evidence.text}"`);
+  }
   const value = parse(raw.value.trim());
   if (value === undefined) return missing(`${label} "${raw.value}" could not be read`);
   return { state: "found", value, evidence: [evidence] };
