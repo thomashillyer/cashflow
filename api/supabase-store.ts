@@ -9,9 +9,9 @@ import {
   loadRecords, loadWorkItems, saveWorkItems, setWorkItemState, toStoreError, upsertBusiness,
   upsertChangeProposals, upsertEvidence, upsertIntakeCandidates, upsertRecords, upsertSignals,
 } from "../db/records";
-import { fromRow, type Row } from "../db/rows";
+import { TABLES, fromRow, toRow, type Row } from "../db/rows";
 import { validateOverrides } from "./overrides";
-import type { Business, IntakeWrite, Store, StoredProfile } from "./store";
+import type { Business, DecisionLookup, DecisionResult, DecisionWrite, IntakeWrite, Store, StoredProfile } from "./store";
 
 // PostgREST / Postgres codes for "this table or function does not exist" (migration not applied yet).
 const MISSING = new Set(["42P01", "PGRST205", "PGRST202", "42883"]);
@@ -71,6 +71,38 @@ export class SupabaseStore implements Store {
 
   upsertRecords(id: string, records: Partial<Records>): Promise<number> {
     return upsertRecords(this.db, id, records);
+  }
+
+  // One transaction in Postgres (commit_review_decision): idempotency key, revision check, every row,
+  // the revision bump and the stored response. Rows use the same mapping upsertRecords uses (toRow).
+  async commitDecision(id: string, d: DecisionWrite): Promise<DecisionResult> {
+    const rows: Record<string, Row[]> = {};
+    for (const [key, table] of Object.entries(TABLES) as [keyof Records, string][]) {
+      const list = (d.records[key] ?? []) as object[];
+      if (list.length) rows[table] = list.map((r) => toRow(r, id));
+    }
+    if (d.proposals.length) rows["change_proposals"] = d.proposals.map((p) => toRow(p, id));
+    const { data, error } = await this.db.rpc("commit_review_decision", {
+      p_business_id: id, p_key: d.idempotencyKey, p_hash: d.requestHash,
+      p_expected_revision: d.expectedRevision, p_rows: rows, p_response: d.response,
+    });
+    if (error) throw toStoreError(`commit decision ${id}`, error);
+    const out = data as { kind: DecisionResult["kind"]; storeRevision?: number | string; response?: Record<string, unknown> };
+    switch (out.kind) {
+      case "ok": return { kind: "ok", storeRevision: Number(out.storeRevision), response: out.response ?? {} };
+      case "replay": return { kind: "replay", response: out.response ?? {} };
+      case "stale": return { kind: "stale", storeRevision: Number(out.storeRevision) };
+      default: return { kind: "conflict" };
+    }
+  }
+
+  async lookupDecision(id: string, key: string, requestHash: string): Promise<DecisionLookup> {
+    const { data, error } = await this.db.from("review_decisions").select("request_hash,response")
+      .eq("business_id", id).eq("idempotency_key", key).maybeSingle();
+    if (error) throw toStoreError(`look up decision ${id}`, error);
+    if (!data) return null;
+    const row = data as { request_hash: string; response: Record<string, unknown> };
+    return row.request_hash === requestHash ? { kind: "replay", response: row.response } : { kind: "conflict" };
   }
 
   async bumpRevision(id: string): Promise<number> {

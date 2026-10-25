@@ -3,7 +3,7 @@ import { consumeEmailLink, currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
 import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
-import { icon, logo, logoLarge } from "./ui/icons.js?v=2";
+import { icon, logo, logoLarge } from "./ui/icons.js";
 import { speak, listen, canSpeak, canListen, speakable, spokenMoney } from "./ui/speech.js";
 import { addDays, dayDate, esc, greeting, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
 
@@ -93,9 +93,36 @@ function masked(html) {
 }
 
 // ---------------------------------------------------------------- summary sentences (screen + voice share one source)
+function forecastReview(run = app.brief.run) {
+  // Older/preview runs without the structured checks cannot establish an all-clear either.
+  if (run.review?.needed === false) return null;
+  const reasons = run.review?.reasons ?? [];
+  const preview = !run.review && api.mode === "preview";
+  return {
+    title: run.review ? "Your forecast needs a check." : preview ? "This preview doesn't include forecast checks." : "Your forecast checks aren't available yet.",
+    message: run.review ? "Check the flagged items before relying on these dates and amounts." : preview
+      ? "Forecast checks require the live Neri server. Verify your source records before acting on these dates and amounts."
+      : "This server hasn't provided forecast checks. Verify your source records before acting on these dates and amounts.",
+    reasons,
+    messages: reasons.some((r) => r.code === "unconfirmed_signal"),
+    sources: !preview && (!reasons.length || reasons.some((r) => r.code !== "unconfirmed_signal")),
+  };
+}
+
+function forecastReviewPanel(run = app.brief.run) {
+  const review = forecastReview(run);
+  if (!review) return "";
+  return `<section class="panel forecast-review" aria-label="Forecast checks">
+    <h2>${esc(review.title)}</h2><p>${esc(review.message)}</p>
+    ${review.reasons.length ? `<ul>${review.reasons.map((r) => `<li>${esc(r.message)}</li>`).join("")}</ul>` : ""}
+    <div class="forecast-review-actions">${review.messages ? `<a class="btn small" href="#/review">Review messages</a>` : ""}${review.sources ? `<a class="btn small" href="#/sources">Check your sources</a>` : ""}</div>
+  </section>`;
+}
+
 function summary() {
   const b = app.brief;
   const run = b.run;
+  const review = forecastReview(run);
   const safety = run.safetyLine;
   const low = run.lowPoint;
   const name = (pid) => app.ctx.parties.find((p) => p.id === pid)?.name;
@@ -114,10 +141,16 @@ function summary() {
         ? `Cash is ${money(short)} below your line right now.`
         : `Cash holds until ${shortDate(holdsUntil)}, then drops ${money(short)} below your line.`,
       sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}${causes.length ? `, when ${causes.join(" and ")} go out` : ""}.`,
-      take: cfoTake(),
+      take: review ? `${review.message}${review.reasons[0] ? ` ${review.reasons[0].message}` : ""}` : cfoTake(),
       tone: "short",
     };
   }
+  if (review) return {
+    headline: review.title,
+    sub: `The current forecast shows a low point of ${money(low.amount)} on ${dayDate(low.date)}.`,
+    take: `${review.message}${review.reasons[0] ? ` ${review.reasons[0].message}` : ""}`,
+    tone: "review",
+  };
   const idle = b.watch.find((w) => w.warning === "idle_balance_over");
   return {
     headline: `You're above your line for all ${run.weeks.length} weeks.`,
@@ -159,7 +192,7 @@ function spokenBrief() {
     parts.push(open.length === 1 ? "One thing today." : `${["", "One", "Two", "Three"][open.length]} things today.`);
     open.forEach((i, n) => parts.push(`${open.length > 1 ? ["First", "Second", "Third"][n] + ". " : ""}${speakable(i.title)}.`));
   } else {
-    parts.push("Nothing needs you today.");
+    parts.push(forecastReview() ? (b.run.review ? "Check the forecast items when you're parked." : "Verify the forecast with your source records before acting.") : "Nothing needs you today.");
   }
   const waiting = app.review.length + app.notes.filter((n) => n.state === "new").length;
   if (waiting) parts.push(`${waiting === 1 ? "One item is" : `${waiting} items are`} waiting for your OK when you're parked.`);
@@ -280,13 +313,14 @@ function viewToday() {
       </div>
     </section>
 
+    ${forecastReviewPanel()}
     <section class="today-list" aria-labelledby="today-h">
       <div class="deck-head">
         <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
         ${n > 1 ? `<div class="deck-nav"><button class="deck-arrow" data-action="deck" data-dir="-1" aria-label="Previous">${arrow("left")}</button><button class="deck-arrow" data-action="deck" data-dir="1" aria-label="Next">${arrow("right")}</button></div>` : ""}
       </div>
       ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}</ol>
-        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">Nothing needs you today. Neri will speak up if a payment moves.</p>`}
+        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the forecast items above first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
     </section>
 
@@ -449,6 +483,7 @@ function viewDetails() {
        ${b.watch.map((w) => `<div class="watch-item"><h4>${esc(w.title)}</h4>${w.warning === "ar_concentration_risk" ? `<button class="btn small quiet" data-action="draft" data-id="${esc(w.id)}">${icon.mail}Draft a terms note</button>` : ""}<p>${esc(w.why)}</p>${w.partnerAction ? `<div style="grid-column:1/-1;margin-top:8px">${sampleCard(w.partnerAction)}</div>` : ""}</div>`).join("")}` : "";
   return `
   <div class="page-head"><div><h1>Details</h1><p>The numbers behind today's brief. Tap any week or source to see where a number comes from.</p></div></div>
+  ${forecastReviewPanel(app.scenario === "stress" && app.stressRun ? app.stressRun : run)}
   ${figures}
   ${forecastBody()}
   <div class="details-grid">
@@ -1065,6 +1100,7 @@ function renderDrive() {
     <div class="drive-top"><span class="drive-brand">${logo}${dayDate(app.ctx.business.asOf)}</span><button data-action="drive-close">Done</button></div>
     <div class="drive-body">
       <p class="drive-line">${esc(s.headline)}</p>
+      ${forecastReview() ? `<p>${esc(forecastReview().message)}</p>` : ""}
       <ol class="drive-list">${open.map((i, n) => `<li class="${itemSpeaking(n) ? "speaking" : ""}"><span>${n + 1}</span>${esc(i.title.replace(/\s*\([A-Z]+-[\w-]+\)/, ""))}</li>`).join("")}</ol>
     </div>
     <div class="drive-controls">

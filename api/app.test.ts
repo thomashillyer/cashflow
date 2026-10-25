@@ -675,3 +675,62 @@ describe("public demo uploads", () => {
     await demo.close();
   });
 });
+
+describe("atomic, idempotent decisions (#191)", () => {
+  beforeEach(() => setup());
+
+  async function pendingProposal(): Promise<string> {
+    const imported = (await app.inject({ method: "POST", url: "/import/pdf", headers: OTHER, payload: { base64: pdfBase64("inv1187.pdf"), fileName: "inv1187.pdf" } })).json();
+    return imported.proposals[0].id as string;
+  }
+  const evidenceCount = async () => (await store.load("cascade_trade")).records.commitments.find((c) => c.id === "inv-INV-1187")!.evidenceIds!.length;
+
+  it("two concurrent confirms: one wins, one gets 409, applied once", async () => {
+    const id = await pendingProposal();
+    const before = await evidenceCount();
+    const confirm = () => app.inject({ method: "POST", url: `/review/${id}/confirm`, headers: OTHER });
+    const [a, b] = await Promise.all([confirm(), confirm()]);
+    expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
+    expect([a, b].find((r) => r.statusCode === 409)!.json().error.code).toBe("STALE_REVIEW");
+    expect(await evidenceCount()).toBe(before + 1);
+    expect((await store.listProposals("cascade_trade")).find((p) => p.id === id)!.state).toBe("confirmed");
+  });
+
+  it("two concurrent signal applies: one wins, one gets 409", async () => {
+    const item = (await app.inject({ method: "GET", url: "/review", headers: OTHER })).json()[0];
+    const apply = () => app.inject({ method: "POST", url: `/signals/${item.signal.id}/apply`, headers: OTHER });
+    const [a, b] = await Promise.all([apply(), apply()]);
+    expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
+    const { records, storeRevision } = await store.load("cascade_trade");
+    expect(records.signals.find((s) => s.id === item.signal.id)!.state).toBe("applied");
+    expect([a, b].find((r) => r.statusCode === 200)!.json().storeRevision).toBe(storeRevision);
+  });
+
+  it("the same Idempotency-Key and body replays the stored response without writing", async () => {
+    const id = await pendingProposal();
+    const headers = { ...OTHER, "idempotency-key": "k-1" };
+    const first = await app.inject({ method: "POST", url: `/review/${id}/confirm`, headers, payload: {} });
+    expect(first.statusCode).toBe(200);
+    const snapshot = JSON.stringify(await store.load("cascade_trade"));
+    const second = await app.inject({ method: "POST", url: `/review/${id}/confirm`, headers, payload: {} });
+    expect(second.statusCode).toBe(200);
+    expect(second.json()).toEqual(first.json());
+    expect(JSON.stringify(await store.load("cascade_trade"))).toBe(snapshot);
+  });
+
+  it("the same key with a different body is 409 IDEMPOTENCY_CONFLICT", async () => {
+    const id = await pendingProposal();
+    const headers = { ...OTHER, "idempotency-key": "k-2" };
+    await app.inject({ method: "POST", url: `/review/${id}/confirm`, headers, payload: {} });
+    const other = await app.inject({ method: "POST", url: `/review/${id}/confirm`, headers, payload: { commitmentId: "inv-INV-1187" } });
+    expect(other.statusCode).toBe(409);
+    expect(other.json().error.code).toBe("IDEMPOTENCY_CONFLICT");
+  });
+
+  it("dismiss goes through the same atomic path", async () => {
+    const id = await pendingProposal();
+    const [a, b] = await Promise.all([1, 2].map(() => app.inject({ method: "POST", url: `/review/${id}/dismiss`, headers: OTHER })));
+    expect([a!.statusCode, b!.statusCode].sort()).toEqual([200, 409]);
+    expect((await store.listProposals("cascade_trade")).find((p) => p.id === id)!.state).toBe("dismissed");
+  });
+});

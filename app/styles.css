@@ -276,6 +276,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .side { display: grid; gap: 16px; position: sticky; top: 84px; }
 .panel { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius-lg); padding: 20px; }
 .panel h2 { font-size: 13.5px; font-weight: 600; color: var(--ink-soft); margin: 0 0 14px; }
+.forecast-review { border-inline-start: 3px solid var(--sun); margin-block: 20px; }
+.forecast-review h2 { color: var(--ink); }
+.forecast-review p, .forecast-review li { font-size: 14px; line-height: 1.5; }
+.forecast-review ul { padding-inline-start: 20px; }
+.forecast-review-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .figures { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 12px; }
 .fig small { display: block; font-size: 12.5px; color: var(--ink-faint); }
 .fig b { display: block; font-size: 24px; font-weight: 650; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; line-height: 1.2; margin-top: 2px; }
