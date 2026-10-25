@@ -41,11 +41,12 @@ export function isOpen(c: Commitment): boolean {
   return c.settlement !== "paid" && c.settlement !== "cancelled" && c.settlement !== "credited";
 }
 
-// Future, not-yet-settled events of each commitment in the run, earliest first.
+// Not-yet-settled events of each commitment in the run, earliest first. Includes overdue events,
+// which keep their past date (design 05 honesty rules).
 export function pendingEventsByCommitment(run: ForecastRun): Map<string, CashEvent[]> {
   const out = new Map<string, CashEvent[]>();
   for (const e of run.events) {
-    if (!e.commitmentId || e.status === "actual" || e.status === "possible" || e.date < run.asOf) continue;
+    if (!e.commitmentId || e.status === "actual" || e.status === "possible") continue;
     const list = out.get(e.commitmentId) ?? [];
     list.push(e);
     out.set(e.commitmentId, list);
@@ -56,27 +57,33 @@ export function pendingEventsByCommitment(run: ForecastRun): Map<string, CashEve
 
 export const sumBase = (events: CashEvent[]) => events.reduce((s, e) => s + e.amountBase, 0);
 
+// Receivables a customer owes on an invoice-like document (not deals, plans, or funding).
+function isReceivable(c: Commitment): boolean {
+  return commitmentDirection(c) === "in" && c.type !== "sales_deal" && c.type !== "plan" && !c.funding;
+}
+
+// Profile recurring items marked nonDeferrable, or any commitment in one of their categories
+// (payroll detected from the bank file has its own id).
 function isNonDeferrable(c: Commitment, profile: Profile): boolean {
-  return profile.recurring.some((r) => r.id === c.id && r.nonDeferrable);
+  return profile.recurring.some((r) => r.nonDeferrable && (r.id === c.id || (!!c.category && r.category === c.category)));
 }
 
-function flexibilityDays(c: Commitment, records: Records): number {
-  for (const rule of records.rules) {
-    if (rule.kind !== "flexibility" || rule.state !== "confirmed") continue;
-    if (!("partyId" in rule.scope) || rule.scope.partyId !== c.partyId) continue;
-    const days = rule.params.extraDays;
-    if (typeof days === "number" && days > 0) return days;
-  }
-  return DEFAULT_DEFER_DAYS;
+// A party-specific confirmed flexibility rule wins over an all-parties one.
+function flexibilityRule(c: Commitment, records: Records) {
+  const confirmed = records.rules.filter((r) => r.kind === "flexibility" && r.state === "confirmed"
+    && typeof r.params.extraDays === "number" && r.params.extraDays > 0);
+  return confirmed.find((r) => "partyId" in r.scope && r.scope.partyId === c.partyId)
+    ?? confirmed.find((r) => "all" in r.scope);
 }
 
-// A daily closing balance falls below the safety line: chase receivables that land after the gap,
-// and defer payables that land on or before it.
+// A daily closing balance falls below the safety line: chase receivables that are overdue or land
+// after the gap, and defer payables that land on or before the gap or the low point.
 export const projectedCashGap: Check = (run, records, profile) => {
   const gapDate = run.firstBelowSafety;
   if (!gapDate) return [];
   const pending = pendingEventsByCommitment(run);
   const lead = profile.actionLeadDays ?? {};
+  const deferUntil = maxDate(gapDate, run.lowPoint.date);
   const out: Candidate[] = [];
 
   for (const c of records.commitments) {
@@ -84,13 +91,16 @@ export const projectedCashGap: Check = (run, records, profile) => {
     if (!events?.length || !isOpen(c) || c.funding) continue;
     const dir = commitmentDirection(c);
 
-    if (dir === "in" && c.type !== "sales_deal") {
-      const due = c.anchors.due;
+    if (isReceivable(c)) {
+      const reach = addDays(run.asOf, lead.chase ?? 0);
       const last = events[events.length - 1]!;
-      if (!due || last.date <= gapDate) continue;
-      // Collecting no earlier than the due date, and no earlier than the owner can reach them.
-      const assumeDate = maxDate(due, addDays(run.asOf, lead.chase ?? 0));
-      if (assumeDate >= last.date) continue;
+      const overdue = last.date < run.asOf;
+      // Overdue: collect as soon as the owner can reach them. Otherwise no earlier than the due date.
+      let assumeDate: string;
+      if (overdue) assumeDate = reach;
+      else if (c.anchors.due && last.date > gapDate) assumeDate = maxDate(c.anchors.due, reach);
+      else continue;
+      if (!overdue && assumeDate >= last.date) continue;
       out.push({
         warning: "projected_cash_gap",
         lever: { kind: "chase", commitmentId: c.id, assumeDate },
@@ -100,11 +110,14 @@ export const projectedCashGap: Check = (run, records, profile) => {
     }
 
     if (dir === "out" && !isNonDeferrable(c, profile)) {
-      const before = events.filter((e) => e.date <= gapDate);
+      const before = events.filter((e) => e.date >= run.asOf && e.date <= deferUntil);
       if (!before.length) continue;
+      const rule = flexibilityRule(c, records);
+      // The base run already applied this flexibility; deferring again would double-count it.
+      if (rule && before.some((e) => e.overriddenBy?.includes(rule.id))) continue;
       out.push({
         warning: "projected_cash_gap",
-        lever: { kind: "defer", commitmentId: c.id, days: flexibilityDays(c, records) },
+        lever: { kind: "defer", commitmentId: c.id, days: (rule?.params.extraDays as number) ?? DEFAULT_DEFER_DAYS },
         evidenceRefs: [c.id, ...before.map((e) => e.id)],
         neededBy: addDays(minDate(before[0]!.date, gapDate), -(lead.defer ?? 0)),
       });
@@ -145,16 +158,18 @@ export const idleBalanceOver: Check = (run, _records, profile) => {
   return [{ warning: "idle_balance_over", evidenceRefs: eventIds, neededBy: week.week }];
 };
 
-// Each party's share of open receivables in the run, in base currency.
+// Each party's share of open receivables in the run, in base currency. Receivables with no party
+// count toward the total.
 export function receivableShares(run: ForecastRun, records: Records) {
   const pending = pendingEventsByCommitment(run);
   const byParty = new Map<string, { amount: number; commitmentIds: string[] }>();
   let total = 0;
   for (const c of records.commitments) {
     const events = pending.get(c.id);
-    if (!events?.length || !c.partyId || !isOpen(c) || commitmentDirection(c) !== "in" || c.funding) continue;
+    if (!events?.length || !isOpen(c) || !isReceivable(c)) continue;
     const amount = sumBase(events);
     total += amount;
+    if (!c.partyId) continue;
     const entry = byParty.get(c.partyId) ?? { amount: 0, commitmentIds: [] };
     entry.amount += amount;
     entry.commitmentIds.push(c.id);
@@ -177,11 +192,14 @@ export const arConcentrationRisk: Check = (run, records, profile) => {
   return out;
 };
 
-// An applied signal moved a receivable later. Raises a change alert; rank re-runs on the new forecast.
+// An applied signal moved a receivable later than its due date. Raises a change alert; rank re-runs
+// on the new forecast.
 export const paymentSlip: Check = (run, records) => {
   const out: Candidate[] = [];
   for (const s of records.signals) {
     if (s.state !== "applied" || s.claim.kind !== "date_change" || !s.commitmentId) continue;
+    const due = records.commitments.find((c) => c.id === s.commitmentId)?.anchors.due;
+    if (due && s.claim.newDate <= due) continue;
     const moved = run.events.some((e) => e.commitmentId === s.commitmentId && e.direction === "in"
       && e.overriddenBy?.includes(s.id));
     if (moved) out.push({ warning: "payment_slip", evidenceRefs: [s.id, s.commitmentId], neededBy: run.asOf });

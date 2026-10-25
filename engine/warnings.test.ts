@@ -184,6 +184,50 @@ describe("warnings on the legacy fixture", () => {
     expect(r.firstBelowSafety).toBe("2026-10-27");
     expect(deferred).not.toContain("payroll");
   });
+
+  it("treats a bank-detected commitment in a non-deferrable category as non-deferrable", () => {
+    const early = fixture("2026-10-27");
+    early.records.commitments.push(commitment({ id: "payroll-bank", type: "recurring", amount: 100_000,
+      category: "payroll" }));
+    const r = forecastOf([...early.events, event("payroll-bank", "2026-10-27", 100_000, "out", 1)]);
+    const deferred = runChecks(r, early.records, profile).flatMap((c) =>
+      c.lever?.kind === "defer" ? [c.lever.commitmentId] : []);
+    expect(deferred).not.toContain("payroll-bank");
+  });
+
+  it("chases an overdue receivable as soon as the owner can reach them", () => {
+    const f = fixture();
+    f.records.commitments.push(commitment({ id: "inv-90", type: "invoice", amount: 500_000, partyId: "evergreen",
+      reference: "INV-90", anchors: { due: "2026-10-01" } }));
+    const r = forecastOf([...f.events, event("inv-90", "2026-10-01", 500_000, "in", 0.7)]);
+    const chase = runChecks(r, f.records, profile).find((c) => c.lever?.commitmentId === "inv-90");
+    expect(chase?.lever).toEqual({ kind: "chase", commitmentId: "inv-90", assumeDate: "2026-10-28" });
+  });
+
+  it("applies an all-parties flexibility rule, and skips one the base run already applied", () => {
+    const all = { id: "r-all", scope: { all: true as const }, kind: "flexibility" as const,
+      params: { extraDays: 7 }, fromNote: "suppliers usually give a week", state: "confirmed" as const };
+    const defer = runChecks(run, { ...records, rules: [all] }, profile).find((c) => c.lever?.kind === "defer");
+    expect(defer?.lever).toEqual({ kind: "defer", commitmentId: "bill-0042", days: 7 });
+
+    const applied = events.map((e) => (e.commitmentId === "bill-0042" ? { ...e, overriddenBy: ["r-all"] } : e));
+    const again = runChecks(forecastOf(applied), { ...records, rules: [all] }, profile);
+    expect(again.some((c) => c.lever?.kind === "defer")).toBe(false);
+  });
+
+  it("counts receivables with no party in the concentration total", () => {
+    const f = fixture();
+    f.records.commitments.push(commitment({ id: "inv-x", type: "invoice", amount: 3_000_000, anchors: {} }));
+    const r = forecastOf([...f.events, event("inv-x", "2026-11-10", 3_000_000, "in", 1)]);
+    // Evergreen: 1,200,000 of 4,200,000 = 29% <= 30%
+    expect(runChecks(r, f.records, profile).some((c) => c.warning === "ar_concentration_risk")).toBe(false);
+  });
+
+  it("does not raise a payment slip when the new date is not later than the due date", () => {
+    const f = fixture();
+    f.records.signals[0]!.claim = { kind: "date_change", newDate: "2026-10-27" };
+    expect(runChecks(forecastOf(f.events), f.records, profile).some((c) => c.warning === "payment_slip")).toBe(false);
+  });
 });
 
 describe("rank", () => {
@@ -217,6 +261,13 @@ describe("rank", () => {
       [{ id: "wi-projected_cash_gap-chase-inv-104", state: "done" }]);
     expect(again.today.map((w) => w.id)).toEqual(["wi-projected_cash_gap-defer-bill-0042"]);
     expect(again.all.find((w) => w.id === "wi-projected_cash_gap-chase-inv-104")?.state).toBe("done");
+  });
+
+  it("formats amounts in the profile's base currency and keeps the idle item id stable", () => {
+    const eur = rank(candidates, run, records, { ...profile, baseCurrency: "EUR" }, simulator(run, records));
+    expect(eur.all.find((w) => w.lever?.kind === "chase")?.why)
+      .toBe("Collecting it by 2026-10-28 raises your low point by €12,000.");
+    expect(eur.all.find((w) => w.warning === "idle_balance_over")?.id).toBe("wi-idle_balance_over");
   });
 
   it("drops levers that do not raise the low point", () => {

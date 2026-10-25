@@ -20,13 +20,21 @@ export type Brief = {
   all: WorkItem[];     // everything, best first
 };
 
-const money = (minor: number) =>
-  `$${Math.round(Math.abs(minor) / 100).toLocaleString("en-US")}`;
+// Whole units of the profile's base currency, from minor units.
+function moneyFormatter(currency: string) {
+  const fmt = new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: 0 });
+  const minorDigits = new Intl.NumberFormat("en-US", { style: "currency", currency })
+    .resolvedOptions().maximumFractionDigits ?? 2;
+  return (minor: number) => fmt.format(Math.abs(minor) / 10 ** minorDigits);
+}
 
+// Warnings about the whole business rather than one party, commitment, or signal.
+const SUBJECTLESS = new Set(["idle_balance_over"]);
+
+// Stable per subject, check, and lever kind, so done/dismissed state survives reruns.
 export function workItemId(c: Candidate): string {
-  return c.lever
-    ? `wi-${c.warning}-${c.lever.kind}-${c.lever.commitmentId}`
-    : `wi-${c.warning}-${c.evidenceRefs[0] ?? "all"}`;
+  if (c.lever) return `wi-${c.warning}-${c.lever.kind}-${c.lever.commitmentId}`;
+  return SUBJECTLESS.has(c.warning) ? `wi-${c.warning}` : `wi-${c.warning}-${c.evidenceRefs[0] ?? "all"}`;
 }
 
 function relationship(partyId: string | undefined, records: Records, profile: Profile): number {
@@ -36,6 +44,7 @@ function relationship(partyId: string | undefined, records: Records, profile: Pr
 
 function describe(
   c: Candidate, value: number, commitment: Commitment | undefined, run: ForecastRun, records: Records,
+  money: (minor: number) => string,
 ): { title: string; why: string } {
   const partyOf = (id?: string) => records.parties.find((p) => p.id === id)?.name ?? "this party";
   const ref = commitment?.reference ?? commitment?.id ?? "";
@@ -88,6 +97,7 @@ export function rank(
   prior: Pick<WorkItem, "id" | "state">[] = [],
 ): Brief {
   const pending = pendingEventsByCommitment(run);
+  const money = moneyFormatter(profile.baseCurrency);
   const priorState = new Map(prior.map((p) => [p.id, p.state]));
   const byId = new Map<string, WorkItem>();
 
@@ -113,7 +123,7 @@ export function rank(
     const item: WorkItem = {
       id,
       warning: c.warning,
-      ...describe(c, value, commitment, run, records),
+      ...describe(c, value, commitment, run, records, money),
       ...(c.lever ? { lever: c.lever } : {}),
       cashEffect: value,
       neededBy: c.neededBy,
