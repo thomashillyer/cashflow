@@ -156,6 +156,14 @@ type Payments = {
 // settings: engineSettings(profile), resolved once per run (expand() fills it in; absent means resolve from the profile).
 // payments: settlements and tagged bank lines grouped by commitmentId once per run (indexPayments), so matching a
 // commitment's payments does not rescan every record; absent means scan the records.
+// Whether a leg waits for the customer, so the party's lag applies: inflow legs only, never funding or actuals. A leg's
+// own `lagged` flag decides when set; otherwise the profile-wide engine.lag.laggedTypes and laggedAnchors do.
+export function legGetsLag(leg: PaymentPattern["legs"][number], c: Commitment, tun: EngineSettings): boolean {
+  if (leg.direction !== "in" || c.funding || c.status === "actual") return false;
+  if (leg.lagged !== undefined) return leg.lagged;
+  return tun.lag.laggedTypes.includes(c.type) && tun.lag.laggedAnchors.includes(leg.anchor);
+}
+
 export type PaymentContext = { snapDate: string; horizonEnd: string; countedActuals?: Set<string>; byId: Map<string, Commitment>; lags?: Map<string | undefined, Lag>; settings?: EngineSettings; payments?: PaymentIndex };
 
 // Settlements and tagged events by commitmentId, each list in record order (so matching is unchanged).
@@ -369,7 +377,7 @@ function expandCommitment(
     if (unknownPattern(c, profile)) basis += ` [unknown pattern ${c.patternId}; used ${pattern ? `default ${pattern.id}` : "a single due-date leg"}]`;
     let conf = c.status === "possible" ? (c.probability ?? tun.statusConfidence.possible) : tun.statusConfidence[c.status];
     const overriddenBy = [...touched];
-    const lagged = leg.direction === "in" && !c.funding && c.status !== "actual" && tun.lag.laggedTypes.includes(c.type) && tun.lag.laggedAnchors.includes(leg.anchor);
+    const lagged = legGetsLag(leg, c, tun);
     if (lagged) {
       let lag = ctx.lags?.get(c.partyId);
       if (!lag) {

@@ -19,8 +19,8 @@
       "appliesTo": "sales_deal",
       "isDefault": true,
       "legs": [
-        { "share": 0.5, "anchor": "order", "offsetDays": 60, "direction": "in" },
-        { "share": 0.5, "anchor": "delivery", "offsetDays": 60, "direction": "in" }
+        { "share": 0.5, "anchor": "order", "offsetDays": 60, "direction": "in", "lagged": true },
+        { "share": 0.5, "anchor": "delivery", "offsetDays": 60, "direction": "in", "lagged": true }
       ]
     },
     {
@@ -48,7 +48,6 @@
     "stressDelayDays": 14
   },
   "actionLeadDays": { "chase": 5, "defer": 3, "split": 5, "pay_early": 1, "ask_advance": 7 },
-  "engine": { "lag": { "laggedAnchors": ["due", "invoice", "delivery", "month_end", "order"] } },
   "signalSources": ["email"],
   "vocabulary": { "deal": "SOW", "recurring_revenue": "retainer", "milestone": "milestone" }
 }

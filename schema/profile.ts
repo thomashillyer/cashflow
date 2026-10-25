@@ -78,7 +78,9 @@ export type EngineTunables = {
 export type PaymentPattern = {
   id: string;
   appliesTo: CommitmentType;
-  legs: { share: number; anchor: Anchor; offsetDays: number; direction: Direction; weekday?: number }[];  // weekday: 0=Mon..6=Sun, for anchor "weekday"
+  // weekday: 0=Mon..6=Sun, for anchor "weekday". lagged: whether this inflow leg waits for the customer (gets the
+  // party's lag); overrides engine.lag.laggedAnchors/laggedTypes for this leg only; omit to use those lists.
+  legs: { share: number; anchor: Anchor; offsetDays: number; direction: Direction; weekday?: number; lagged?: boolean }[];
   linkedCosts?: { patternId: string; share: number }[];  // share of the deal amount, e.g. supplier cost 0.6
   isDefault?: boolean;                // default for its appliesTo when a commitment has no patternId
 };
