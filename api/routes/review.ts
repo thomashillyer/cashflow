@@ -13,6 +13,7 @@ import { fmtDate } from "../../ai/brief";
 import { fmtMoney } from "../../ai/money";
 import { enrichEvidence, prepareFileImport, type PreparedImport } from "../../adapters/prepare";
 import type { Deps } from "../app";
+import { inferWhatsAppDateOrder, normalizeChat } from "../../adapters/whatsapp/export";
 import { businessIdentity, loadForRun, runInputs, savedScenario } from "../engine";
 import { businessOf, HttpError, isIsoDate } from "../http";
 import type { Business, Store } from "../store";
@@ -148,7 +149,11 @@ async function toInput(adapter: string, body: Record<string, unknown>, now: stri
     }
     case "whatsapp":
       if (typeof body.base64 === "string" || (text === undefined && /\.(zip|txt)$/i.test(fileName ?? ""))) return fromFile("whatsapp", fileName ?? "chat.txt", bytes());
-      return { input: { kind: "whatsapp", raw: raw() } };
+      {
+        const chat = normalizeChat(raw());
+        const order = body.dateOrder === "MDY" || body.dateOrder === "DMY" ? body.dateOrder : inferWhatsAppDateOrder(chat).order;
+        return { input: { kind: "whatsapp", raw: chat, ...(order ? { dateOrder: order } : {}) } };
+      }
     case "paste": {
       const t = raw();
       if (!t.trim()) throw new HttpError(400, "INVALID_ARGUMENT", "Paste the message text first.", { fieldIssues: [{ field: "text", issue: "empty" }] });

@@ -56,7 +56,7 @@ export type Attachment = {
 export type IntakeInput =
   | { kind: "pdf"; bytes: Uint8Array; fileName?: string; source?: InputSource }
   | { kind: "email"; raw: string; attachments?: Attachment[]; source?: InputSource }
-  | { kind: "whatsapp"; raw: string; attachments?: Attachment[]; source?: InputSource }
+  | { kind: "whatsapp"; raw: string; attachments?: Attachment[]; source?: InputSource; dateOrder?: "MDY" | "DMY" }
   | { kind: "paste"; text: string; receivedAt: string; source?: InputSource }
   | {
     kind: "sheet"; sheets: SheetContent[]; source?: InputSource;
@@ -406,7 +406,7 @@ async function readMessage(env: Env, input: Extract<IntakeInput, { kind: "email"
   };
   const parse = (o: typeof pOpts & { receivedAt?: string }): MessageBundle =>
     input.kind === "email" ? parseEmail(text, o)
-      : input.kind === "whatsapp" ? parseWhatsApp(text, o)
+      : input.kind === "whatsapp" ? parseWhatsApp(text, { ...o, ...(input.dateOrder ? { dateOrder: input.dateOrder } : {}) })
         : parsePaste(text, { ...o, receivedAt: input.receivedAt });
   let bundle: MessageBundle;
   try {
@@ -467,7 +467,7 @@ async function readMessage(env: Env, input: Extract<IntakeInput, { kind: "email"
   if (!hasAttachment && bundle.text.trim() !== "") {
     const ids = [parent.id, ...linkIds];
     const segments: SourceSegment[] = [{ evidenceId: parent.id, text: bundle.text }];
-    const extracted = await extractDocument(segments, extractOpts(env, `cand-${parent.id}`, ids));
+    const extracted = await extractDocument(segments, { ...extractOpts(env, `cand-${parent.id}`, ids), ...(input.kind === "whatsapp" && input.dateOrder === "DMY" ? { dayFirst: true } : {}) });
     let cand: IntakeCandidate | undefined = bodyCandidate(env, extracted, bundle);
     if (cand) {
       cand = withCounterparty(cand, ctx.records, [bundle.text], headerEmails(bundle));

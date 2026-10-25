@@ -4,7 +4,7 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { parseWhatsApp } from "../../ai/extract/message";
-import { importWhatsAppExport, normalizeChat, referencedFiles } from "./export";
+import { importWhatsAppExport, inferWhatsAppDateOrder, normalizeChat, referencedFiles } from "./export";
 
 const root = join(__dirname, "..", "..");
 const AT = "2026-10-25T18:00:00Z";
@@ -93,6 +93,38 @@ describe("WhatsApp export", () => {
     expect(r.diagnostics.warnings.join(" ")).toMatch(/March 4 or April 3/);
     const clear = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[11/28/26, 9:14:02 AM] Dana: hi\n"), receivedAt: AT });
     expect(clear.diagnostics.warnings).toEqual([]);
+  });
+
+  it("infers day-first from a header date with a first part over 12, with no ambiguity warning", async () => {
+    const chat = "[03/04/26, 9:14:02 AM] Mei: reminder\n[25/11/26, 9:31:00 AM] Dana: we pay on 05/12\n";
+    const r = await importWhatsAppExport({ fileName: "c.txt", bytes: enc(chat), receivedAt: AT });
+    expect(r.input!.dateOrder).toBe("DMY");
+    expect(r.diagnostics.warnings).toEqual([]);
+  });
+
+  it("infers month-first from a second part over 12, and leaves the order unset when the data conflicts", async () => {
+    const mdy = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[03/04/26, 9:14 AM] A: x\n[11/28/26, 9:15 AM] B: y\n"), receivedAt: AT });
+    expect(mdy.input!.dateOrder).toBe("MDY");
+    const mixed = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[25/11/26, 9:14 AM] A: x\n[11/28/26, 9:15 AM] B: y\n"), receivedAt: AT });
+    expect(mixed.input!.dateOrder).toBeUndefined();
+  });
+
+  it("conflicting headers leave the order unset and say why", async () => {
+    const r = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[25/11/26, 9:14 AM] A: x\n[11/28/26, 9:15 AM] B: y\n"), receivedAt: AT });
+    expect(r.diagnostics.warnings).toEqual(["This chat mixes day-first and month-first dates; export it again from one phone, or paste the messages."]);
+    expect(inferWhatsAppDateOrder("‎[25/11/26, 9:14 AM] A: x\n[11/28/26, 9:15 AM] B: y")).toEqual({ conflict: true, ambiguous: false });
+  });
+
+  it("an all-ambiguous chat still warns and sets no order; an explicit order wins and silences the warning", async () => {
+    const bytes = enc("[03/04/26, 9:14:02 AM] Dana: we pay on 10/11\n");
+    const r = await importWhatsAppExport({ fileName: "c.txt", bytes, receivedAt: AT });
+    expect(r.input!.dateOrder).toBeUndefined();
+    expect(r.diagnostics.warnings.join(" ")).toMatch(/March 4 or April 3/);
+    const given = await importWhatsAppExport({ fileName: "c.txt", bytes, receivedAt: AT, dateOrder: "DMY" });
+    expect(given.input!.dateOrder).toBe("DMY");
+    expect(given.diagnostics.warnings).toEqual([]);
+    const over = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[25/11/26, 9:14 AM] A: x\n"), receivedAt: AT, dateOrder: "MDY" });
+    expect(over.input!.dateOrder).toBe("MDY");
   });
 
   it("a zip with no chat text is explained", async () => {

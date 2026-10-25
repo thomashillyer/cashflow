@@ -691,3 +691,17 @@ describe("what a proposal can do", () => {
     expect(c.every((x) => x.settlement === "open")).toBe(true);
   });
 });
+
+describe("whatsapp day-first chats", () => {
+  // A day-first phone: 03/12/26 is 3 December. No cached Claude response exists for this chat, so the
+  // extraction is not under test; the parsed message date (the evidence's receivedAt) is.
+  const chat = "[25/11/26, 9:14:02 AM] Mei: Reminder INV-1187 is due soon.\n[03/12/26, 9:31:47 AM] Dana: We will pay on 05/12.\n";
+  const receivedAt = async (input: IntakeInput) => (await run(input)).evidence.find((x) => x.channel === "whatsapp")!.receivedAt;
+
+  it("reads the message date day first when the input says DMY", async () => {
+    expect(await receivedAt({ kind: "whatsapp", raw: chat, dateOrder: "DMY" })).toMatch(/^2026-12-03T/);
+  });
+  it("reads it month first by default", async () => {
+    expect(await receivedAt({ kind: "whatsapp", raw: chat.replace("25/11", "11/25") })).toMatch(/^2026-03-12T/);
+  });
+});
