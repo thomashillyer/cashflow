@@ -310,6 +310,12 @@ const live = {
   async setBalance(amount, asOf, account = "main") {
     return http("/balance", { method: "PUT", body: JSON.stringify({ amount, asOf, account }) });
   },
+  async loadSample() {
+    return http("/samples/load", { method: "POST", body: "{}" });
+  },
+  async clearSample() {
+    return http("/samples/clear", { method: "POST", body: "{}" });
+  },
   // partyByCommitment (commitment id -> party id) becomes the same partyOf() the preview context offers.
   async context() {
     const c = await http("/context");
