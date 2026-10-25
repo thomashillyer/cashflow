@@ -11,6 +11,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { AskLiveGuard, type AskLiveOptions } from "./ask-live";
 import type { AiMode } from "./engine";
 import type { Store } from "./store";
+import { MemoryBlobs, type Blobs } from "./blobs";
+import { evidenceRoutes } from "./routes/evidence";
 import { readRoutes } from "./routes/read";
 import { reviewRoutes } from "./routes/review";
 import { ownerRoutes } from "./routes/owner";
@@ -25,6 +27,7 @@ export type Verifier = (token: string) => Promise<User | null>;
 
 export type AppOptions = {
   store: Store;
+  blobs?: Blobs;                   // originals behind Evidence.storageKey; in memory when omitted
   verify: Verifier;
   demoMode?: boolean;              // DEMO_MODE=1: unauthenticated requests may use synthetic businesses
   defaultBusiness?: string;        // sample opened when the caller has no business of their own
@@ -43,7 +46,7 @@ export type AppOptions = {
   schemaStatus?: SchemaStatusFn;   // GET /ready: repo vs database migration version (Supabase store only)
 };
 
-export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "askMode" | "now" | "allowReset">> & {
+export type Deps = Required<Pick<AppOptions, "store" | "blobs" | "demoMode" | "defaultBusiness" | "aiMode" | "askMode" | "now" | "allowReset">> & {
   askGuard: AskLiveGuard;
   askClient?: Anthropic;
   askCacheDirs?: { intent?: string; voice?: string };
@@ -72,7 +75,7 @@ const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals", "/rules",
-  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides"];
+  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides", "/evidence"];
 
 const isApiPath = (url: string) => {
   const path = url.split("?")[0]!;
@@ -97,6 +100,7 @@ const BUSINESS_ID = /^[A-Za-z0-9_-]{1,64}$/;
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const deps: Deps = {
     store: opts.store,
+    blobs: opts.blobs ?? new MemoryBlobs(),
     demoMode: opts.demoMode ?? false,
     defaultBusiness: opts.defaultBusiness ?? "cascade_trade",
     aiMode: opts.aiMode ?? "cache_only",
@@ -202,6 +206,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(workRoutes(deps));
   await app.register(demoRoutes(deps));
   await app.register(overrideRoutes(deps));
+  await app.register(evidenceRoutes(deps));
 
   if (opts.staticDir && existsSync(opts.staticDir)) {
     // The committed app/config.js stays empty (the static preview publishes it). When this server serves the app,
