@@ -12,6 +12,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["schema", "adapters", "engine", "ai", "api", "intake", "fixtures/**/*.ts", "**/*.test.ts"],
+  "include": ["schema", "db", "adapters", "engine", "ai", "api", "intake", "fixtures/**/*.ts", "**/*.test.ts"],
   "exclude": ["node_modules", "dist"]
 }
