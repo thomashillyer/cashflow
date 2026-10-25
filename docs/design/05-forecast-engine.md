@@ -32,7 +32,7 @@ type ForecastRun = {
   firstNegative?: string;      // date
   warnings: string[];          // data-quality: stale source, unresolved reviews, missing facts
   review?: { needed: boolean; reasons: { code: string; message: string; refs: string[] }[] };  // structured needs-review flag
-  days: { date: string; closing: number; eventIds: string[] }[];  // daily drill-down
+  days: { date: string; closing: number; pipeline?: number; eventIds: string[] }[];  // pipeline = closing + weighted possible deals; daily drill-down
   weeks: {
     start: string;             // Monday
     inflow: number; outflow: number; closing: number;
@@ -94,7 +94,7 @@ From the profile: a fixed amount, or N weeks of average fixed costs (recurring o
 ## Deals
 
 - `likely` (won, not yet invoiced): in the main line in full, including linked supplier costs.
-- `possible` (quoted RFQ): never in the main line; contributes `probability × amount` to `pipelineClosing` only.
+- `possible` (quoted RFQ): never in the main line; contributes `probability × amount` to the separate daily `days[].pipeline` and weekly `pipelineClosing` balances, including linked supplier costs in their direction.
 
 ## Currency
 

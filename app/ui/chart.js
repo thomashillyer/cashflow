@@ -12,7 +12,7 @@ export function cashChart(run, { width = 640, height = 260, mini = false, ghost 
   const ih = H - pad.t - pad.b;
 
   const series = [run, ghost, whatIf].filter(Boolean);
-  let lo = Math.min(0, run.safetyLine, ...series.flatMap((r) => r.days.map((d) => d.closing)));
+  let lo = Math.min(0, run.safetyLine, ...series.flatMap((r) => r.days.map((d) => (pipeline && typeof d.pipeline === "number" ? Math.min(d.closing, d.pipeline) : d.closing))));
   let hi = Math.max(run.safetyLine, ...series.flatMap((r) => r.days.map((d) => (pipeline && typeof d.pipeline === "number" ? Math.max(d.closing, d.pipeline) : d.closing))));
   const span = hi - lo || 1;
   lo -= span * 0.08;

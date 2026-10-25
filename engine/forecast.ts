@@ -326,7 +326,7 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     bal += inflow - outflow;
     pipe += possibleByDate.get(date) ?? 0;
     pipelineCum.push(pipe);
-    days.push({ date, inflow, outflow, closing: bal, eventIds: evs.map((e) => e.id) });
+    days.push({ date, inflow, outflow, closing: bal, pipeline: bal + pipe, eventIds: evs.map((e) => e.id) });
   }
 
   const weekStarts = [...new Set(dates.map(mondayOf))];

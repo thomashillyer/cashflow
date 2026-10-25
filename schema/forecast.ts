@@ -12,7 +12,7 @@ export type ForecastRun = {
   fxRates: Record<string, number>;
   openingBalance: number;
   safetyLine: number;
-  days: { date: string; inflow: number; outflow: number; closing: number; eventIds: string[] }[];
+  days: { date: string; inflow: number; outflow: number; closing: number; pipeline?: number; eventIds: string[] }[]; // pipeline = closing + probability-weighted possible deals
   weeks: {
     start: string;             // Monday
     inflow: number; outflow: number; closing: number;

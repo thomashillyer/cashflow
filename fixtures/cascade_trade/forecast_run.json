@@ -15,6 +15,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 14500000,
+      "pipeline": 14500000,
       "eventIds": []
     },
     {
@@ -22,6 +23,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 14500000,
+      "pipeline": 14500000,
       "eventIds": []
     },
     {
@@ -29,6 +31,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 14500000,
+      "pipeline": 14500000,
       "eventIds": []
     },
     {
@@ -36,6 +39,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 14500000,
+      "pipeline": 14500000,
       "eventIds": []
     },
     {
@@ -43,6 +47,7 @@
       "inflow": 0,
       "outflow": 1800000,
       "closing": 12700000,
+      "pipeline": 12700000,
       "eventIds": [
         "evt-po-PO-2291-0"
       ]
@@ -52,6 +57,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12700000,
+      "pipeline": 12700000,
       "eventIds": []
     },
     {
@@ -59,6 +65,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12700000,
+      "pipeline": 12700000,
       "eventIds": []
     },
     {
@@ -66,6 +73,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12700000,
+      "pipeline": 12700000,
       "eventIds": []
     },
     {
@@ -73,6 +81,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12700000,
+      "pipeline": 12700000,
       "eventIds": []
     },
     {
@@ -80,6 +89,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12700000,
+      "pipeline": 12700000,
       "eventIds": []
     },
     {
@@ -87,6 +97,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12700000,
+      "pipeline": 12700000,
       "eventIds": []
     },
     {
@@ -94,6 +105,7 @@
       "inflow": 0,
       "outflow": 1400000,
       "closing": 11300000,
+      "pipeline": 11300000,
       "eventIds": [
         "evt-rec-payroll-1"
       ]
@@ -103,6 +115,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11300000,
+      "pipeline": 11300000,
       "eventIds": []
     },
     {
@@ -110,6 +123,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11300000,
+      "pipeline": 11300000,
       "eventIds": []
     },
     {
@@ -117,6 +131,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11300000,
+      "pipeline": 11300000,
       "eventIds": []
     },
     {
@@ -124,6 +139,7 @@
       "inflow": 0,
       "outflow": 1850000,
       "closing": 9450000,
+      "pipeline": 9450000,
       "eventIds": [
         "evt-po-PO-2302-0",
         "evt-rec-rent-0"
@@ -134,6 +150,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9450000,
       "eventIds": []
     },
     {
@@ -141,6 +158,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9450000,
       "eventIds": []
     },
     {
@@ -148,6 +166,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9450000,
       "eventIds": []
     },
     {
@@ -155,6 +174,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9774000,
       "eventIds": []
     },
     {
@@ -162,6 +182,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9774000,
       "eventIds": []
     },
     {
@@ -169,6 +190,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9774000,
       "eventIds": []
     },
     {
@@ -176,6 +198,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9774000,
       "eventIds": []
     },
     {
@@ -183,6 +206,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9774000,
       "eventIds": []
     },
     {
@@ -190,6 +214,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 9774000,
       "eventIds": []
     },
     {
@@ -197,6 +222,7 @@
       "inflow": 0,
       "outflow": 1400000,
       "closing": 8050000,
+      "pipeline": 8374000,
       "eventIds": [
         "evt-rec-payroll-2"
       ]
@@ -206,6 +232,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 8050000,
+      "pipeline": 8374000,
       "eventIds": []
     },
     {
@@ -213,6 +240,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 8050000,
+      "pipeline": 8374000,
       "eventIds": []
     },
     {
@@ -220,6 +248,7 @@
       "inflow": 0,
       "outflow": 4200000,
       "closing": 3850000,
+      "pipeline": 4174000,
       "eventIds": [
         "evt-bill-SC-0042-0"
       ]
@@ -229,6 +258,7 @@
       "inflow": 0,
       "outflow": 2100000,
       "closing": 1750000,
+      "pipeline": 2074000,
       "eventIds": [
         "evt-po-PO-2302-1",
         "evt-rec-est-tax-0"
@@ -239,6 +269,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1750000,
+      "pipeline": 2074000,
       "eventIds": []
     },
     {
@@ -246,6 +277,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1750000,
+      "pipeline": 2074000,
       "eventIds": []
     },
     {
@@ -253,6 +285,7 @@
       "inflow": 0,
       "outflow": 900000,
       "closing": 850000,
+      "pipeline": 1174000,
       "eventIds": [
         "evt-bill-duties-2291-0"
       ]
@@ -262,6 +295,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 850000,
+      "pipeline": 1174000,
       "eventIds": []
     },
     {
@@ -269,6 +303,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 850000,
+      "pipeline": 1174000,
       "eventIds": []
     },
     {
@@ -276,6 +311,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 850000,
+      "pipeline": 1174000,
       "eventIds": []
     },
     {
@@ -283,6 +319,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 850000,
+      "pipeline": 1174000,
       "eventIds": []
     },
     {
@@ -290,6 +327,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 850000,
+      "pipeline": 1174000,
       "eventIds": []
     },
     {
@@ -297,6 +335,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 850000,
+      "pipeline": 1174000,
       "eventIds": []
     },
     {
@@ -304,6 +343,7 @@
       "inflow": 0,
       "outflow": 1400000,
       "closing": -550000,
+      "pipeline": -226000,
       "eventIds": [
         "evt-rec-payroll-3"
       ]
@@ -313,6 +353,7 @@
       "inflow": 3200000,
       "outflow": 0,
       "closing": 2650000,
+      "pipeline": 2974000,
       "eventIds": [
         "evt-inv-INV-1187-0",
         "evt-inv-INV-1203-0"
@@ -323,6 +364,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2650000,
+      "pipeline": 2974000,
       "eventIds": []
     },
     {
@@ -330,6 +372,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2650000,
+      "pipeline": 2974000,
       "eventIds": []
     },
     {
@@ -337,6 +380,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2650000,
+      "pipeline": 2974000,
       "eventIds": []
     },
     {
@@ -344,6 +388,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2650000,
+      "pipeline": 2974000,
       "eventIds": []
     },
     {
@@ -351,6 +396,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2650000,
+      "pipeline": 2974000,
       "eventIds": []
     },
     {
@@ -358,6 +404,7 @@
       "inflow": 0,
       "outflow": 650000,
       "closing": 2000000,
+      "pipeline": 2324000,
       "eventIds": [
         "evt-rec-rent-1"
       ]
@@ -367,6 +414,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2000000,
+      "pipeline": 2324000,
       "eventIds": []
     },
     {
@@ -374,6 +422,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2000000,
+      "pipeline": 2324000,
       "eventIds": []
     },
     {
@@ -381,6 +430,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2000000,
+      "pipeline": 1400000,
       "eventIds": []
     },
     {
@@ -388,6 +438,7 @@
       "inflow": 800000,
       "outflow": 0,
       "closing": 2800000,
+      "pipeline": 2200000,
       "eventIds": [
         "evt-inv-INV-1196-0"
       ]
@@ -397,6 +448,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2800000,
+      "pipeline": 2200000,
       "eventIds": []
     },
     {
@@ -404,6 +456,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2800000,
+      "pipeline": 2200000,
       "eventIds": []
     },
     {
@@ -411,6 +464,7 @@
       "inflow": 0,
       "outflow": 1400000,
       "closing": 1400000,
+      "pipeline": 800000,
       "eventIds": [
         "evt-rec-payroll-4"
       ]
@@ -420,6 +474,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1400000,
+      "pipeline": 800000,
       "eventIds": []
     },
     {
@@ -427,6 +482,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1400000,
+      "pipeline": 800000,
       "eventIds": []
     },
     {
@@ -434,6 +490,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1400000,
+      "pipeline": 800000,
       "eventIds": []
     },
     {
@@ -441,6 +498,7 @@
       "inflow": 11500000,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": [
         "evt-inv-INV-1215-0"
       ]
@@ -450,6 +508,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -457,6 +516,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -464,6 +524,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -471,6 +532,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -478,6 +540,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -485,6 +548,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -492,6 +556,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -499,6 +564,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -506,6 +572,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 12900000,
+      "pipeline": 12300000,
       "eventIds": []
     },
     {
@@ -513,6 +580,7 @@
       "inflow": 0,
       "outflow": 1400000,
       "closing": 11500000,
+      "pipeline": 10900000,
       "eventIds": [
         "evt-rec-payroll-5"
       ]
@@ -522,6 +590,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10900000,
       "eventIds": []
     },
     {
@@ -529,6 +598,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10900000,
       "eventIds": []
     },
     {
@@ -536,6 +606,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10660000,
       "eventIds": []
     },
     {
@@ -543,6 +614,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10660000,
       "eventIds": []
     },
     {
@@ -550,6 +622,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10660000,
       "eventIds": []
     },
     {
@@ -557,6 +630,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10660000,
       "eventIds": []
     },
     {
@@ -564,6 +638,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10660000,
       "eventIds": []
     },
     {
@@ -571,6 +646,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10660000,
       "eventIds": []
     },
     {
@@ -578,6 +654,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 11500000,
+      "pipeline": 10660000,
       "eventIds": []
     },
     {
@@ -585,6 +662,7 @@
       "inflow": 0,
       "outflow": 650000,
       "closing": 10850000,
+      "pipeline": 10010000,
       "eventIds": [
         "evt-rec-rent-2"
       ]
@@ -594,6 +672,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 10850000,
+      "pipeline": 10010000,
       "eventIds": []
     },
     {
@@ -601,6 +680,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 10850000,
+      "pipeline": 10010000,
       "eventIds": []
     },
     {
@@ -608,6 +688,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 10850000,
+      "pipeline": 10010000,
       "eventIds": []
     },
     {
@@ -615,6 +696,7 @@
       "inflow": 0,
       "outflow": 1400000,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": [
         "evt-rec-payroll-6"
       ]
@@ -624,6 +706,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     },
     {
@@ -631,6 +714,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     },
     {
@@ -638,6 +722,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     },
     {
@@ -645,6 +730,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     },
     {
@@ -652,6 +738,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     },
     {
@@ -659,6 +746,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     },
     {
@@ -666,6 +754,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     },
     {
@@ -673,6 +762,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     },
     {
@@ -680,6 +770,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 9450000,
+      "pipeline": 8610000,
       "eventIds": []
     }
   ],

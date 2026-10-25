@@ -14,6 +14,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 2555327,
+      "pipeline": 2555327,
       "eventIds": [
         "evt-daily-sales-2026-11-16"
       ]
@@ -23,6 +24,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 2831693,
+      "pipeline": 2831693,
       "eventIds": [
         "evt-daily-sales-2026-11-17"
       ]
@@ -32,6 +34,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 2950135,
+      "pipeline": 2950135,
       "eventIds": [
         "evt-daily-sales-2026-11-18"
       ]
@@ -41,6 +44,7 @@
       "inflow": 138183,
       "outflow": 530000,
       "closing": 2558318,
+      "pipeline": 2558318,
       "eventIds": [
         "evt-bill-FP-4400-0",
         "evt-bill-NW-4400-0",
@@ -52,6 +56,7 @@
       "inflow": 157923,
       "outflow": 990000,
       "closing": 1726241,
+      "pipeline": 1726241,
       "eventIds": [
         "evt-daily-sales-2026-11-20",
         "evt-rec-payroll-0",
@@ -63,6 +68,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 1923645,
+      "pipeline": 1923645,
       "eventIds": [
         "evt-daily-sales-2026-11-21"
       ]
@@ -72,6 +78,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 2219751,
+      "pipeline": 2219751,
       "eventIds": [
         "evt-daily-sales-2026-11-22"
       ]
@@ -81,6 +88,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 2575078,
+      "pipeline": 2575078,
       "eventIds": [
         "evt-daily-sales-2026-11-23"
       ]
@@ -90,6 +98,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 2851444,
+      "pipeline": 2851444,
       "eventIds": [
         "evt-daily-sales-2026-11-24"
       ]
@@ -99,6 +108,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 2969886,
+      "pipeline": 2969886,
       "eventIds": [
         "evt-daily-sales-2026-11-25"
       ]
@@ -108,6 +118,7 @@
       "inflow": 138183,
       "outflow": 390000,
       "closing": 2718069,
+      "pipeline": 2718069,
       "eventIds": [
         "evt-bill-FP-4401-0",
         "evt-daily-sales-2026-11-26"
@@ -118,6 +129,7 @@
       "inflow": 157923,
       "outflow": 750000,
       "closing": 2125992,
+      "pipeline": 2125992,
       "eventIds": [
         "evt-daily-sales-2026-11-27",
         "evt-rec-payroll-1"
@@ -128,6 +140,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 2323396,
+      "pipeline": 2323396,
       "eventIds": [
         "evt-daily-sales-2026-11-28"
       ]
@@ -137,6 +150,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 2619502,
+      "pipeline": 2619502,
       "eventIds": [
         "evt-daily-sales-2026-11-29"
       ]
@@ -146,6 +160,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 2974829,
+      "pipeline": 2974829,
       "eventIds": [
         "evt-daily-sales-2026-11-30"
       ]
@@ -155,6 +170,7 @@
       "inflow": 276366,
       "outflow": 550000,
       "closing": 2701195,
+      "pipeline": 2701195,
       "eventIds": [
         "evt-daily-sales-2026-12-01",
         "evt-rec-rent-0"
@@ -165,6 +181,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 2819637,
+      "pipeline": 2819637,
       "eventIds": [
         "evt-daily-sales-2026-12-02"
       ]
@@ -174,6 +191,7 @@
       "inflow": 138183,
       "outflow": 550000,
       "closing": 2407820,
+      "pipeline": 2407820,
       "eventIds": [
         "evt-bill-FP-4402-0",
         "evt-bill-NW-4402-0",
@@ -185,6 +203,7 @@
       "inflow": 357923,
       "outflow": 750000,
       "closing": 2015743,
+      "pipeline": 2015743,
       "eventIds": [
         "evt-daily-sales-2026-12-04",
         "evt-plan-catering-2026-12-04-0",
@@ -196,6 +215,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 2213147,
+      "pipeline": 2213147,
       "eventIds": [
         "evt-daily-sales-2026-12-05"
       ]
@@ -205,6 +225,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 2509253,
+      "pipeline": 2509253,
       "eventIds": [
         "evt-daily-sales-2026-12-06"
       ]
@@ -214,6 +235,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 2864580,
+      "pipeline": 2864580,
       "eventIds": [
         "evt-daily-sales-2026-12-07"
       ]
@@ -223,6 +245,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 3140946,
+      "pipeline": 3140946,
       "eventIds": [
         "evt-daily-sales-2026-12-08"
       ]
@@ -232,6 +255,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 3259388,
+      "pipeline": 3259388,
       "eventIds": [
         "evt-daily-sales-2026-12-09"
       ]
@@ -241,6 +265,7 @@
       "inflow": 138183,
       "outflow": 410000,
       "closing": 2987571,
+      "pipeline": 2987571,
       "eventIds": [
         "evt-bill-FP-4403-0",
         "evt-daily-sales-2026-12-10"
@@ -251,6 +276,7 @@
       "inflow": 507923,
       "outflow": 750000,
       "closing": 2745494,
+      "pipeline": 2745494,
       "eventIds": [
         "evt-daily-sales-2026-12-11",
         "evt-plan-catering-2026-12-11-0",
@@ -262,6 +288,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 2942898,
+      "pipeline": 2942898,
       "eventIds": [
         "evt-daily-sales-2026-12-12"
       ]
@@ -271,6 +298,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 3239004,
+      "pipeline": 3239004,
       "eventIds": [
         "evt-daily-sales-2026-12-13"
       ]
@@ -280,6 +308,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 3594331,
+      "pipeline": 3594331,
       "eventIds": [
         "evt-daily-sales-2026-12-14"
       ]
@@ -289,6 +318,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 3870697,
+      "pipeline": 3870697,
       "eventIds": [
         "evt-daily-sales-2026-12-15"
       ]
@@ -298,6 +328,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 3989139,
+      "pipeline": 3989139,
       "eventIds": [
         "evt-daily-sales-2026-12-16"
       ]
@@ -307,6 +338,7 @@
       "inflow": 138183,
       "outflow": 530000,
       "closing": 3597322,
+      "pipeline": 3597322,
       "eventIds": [
         "evt-bill-FP-4404-0",
         "evt-bill-NW-4404-0",
@@ -318,6 +350,7 @@
       "inflow": 407923,
       "outflow": 750000,
       "closing": 3255245,
+      "pipeline": 3255245,
       "eventIds": [
         "evt-daily-sales-2026-12-18",
         "evt-plan-catering-2026-12-18-0",
@@ -329,6 +362,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 3452649,
+      "pipeline": 3452649,
       "eventIds": [
         "evt-daily-sales-2026-12-19"
       ]
@@ -338,6 +372,7 @@
       "inflow": 296106,
       "outflow": 240000,
       "closing": 3508755,
+      "pipeline": 3508755,
       "eventIds": [
         "evt-daily-sales-2026-12-20",
         "evt-rec-sales-tax-1"
@@ -348,6 +383,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 3864082,
+      "pipeline": 3864082,
       "eventIds": [
         "evt-daily-sales-2026-12-21"
       ]
@@ -357,6 +393,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 4140448,
+      "pipeline": 4140448,
       "eventIds": [
         "evt-daily-sales-2026-12-22"
       ]
@@ -366,6 +403,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 4258890,
+      "pipeline": 4258890,
       "eventIds": [
         "evt-daily-sales-2026-12-23"
       ]
@@ -375,6 +413,7 @@
       "inflow": 138183,
       "outflow": 390000,
       "closing": 4007073,
+      "pipeline": 4007073,
       "eventIds": [
         "evt-bill-FP-4405-0",
         "evt-daily-sales-2026-12-24"
@@ -385,6 +424,7 @@
       "inflow": 157923,
       "outflow": 750000,
       "closing": 3414996,
+      "pipeline": 3414996,
       "eventIds": [
         "evt-daily-sales-2026-12-25",
         "evt-rec-payroll-5"
@@ -395,6 +435,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 3612400,
+      "pipeline": 3612400,
       "eventIds": [
         "evt-daily-sales-2026-12-26"
       ]
@@ -404,6 +445,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 3908506,
+      "pipeline": 3908506,
       "eventIds": [
         "evt-daily-sales-2026-12-27"
       ]
@@ -413,6 +455,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 4263833,
+      "pipeline": 4263833,
       "eventIds": [
         "evt-daily-sales-2026-12-28"
       ]
@@ -422,6 +465,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 4540199,
+      "pipeline": 4540199,
       "eventIds": [
         "evt-daily-sales-2026-12-29"
       ]
@@ -431,6 +475,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 4658641,
+      "pipeline": 4658641,
       "eventIds": [
         "evt-daily-sales-2026-12-30"
       ]
@@ -440,6 +485,7 @@
       "inflow": 138183,
       "outflow": 550000,
       "closing": 4246824,
+      "pipeline": 4246824,
       "eventIds": [
         "evt-bill-FP-4406-0",
         "evt-bill-NW-4406-0",
@@ -451,6 +497,7 @@
       "inflow": 157923,
       "outflow": 1300000,
       "closing": 3104747,
+      "pipeline": 3104747,
       "eventIds": [
         "evt-daily-sales-2027-01-01",
         "evt-rec-payroll-6",
@@ -462,6 +509,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 3302151,
+      "pipeline": 3302151,
       "eventIds": [
         "evt-daily-sales-2027-01-02"
       ]
@@ -471,6 +519,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 3598257,
+      "pipeline": 3598257,
       "eventIds": [
         "evt-daily-sales-2027-01-03"
       ]
@@ -480,6 +529,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 3953584,
+      "pipeline": 3953584,
       "eventIds": [
         "evt-daily-sales-2027-01-04"
       ]
@@ -489,6 +539,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 4229950,
+      "pipeline": 4229950,
       "eventIds": [
         "evt-daily-sales-2027-01-05"
       ]
@@ -498,6 +549,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 4348392,
+      "pipeline": 4348392,
       "eventIds": [
         "evt-daily-sales-2027-01-06"
       ]
@@ -507,6 +559,7 @@
       "inflow": 138183,
       "outflow": 410000,
       "closing": 4076575,
+      "pipeline": 4076575,
       "eventIds": [
         "evt-bill-FP-4407-0",
         "evt-daily-sales-2027-01-07"
@@ -517,6 +570,7 @@
       "inflow": 157923,
       "outflow": 750000,
       "closing": 3484498,
+      "pipeline": 3484498,
       "eventIds": [
         "evt-daily-sales-2027-01-08",
         "evt-rec-payroll-7"
@@ -527,6 +581,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 3681902,
+      "pipeline": 3681902,
       "eventIds": [
         "evt-daily-sales-2027-01-09"
       ]
@@ -536,6 +591,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 3978008,
+      "pipeline": 3978008,
       "eventIds": [
         "evt-daily-sales-2027-01-10"
       ]
@@ -545,6 +601,7 @@
       "inflow": 355327,
       "outflow": 250000,
       "closing": 4083335,
+      "pipeline": 4083335,
       "eventIds": [
         "evt-bill-WSLCB-2027-0",
         "evt-daily-sales-2027-01-11"
@@ -555,6 +612,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 4359701,
+      "pipeline": 4359701,
       "eventIds": [
         "evt-daily-sales-2027-01-12"
       ]
@@ -564,6 +622,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 4478143,
+      "pipeline": 4478143,
       "eventIds": [
         "evt-daily-sales-2027-01-13"
       ]
@@ -573,6 +632,7 @@
       "inflow": 138183,
       "outflow": 2330000,
       "closing": 2286326,
+      "pipeline": 2286326,
       "eventIds": [
         "evt-bill-FP-4408-0",
         "evt-bill-NW-4408-0",
@@ -585,6 +645,7 @@
       "inflow": 157923,
       "outflow": 1150000,
       "closing": 1294249,
+      "pipeline": 1294249,
       "eventIds": [
         "evt-daily-sales-2027-01-15",
         "evt-rec-est-tax-0",
@@ -596,6 +657,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 1491653,
+      "pipeline": 1491653,
       "eventIds": [
         "evt-daily-sales-2027-01-16"
       ]
@@ -605,6 +667,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 1787759,
+      "pipeline": 1787759,
       "eventIds": [
         "evt-daily-sales-2027-01-17"
       ]
@@ -614,6 +677,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 2143086,
+      "pipeline": 2143086,
       "eventIds": [
         "evt-daily-sales-2027-01-18"
       ]
@@ -623,6 +687,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 2419452,
+      "pipeline": 2419452,
       "eventIds": [
         "evt-daily-sales-2027-01-19"
       ]
@@ -632,6 +697,7 @@
       "inflow": 118442,
       "outflow": 240000,
       "closing": 2297894,
+      "pipeline": 2297894,
       "eventIds": [
         "evt-daily-sales-2027-01-20",
         "evt-rec-sales-tax-2"
@@ -642,6 +708,7 @@
       "inflow": 138183,
       "outflow": 390000,
       "closing": 2046077,
+      "pipeline": 2046077,
       "eventIds": [
         "evt-bill-FP-4409-0",
         "evt-daily-sales-2027-01-21"
@@ -652,6 +719,7 @@
       "inflow": 157923,
       "outflow": 750000,
       "closing": 1454000,
+      "pipeline": 1454000,
       "eventIds": [
         "evt-daily-sales-2027-01-22",
         "evt-rec-payroll-9"
@@ -662,6 +730,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 1651404,
+      "pipeline": 1651404,
       "eventIds": [
         "evt-daily-sales-2027-01-23"
       ]
@@ -671,6 +740,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 1947510,
+      "pipeline": 1947510,
       "eventIds": [
         "evt-daily-sales-2027-01-24"
       ]
@@ -680,6 +750,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 2302837,
+      "pipeline": 2302837,
       "eventIds": [
         "evt-daily-sales-2027-01-25"
       ]
@@ -689,6 +760,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 2579203,
+      "pipeline": 2579203,
       "eventIds": [
         "evt-daily-sales-2027-01-26"
       ]
@@ -698,6 +770,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 2697645,
+      "pipeline": 2697645,
       "eventIds": [
         "evt-daily-sales-2027-01-27"
       ]
@@ -707,6 +780,7 @@
       "inflow": 138183,
       "outflow": 550000,
       "closing": 2285828,
+      "pipeline": 2285828,
       "eventIds": [
         "evt-bill-FP-4410-0",
         "evt-bill-NW-4410-0",
@@ -718,6 +792,7 @@
       "inflow": 157923,
       "outflow": 750000,
       "closing": 1693751,
+      "pipeline": 1693751,
       "eventIds": [
         "evt-daily-sales-2027-01-29",
         "evt-rec-payroll-10"
@@ -728,6 +803,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 1891155,
+      "pipeline": 1891155,
       "eventIds": [
         "evt-daily-sales-2027-01-30"
       ]
@@ -737,6 +813,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 2187261,
+      "pipeline": 2187261,
       "eventIds": [
         "evt-daily-sales-2027-01-31"
       ]
@@ -746,6 +823,7 @@
       "inflow": 355327,
       "outflow": 550000,
       "closing": 1992588,
+      "pipeline": 1992588,
       "eventIds": [
         "evt-daily-sales-2027-02-01",
         "evt-rec-rent-2"
@@ -756,6 +834,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 2268954,
+      "pipeline": 2268954,
       "eventIds": [
         "evt-daily-sales-2027-02-02"
       ]
@@ -765,6 +844,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 2387396,
+      "pipeline": 2387396,
       "eventIds": [
         "evt-daily-sales-2027-02-03"
       ]
@@ -774,6 +854,7 @@
       "inflow": 138183,
       "outflow": 410000,
       "closing": 2115579,
+      "pipeline": 2115579,
       "eventIds": [
         "evt-bill-FP-4411-0",
         "evt-daily-sales-2027-02-04"
@@ -784,6 +865,7 @@
       "inflow": 157923,
       "outflow": 750000,
       "closing": 1523502,
+      "pipeline": 1523502,
       "eventIds": [
         "evt-daily-sales-2027-02-05",
         "evt-rec-payroll-11"
@@ -794,6 +876,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 1720906,
+      "pipeline": 1720906,
       "eventIds": [
         "evt-daily-sales-2027-02-06"
       ]
@@ -803,6 +886,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 2017012,
+      "pipeline": 2017012,
       "eventIds": [
         "evt-daily-sales-2027-02-07"
       ]
@@ -812,6 +896,7 @@
       "inflow": 355327,
       "outflow": 0,
       "closing": 2372339,
+      "pipeline": 2372339,
       "eventIds": [
         "evt-daily-sales-2027-02-08"
       ]
@@ -821,6 +906,7 @@
       "inflow": 276366,
       "outflow": 0,
       "closing": 2648705,
+      "pipeline": 2648705,
       "eventIds": [
         "evt-daily-sales-2027-02-09"
       ]
@@ -830,6 +916,7 @@
       "inflow": 118442,
       "outflow": 0,
       "closing": 2767147,
+      "pipeline": 2767147,
       "eventIds": [
         "evt-daily-sales-2027-02-10"
       ]
@@ -839,6 +926,7 @@
       "inflow": 138183,
       "outflow": 530000,
       "closing": 2375330,
+      "pipeline": 2375330,
       "eventIds": [
         "evt-bill-FP-4412-0",
         "evt-bill-NW-4412-0",
@@ -850,6 +938,7 @@
       "inflow": 157923,
       "outflow": 750000,
       "closing": 1783253,
+      "pipeline": 1783253,
       "eventIds": [
         "evt-daily-sales-2027-02-12",
         "evt-rec-payroll-12"
@@ -860,6 +949,7 @@
       "inflow": 197404,
       "outflow": 0,
       "closing": 1980657,
+      "pipeline": 1980657,
       "eventIds": [
         "evt-daily-sales-2027-02-13"
       ]
@@ -869,6 +959,7 @@
       "inflow": 296106,
       "outflow": 0,
       "closing": 2276763,
+      "pipeline": 2276763,
       "eventIds": [
         "evt-daily-sales-2027-02-14"
       ]
