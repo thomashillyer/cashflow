@@ -497,7 +497,7 @@ function countProblems(text: string, f: Facts): string[] {
 // Tense and phrasing rules (P4.18). Tense is relative to asOf, through the code-computed dueStatus: nothing
 // that is not yet due "was due", nothing that is overdue "is due". neededBy is when to ask or act, not a
 // settlement date. The expected date sits "after your lowest point"; a week is not a point in time.
-const PAST_DUE_RE = /\b(?:was|were)\s+due\b|\boverdue\b|\bpast\s+due\b/i;
+const PAST_DUE_RE = /\b(?:was|were)\s+due\b|\b(?:is|are)\s+(?:now\s+)?(?:overdue|past\s+due)\b/i;
 const FUTURE_DUE_RE = /\bnot\s+yet\s+due\b|\b(?:is|are)\s+due\b/i;
 const SETTLED_BY_RE = /\bsettle[ds]?\s+by\b|\bsettlement\s+by\b/i;
 const LOWEST_WEEK_RE = /\b(?:after|before)\s+(?:your|the)\s+lowest\s+week\b/i;
