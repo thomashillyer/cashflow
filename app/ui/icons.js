@@ -26,5 +26,5 @@ export const icon = {
 };
 
 // Neri mark: the brand artwork (ribbon rising to a sun on deep navy), as a square tile.
-export const logo = `<img class="mark" src="./assets/neri-mark-96.png" srcset="./assets/neri-mark-64.png 1x, ./assets/neri-mark-96.png 2x, ./assets/neri-mark-192.png 3x" width="32" height="32" alt="" decoding="async" />`;
-export const logoLarge = `<img class="mark mark-lg" src="./assets/neri-mark-192.png" srcset="./assets/neri-mark-192.png 1x, ./assets/neri-mark-512.png 2x" width="72" height="72" alt="" decoding="async" />`;
+export const logo = `<img class="mark" src="./assets/neri-mark-96.png?v=2" srcset="./assets/neri-mark-64.png?v=2 1x, ./assets/neri-mark-96.png?v=2 2x, ./assets/neri-mark-192.png?v=2 3x" width="32" height="32" alt="" decoding="async" />`;
+export const logoLarge = `<img class="mark mark-lg" src="./assets/neri-mark-192.png?v=2" srcset="./assets/neri-mark-192.png?v=2 1x, ./assets/neri-mark-512.png?v=2 2x" width="72" height="72" alt="" decoding="async" />`;
