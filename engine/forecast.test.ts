@@ -457,3 +457,146 @@ describe("horizon and weeks", () => {
     expect(run.days.at(-1)?.date).toBe(addDays("2026-10-19", 90)); // Sunday Jan 17
   });
 });
+
+describe("recurring items, pattern fallback, daily-sales coverage (#62 #75 #66 #68)", () => {
+  const rent: Profile["recurring"][number] = { id: "rent", name: "Rent", amount: $(1000), cadence: "monthly", anchor: "2026-12-01", category: "rent" };
+  const rentOf = (run: { events: CashEvent[] }) => run.events.filter((e) => e.commitmentId === "rent").map((e) => `${e.legIndex}:${e.date}:${e.amount}`);
+  const withBal = () => {
+    const r = empty();
+    r.balances = [bal($(100000))];
+    return r;
+  };
+
+  it("#75 an anchor after asOf is a phase: earlier occurrences are forecast, legIndex counts from the anchor", () => {
+    const run = forecast(withBal(), { ...profile, recurring: [rent] }, base, "2026-10-25", {});
+    expect(rentOf(run)).toEqual([`-1:2026-11-01:${$(1000)}`, `0:2026-12-01:${$(1000)}`, `1:2027-01-01:${$(1000)}`]);
+    const pay: Profile["recurring"][number] = { id: "pay", name: "Payroll", amount: $(500), cadence: "biweekly", anchor: "2026-11-13", category: "payroll" };
+    const p = forecast(withBal(), { ...profile, recurring: [pay] }, base, "2026-10-25", {});
+    expect(p.events.filter((e) => e.commitmentId === "pay").slice(0, 2).map((e) => `${e.legIndex}:${e.date}`)).toEqual(["-1:2026-10-30", "0:2026-11-13"]);
+  });
+
+  it("#75 startDate and endDate bound the projection", () => {
+    const run = forecast(withBal(), { ...profile, recurring: [{ ...rent, startDate: "2026-12-01", endDate: "2026-12-31" }] }, base, "2026-10-25", {});
+    expect(rentOf(run)).toEqual([`0:2026-12-01:${$(1000)}`]);
+  });
+
+  it("#75 semimonthly before the anchor uses stable 2n / 2n+1 indexes", () => {
+    const semi: Profile["recurring"][number] = { id: "rent", name: "Pay", amount: $(10), cadence: "semimonthly", anchor: "2026-12-01", secondDay: 15, endDate: "2026-12-15", category: "payroll" };
+    const run = forecast(withBal(), { ...profile, recurring: [semi] }, base, "2026-10-25", {});
+    expect(rentOf(run).map((s) => s.split(":").slice(0, 2).join(":"))).toEqual(["-2:2026-11-01", "-1:2026-11-15", "0:2026-12-01", "1:2026-12-15"]);
+  });
+
+  it("#62 a commitment with a profile recurring id overrides amount and anchor but keeps the cadence", () => {
+    const r = withBal();
+    r.commitments = [com("rent", { type: "recurring", amount: $(1200), category: "rent", anchors: { due: "2026-11-05" } })];
+    const run = forecast(r, { ...profile, recurring: [rent] }, base, "2026-10-25", {});
+    expect(rentOf(run)).toEqual([`-1:2026-11-05:${$(1200)}`, `0:2026-12-05:${$(1200)}`, `1:2027-01-05:${$(1200)}`]);
+    expect(run.events.find((e) => e.commitmentId === "rent")?.sourceRef).toEqual(src);
+  });
+
+  it("#62 legIndex counts from the profile anchor, so a re-import that moves the due date keeps override targets", () => {
+    const at = (due: string) => {
+      const r = withBal();
+      r.commitments = [com("rent", { type: "recurring", amount: $(1200), category: "rent", anchors: { due } })];
+      return forecast(r, { ...profile, recurring: [rent] }, base, "2026-10-25", {}).events.find((e) => e.commitmentId === "rent" && e.date === "2026-12-05")?.legIndex;
+    };
+    expect(at("2026-11-05")).toBe(0);
+    expect(at("2026-12-05")).toBe(0);
+    const weekly: Profile["recurring"][number] = { id: "rent", name: "Pay", amount: $(10), cadence: "weekly", anchor: "2026-11-02", category: "payroll" };
+    const w = (due: string) => {
+      const r = withBal();
+      r.commitments = [com("rent", { type: "recurring", amount: $(10), anchors: { due } })];
+      return forecast(r, { ...profile, recurring: [weekly] }, base, "2026-10-25", {}).events.filter((e) => e.commitmentId === "rent").map((e) => `${e.legIndex}:${e.date}`).slice(0, 2);
+    };
+    expect(w("2026-11-04")).toEqual(["-1:2026-10-28", "0:2026-11-04"]);
+    expect(w("2026-11-11")).toEqual(["-1:2026-10-28", "0:2026-11-04"]);
+  });
+
+  it("#62 a paid or credited matched commitment drops only its own occurrence", () => {
+    for (const settlement of ["paid", "credited"] as const) {
+      const r = withBal();
+      r.commitments = [com("rent", { type: "recurring", amount: $(1200), category: "rent", anchors: { due: "2026-11-01" }, settlement })];
+      const run = forecast(r, { ...profile, recurring: [rent] }, base, "2026-10-25", {});
+      expect(rentOf(run)).toEqual([`0:2026-12-01:${$(1200)}`, `1:2027-01-01:${$(1200)}`]);
+    }
+  });
+
+  it("#62 a cancelled matched commitment ends the series from its due date and warns", () => {
+    const r = withBal();
+    r.commitments = [com("rent", { type: "recurring", amount: $(1000), category: "rent", anchors: { due: "2026-12-01" }, settlement: "cancelled" })];
+    const run = forecast(r, { ...profile, recurring: [rent] }, base, "2026-10-25", {});
+    expect(rentOf(run)).toEqual([`-1:2026-11-01:${$(1000)}`]);
+    expect(run.warnings.join(" ")).toMatch(/rent: recurring Rent is cancelled from 2026-12-01.*needs review/);
+  });
+
+  it("#62 an actual matched commitment projects committed occurrences", () => {
+    const r = withBal();
+    r.commitments = [com("rent", { type: "recurring", amount: $(1000), category: "rent", status: "actual", anchors: { due: "2026-10-01" } })];
+    const run = forecast(r, { ...profile, recurring: [rent] }, base, "2026-10-25", {});
+    const evs = run.events.filter((e) => e.commitmentId === "rent");
+    expect(evs.length).toBe(3);
+    expect(evs.every((e) => e.status === "committed")).toBe(true);
+  });
+
+  it("#62 without a due date the commitment overrides the amount only and keeps the profile anchor", () => {
+    const r = withBal();
+    r.commitments = [com("rent", { type: "recurring", amount: $(1200), category: "rent" })];
+    const run = forecast(r, { ...profile, recurring: [rent] }, base, "2026-10-25", {});
+    expect(rentOf(run)).toEqual([`-1:2026-11-01:${$(1200)}`, `0:2026-12-01:${$(1200)}`, `1:2027-01-01:${$(1200)}`]);
+  });
+
+  it("#62 a recurring commitment that yields no events warns", () => {
+    const r = withBal();
+    r.commitments = [com("gym", { type: "recurring", amount: $(50) })];
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    expect(run.warnings.join(" ")).toMatch(/gym: recurring commitment has no due date/);
+  });
+
+  it("#66 an unknown patternId warns and falls back to the type default, saying so in basis", () => {
+    const r = withBal();
+    const deal: Profile["paymentPatterns"][number] = {
+      id: "deal", appliesTo: "sales_deal", isDefault: true,
+      legs: [{ share: 0.3, anchor: "order", offsetDays: 0, direction: "in" }, { share: 0.7, anchor: "delivery", offsetDays: 0, direction: "in" }],
+    };
+    r.commitments = [com("d1", { type: "sales_deal", patternId: "typo", amount: $(1000), anchors: { order: "2026-10-28", delivery: "2026-11-20" } })];
+    const run = forecast(r, { ...profile, paymentPatterns: [...profile.paymentPatterns, deal] }, base, "2026-10-25", {});
+    const evs = run.events.filter((e) => e.commitmentId === "d1");
+    expect(evs.map((e) => e.amount)).toEqual([$(300), $(700)]);
+    expect(evs[0]?.basis).toMatch(/unknown pattern typo; used default deal/);
+    expect(run.warnings.join(" ")).toMatch(/d1: unknown payment pattern typo; used the sales_deal default deal \(needs review\)/);
+  });
+
+  it("#68 the daily-sales average divides by the days of history covered and warns when short", () => {
+    const p: Profile = { ...profile, revenueModel: { kind: "dailySales", weekdayWeights: [1, 1, 1, 1, 1, 1, 1] } };
+    const sale = (date: string): CashEvent => ({ id: `s-${date}`, legIndex: 0, date, amount: $(700), currency: "USD", amountBase: $(700), direction: "in", status: "actual", confidence: 1, basis: "bank", category: "sales", sourceRef: src });
+    const r = withBal();
+    r.events = Array.from({ length: 7 }, (_, i) => sale(addDays("2026-10-18", i)));
+    const run = forecast(r, p, base, "2026-10-25", {});
+    expect(run.events.find((e) => e.commitmentId === "daily-sales")?.amount).toBe($(700));
+    expect(run.warnings.join(" ")).toMatch(/covers only 7 days/);
+    const full = withBal();
+    full.events = Array.from({ length: 28 }, (_, i) => sale(addDays("2026-09-27", i)));
+    const f = forecast(full, p, base, "2026-10-25", {});
+    expect(f.events.find((e) => e.commitmentId === "daily-sales")?.amount).toBe($(700));
+    expect(f.warnings.join(" ")).not.toMatch(/covers only/);
+  });
+
+  it("#68 a single Saturday receipt forecasts the same Saturday amount, weighted by weekday", () => {
+    const p: Profile = { ...profile, revenueModel: { kind: "dailySales", weekdayWeights: [1, 1, 1, 1, 1, 2, 1] } };
+    const r = withBal();
+    r.events = [{ id: "s-sat", legIndex: 0, date: "2026-10-24", amount: $(800), currency: "USD", amountBase: $(800), direction: "in", status: "actual", confidence: 1, basis: "bank", category: "sales", sourceRef: src }];
+    const sales = forecast(r, p, base, "2026-10-25", {}).events.filter((e) => e.commitmentId === "daily-sales");
+    expect(sales.find((e) => e.date === "2026-10-31")?.amount).toBe($(800)); // Saturday
+    expect(sales.find((e) => e.date === "2026-10-26")?.amount).toBe($(400)); // Monday
+  });
+
+  it("#66/#62 settled commitments do not warn about patterns or missing due dates", () => {
+    const r = withBal();
+    r.commitments = [
+      com("d1", { type: "sales_deal", patternId: "typo", amount: $(10), settlement: "paid" }),
+      com("gym", { type: "recurring", amount: $(50), settlement: "cancelled" }),
+    ];
+    const w = forecast(r, profile, base, "2026-10-25", {}).warnings.join(" ");
+    expect(w).not.toMatch(/unknown payment pattern|no due date/);
+  });
+});

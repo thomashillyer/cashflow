@@ -941,7 +941,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -976,7 +976,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "basis": "recurring monthly: Rent, anchored on 2026-12-01",
       "category": "rent",
       "sourceRef": {
         "system": "profile",
@@ -1028,7 +1028,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -1080,7 +1080,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring quarterly: Quarterly estimated taxes, from 2026-12-15",
+      "basis": "recurring quarterly: Quarterly estimated taxes, anchored on 2026-12-15",
       "category": "tax",
       "sourceRef": {
         "system": "profile",
@@ -1116,7 +1116,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -1151,7 +1151,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "basis": "recurring monthly: Rent, anchored on 2026-12-01",
       "category": "rent",
       "sourceRef": {
         "system": "profile",
@@ -1203,7 +1203,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -1238,7 +1238,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -1273,7 +1273,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "basis": "recurring monthly: Rent, anchored on 2026-12-01",
       "category": "rent",
       "sourceRef": {
         "system": "profile",
@@ -1291,7 +1291,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",

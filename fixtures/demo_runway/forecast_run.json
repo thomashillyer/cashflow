@@ -878,7 +878,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring monthly: Payroll, from 2026-11-01 to 2026-11-01",
+      "basis": "recurring monthly: Payroll, anchored on 2026-11-01, ends 2026-11-01",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
