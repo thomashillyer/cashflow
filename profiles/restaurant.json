@@ -32,6 +32,7 @@
     "splitIntervalDays": 14
   },
   "actionLeadDays": { "defer": 2, "pay_early": 1 },
+  "engine": { "salesHistoryDays": 28, "dailySalesConfidence": 0.6 },
   "signalSources": ["email"],
   "vocabulary": { "sales": "covers", "cost": "prime cost" }
 }

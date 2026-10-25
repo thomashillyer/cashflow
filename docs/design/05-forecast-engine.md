@@ -73,9 +73,9 @@ lag_p = (n_p × median_p + k × defaultLagDays) / (n_p + k),   k = profile.lagSh
 ```
 
 - `n_p` = number of past paid invoices for the party; `median_p` = median of (paid − due) in days, negative allowed.
-- Use the last 12 payments at most, so behavior changes show up.
+- Use the last 12 payments at most (profile `engine.lag.maxSamples`), so behavior changes show up.
 - A confirmed `lag_offset` rule replaces the model for that party.
-- **Confidence:** start at `n / (n + k)`, reduce by spread: `confidence = n/(n+k) × 1/(1 + iqrDays/14)`. Shown to the owner as "based on Customer A's last 8 payments."
+- **Confidence:** start at `n / (n + k)`, reduce by spread: `confidence = n/(n+k) × 1/(1 + iqrDays/14)` (14 is profile `engine.lag.iqrScaleDays`; with no history, `engine.lag.noHistoryConfidence`, default 0.1). Shown to the owner as "based on Customer A's last 8 payments."
 - `event.basis` example: `"due 2026-12-02 + 22 days (median of last 8 payments)"`.
 
 ## Free cash

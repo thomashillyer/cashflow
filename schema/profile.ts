@@ -51,6 +51,28 @@ export type Profile = {
   actionLeadDays?: Partial<Record<Lever["kind"], number>>;  // e.g. { chase: 3, defer: 3 }
   signalSources: ("email" | "whatsapp" | "crm" | "owner")[];
   vocabulary: Record<string, string>;
+  engine?: EngineTunables;            // forecast-engine tunables; omit any field for its default (engine/settings.ts)
+};
+
+// Engine tunables that depend on the business. Every field is optional; defaults live in engine/settings.ts
+// (ENGINE_DEFAULTS) and reproduce the engine's behavior before these fields existed.
+export type EngineTunables = {
+  statusConfidence?: { committed?: number; likely?: number; possible?: number };  // event confidence by status (0..1); "actual" is always 1; a commitment's own probability wins for possible
+  dailySalesConfidence?: number;      // confidence of each forecast daily-sales event (dailySales revenue model)
+  salesHistoryDays?: number;          // daily-sales average: days of actual sales receipts before asOf
+  lag?: {
+    maxSamples?: number;              // most recent paid receivables per party used by the lag model
+    noHistoryConfidence?: number;     // lag confidence when a party has no payment history (profile defaultLagDays used)
+    iqrScaleDays?: number;            // lag confidence = n/(n+k) * 1/(1 + IQR/iqrScaleDays): spread (days) that halves confidence
+    laggedAnchors?: Anchor[];         // inflow legs on these anchors wait for the customer, so the party's lag applies
+    laggedTypes?: CommitmentType[];   // commitment types whose inflow legs get the party's lag
+  };
+  settlementMatchDays?: number;       // a books Settlement and a bank line this many days apart (same amount) are one payment
+  staleFallbackDays?: number;         // balance age (days) that needs review when thresholds.staleAfterHours is unset
+  noSnapshotLookbackDays?: number;    // with no balance snapshot, actuals this far before asOf are reported as left out
+  deferDays?: number;                 // defer lever: days to push a payable with no confirmed flexibility rule
+  affordabilityStep?: number;         // deal affordability: grid step of the upfront-share search, in (0, 1]
+  urgencyScaleDays?: number;          // ranking: score = value / (1 + daysUntilNeeded / urgencyScaleDays) * confidence * relationship
 };
 
 export type PaymentPattern = {

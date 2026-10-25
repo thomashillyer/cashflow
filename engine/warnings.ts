@@ -9,10 +9,10 @@ import type { CashEvent, Commitment, Direction, Override, Records } from "../sch
 import { isNonDeferrable } from "./adjust";
 import { runAtUpfrontShare, smallestUpfrontShare } from "./affordability";
 import { addDays } from "./dates";
+import { ENGINE_DEFAULTS, engineSettings } from "./settings";
 
-// Design 07 default when a payable has no confirmed `flexibility` rule. Move to the profile when the
-// schema gains a field for it.
-export const DEFAULT_DEFER_DAYS = 10;
+// Design 07 default when a payable has no confirmed `flexibility` rule; profile engine.deferDays overrides it.
+export const DEFAULT_DEFER_DAYS = ENGINE_DEFAULTS.deferDays;
 
 const minDate = (a: string, b: string) => (a < b ? a : b);
 const maxDate = (a: string, b: string) => (a > b ? a : b);
@@ -110,7 +110,7 @@ export const projectedCashGap: Check = (run, records, profile) => {
 
     if (commitmentDirection(c) === "out" && !isNonDeferrable(profile, c.id, c.category ?? events[0]?.category)) {
       const rule = flexibilityRule(c, records);
-      const days = (rule?.params.extraDays as number | undefined) ?? DEFAULT_DEFER_DAYS;
+      const days = (rule?.params.extraDays as number | undefined) ?? engineSettings(profile).deferDays;
       for (const { leg, legIndex } of legLevers(c, events, "out", profile)) {
         if (leg.date < run.asOf || leg.date > deferUntil) continue;
         // The base run already applied this flexibility; deferring again would double-count it.
