@@ -51,7 +51,20 @@ export type Profile = {
   actionLeadDays?: Partial<Record<Lever["kind"], number>>;  // e.g. { chase: 3, defer: 3 }
   signalSources: ("email" | "whatsapp" | "crm" | "owner")[];
   vocabulary: Record<string, string>;
+  crm?: CrmMapping;                   // how this business's CRM deals become sales_deal commitments (adapters/zoho_crm)
   engine?: EngineTunables;            // forecast-engine tunables; omit any field for its default (engine/settings.ts)
+};
+
+// How CRM deals map to certainty. Stage names are the business's own, so the mapping lives here, not in code.
+// Without an entry, a deal's own CRM probability decides: at or above committedAt it is committed, at or above
+// likelyAt likely, above 0 possible (weighted by that probability), and 0 is lost (skipped).
+export type CrmMapping = {
+  module?: string;                    // default "Deals"
+  fields?: Partial<Record<"name" | "stage" | "amount" | "currency" | "closeDate" | "account" | "probability", string>>;
+  // "skip" = the money is already in the books (delivered, invoiced) or lost: counting it again would double count.
+  stageStatus?: Record<string, "skip" | "committed" | "likely" | "possible">;
+  probabilityStatus?: { committedAt?: number; likelyAt?: number };   // on 0..1; defaults 1 and 0.6
+  defaultCurrency?: string;           // when a deal names none (the profile base currency)
 };
 
 // Engine tunables that depend on the business. Every field is optional; defaults live in engine/settings.ts
