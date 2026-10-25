@@ -26,7 +26,5 @@ build/
 # Claude Code agent worktrees
 .claude/worktrees/
 
-# wrangler files
-.wrangler
 .dev.vars*
 !.dev.vars.example
