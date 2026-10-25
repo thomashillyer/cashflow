@@ -15,13 +15,28 @@ export type AiMode = "live" | "cache_only";
 
 export type RunInputs = { profile: Profile; asOf: string; fxRates: Record<string, number> };
 
+const warned = new Set<string>();
+const defaultWarn = (msg: string) => { if (!warned.has(msg)) { warned.add(msg); console.warn(msg); } };
+
+// FX rates at the boundary: ISO 4217 code (three capital letters) -> positive finite number. Anything else is
+// dropped with a warning, so one bad entry can't poison every conversion.
+export function cleanFxRates(raw: unknown, warn: (msg: string) => void = defaultWarn): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
+  for (const [code, rate] of Object.entries(raw)) {
+    if (/^[A-Z]{3}$/.test(code) && typeof rate === "number" && Number.isFinite(rate) && rate > 0) out[code] = rate;
+    else warn(`Dropped invalid FX rate for "${code}": rates must be positive numbers keyed by ISO 4217 code.`);
+  }
+  return out;
+}
+
 export function runInputs(b: Business, now: () => Date): RunInputs {
   const { account, ...profile } = b.profile;
   return {
     profile: profile as Profile,
     // Samples run at their fixture date; real businesses at today's UTC date.
     asOf: account?.asOf ?? now().toISOString().slice(0, 10),
-    fxRates: account?.fxRates ?? {},
+    fxRates: cleanFxRates(account?.fxRates),
   };
 }
 

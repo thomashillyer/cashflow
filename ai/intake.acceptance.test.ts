@@ -348,7 +348,7 @@ describe("unreadable input", () => {
       expect(c.fields.amount.state).toBe("missing");
     }
     expect(e.noZeroAmount).toBe(true);
-    expect(result.notes.some((n) => /upload a text pdf/i.test(n.text))).toBe(true);
+    expect(result.notes.some((n) => /couldn't read this scan.*enter the amount and due date/i.test(n.text))).toBe(true);
     expect(() => applyProposal(before, result.proposals[0]!, { now: NOW })).toThrow(ApplyError);
     expect(eventsAdded(before, confirmAll(before, result))).toBe(e.eventsAdded);
   });

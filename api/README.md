@@ -41,7 +41,7 @@ The hosted app creates accounts and signs in with email and password directly th
 
 - **Email-link callback:** set the hosted Supabase Authentication Site URL to `https://neri-cash.fly.dev` (for local development, use the app's local origin). The frontend uses that default destination without a redirect override or wildcard allowlist. The default email template works unchanged: open the link in the browser/device where sign-in started so the stored PKCE verifier is available. Existing businesses are restored through `GET /context`; signing in does not call `POST /setup` again. Six-digit OTP templates remain supported.
 - **Email delivery:** without custom SMTP, the built-in sender is limited to team addresses and currently two emails/hour. A configured provider such as SendGrid supports its own recipient and rate-limit policy; the frontend also accepts its six-digit-code templates. Keep anonymous samples available for judges. No sender credentials or auth-confirmation settings are changed by this frontend flow. Configure hosted Auth separately from app deployment; do not push the local `supabase/config.toml` wholesale. [Supabase SMTP limits](https://supabase.com/docs/guides/auth/auth-smtp).
-- Every route except `GET /health` reads `Authorization: Bearer <supabase access token>` and verifies it with `supabase.auth.getUser` (anon-key client). A bad or expired token is `401` (the app then returns to sign-in). No token is `401` unless `DEMO_MODE=1`.
+- Every route except `GET /health` and `GET /ready` reads `Authorization: Bearer <supabase access token>` and verifies it with `supabase.auth.getUser` (anon-key client). A bad or expired token is `401` (the app then returns to sign-in). No token is `401` unless `DEMO_MODE=1`.
 - **Which business:** the `X-Neri-Business` header (or `?business=`) if sent; else the caller's own business; else the default sample. The app does not send one yet, so a signed-in owner sees their own business and everyone else sees the sample.
 - **Membership:** synthetic businesses are open to any verified caller (and to anonymous callers in demo mode). A private business needs membership: a row in `memberships` (tenant-access migration, branch `p3/tenant-access`) or, until that migration is applied, the owner recorded at `POST /setup` (`profile.account.ownerUserId`). Anything else is `404`, the same answer as an unknown id.
 - Reads and writes then use the service-role client, scoped by that business id.
@@ -53,7 +53,8 @@ Errors are `{ error: { code, message, fieldIssues, retryable }, revision? }`; `m
 
 | Route | Does | Returns |
 |---|---|---|
-| `GET /health` | Liveness, no auth | `{ ok, demoMode, aiMode }` |
+| `GET /health` | Liveness, no auth. Always 200 while the process is up (Fly checks it), whatever the database says | `{ ok, demoMode, aiMode }` |
+| `GET /ready` | Readiness, no auth. Compares the newest `supabase/migrations` file with `public.schema_version()`; cached ~30s. Memory store: always ready | `200 { ok: true, schema: { repo, db } }`, or `503 { ok: false, schema: { repo, db }, message }` when the database is behind (run `npx supabase db push`); `schema: null` on the memory store |
 | `GET /context` | Business, owner, time zone, sources with last sync, parties, rules, profile | `{ business, profile, parties, rules, safetyLine, partyByCommitment, storeRevision }` |
 | `GET /brief` | One engine run (`buildBrief`) + words (`writeBrief`) | `{ three, rest, watch, combined, shortfall, run, storeRevision, inputsHash, usedFallback }`; items carry `kind` (`act`/`watch`) and `partyId` |
 | `GET /forecast?scenario=base\|stress` | Forecast run | `ForecastRun` |
@@ -91,3 +92,7 @@ Confirm, dismiss and signal apply/dismiss are one atomic `Store.commitDecision` 
 ## Not served yet
 
 - Owner notes, the account details and import notes live in `businesses.profile.account` (no migration needed).
+
+## Request logs and startup check
+
+Each request writes one structured log line (`msg: "request"`): `reqId`, `method`, `route` (the route pattern, not the URL), `status`, `ms`, `businessId` when one was resolved, and `errorCode` on errors. Bodies, headers and tokens are never logged. Tests run with the logger off. At startup (Supabase store only) the server compares the newest migration file with `schema_version()` and logs one warning naming both versions if the database is behind or the function is missing; it never crashes. FX rates in the business account are checked in `runInputs`: only positive finite numbers keyed by a three-letter ISO 4217 code are used, others are dropped with a warning. The rates used are already in the run (`ForecastRun.fxRates`).

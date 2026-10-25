@@ -1,5 +1,5 @@
 // Layer 1: embedded PDF text per page, with line structure for field evidence.
-// No OCR: image-only PDFs come back "unreadable" and ask for manual completion.
+// No OCR: image-only PDFs come back "unreadable"; ai/extract/scan.ts may read them with Claude vision.
 // Limits from docs/TECHNICAL_PLAN.md section 5. Never throws on bad input.
 
 import type { FieldEvidence } from "../../schema/intake";
@@ -14,6 +14,7 @@ export type PdfText = {
   status: "ok" | "unreadable" | "too_large" | "encrypted" | "failed";
   pages: PdfPage[];
   reason?: string;
+  note?: string;       // e.g. "Read pages 1-10 of 17." when a long PDF was cut at the page limit
 };
 
 type TextItem = { str: string; transform: number[] };
@@ -68,20 +69,20 @@ export async function extractPdfText(bytes: Uint8Array, opts: { evidenceId: stri
     return { evidenceId, status: "failed", pages: [], reason: `Could not read PDF: ${message(err)}` };
   }
   try {
-    if (doc.numPages > PDF_MAX_PAGES) {
-      return { evidenceId, status: "too_large", pages: [], reason: `PDF has ${doc.numPages} pages (limit ${PDF_MAX_PAGES}); split it or enter the fields manually.` };
-    }
+    // Over the page limit we read the first PDF_MAX_PAGES pages and say so; the byte cap still refuses.
+    const last = Math.min(doc.numPages, PDF_MAX_PAGES);
+    const note = doc.numPages > last ? `Read pages 1-${last} of ${doc.numPages}.` : undefined;
     const pages: PdfPage[] = [];
-    for (let n = 1; n <= doc.numPages; n++) {
+    for (let n = 1; n <= last; n++) {
       const page = await doc.getPage(n);
       const content = await page.getTextContent();
       const lines = toLines(content.items.filter((i): i is TextItem => typeof (i as TextItem).str === "string"));
       pages.push({ page: n, lines, text: lines.join("\n") });
     }
     if (pages.every((p) => p.text.length === 0)) {
-      return { evidenceId, status: "unreadable", pages, reason: "No embedded text (likely a scan). Upload a text PDF or enter the fields manually." };
+      return { evidenceId, status: "unreadable", pages, reason: "No embedded text (likely a scan). Upload a text PDF or enter the fields manually.", ...(note ? { note } : {}) };
     }
-    return { evidenceId, status: "ok", pages };
+    return { evidenceId, status: "ok", pages, ...(note ? { note } : {}) };
   } catch (err) {
     return { evidenceId, status: "failed", pages: [], reason: `Could not read PDF text: ${message(err)}` };
   } finally {

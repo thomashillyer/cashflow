@@ -516,11 +516,15 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .drive-list li.speaking { color: #fff; }
 .drive-list li.speaking span { color: #f7c47a; }
 .drive-controls { display: flex; justify-content: center; gap: 20px; padding-top: 16px; }
+/* Play and mic are a matched pair: same size, same soft tinted disc, each in its own colour */
 .drive-btn {
-  width: 84px; height: 84px; border-radius: 50%; border: 0; display: grid; place-items: center;
-  background: #1d2440; color: #fff;
+  width: 92px; height: 92px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: #1d2440; color: #fff; transition: background .15s, color .15s;
 }
-.drive-btn.main { width: 104px; height: 104px; background: #4a5fd9; }
+.drive-btn.main { background: #1c2556; color: #aeb8ff; }
+.drive-btn.main[aria-label="Stop"] { background: #8d9cff; color: #060b26; }
+.drive-btn.main svg { transform: translateX(2px); }
+.drive-btn.main[aria-label="Stop"] svg { transform: none; }
 .drive-btn.rec { background: #3a2a10; color: #f7c47a; }
 .drive-btn.rec[aria-pressed="true"] { background: #f5a93f; color: #2a1800; animation: pulse 1.4s infinite; }
 .drive-btn svg { width: 32px; height: 32px; }
