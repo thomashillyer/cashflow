@@ -1,0 +1,559 @@
+// Layer 1 (P4.12): interpret already-read XLSX sheet content as intake candidates.
+// Person 1 reads the workbook (ExcelJS) and hands over cached cell values; this module
+// decides what the cells mean. Deterministic, no model calls. Cell contents are data.
+//
+// Rules (docs/TECHNICAL_PLAN.md section 5): one invoice per table row, a single-document
+// sheet becomes one candidate, and line items + subtotal + total are never summed into
+// the amount: the amount is the stated total, or missing.
+
+import type { CandidateFields, Field, FieldEvidence, IntakeCandidate } from "../../schema/intake";
+import { fieldFrom, minorUnitDigits, missing, parseAmount, parseDate } from "../normalize";
+
+// Cached values; formulas already resolved. Dates arrive as ISO strings (or Excel serial numbers).
+export type SheetCell = string | number | null;
+// rows[0] is spreadsheet row 1; rows[r][c] is column c, 0-based (c = 0 is column A).
+export type SheetContent = { evidenceId: string; sheet: string; rows: SheetCell[][] };
+
+export const SHEET_MAX_ROWS = 500;
+export const SHEET_MAX_COLUMNS = 50;
+export const SHEET_EXTRACTION_VERSION = "sheet-1";
+
+export type SheetLayout = "document" | "table" | "unknown";
+export type SheetClassification = {
+  layout: SheetLayout;
+  headerRow?: number;           // 1-based spreadsheet row, for "table"
+  reason: string;
+};
+
+export type ColumnKey = "reference" | "party" | "amount" | "currency" | "issueDate" | "dueDate" | "outstanding";
+export type ColumnMapping = Partial<Record<ColumnKey, number>>;   // 0-based column indexes
+
+export type ProposedMapping = {
+  headerRow?: number;                                  // 1-based
+  columns: ColumnMapping;                              // what was used (owner overrides win)
+  headers: Partial<Record<ColumnKey, string>>;         // header text of each mapped column, for the confirm UI
+  partyKind: "customer" | "vendor" | "unknown";
+  source: "inferred" | "owner" | "mixed";
+};
+
+export type SheetOptions = {
+  business: { name: string };
+  currency?: string;            // fallback when the sheet states none; the candidate carries a note
+  dayFirst?: boolean;           // ambiguous 03/04/2026 style dates
+  idPrefix: string;             // candidate ids: `${idPrefix}-${row}` for tables, `${idPrefix}` for documents
+};
+
+export type TableOptions = SheetOptions & {
+  columnMapping?: ColumnMapping;
+  headerRow?: number;           // 1-based; owner-confirmed when the header could not be detected
+};
+
+export type TableResult = {
+  candidates: IntakeCandidate[];
+  rejectedRows: { row: number; reason: string }[];       // row is 1-based
+  proposedMapping: ProposedMapping;
+  reason?: string;              // set when nothing could be produced
+};
+
+// ---------- cell helpers ----------
+
+const text = (c: SheetCell | undefined): string => (c === null || c === undefined ? "" : typeof c === "number" ? String(c) : c.trim());
+const blankRow = (row: SheetCell[] | undefined) => !row || row.every((c) => text(c) === "");
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9#]+/g, " ").trim();
+
+function trimmedRowCount(rows: SheetCell[][]): number {
+  let n = rows.length;
+  while (n > 0 && blankRow(rows[n - 1])) n--;
+  return n;
+}
+
+function limitProblem(sheet: SheetContent): string | undefined {
+  const n = trimmedRowCount(sheet.rows);
+  if (n > SHEET_MAX_ROWS) return `Sheet "${sheet.sheet}" has ${n} rows (limit ${SHEET_MAX_ROWS}); split it or map a smaller range.`;
+  let cols = 0;
+  for (const r of sheet.rows.slice(0, n)) {
+    let w = r.length;
+    while (w > 0 && text(r[w - 1]) === "") w--;
+    cols = Math.max(cols, w);
+  }
+  if (cols > SHEET_MAX_COLUMNS) return `Sheet "${sheet.sheet}" has ${cols} columns (limit ${SHEET_MAX_COLUMNS}); split it or map the needed columns.`;
+  return undefined;
+}
+
+function numToMinor(n: number, currency: string): number | undefined {
+  if (!Number.isFinite(n) || n < 0) return undefined;
+  const scaled = n * 10 ** minorUnitDigits(currency);
+  const r = Math.round(scaled);
+  return Math.abs(scaled - r) < 1e-4 && Number.isSafeInteger(r) ? r : undefined;
+}
+
+function serialToIso(n: number): string | undefined {
+  if (!Number.isFinite(n) || n < 20000 || n > 80000) return undefined;   // roughly years 1954-2118
+  return new Date(Date.UTC(1899, 11, 30) + Math.floor(n) * 86_400_000).toISOString().slice(0, 10);
+}
+
+const evidenceFor = (sheet: SheetContent, row: number, cellText: string): FieldEvidence =>
+  ({ evidenceId: sheet.evidenceId, sheet: sheet.sheet, row, text: cellText });
+
+// Build a field from one cell via normalize.fieldFrom, then point its evidence at sheet/row.
+// `shown` is the full cell text when the parsed value is only part of it ("Total due USD 31,200.00").
+function cellField<T>(
+  sheet: SheetContent, row: number, cell: SheetCell | undefined, parse: (v: string) => T | undefined, label: string, shown?: string,
+): Field<T> {
+  const t = text(cell);
+  const f = fieldFrom({ value: t === "" ? null : t, quote: t }, [{ evidenceId: sheet.evidenceId, text: t }], parse, label);
+  return f.state === "found" ? { state: "found", value: f.value, evidence: [evidenceFor(sheet, row, shown ?? t)] } : f;
+}
+
+type Ctx = { sheet: SheetContent; dayFirst?: boolean; notes: string[] };
+
+const nonNegative = (n: number | undefined) => (n !== undefined && n >= 0 ? n : undefined);
+
+function amountField(ctx: Ctx, row: number, cell: SheetCell | undefined, currency: string, label: string, shown?: string): Field<number> {
+  return cellField(ctx.sheet, row, cell, (v) => (typeof cell === "number" ? numToMinor(cell, currency) : nonNegative(parseAmount(v, currency))), label, shown);
+}
+
+function dateField(ctx: Ctx, row: number, cell: SheetCell | undefined, label: string, shown?: string): Field<string> {
+  return cellField(ctx.sheet, row, cell, (v) => {
+    if (typeof cell === "number") return serialToIso(cell);
+    const p = parseDate(v, { ...(ctx.dayFirst !== undefined ? { dayFirst: ctx.dayFirst } : {}) });
+    if (p?.ambiguous) ctx.notes.push(`${label} "${v}" (row ${row}) is ambiguous; read as ${p.date}. Check day/month order.`);
+    return p?.date;
+  }, label, shown);
+}
+
+const isCurrency = (code: string) => {
+  try {
+    return (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf("currency").includes(code);
+  } catch {
+    return true;
+  }
+};
+const currencyCode = (s: string): string | undefined => {
+  const t = s.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(t) && isCurrency(t) ? t : undefined;
+};
+
+const mentions = (haystack: string, name: string) => haystack.toLowerCase().includes(name.toLowerCase());
+
+// Our own side of the document: found only when the sheet actually names the business.
+function businessField(sheet: SheetContent, name: string): Field<string> {
+  for (let r = 0; r < Math.min(sheet.rows.length, 30); r++) {
+    for (const c of sheet.rows[r] ?? []) {
+      const t = text(c);
+      if (typeof c === "string" && t && mentions(t, name)) return { state: "found", value: name, evidence: [evidenceFor(sheet, r + 1, t)] };
+    }
+  }
+  return missing("the sheet does not name the business");
+}
+
+// ---------- table layout ----------
+
+const HEADER_PATTERNS: Record<ColumnKey, RegExp[]> = {
+  reference: [/^(invoice|inv|bill|document|doc|reference|ref)( (#|no|num|number|id))?$/, /^(number|no|#|id)$/],
+  party: [/^(customer|client|vendor|supplier|buyer|seller|payee|bill to|billed to|sold to|pay to|party|account|name)( name)?$/],
+  currency: [/^(currency|ccy|cur)( code)?$/],
+  issueDate: [/^(invoice|issue|bill|doc|document) date$/, /^(issued|date issued|date)$/],
+  dueDate: [/^(due date|payment due|payment due date|due on|pay by|due)$/],
+  outstanding: [/^(balance due|balance|outstanding|open balance|amount outstanding|amount remaining|remaining|open amount)$/],
+  amount: [/^(invoice total|invoice amount|total amount|total|amount|gross amount|gross)$/, /^(amount due)$/],
+};
+const COLUMN_ORDER: ColumnKey[] = ["reference", "party", "currency", "issueDate", "dueDate", "outstanding", "amount"];
+
+function inferColumns(row: SheetCell[]): ColumnMapping {
+  const out: ColumnMapping = {};
+  const used = new Set<number>();
+  for (const key of COLUMN_ORDER) {
+    let best: { prio: number; col: number } | undefined;
+    row.forEach((c, col) => {
+      if (typeof c !== "string" || used.has(col)) return;
+      const h = norm(c);
+      const prio = HEADER_PATTERNS[key].findIndex((re) => re.test(h));
+      if (prio >= 0 && (!best || prio < best.prio)) best = { prio, col };
+    });
+    if (best) { out[key] = best.col; used.add(best.col); }
+  }
+  return out;
+}
+
+function findTableHeader(rows: SheetCell[][]): { headerRow: number; columns: ColumnMapping } | undefined {
+  const n = trimmedRowCount(rows);
+  for (let r = 0; r < Math.min(n, 25); r++) {
+    const columns = inferColumns(rows[r] ?? []);
+    if (columns.reference === undefined || columns.amount === undefined) continue;
+    if (rows.slice(r + 1, n).some((x) => !blankRow(x))) return { headerRow: r + 1, columns };
+  }
+  return undefined;
+}
+
+// ---------- document layout ----------
+
+type LabelKey =
+  | "subtotal" | "totalDue" | "grandTotal" | "total" | "amountDue" | "charge" | "issueDate" | "dueDate"
+  | "terms" | "buyer" | "seller" | "currency" | "po" | "reference";
+
+// Full-cell matches are tried first, then "Label value" inline cells. Order matters.
+const LABELS: [LabelKey, string][] = [
+  ["subtotal", "sub ?total"],
+  ["totalDue", "total due"],
+  ["grandTotal", "grand total|invoice total|total amount|total payable"],
+  ["amountDue", "amount due|balance due|balance|outstanding|amount outstanding|open balance"],
+  ["total", "total"],
+  ["charge", "freight|shipping( and handling)?|delivery|handling|(sales )?tax( [0-9.]+ ?%?)?|vat|gst|hst|discount|surcharge"],
+  ["issueDate", "invoice date|issue date|date issued|bill date|date"],
+  ["dueDate", "due date|payment due|due by|due on|due"],
+  ["terms", "payment terms|terms"],
+  ["po", "customer po|purchase order( #| no| number)?|po( #| no| number)?"],
+  ["reference", "invoice ?(#|no|number|num|id)|bill ?(#|no|number|num|id)|inv ?(#|no)|document ?(#|no|number)|invoice"],
+  ["buyer", "bill to|billed to|sold to|customer( name)?|client|buyer"],
+  ["seller", "vendor( name)?|supplier( name)?|seller|from"],
+  ["currency", "currency|ccy"],
+];
+const FULL = LABELS.map(([k, src]) => [k, new RegExp(`^(?:${src})$`)] as const);
+const INLINE = LABELS.map(([k, src]) => [k, new RegExp(`^(?:${src})\\s*#?\\s+(.*\\d.*)$`)] as const);
+const INLINE_OK = new Set<LabelKey>(["subtotal", "totalDue", "grandTotal", "amountDue", "total", "reference", "issueDate", "dueDate", "po"]);
+const AMOUNT_LABELS = new Set<LabelKey>(["subtotal", "totalDue", "grandTotal", "amountDue", "total", "charge"]);
+
+type LabelHit = { key: LabelKey; label: string; inline?: string };
+
+function labelOf(cell: SheetCell | undefined): LabelHit | undefined {
+  if (typeof cell !== "string") return undefined;
+  const t = norm(cell);
+  if (!t) return undefined;
+  for (const [key, re] of FULL) if (re.test(t)) return { key, label: t };
+  const lowered = cell.trim().replace(/\s+/g, " ").toLowerCase().replace(/^([a-z ]+?):\s*/, "$1 ");
+  for (const [key, re] of INLINE) {
+    if (!INLINE_OK.has(key)) continue;
+    const m = re.exec(lowered);
+    if (!m) continue;
+    const inline = cell.trim().slice(cell.trim().length - m[1]!.length).trim();
+    if (AMOUNT_LABELS.has(key) && !/^(?:[A-Za-z]{3}\s*)?[$€£]?\s*[(-]?\d/.test(inline)) continue;
+    return { key, label: norm(cell.trim().slice(0, cell.trim().length - m[1]!.length)), inline };
+  }
+  return undefined;
+}
+
+type LineBlock = { header: number; descCol: number; amountCol?: number; rows: number[] };
+
+const SUMMARY_CELL = /^(sub ?-?total|grand total|total( due| amount)?|amount due|balance( due)?)\s*:?$/i;
+
+function findLineItems(rows: SheetCell[][]): LineBlock | undefined {
+  const n = trimmedRowCount(rows);
+  for (let r = 0; r < n; r++) {
+    const heads = (rows[r] ?? []).map((c) => (typeof c === "string" ? norm(c) : ""));
+    const descCol = heads.findIndex((h) => /^(description|item|items|product|service|details|item description)$/.test(h));
+    if (descCol < 0) continue;
+    if (!heads.some((h, i) => i !== descCol && /^(qty|quantity|unit price|price|rate|amount|line total|total)$/.test(h))) continue;
+    const amountCol = heads.findIndex((h) => /^(amount|line total|total|extended( amount| price)?|ext amount|ext price)$/.test(h));
+    const items: number[] = [];
+    for (let i = r + 1; i < n; i++) {
+      const x = rows[i] ?? [];
+      if (blankRow(x)) break;
+      if (x.some((c) => typeof c === "string" && SUMMARY_CELL.test(c.trim()))) break;
+      items.push(i);
+    }
+    return { header: r, descCol, ...(amountCol >= 0 ? { amountCol } : {}), rows: items };
+  }
+  return undefined;
+}
+
+type Found = { key: LabelKey; label: string; r: number; c: number; cell: SheetCell; shown: string };
+
+// Value for a label: inline text, else the next non-blank cell to the right, else the cell below.
+function valueFor(rows: SheetCell[][], r: number, c: number, hit: LabelHit): Found | undefined {
+  const found = valueNear(rows, r, c, hit);
+  // A bare "Invoice" is usually the page title; it only labels a value that looks like a number.
+  if (found && hit.label === "invoice" && !/\d/.test(found.shown)) return undefined;
+  return found;
+}
+
+function valueNear(rows: SheetCell[][], r: number, c: number, hit: LabelHit): Found | undefined {
+  const base = { key: hit.key, label: hit.label, r, c };
+  if (hit.inline !== undefined) return { ...base, cell: hit.inline, shown: text(rows[r]?.[c]) };
+  const row = rows[r] ?? [];
+  for (let cc = c + 1; cc < row.length; cc++) {
+    if (text(row[cc]) === "") continue;
+    if (labelOf(row[cc])) break;
+    return { ...base, c: cc, cell: row[cc] ?? null, shown: text(row[cc]) };
+  }
+  const below = rows[r + 1]?.[c];
+  if (below !== undefined && below !== null && text(below) !== "" && !labelOf(below)) return { ...base, r: r + 1, cell: below, shown: text(below) };
+  return undefined;
+}
+
+export function classifySheet(sheet: SheetContent): SheetClassification {
+  const problem = limitProblem(sheet);
+  if (problem) return { layout: "unknown", reason: problem };
+  const header = findTableHeader(sheet.rows);
+  if (header) {
+    return { layout: "table", headerRow: header.headerRow, reason: `Header row ${header.headerRow} has an invoice number column and an amount column, with data rows below.` };
+  }
+  const block = findLineItems(sheet.rows);
+  const seen = new Set<LabelKey>();
+  sheet.rows.forEach((row, r) => row.forEach((cell, c) => {
+    if (block && r === block.header) return;
+    const hit = labelOf(cell);
+    if (hit && valueFor(sheet.rows, r, c, hit)) seen.add(hit.key);
+  }));
+  const hasTotal = (["totalDue", "grandTotal", "total", "amountDue"] as LabelKey[]).some((k) => seen.has(k));
+  const support = [seen.has("reference"), seen.has("buyer") || seen.has("seller"), seen.has("dueDate"), seen.has("issueDate"), !!block].filter(Boolean).length;
+  if (hasTotal && support >= 2) {
+    return { layout: "document", reason: `Label/value pairs for a single document (total${seen.has("reference") ? ", invoice number" : ""}${block ? ", line items" : ""}).` };
+  }
+  return { layout: "unknown", reason: "No invoice table header (invoice number plus amount) and not enough invoice labels (total, invoice number, bill to, dates); needs the owner to map it." };
+}
+
+// ---------- shared candidate assembly ----------
+
+type PartyKind = "customer" | "vendor" | "unknown";
+const CUSTOMER_HEADER = /^(customer|client|bill(ed)? to|sold to|buyer)\b/;
+const VENDOR_HEADER = /^(vendor|supplier|payee|seller|pay to)\b/;
+
+function partyKind(header: string | undefined): PartyKind {
+  const h = norm(header ?? "");
+  return CUSTOMER_HEADER.test(h) ? "customer" : VENDOR_HEADER.test(h) ? "vendor" : "unknown";
+}
+
+function assemble(args: {
+  id: string; sheet: SheetContent; kind: "invoice" | "bill"; counterparty: Field<string>; business: Field<string>;
+  fields: Omit<CandidateFields, "sellerName" | "buyerName">; notes: string[]; base: number;
+}): IntakeCandidate {
+  const { kind, counterparty, business, fields } = args;
+  const full: CandidateFields = {
+    sellerName: kind === "invoice" ? business : counterparty,
+    buyerName: kind === "invoice" ? counterparty : business,
+    ...fields,
+  };
+  const ok = full.amount.state === "found";
+  const notes = [...args.notes];
+  if (!ok) notes.push("Amount is missing; enter it manually before this can be confirmed.");
+  const lacking = [full.reference, full.amount, full.dueDate, counterparty].filter((f) => f.state !== "found").length;
+  return {
+    id: args.id,
+    revision: 1,
+    extractionVersion: SHEET_EXTRACTION_VERSION,
+    evidenceIds: [args.sheet.evidenceId],
+    kind,
+    direction: kind === "invoice" ? "in" : "out",
+    fields: full,
+    confidence: Math.max(0.3, Math.round((args.base - 0.1 * lacking) * 100) / 100),
+    extraction: ok ? "ok" : "partial",
+    notes,
+  };
+}
+
+// ---------- tableToCandidates ----------
+
+const TOTAL_CELL = /^(grand |sub[ -]?|report )?totals?\s*:?$/i;
+
+export function tableToCandidates(sheet: SheetContent, opts: TableOptions): TableResult {
+  const empty = (reason: string, mapping: ProposedMapping): TableResult => ({ candidates: [], rejectedRows: [], proposedMapping: mapping, reason });
+  const problem = limitProblem(sheet);
+  if (problem) return empty(problem, { columns: {}, headers: {}, partyKind: "unknown", source: "inferred" });
+
+  const detected = findTableHeader(sheet.rows);
+  const headerRow = opts.headerRow ?? detected?.headerRow ?? (opts.columnMapping ? 1 : undefined);
+  const inferred = headerRow !== undefined ? inferColumns(sheet.rows[headerRow - 1] ?? []) : {};
+  const columns: ColumnMapping = { ...inferred, ...opts.columnMapping };
+  const owner = Object.keys(opts.columnMapping ?? {}).length > 0;
+  const headerCells = headerRow !== undefined ? sheet.rows[headerRow - 1] ?? [] : [];
+  const headers: ProposedMapping["headers"] = {};
+  for (const [k, col] of Object.entries(columns) as [ColumnKey, number][]) {
+    const h = text(headerCells[col]);
+    if (h) headers[k] = h;
+  }
+  const kindHint = partyKind(headers.party);
+  const proposedMapping: ProposedMapping = {
+    ...(headerRow !== undefined ? { headerRow } : {}),
+    columns, headers, partyKind: kindHint,
+    source: !owner ? "inferred" : Object.keys(inferred).length === 0 ? "owner" : "mixed",
+  };
+  if (headerRow === undefined || columns.reference === undefined || columns.amount === undefined) {
+    return empty("Could not find an invoice number column and an amount column; confirm the column mapping.", proposedMapping);
+  }
+
+  const refHeader = norm(headers.reference ?? "");
+  const kind: "invoice" | "bill" = kindHint === "vendor" || (kindHint === "unknown" && /^bill\b/.test(refHeader)) ? "bill" : "invoice";
+  const baseNotes: string[] = [];
+  if (kindHint === "unknown") {
+    baseNotes.push(columns.party === undefined
+      ? "No customer or vendor column; treated as an invoice (money in). Check the direction."
+      : `Party column "${headers.party ?? ""}" does not say customer or vendor; treated as ${kind === "bill" ? "a bill (money out)" : "an invoice (money in)"}. Check the direction.`);
+  }
+  const business = businessField(sheet, opts.business.name);
+  const defaultCurrency = opts.currency ? currencyCode(opts.currency) : undefined;
+
+  const candidates: IntakeCandidate[] = [];
+  const rejectedRows: TableResult["rejectedRows"] = [];
+  const n = trimmedRowCount(sheet.rows);
+  for (let r = headerRow; r < n; r++) {
+    const row = sheet.rows[r] ?? [];
+    const rowNo = r + 1;
+    if (blankRow(row)) continue;
+    if (row.some((c) => typeof c === "string" && TOTAL_CELL.test(c.trim()))) {
+      rejectedRows.push({ row: rowNo, reason: "Totals row; not an invoice." });
+      continue;
+    }
+    const refText = text(row[columns.reference]);
+    if (refText === "") { rejectedRows.push({ row: rowNo, reason: "No invoice number." }); continue; }
+    if (!/\d/.test(refText)) { rejectedRows.push({ row: rowNo, reason: `"${refText}" does not look like an invoice number.` }); continue; }
+
+    const notes = [...baseNotes];
+    const ctx: Ctx = { sheet, ...(opts.dayFirst !== undefined ? { dayFirst: opts.dayFirst } : {}), notes };
+    const reference = cellField(sheet, rowNo, row[columns.reference], (v) => v, "Invoice number");
+    const party = columns.party !== undefined ? cellField(sheet, rowNo, row[columns.party], (v) => v, "Party name") : missing<string>("no party column");
+
+    let currency: Field<string> = columns.currency !== undefined
+      ? cellField(sheet, rowNo, row[columns.currency], currencyCode, "Currency")
+      : missing("no currency column");
+    const amountText = text(row[columns.amount]);
+    if (currency.state !== "found" && defaultCurrency && amountText) {
+      currency = { state: "found", value: defaultCurrency, evidence: [evidenceFor(sheet, rowNo, amountText)] };
+      notes.push(`Currency is not stated in the sheet; using the business default ${defaultCurrency}.`);
+    }
+    const cur = currency.state === "found" ? currency.value : "USD";
+    const fields: Omit<CandidateFields, "sellerName" | "buyerName"> = {
+      reference,
+      amount: amountField(ctx, rowNo, row[columns.amount], cur, "Amount"),
+      currency,
+      issueDate: columns.issueDate !== undefined ? dateField(ctx, rowNo, row[columns.issueDate], "Issue date") : missing("no issue date column"),
+      dueDate: columns.dueDate !== undefined ? dateField(ctx, rowNo, row[columns.dueDate], "Due date") : missing("no due date column"),
+      ...(columns.outstanding !== undefined ? { outstanding: amountField(ctx, rowNo, row[columns.outstanding], cur, "Outstanding") } : {}),
+    };
+    candidates.push(assemble({
+      id: `${opts.idPrefix}-${rowNo}`, sheet, kind, counterparty: party, business, fields, notes,
+      base: owner ? 0.9 : 0.85,
+    }));
+  }
+  return { candidates, rejectedRows, proposedMapping };
+}
+
+// ---------- documentToCandidate ----------
+
+export function documentToCandidate(sheet: SheetContent, opts: SheetOptions): IntakeCandidate {
+  const rows = sheet.rows;
+  const block = findLineItems(rows);
+  const notes: string[] = ["Interpreted as a single document from label/value pairs; confirm before it creates anything."];
+  const ctx: Ctx = { sheet, ...(opts.dayFirst !== undefined ? { dayFirst: opts.dayFirst } : {}), notes };
+  const lineRows = new Set(block?.rows ?? []);
+
+  const found = new Map<LabelKey, Found[]>();
+  rows.forEach((row, r) => row.forEach((cell, c) => {
+    if (block && (r === block.header || lineRows.has(r))) return;
+    const hit = labelOf(cell);
+    const v = hit ? valueFor(rows, r, c, hit) : undefined;
+    if (v) found.set(v.key, [...(found.get(v.key) ?? []), v]);
+  }));
+  const first = (k: LabelKey) => found.get(k)?.[0];
+  const ev = (f: Found) => evidenceFor(sheet, f.r + 1, f.shown);
+
+  const tierA = (["totalDue", "grandTotal", "total"] as LabelKey[]).flatMap((k) => found.get(k) ?? []);
+  const tierB = found.get("amountDue") ?? [];
+  const totalCells = tierA.length > 0 ? tierA : tierB;
+
+  // Currency: explicit label, else a code written next to a total, else the business default.
+  let currency: Field<string> = missing("currency not stated");
+  const curLabel = first("currency");
+  const fromLabel = curLabel ? currencyCode(text(curLabel.cell)) : undefined;
+  if (curLabel && fromLabel) currency = { state: "found", value: fromLabel, evidence: [ev(curLabel)] };
+  else {
+    for (const f of [...totalCells, ...(found.get("subtotal") ?? [])]) {
+      const parsed = [...f.shown.matchAll(/\b([A-Za-z]{3})\b/g)].map((m) => currencyCode(m[1]!)).find((x) => x !== undefined);
+      if (parsed) { currency = { state: "found", value: parsed, evidence: [ev(f)] }; break; }
+    }
+  }
+  const defaultCurrency = opts.currency ? currencyCode(opts.currency) : undefined;
+  if (currency.state !== "found" && defaultCurrency && totalCells[0]) {
+    currency = { state: "found", value: defaultCurrency, evidence: [ev(totalCells[0])] };
+    notes.push(`Currency is not stated in the sheet; using the business default ${defaultCurrency}.`);
+  }
+  const cur = currency.state === "found" ? currency.value : "USD";
+  const asAmount = (f: Found, label: string) => amountField(ctx, f.r + 1, f.cell, cur, label, f.shown);
+
+  // Amount: the stated total. Never a sum. Differing totals are a conflict for the owner.
+  let amount: Field<number> = missing("no total line; line items not summed");
+  const stated = totalCells.flatMap((f) => {
+    const a = asAmount(f, "Total");
+    return a.state === "found" ? [{ value: a.value, evidence: a.evidence }] : [];
+  });
+  if (stated.length > 0) {
+    const distinct = [...new Set(stated.map((s) => s.value))];
+    if (distinct.length === 1) amount = { state: "found", value: distinct[0]!, evidence: stated.flatMap((s) => s.evidence) };
+    else {
+      amount = { state: "conflict", values: distinct.map((v) => ({ value: v, evidence: stated.filter((s) => s.value === v).flatMap((s) => s.evidence) })) };
+      notes.push("The sheet states more than one different total; the owner must pick the document total.");
+    }
+  } else if (totalCells.length > 0) {
+    amount = missing(`total "${totalCells[0]!.shown}" could not be read`);
+  }
+
+  // Outstanding: a balance/amount-due line next to a stated total.
+  let outstanding: Field<number> | undefined;
+  if (tierA.length > 0 && tierB[0]) {
+    const o = asAmount(tierB[0], "Outstanding");
+    if (o.state === "found") outstanding = o;
+  }
+
+  // Reconciliation note only: line items + charges vs the stated total. Never overrides it.
+  const total = amount.state === "found" ? amount.value : undefined;
+  const amountCol = block?.amountCol;
+  if (total !== undefined && block && amountCol !== undefined && block.rows.length > 0) {
+    const items = block.rows.flatMap((i) => {
+      const f = amountField(ctx, i + 1, rows[i]?.[amountCol], cur, "Line amount");
+      return f.state === "found" ? [f.value] : [];
+    });
+    if (items.length > 0) {
+      const lineSum = items.reduce((a, b) => a + b, 0);
+      let adjust = 0;
+      for (const f of found.get("charge") ?? []) {
+        const a = asAmount(f, "Charge");
+        if (a.state === "found") adjust += /discount/.test(f.label) ? -a.value : a.value;
+      }
+      const sub = first("subtotal") ? asAmount(first("subtotal")!, "Subtotal") : undefined;
+      const subtotal = sub?.state === "found" ? sub.value : undefined;
+      const reconciles = [lineSum, subtotal].some((b) => b !== undefined && (b + adjust === total || b === total));
+      if (!reconciles) {
+        const digits = minorUnitDigits(cur);
+        const fmt = (n: number) => (n / 10 ** digits).toFixed(digits);
+        notes.push(`Line items sum to ${fmt(lineSum)}${adjust ? ` and charges/discounts to ${fmt(adjust)}` : ""}, which does not match the stated total ${fmt(total)}. Kept the stated total; check the document.`);
+      }
+    }
+  }
+
+  const refF = first("reference");
+  const buyerF = first("buyer");
+  const sellerF = first("seller");
+  const name = opts.business.name;
+  let kind: "invoice" | "bill" | undefined;
+  if (sellerF && mentions(text(sellerF.cell), name)) kind = "invoice";
+  else if (buyerF && mentions(text(buyerF.cell), name)) kind = "bill";
+  else if (buyerF) kind = "invoice";
+  else if (sellerF && /^(vendor|supplier)/.test(sellerF.label)) kind = "bill";
+  if (!kind) {
+    kind = "invoice";
+    notes.push("Could not tell whether the business issued or received this document; treated as an invoice (money in). Check the direction.");
+  }
+  const counterF = kind === "invoice" ? buyerF : sellerF;
+  const str = (f: Found | undefined, label: string, absent: string): Field<string> =>
+    f ? cellField(sheet, f.r + 1, f.cell, (v) => v, label, f.shown) : missing(absent);
+  const dateOf = (k: LabelKey, label: string): Field<string> => {
+    const f = first(k);
+    return f ? dateField(ctx, f.r + 1, f.cell, label, f.shown) : missing(`no ${label.toLowerCase()} label`);
+  };
+  const termsF = first("terms");
+  const poF = first("po");
+  const fields: Omit<CandidateFields, "sellerName" | "buyerName"> = {
+    reference: str(refF, "Invoice number", "no invoice number label"),
+    amount,
+    currency,
+    issueDate: dateOf("issueDate", "Issue date"),
+    dueDate: dateOf("dueDate", "Due date"),
+    ...(outstanding ? { outstanding } : {}),
+    ...(termsF ? { terms: str(termsF, "Terms", "") } : {}),
+    ...(poF ? { poReference: str(poF, "PO reference", "") } : {}),
+  };
+  return assemble({
+    id: opts.idPrefix, sheet, kind, counterparty: str(counterF, "Party name", "no party label"),
+    business: businessField(sheet, name), fields, notes, base: 0.8,
+  });
+}
