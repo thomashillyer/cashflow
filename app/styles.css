@@ -648,13 +648,14 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .attach-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--accent) 14%, var(--sunken)); }
 .attach-btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .attach-btn svg { width: 20px; height: 20px; stroke-width: 2; }
-.attach-list { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; padding: 0 4px; }
+.attach-list { list-style: none; display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; margin: 0 0 8px; padding: 0 4px; }
+.attach-list::-webkit-scrollbar { display: none; }
 .attach-chip {
-  display: inline-flex; align-items: center; gap: 6px; max-width: 240px; padding: 4px 6px 4px 12px; border-radius: 999px;
+  display: inline-flex; flex-shrink: 0; align-items: center; gap: 4px; max-width: 240px; padding: 2px 2px 2px 12px; border-radius: 999px;
   font-size: 13px; background: var(--surface); border: 1px solid var(--rule); color: var(--ink);
 }
 .attach-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.attach-chip button { border: 0; background: none; color: var(--ink-faint); font-size: 16px; line-height: 1; width: 22px; height: 22px; border-radius: 50%; }
+.attach-chip button { border: 0; background: none; color: var(--ink-faint); font-size: 18px; line-height: 1; width: 32px; height: 32px; border-radius: 50%; }
 .attach-chip button:hover { background: var(--sunken); color: var(--ink); }
 
 /* Suggested questions sit in one row right on top of the bar; the row scrolls sideways when it runs long */
@@ -703,6 +704,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   .dock-hints { margin-bottom: 8px; }
   .dock-hints .hint { font-size: 13px; padding: 5px 11px; }
   .home:has(.dock-hints) { padding-bottom: 116px; }
+  .home:has(.attach-list) { padding-bottom: 160px; }
   .dock .askbar input { font-size: 16px; padding: 8px 0; }
   .wide-only { display: none; }
   .kpis { grid-template-columns: 1fr 1fr; }
