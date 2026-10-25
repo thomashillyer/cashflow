@@ -15,7 +15,6 @@ supabase/.branches/
 # Not needed at runtime.
 .git
 **/node_modules
-.wrangler
 .claude
 docs/reviews/
 **/*.log
