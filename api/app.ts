@@ -4,7 +4,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { HttpError, sendError, type NeriRequest, type User } from "./http";
 import type { AiMode } from "./engine";
@@ -15,6 +15,7 @@ import { ownerRoutes } from "./routes/owner";
 import { workRoutes } from "./routes/work";
 import { demoRoutes } from "./routes/demo";
 import { overrideRoutes } from "./routes/overrides";
+import { isBehind, type SchemaStatus, type SchemaStatusFn } from "./schema-status";
 
 // Verifies a Supabase access token. Returns null for an invalid or expired token.
 export type Verifier = (token: string) => Promise<User | null>;
@@ -30,10 +31,27 @@ export type AppOptions = {
   appConfig?: { supabaseUrl?: string; supabaseAnonKey?: string };
   now?: () => Date;
   allowReset?: boolean;            // POST /demo/reset (synthetic businesses only)
-  logger?: boolean;
+  logger?: boolean | { stream: NodeJS.WritableStream }; // tests pass a stream to capture log lines
+  schemaStatus?: SchemaStatusFn;   // GET /ready: repo vs database migration version (Supabase store only)
 };
 
-export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">>;
+export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">> & { schemaStatus?: SchemaStatusFn };
+
+const READY_CACHE_MS = 30_000;
+
+// The fields of a per-request log line. Never bodies, headers or tokens.
+export function requestLogLine(req: FastifyRequest, status: number, ms: number, errorCode?: string) {
+  const businessId = (req as NeriRequest).business?.id;
+  return {
+    reqId: req.id,
+    method: req.method,
+    route: req.routeOptions?.url ?? "unmatched",
+    status,
+    ms: Math.round(ms * 10) / 10,
+    ...(businessId ? { businessId } : {}),
+    ...(errorCode ? { errorCode } : {}),
+  };
+}
 
 // Routes that need a signed-in user but no business yet.
 const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
@@ -64,8 +82,10 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     aiMode: opts.aiMode ?? "cache_only",
     now: opts.now ?? (() => new Date()),
     allowReset: opts.allowReset ?? false,
+    ...(opts.schemaStatus ? { schemaStatus: opts.schemaStatus } : {}),
   };
-  const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 12 * 1024 * 1024 });
+  // disableRequestLogging: the onResponse hook below writes the one structured line per request.
+  const app = Fastify({ logger: opts.logger ?? false, logController: new LogController({ disableRequestLogging: true }), bodyLimit: 12 * 1024 * 1024 });
 
   // The app sends Content-Type: application/json on every call, including body-less POSTs.
   app.removeContentTypeParser("application/json");
@@ -78,12 +98,33 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     }
   });
 
-  app.setErrorHandler((err, _req, reply) => {
+  const errorCodes = new WeakMap<FastifyRequest, string>();
+  app.setErrorHandler((err, req, reply) => {
+    errorCodes.set(req, err instanceof HttpError ? err.code : typeof (err as { code?: unknown }).code === "string" ? (err as { code: string }).code : "INTERNAL");
     if (!(err instanceof HttpError) && ((err as { statusCode?: number }).statusCode ?? 500) >= 500) app.log.error({ code: (err as { code?: string }).code }, "request failed");
     return sendError(reply, err);
   });
 
+  // One structured line per request: no bodies, headers or tokens.
+  app.addHook("onResponse", async (req, reply) => {
+    app.log.info(requestLogLine(req, reply.statusCode, reply.elapsedTime, errorCodes.get(req)), "request");
+  });
+
+  // Liveness only: Fly health-checks this. It must stay 200 while the process is up, whatever the database says.
   app.get("/health", async () => ({ ok: true, demoMode: deps.demoMode, aiMode: deps.aiMode }));
+
+  // Readiness: is the database migrated to what this code expects? Cached ~30s.
+  let cached: { at: number; status: SchemaStatus | null } | undefined;
+  app.get("/ready", async (_req, reply) => {
+    if (!deps.schemaStatus) return { ok: true, schema: null };
+    const t = deps.now().getTime();
+    if (!cached || t - cached.at >= READY_CACHE_MS) {
+      cached = { at: t, status: await deps.schemaStatus().catch(() => null) };
+    }
+    const schema = cached.status ?? { repo: "unknown", db: null };
+    if (cached.status && !isBehind(cached.status)) return { ok: true, schema };
+    return reply.code(503).send({ ok: false, schema, message: "Database is behind the code: run npx supabase db push." });
+  });
 
   app.addHook("preHandler", async (req) => {
     if (!isApiPath(req.url)) return;
