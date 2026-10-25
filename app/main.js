@@ -49,6 +49,8 @@ async function load() {
   app.ctx = await api.context();
   if (app.account.reserve && !app.account.reserveApplied) {
     await api.setSafetyLine(app.account.reserve);
+    app.account = { ...app.account, reserveApplied: true };
+    try { localStorage.setItem("neri.account", JSON.stringify(app.account)); } catch {}
   }
   await refresh();
 }
@@ -559,7 +561,7 @@ function reviewCard(rv) {
     <header><span class="ico">${s.channel === "whatsapp" ? icon.chat : icon.mail}</span><div><b>${esc(rv.party?.name ?? "Unknown sender")} about ${esc(rv.commitment.sourceRef.record)}</b><span>${s.channel === "email" ? "Email" : esc(s.channel)} from ${esc(m?.from ?? "")}, ${dayOf(s.receivedAt)} at ${clock(s.receivedAt)}</span></div></header>
     ${m ? `<div class="message">${body}</div>` : ""}
     <div class="change">
-      <div><small>${esc(rv.commitment.sourceRef.record)}, ${money(rv.commitment.amount)}, expected</small><b>${shortDate(rv.from)}</b><span class="arrow">→</span><b>${shortDate(rv.to)}</b></div>
+      <div><small>${esc(rv.commitment.sourceRef.record)}, ${money(rv.commitment.amount, { currency: rv.commitment.currency })}, expected</small><b>${shortDate(rv.from)}</b><span class="arrow">→</span><b>${shortDate(rv.to)}</b></div>
       <div><small>Your low point</small><b class="${rv.before.amount < 0 ? "below" : ""}">${money(rv.before.amount)}</b><span class="arrow">→</span><b class="${rv.after.amount < 0 ? "below" : ""}">${money(rv.after.amount)}</b></div>
     </div>
     <footer>
@@ -656,7 +658,7 @@ function viewSettings() {
       <div class="seg control" role="group" aria-label="Appearance">${["auto", "light", "dark"].map((t) => `<button data-action="theme" data-t="${t}" aria-pressed="${theme === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div></div>
     <h2 class="section-title" style="margin-top:32px">Rules from your notes</h2>
     <p class="section-note">Things you told Neri about how people pay and get paid. They shape every forecast.</p>
-    ${app.ctx.rules.filter((r) => r.state !== "dismissed").length ? app.ctx.rules.filter((r) => r.state !== "dismissed").map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q><div>${esc(app.ctx.parties.find((p) => p.id === r.scope.partyId)?.name ?? "Everyone")}: ${r.kind === "flexibility" ? `can move payments up to ${r.params.extraDays} days` : r.kind === "lag_offset" ? `pays about ${r.params.offsetDays} days late` : r.kind}${r.state === "confirmed" ? "" : " (waiting for your OK)"}</div></div>`).join("") : `<p>No rules yet.</p>`}
+    ${app.ctx.rules.filter((r) => r.state !== "dismissed").length ? app.ctx.rules.filter((r) => r.state !== "dismissed").map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q><div>${esc(app.ctx.parties.find((p) => p.id === r.scope.partyId)?.name ?? "Everyone")}: ${r.kind === "flexibility" ? `can move payments up to ${r.params.extraDays} days` : r.kind === "lag_offset" ? `pays about ${r.params.offsetDays} days late` : esc(r.kind)}${r.state === "confirmed" ? "" : " (waiting for your OK)"}</div></div>`).join("") : `<p>No rules yet.</p>`}
   </div>`;
 }
 
@@ -789,13 +791,13 @@ async function showRecord(id) {
       <dt>Amount</dt><dd>${money(c.amount, { currency: c.currency })}${c.currency !== (app.ctx.profile.baseCurrency ?? "USD") && rec.events[0] ? ` <span style="color:var(--ink-faint)">(${money(rec.events.reduce((t, e) => t + e.amountBase, 0))})</span>` : ""}</dd>
       ${c.anchors.due ? `<dt>Due</dt><dd>${dayDate(c.anchors.due)}</dd>` : ""}
       ${c.anchors.order ? `<dt>Order date</dt><dd>${dayDate(c.anchors.order)}</dd>` : ""}
-      <dt>Status</dt><dd>${statusWord[c.status] ?? c.status}${c.probability ? `, ${Math.round(c.probability * 100)}% chance` : ""}</dd>
+      <dt>Status</dt><dd>${esc(statusWord[c.status] ?? c.status)}${c.probability ? `, ${Math.round(c.probability * 100)}% chance` : ""}</dd>
       ${lag ? `<dt>How they pay</dt><dd>${Math.abs(lag.medianDaysLate)} days ${lag.medianDaysLate >= 0 ? "late" : "early"}, last ${lag.n} payments</dd>` : ""}
       ${c.discount ? `<dt>Discount</dt><dd>${c.discount.pct}% if paid by ${shortDate(c.discount.byDate)}</dd>` : ""}
       <dt>Source</dt><dd>${/^https?:\/\//.test(c.sourceRef.url ?? "") ? `<a href="${esc(c.sourceRef.url)}" target="_blank" rel="noopener">${esc(sourceName(c.sourceRef.system))}: ${esc(c.sourceRef.record)}</a>` : `${esc(sourceName(c.sourceRef.system))}: ${esc(c.sourceRef.record)}`}</dd>
     </dl>
     <h3 class="section-title">In the forecast</h3>
-    ${rec.events.map((e) => `<div class="event"><b>${dayDate(e.date)}<span class="status">${statusWord[e.status]}</span></b><span class="amt ${e.direction === "in" ? "in" : "out"}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p></div>`).join("") || `<p style="color:var(--ink-soft)">Outside the 13-week view.</p>`}
+    ${rec.events.map((e) => `<div class="event"><b>${dayDate(e.date)}<span class="status">${esc(statusWord[e.status] ?? e.status)}</span></b><span class="amt ${e.direction === "in" ? "in" : "out"}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p></div>`).join("") || `<p style="color:var(--ink-soft)">Outside the 13-week view.</p>`}
     ${rec.message ? `<h3 class="section-title" style="margin-top:18px">The message behind the date</h3><div class="message">${esc(rec.message.body).replace(esc(rec.message.excerpt), `<mark>${esc(rec.message.excerpt)}</mark>`)}</div>` : ""}
     ${rec.rules.length ? `<h3 class="section-title" style="margin-top:18px">Your notes about ${esc(p?.name ?? "")}</h3>${rec.rules.map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q></div>`).join("")}` : ""}
     <p class="fineprint">A payment link or a promise is never treated as paid. Only the bank confirms that.</p>`);
@@ -1123,8 +1125,15 @@ document.addEventListener("click", async (ev) => {
     render();
     const dollars = Number(String(st.reserve).replace(/[^\d.]/g, ""));
     // Preview: connectors marked Ready sign in on the Neri server; here they show as connected. Others wait for a file.
-    await new Promise((r) => setTimeout(r, st.picked.size ? 1100 : 0));
-    await api.completeSetup({ email: app.signup.email, businessName: app.signup.name, kind: st.kind, reserve: dollars ? Math.round(dollars * 100) : null, connect: [...st.picked] });
+    try {
+      await new Promise((r) => setTimeout(r, st.picked.size ? 1100 : 0));
+      await api.completeSetup({ email: app.signup.email, businessName: app.signup.name, kind: st.kind, reserve: dollars ? Math.round(dollars * 100) : null, connect: [...st.picked] });
+    } catch (e) {
+      st.connecting = false;
+      render();
+      toast("Couldn't finish setup", `${e.message} Try again, or upload a file instead.`);
+      return;
+    }
     st.connecting = false;
     history.replaceState(null, "", "#/today");
     await load();

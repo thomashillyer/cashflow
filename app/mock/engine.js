@@ -35,7 +35,7 @@ export function createEngine(fixture) {
           commitmentId: c.id,
           legIndex: l.legIndex,
           date: l.date,
-          amount: l.amount,
+          amount: c.currency === fixture.profile.baseCurrency ? l.amount : Math.round(c.amount * (l.amount / (c.legs.reduce((t, x) => t + x.amount, 0) || l.amount))),
           currency: c.currency,
           amountBase: l.amount,
           direction: l.direction,
