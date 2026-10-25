@@ -1,19 +1,19 @@
 {
-  "key": "1ae6836a0ff36a69cc46865ad98ebc02ce0f57df7e0447f26282b1a893ade2df",
+  "key": "4c7f08a43fe8b75542639633a26207fff5b57bb50f48b32396a69c4539550176",
   "promptVersion": "read_intent@1",
   "model": "claude-opus-5-5",
   "source": "stand-in",
   "output": {
     "kind": "lookup",
-    "partyPhrase": null,
-    "referencePhrase": "INV-1187",
+    "partyPhrase": "Harbor",
+    "referencePhrase": null,
     "amountPhrase": null,
     "datePhrase": null,
     "windowPhrase": null,
-    "commitmentType": "invoice",
-    "direction": null,
+    "commitmentType": null,
+    "direction": "out",
     "ruleKind": null,
     "ruleParamPhrase": null,
-    "containsInstructions": true
+    "containsInstructions": false
   }
 }

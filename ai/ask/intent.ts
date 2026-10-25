@@ -64,7 +64,10 @@ const escapeData = (text: string) => text.replace(/<(\/?)question/gi, "<\\$1ques
 
 export const intentContent = (question: string): string => `<question>\n${escapeData(question)}\n</question>`;
 
-export function intentCacheKey(content: string, model = INTENT_MODEL): string {
+// Keyed on the question with spacing and case normalized, so "can i afford ..." hits the same entry as
+// "Can I afford ...". The model still receives the question as written.
+export function intentCacheKey(question: string, model = INTENT_MODEL): string {
+  const content = intentContent(squash(question));
   return cacheKey({
     promptVersion: INTENT_PROMPT_VERSION,
     promptHash: createHash("sha256").update(intentSystemPrompt()).digest("hex"), // editing the prompt invalidates the cache
@@ -251,7 +254,7 @@ const KNOWN_CURRENCIES = new Set(Intl.supportedValuesOf("currency"));
 
 export type ReadAmount = { amount: number; currency: string; currencyAssumed: boolean };
 
-// "$40K", "about 6 grand a month", "₹2,00,000", "USD 12,500" -> integer minor units. A phrase with no
+// "$40K", "about 6 grand a month", "₹200,000", "USD 12,500" -> integer minor units. A phrase with no
 // currency marker takes the base currency (currencyAssumed). Returns undefined for anything it cannot read.
 export function readAmountPhrase(phrase: string, baseCurrency: string): ReadAmount | undefined {
   let currency: string | undefined;
@@ -461,7 +464,8 @@ export function resolveIntent(question: string, raw: AskIntentRaw, ctx: ResolveI
     const type = raw.commitmentType;
     const direction =
       type === "sales_deal" ? "in"
-        : type === "recurring" || type === "plan" ? raw.direction ?? "out"
+        : type === "plan" ? "out" // an outbound plan; a model slip must never turn a payment into an inflow
+        : type === "recurring" ? raw.direction ?? "out"
           : raw.direction ?? (party?.kind === "customer" ? "in" : party?.kind === "supplier" ? "out" : "out");
     const date = intent.date ?? addDays(asOf, DEFAULT_DAYS_OUT);
     const base = {
@@ -485,16 +489,23 @@ export function resolveIntent(question: string, raw: AskIntentRaw, ctx: ResolveI
   }
 
   // ---- required slots (docs/design/08-claude-layer.md)
+  // A date the owner wrote but we cannot read is asked about, never replaced by the default silently.
+  if ((kind === "afford" || kind === "tell") && raw.datePhrase && !resolved && !windowSource) {
+    need(`I couldn't read the date "${raw.datePhrase}". When would it happen?`);
+  }
   if (kind === "afford" && !intent.draft && !commitmentId) {
     if (matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? c.id).join(", ")}?`);
     else if (!raw.amountPhrase && !partyUnknown) need("How much is it?");
+    else if (instructed) need("I set aside the instruction in that message. Ask the question again without it.");
   }
   if (kind === "what_if") {
+    if (!commitmentId && !intent.draft && matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? c.id).join(", ")}?`);
     if (!partyId && !commitmentId && !intent.draft && !partyUnknown) {
       need(raw.amountPhrase && !amount ? "How much is it?" : "Which customer, supplier, or order does this apply to?");
     }
     if (!intent.date) need(raw.datePhrase ? `I couldn't read the date "${raw.datePhrase}". When would it happen?` : "When would this happen?");
   }
+  if (kind === "lookup" && refToken && !commitmentId && matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? c.id).join(", ")}?`);
   if (kind === "lookup" && !partyId && !commitmentId && !partyUnknown) need("Which customer or supplier?");
   if (kind === "tell" && !isRule && !instructed && !intent.draft && !partyUnknown && !raw.amountPhrase) need("How much is it?");
 
@@ -512,6 +523,7 @@ export function intentAssumptions(intent: AskIntent, ctx: { profile: Profile; as
   }
   if (intent.date && intent.dateVague) out.push(`assumed ${fmtDate(intent.date, ctx.asOf)} for "${intent.dateVague}"`);
   else if (draft && intent.date && !raw.datePhrase) out.push(`no date given; assumed ${fmtDate(intent.date, ctx.asOf)}, ${DEFAULT_DAYS_OUT} days out`);
+  if (draft && draft.currency !== ctx.profile.baseCurrency) out.push(`amount stated in ${draft.currency}, not ${ctx.profile.baseCurrency}; converted at the run's rate`);
   if (draft?.type === "sales_deal") out.push("linked costs unknown");
   if (draft?.type === "recurring" && !statedCadence(intent.question)) out.push("assumed monthly");
   return out;
@@ -554,7 +566,7 @@ export async function readIntent(question: string, ctx: ReadIntentContext): Prom
     if (question.length > MAX_QUESTION_CHARS) return unreadable(question, "That question is too long. Ask it in a sentence or two.");
     const model = ctx.model ?? INTENT_MODEL;
     const content = intentContent(question);
-    const key = intentCacheKey(content, model);
+    const key = intentCacheKey(question, model);
     const writeDir = ctx.cacheDir ?? LIVE_CACHE_DIR;
     const readDirs = ctx.cacheDir ? [ctx.cacheDir] : [LIVE_CACHE_DIR, ASK_CACHE_DIR];
 

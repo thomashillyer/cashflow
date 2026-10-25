@@ -1,15 +1,15 @@
 {
-  "key": "07dce7b8b66b53d229d67923e8e9c7807edd7a6cc2296490bb68a7e727ef7d85",
+  "key": "5bc4313d5dff08a01907fa143bbdbf4895fff7b59bfd33d2c03c326072beff8f",
   "promptVersion": "read_intent@1",
   "model": "claude-opus-5-5",
   "source": "stand-in",
   "output": {
-    "kind": "status",
+    "kind": "fix_gap",
     "partyPhrase": null,
     "referencePhrase": null,
     "amountPhrase": null,
     "datePhrase": null,
-    "windowPhrase": "my tightest week",
+    "windowPhrase": "December",
     "commitmentType": null,
     "direction": null,
     "ruleKind": null,

@@ -1,19 +1,19 @@
 {
-  "key": "84ca60c8d415c1768774b6bff1ec40ed1a8e39e210a675244bdd9a7a902c6c86",
+  "key": "61bbed3aba454ff6fa0284d298aa18cbb100c8dc516e3c4fe911b609d112700f",
   "promptVersion": "read_intent@1",
   "model": "claude-opus-5-5",
   "source": "stand-in",
   "output": {
-    "kind": "fix_gap",
+    "kind": "lookup",
     "partyPhrase": null,
-    "referencePhrase": null,
+    "referencePhrase": "INV-1187",
     "amountPhrase": null,
     "datePhrase": null,
-    "windowPhrase": "December",
-    "commitmentType": null,
+    "windowPhrase": null,
+    "commitmentType": "invoice",
     "direction": null,
     "ruleKind": null,
     "ruleParamPhrase": null,
-    "containsInstructions": false
+    "containsInstructions": true
   }
 }

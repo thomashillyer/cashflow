@@ -7,7 +7,7 @@
 //   npx tsx scripts/intent-standins.ts --write    # write fixtures/cascade_trade/ask/cache/<key>.json
 
 import { ASK_CACHE_DIR, writeCache } from "../ai/cache";
-import { intentCacheKey, intentContent } from "../ai/ask/intent";
+import { intentCacheKey } from "../ai/ask/intent";
 import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../ai/config";
 import type { AskIntentRaw } from "../schema/ask";
 
@@ -79,7 +79,7 @@ export const INTENT_STANDINS: { question: string; raw: AskIntentRaw }[] = [
 if (import.meta.url === `file://${process.argv[1]}`) {
   const write = process.argv.includes("--write");
   for (const { question, raw } of INTENT_STANDINS) {
-    const key = intentCacheKey(intentContent(question));
+    const key = intentCacheKey(question);
     console.log(`${key}  ${question}`);
     if (write) {
       writeCache(ASK_CACHE_DIR, {

@@ -298,7 +298,7 @@ Use the same `BriefContext` and the `WorkItem` loaded for `:id` from the same ru
 
 - A hire is a `type: "recurring"` draft with `anchors.due` = the start date and the cadence in `category` (`cadence:monthly`; `draftCadence(draft)` reads it); the decision step turns it into a profile `recurring` item. `askDraftId(question)` is the `ask-draft-<hash>` id for any synthetic item.
 - `intentAssumptions(intent, { profile, asOf })` lists what code assumed (base currency, a vague date, a default date, "linked costs unknown") for `Decision.assumptions`.
-- `containsInstructions` always means no draft and no rule.
+- `containsInstructions` always means no draft and no rule; an `afford` or `what_if` left with nothing to answer returns an `unresolved` question, and a `tell` becomes `out_of_scope`.
 
 ## Where `number_check` fits
 

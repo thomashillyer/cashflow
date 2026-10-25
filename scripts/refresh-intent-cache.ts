@@ -26,7 +26,7 @@ let failed = 0;
 
 for (const question of questions) {
   const content = intentContent(question);
-  const key = intentCacheKey(content);
+  const key = intentCacheKey(question);
   const result = await callIntentModel(client, content, INTENT_MODEL);
   if ("problem" in result) {
     failed++;
