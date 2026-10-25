@@ -33,3 +33,23 @@ export function httpFailure(provider: string, status: number, fallback: Connecto
   if (status === 429) return { kind: "rate_limit", message: `${provider} asked us to slow down.`, nextStep: `Wait a few minutes and import again, or ${alt}.`, fallback };
   return { kind: "network", message: `${provider} returned an error (${status}).`, nextStep: `Try again later, or ${alt}.`, fallback };
 }
+
+// One bounded GET returning a JSON object, or a ConnectorFailure with a plain next step.
+export async function getJson(opts: {
+  fetch: Fetch; url: string; headers: Record<string, string>; provider: string; fallback: ConnectorError["fallback"]; timeoutMs?: number;
+}): Promise<Record<string, unknown>> {
+  const alt = opts.fallback === "paste" ? "paste the message instead" : "upload an export instead";
+  let res: Awaited<ReturnType<Fetch>>;
+  try {
+    res = await opts.fetch(opts.url, { method: "GET", headers: opts.headers, signal: AbortSignal.timeout(opts.timeoutMs ?? 10_000) });
+  } catch {
+    throw new ConnectorFailure({ kind: "network", message: `${opts.provider} did not answer.`, nextStep: `Try again in a minute, or ${alt}.`, fallback: opts.fallback });
+  }
+  if (res.status < 200 || res.status >= 300) throw new ConnectorFailure(httpFailure(opts.provider, res.status, opts.fallback));
+  let body: unknown;
+  try { body = await res.json(); } catch { body = undefined; }
+  if (typeof body !== "object" || body === null) {
+    throw new ConnectorFailure({ kind: "unsupported", message: `${opts.provider} sent an answer Neri could not read.`, nextStep: `Try again later, or ${alt}.`, fallback: opts.fallback });
+  }
+  return body as Record<string, unknown>;
+}

@@ -96,8 +96,8 @@ describe("pullZoho", () => {
     const r = await pullZoho({ region: "com", token, now: NOW, fetch });
     if (!r.ok) throw new Error("expected ok");
     expect(r.data.settlements).toEqual([
-      expect.objectContaining({ id: "set-zoho-p1-inv-INV-104", commitmentId: "inv-INV-104", amount: 1200000, date: "2026-09-27", sourceRef: { system: "zoho_books", record: "p1" } }),
-      expect.objectContaining({ id: "set-zoho-p2-inv-INV-1190", commitmentId: "inv-INV-1190", amount: 400000, date: "2026-10-20" }),
+      expect.objectContaining({ id: "set-zoho_books-p1-inv-INV-104", commitmentId: "inv-INV-104", amount: 1200000, date: "2026-09-27", sourceRef: { system: "zoho_books", record: "p1" } }),
+      expect.objectContaining({ id: "set-zoho_books-p2-inv-INV-1190", commitmentId: "inv-INV-1190", amount: 400000, date: "2026-10-20" }),
     ]);
     expect(r.data.paymentHistory).toEqual([expect.objectContaining({ invoiceId: "inv-INV-104", due: "2026-09-30", paid: "2026-09-27" })]);
   });
