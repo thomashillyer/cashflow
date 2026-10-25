@@ -1,0 +1,68 @@
+{
+  "id": "contractor",
+  "displayName": "Trades and construction",
+  "baseCurrency": "USD",
+  "horizonWeeks": 13,
+  "freeCashLookaheadWeeks": 6,
+  "defaultLagDays": 10,
+  "lagShrinkageK": 3,
+  "safetyLine": { "kind": "weeksOfFixedCosts", "weeks": 3 },
+  "paymentPatterns": [
+    {
+      "id": "invoice_due",
+      "appliesTo": "invoice",
+      "isDefault": true,
+      "legs": [{ "share": 1, "anchor": "due", "offsetDays": 0, "direction": "in" }]
+    },
+    {
+      "id": "progress_billing_retainage_10",
+      "appliesTo": "invoice",
+      "legs": [
+        { "share": 0.9, "anchor": "due", "offsetDays": 0, "direction": "in" },
+        { "share": 0.1, "anchor": "due", "offsetDays": 60, "direction": "in" }
+      ]
+    },
+    {
+      "id": "contract_deposit_progress_retainage",
+      "appliesTo": "sales_deal",
+      "isDefault": true,
+      "legs": [
+        { "share": 0.1, "anchor": "order", "offsetDays": 0, "direction": "in" },
+        { "share": 0.8, "anchor": "delivery", "offsetDays": 30, "direction": "in" },
+        { "share": 0.1, "anchor": "delivery", "offsetDays": 60, "direction": "in" }
+      ],
+      "linkedCosts": [{ "patternId": "job_materials_net30", "share": 0.4 }]
+    },
+    {
+      "id": "materials_bill_due",
+      "appliesTo": "bill",
+      "isDefault": true,
+      "legs": [{ "share": 1, "anchor": "due", "offsetDays": 0, "direction": "out" }]
+    },
+    {
+      "id": "job_materials_net30",
+      "appliesTo": "purchase_order",
+      "isDefault": true,
+      "legs": [{ "share": 1, "anchor": "order", "offsetDays": 30, "direction": "out" }]
+    }
+  ],
+  "revenueModel": { "kind": "deals" },
+  "recurring": [
+    { "id": "rec-payroll", "name": "Payroll", "amount": 900000, "cadence": "weekly", "anchor": "2026-11-20", "category": "payroll", "nonDeferrable": true },
+    { "id": "rec-equipment", "name": "Equipment lease", "amount": 250000, "cadence": "monthly", "anchor": "2026-12-01", "category": "equipment" },
+    { "id": "rec-insurance", "name": "Insurance", "amount": 120000, "cadence": "monthly", "anchor": "2026-11-10", "category": "insurance", "nonDeferrable": true },
+    { "id": "rec-est-tax", "name": "Quarterly estimated taxes", "amount": 700000, "cadence": "quarterly", "anchor": "2027-01-15", "category": "tax", "nonDeferrable": true }
+  ],
+  "thresholds": {
+    "idleBalanceOver": { "amount": 5000000, "minWeeks": 4 },
+    "arConcentrationPct": 40,
+    "signalAutoApplyConfidence": 0.85,
+    "rankFloor": 0.1,
+    "relationshipPenalty": { "preferred": 0.5, "strategic": 0.5 },
+    "staleAfterHours": 72,
+    "stressDelayDays": 14
+  },
+  "actionLeadDays": { "chase": 5, "defer": 3, "split": 5, "pay_early": 1, "ask_advance": 5 },
+  "signalSources": ["email", "owner"],
+  "vocabulary": { "deal": "job", "invoice": "progress bill", "retainage": "retainage", "cost": "materials" }
+}

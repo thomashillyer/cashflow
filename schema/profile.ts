@@ -17,7 +17,7 @@ export type Profile = {
   paymentPatterns: PaymentPattern[];
   revenueModel:
     | { kind: "deals" }                                   // deals/RFQs/invoices
-    | { kind: "dailySales"; weekdayWeights: number[] }    // restaurants, retail
+    | { kind: "dailySales"; weekdayWeights: number[]; settleLagDays?: number }  // restaurants, retail; settleLagDays: card sales land N days after the sale (default 0)
     | { kind: "retainers" };
   recurring: {
     id: string;                       // stable; becomes the commitment id so overrides can target it

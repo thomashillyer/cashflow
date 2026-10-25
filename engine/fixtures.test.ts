@@ -212,8 +212,10 @@ describe.each(names)("fixture %s", (name) => {
     it("forecasts daily sales from history, shaped by weekday", () => {
       const sales = run().events.filter((e) => e.commitmentId === "daily-sales");
       expect(sales.length).toBe(run().days.length);
-      const byDow = (d: number) => sales.find((e) => new Date(e.date + "T00:00:00Z").getUTCDay() === d)!.amount;
-      expect(byDow(6)).toBeGreaterThan(byDow(1)); // Saturday beats Monday
+      // Weekday of the sale, not the settlement: card sales land settleLagDays after the sale.
+      const lag = profile.revenueModel.kind === "dailySales" ? (profile.revenueModel.settleLagDays ?? 0) : 0;
+      const byDow = (d: number) => sales.find((e) => new Date(e.date + "T00:00:00Z").getUTCDay() === (d + lag) % 7)!.amount;
+      expect(byDow(6)).toBeGreaterThan(byDow(1)); // Saturday sales beat Monday sales
     });
   }
 });
