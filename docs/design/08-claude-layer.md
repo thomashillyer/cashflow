@@ -13,6 +13,68 @@ Claude never computes a forecast or a ranking. It reads, explains, answers, and 
 
 Pick current model IDs from the Anthropic docs on the day; keep them in one config file.
 
+## Ask Neri: a CFO, not a menu
+
+The owner asked for a CFO that infers and recommends with conviction, not a list of options to choose from. Contracts: `schema/ask.ts`.
+
+- **Lead with the call.** Every answer opens with a verdict and one recommendation: "Yes, if Harbor and Hearth pays 40% up front by Dec 1." Never "you could consider A, B, or C." At most one fallback: "If they refuse, ask Jaipur Textiles for 10 more days."
+- **Code decides; Claude voices.** Claude reads the question into an `AskIntent` (quotes, not computed values; code resolves dates, amounts, and parties). Code runs the engine (`forecast`, `simulate`, `runChecks`/`rank`, `smallestUpfrontShare`) and builds a `Decision`: the best move by simulated effect and the profile's ranking, the act-by date, and the resulting low point. Claude turns the Decision into a `CfoAnswer` and cannot change a field.
+- **Conviction is computed, not felt.** `high`/`medium`/`low` from data quality: payment-history sample size, unresolved reviews, stale sources, tentative or possible money in the path, vague dates. The answer says why in plain words and names the one fact that would change the call.
+- **Ask back only when it matters.** If a missing fact changes the call (which supplier? what amount?), ask one short question; otherwise assume the profile default and say so.
+- **Same guardrails.** Every figure passes `number_check` against `Decision.allowed`; citations required; code-built text on failure. Nothing is sent, paid, or applied: a stated plan or rule becomes a proposal with one-tap confirm. No investment or loan product advice (`out_of_scope` -> decline, with the cash facts).
+
+
+**Who judges.** Ask Neri moves judgment into code (the pick, conviction, and what would change the call); Claude reads the question and voices the decision. That is a stricter reading of "Code computes, Claude judges", chosen so a confident tone never rests on an unchecked figure.
+
+**Synthetic inputs.** A hypothetical never goes into overrides (an `Override` only moves, resizes, or excludes an existing commitment). Copy `records` and add a synthetic commitment with id `ask-draft-<hash of question>`, or copy the profile and add a `recurring` item; `buildBrief`, `simulate`, and `forecast` take both. Record them in `Decision.scenarioInputs` so the chart can re-run.
+- Outbound plan (a deposit, a purchase): `type: "plan"`, `direction: "out"`, `status: "likely"`, `anchors.due` = the date, no `patternId`, base currency.
+- Hypothetical inbound deal: `type: "sales_deal"`, `direction: "in"`, `status: "likely"`, `anchors.order` = the date, default pattern, plus the assumption "linked costs unknown".
+- Hire or new fixed cost: a profile `recurring` item, id `ask-draft-<hash>`, cadence monthly unless stated, `anchor` = the start date, `direction: "out"`.
+- A question naming an existing commitment ("Can I take the Harbor order?") uses its `commitmentId`; nothing is synthesized.
+- Date moves ("Evergreen pays in January") are overrides: `{ target: { commitmentId }, change: { date }, origin: "owner" }` in `scenario.overrides`.
+
+**Engine path per intent** (all in `engine/`; `Decision` amounts are in the profile base currency):
+
+| Intent | Path | baseLowPoint / cashEffect | byDate |
+|---|---|---|---|
+| afford, inbound deal | `smallestUpfrontShare` on the deal. `already_ok` -> `yes`, no recommendation. `found` -> `yes_if` with `upfrontShare`. `not_achievable` -> `no` (best share 1, its low point). `not_deal_driven` -> `act_now` via the fix_gap path. | base = `runAtUpfrontShare(currentShare)` low point (`lowPointWithoutDeal` for not_deal_driven); cashEffect = run at the recommended share minus base | date of the upfront leg in the run |
+| afford, outbound plan | `forecast` with the draft added. Low point >= safety line -> `yes`. Else `buildBrief` with the draft added; pick as fix_gap; re-`simulate` with the draft; clears the line -> `yes_if`; else `no`. | base = forecast without the draft; cashEffect = `simulate().lowPointDelta` | the lever's `neededBy` |
+| fix_gap | `buildBrief`. Candidates: items with a lever and `cashEffect > 0` (never idle_balance, early_pay_discount, or payment_slip items), from `today` then `all`. Verdict `act_now` if `run.lowPoint.amount < run.safetyLine`, else `on_track`. Fallback: the next candidate on a different commitment or party. | base = brief `run.lowPoint`; resultingLowPoint = `simulate(...).run.lowPoint` | `WorkItem.neededBy` |
+| what_if | apply the overrides / synthetic inputs, then `buildBrief`; report the new low point vs base and the top candidate (as fix_gap). | base = run without the what-if | the move's `neededBy` |
+| status | `forecast` over `intent.window` (default horizon); tightest day from daily minima; `on_track` if above the safety line, else `act_now` via fix_gap. | base = run low point | n/a |
+| lookup | `lagSamples`, `partyLag`, `confirmedLagRule`, open commitments, settlements; `info`. | n/a | n/a |
+| tell | plan -> the caller persists a proposed owner Signal (`channel: "owner"`, `claim: { kind: "plan", draft }`, `state: "proposed"`); rule -> a proposed Rule (`fromNote` = the verbatim question; params: `lag_offset` `{ offsetDays }`, `flexibility` `{ extraDays }`, `preference` `{ tag }`); verdict `proposed`; `CfoAnswer.proposal.id` is the persisted id. | n/a | n/a |
+
+Fallbacks exist only for fix_gap (and afford/what_if when a second candidate on a different commitment or party exists).
+
+**Required slots** (anything else missing is assumed and listed in `assumptions`):
+
+| Kind | Required | If missing |
+|---|---|---|
+| afford | an amount, or an existing `commitmentId` | `need_info` with one question; a missing date takes the profile default (end of the named month, else 30 days out) as an assumption |
+| what_if | a party or commitment, and a date | `need_info` |
+| tell (rule) | a party and a parameter | `need_info` |
+| lookup | a party | `need_info` |
+| fix_gap, status | none | n/a |
+
+`containsInstructions`: ignore the instruction, answer the question that remains, and add a one-line note. Verdicts `need_info`, `decline`, and `proposed` use a code-built voice (no model call).
+
+**Conviction** (thresholds from `profile.thresholds.conviction`; defaults: `highMinLagSamples` 6, `mediumMinLagSamples` 3, `maxPendingReviewsForHigh` 0):
+1. Start from the weakest timing input on the path: high if its party has >= highMinLagSamples samples (`partyLag().n`) or a confirmed lag rule, and pending reviews <= maxPendingReviewsForHigh; medium if >= mediumMinLagSamples; else low. Paths with no timing estimate (a defer, a new plan) start at high.
+2. Caps: any one of a stale balance (`BalanceSnapshot.asOf` older than `thresholds.staleAfterHours`; no check when unset), a tentative/possible event on the path, or a vague date caps at medium; two or more cap at low.
+3. `convictionReasons` lists each input that set or capped the level; `whatWouldChange` names the lowest-confidence event on the path. `pendingReviewCount` is passed in by the caller.
+
+**number_check for answers.** `Decision.allowed` is built by code as the union of every money, date, and NumberFact in the Decision, including figures inside code-built strings (`action`, `whatWouldChange`, `convictionReasons`, `assumptions`). `CfoAnswer.text` joins the voice fields, so the existing check covers them. The voice task extends `ai/number_check.ts` to check only `N%` (pct), `N [more|extra] days` (days), and `N payments|samples|invoices` (count) against `allowed.numbers`; other bare numbers stay ignored.
+
+| Question | Intent | Decision |
+|---|---|---|
+| "Can I afford a $40K deposit in December?" | afford | yes / no / yes_if with the cheapest change that keeps cash above the safety line |
+| "What should I do about December?" | fix_gap | act_now with the top-ranked lever and act-by date |
+| "What if Evergreen pays in January?" | what_if | the new low point and the one move that covers it; scenarioId for the chart |
+| "Am I OK this month?" | status | on_track / act_now with the tightest day |
+| "When does Evergreen usually pay?" | lookup | info, from lag stats and history |
+| "Evergreen always pays 20 days late" | tell | proposed rule for one-tap confirm |
+
 ## Tools exposed to Claude
 
 ```ts
