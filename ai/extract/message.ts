@@ -25,6 +25,7 @@ export type ParseOptions = {
   evidenceId: string;
   receivedAt?: string;           // ISO; overrides what the message says
   timeZone?: string;             // for timestamps without an offset; default America/Los_Angeles
+  dateOrder?: "MDY" | "DMY";     // chat export date order; depends on the phone's locale; default MDY
 };
 
 const DEFAULT_TZ = "America/Los_Angeles";
@@ -157,15 +158,18 @@ export function parseEmail(raw: string, opts: ParseOptions): MessageBundle {
   const src = raw.replace(/\r\n/g, "\n");
   const split = src.search(/\n[ \t]*\n/);
   const headerBlock = split === -1 ? src : src.slice(0, split);
-  const body = split === -1 ? "" : src.slice(split).replace(/^\n[ \t]*\n/, "");
 
-  const headers: Record<string, string> = {};
+  let headers: Record<string, string> = {};
   let last = "";
   for (const line of headerBlock.split("\n")) {
     if (/^[ \t]/.test(line) && last) { headers[last] += " " + line.trim(); continue; }
     const m = /^([A-Za-z][\w-]*):\s*(.*)$/.exec(line);
     if (m) { last = m[1]!.toLowerCase(); headers[last] = m[2]!; }
   }
+  // A pasted body without real headers ("Invoice: INV-1203") must not be swallowed as headers.
+  const hasHeaders = ["from", "to", "subject", "date", "message-id"].some((h) => h in headers);
+  if (!hasHeaders) headers = {};
+  const body = !hasHeaders ? src : split === -1 ? "" : src.slice(split).replace(/^\n[ \t]*\n/, "");
 
   const tz = opts.timeZone ?? DEFAULT_TZ;
   const receivedAt = requireReceivedAt(
@@ -173,8 +177,9 @@ export function parseEmail(raw: string, opts: ParseOptions): MessageBundle {
 
   const from = headers.from ?? "";
   const fm = /^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/.exec(from);
-  const email = (fm ? fm[2] : from.trim()) || undefined;
-  const name = fm?.[1]?.trim() || undefined;
+  const bare = from.trim();
+  const email = (fm ? fm[2]!.trim() : bare.includes("@") ? bare : "") || undefined;
+  const name = (fm ? fm[1]!.trim() : bare.includes("@") ? "" : bare) || undefined;
   const sender = email || name ? { name, email: email?.toLowerCase() } : undefined;
 
   const messageId = headers["message-id"]?.replace(/[<>]/g, "") || opts.evidenceId;
@@ -203,7 +208,8 @@ export function parseWhatsApp(raw: string, opts: ParseOptions): MessageBundle {
   for (const line of text.split("\n")) {
     const m = WA_LINE.exec(line);
     if (m) {
-      const [prefix, mo, d, yy, hh, mi, ss = "0", ampm, who] = m;
+      const [prefix, a, b, yy, hh, mi, ss = "0", ampm, who] = m;
+      const [mo, d] = opts.dateOrder === "DMY" ? [b, a] : [a, b];
       let h = Number(hh);
       if (ampm) h = (h % 12) + (/p/i.test(ampm) ? 12 : 0);
       const y = yy!.length === 2 ? 2000 + Number(yy) : Number(yy);

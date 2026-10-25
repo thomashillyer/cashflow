@@ -55,6 +55,15 @@ describe("resolveParty", () => {
   });
 });
 
+describe("free-mail domains", () => {
+  it("never auto-match even when a party lists one", () => {
+    const withGmail: Party[] = parties.map((p) =>
+      p.id === "party-puget-market" ? { ...p, contacts: { emailDomains: ["gmail.com"] } } : p);
+    const r = resolveParty({ email: "random.person@gmail.com" }, withGmail);
+    expect(r).not.toHaveProperty("partyId");
+  });
+});
+
 describe("nameSimilarity", () => {
   it("ignores suffixes and punctuation", () => {
     expect(nameSimilarity("Shenzhen Ceramics Co., Ltd.", "Shenzhen Ceramics Co.")).toBeGreaterThanOrEqual(0.8);

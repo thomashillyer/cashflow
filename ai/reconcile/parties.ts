@@ -63,6 +63,11 @@ function domainMatches(domain: string, confirmed: string): boolean {
 
 const NAME_THRESHOLD = 0.5;
 
+const FREE_MAIL = new Set([
+  "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "yahoo.com",
+  "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com", "gmx.com", "qq.com", "163.com",
+]);
+
 export function resolveParty(
   hint: PartyHint,
   parties: Party[],
@@ -82,12 +87,13 @@ export function resolveParty(
     if (ids.length === 1) return { partyId: ids[0]!, via: "provider_id" };
   }
 
-  // 2. Confirmed email domain. Several parties sharing a domain is ambiguous.
+  // 2. Confirmed email domain. Several parties sharing a domain, or a free-mail
+  //    domain that anyone can use, is a candidate only.
   const domain = hint.email ? emailDomain(hint.email) : undefined;
   if (domain) {
     const hits = parties.filter((p) => p.contacts?.emailDomains?.some((d) => domainMatches(domain, d)));
-    if (hits.length === 1) return { partyId: hits[0]!.id, via: "email_domain" };
-    if (hits.length > 1) {
+    if (hits.length === 1 && !FREE_MAIL.has(domain)) return { partyId: hits[0]!.id, via: "email_domain" };
+    if (hits.length >= 1) {
       return { candidates: hits.map((p) => ({ ...hintCandidate, partyId: p.id, reason: `shares email domain ${domain}` })) };
     }
   }

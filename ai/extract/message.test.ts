@@ -42,6 +42,18 @@ describe("parseEmail", () => {
     expect(JSON.stringify(inj)).not.toMatch(/settle|commitmentId/i);
   });
 
+  it("keeps a pasted body without headers as text", () => {
+    const pasted = "Invoice: INV-1203\nTotal due: USD 4,000.00\n\nThanks";
+    const p = parseEmail(pasted, { evidenceId: "p", receivedAt: "2026-11-16T18:05:00Z" });
+    expect(p.text).toBe(pasted);
+    expect(p.headers).toEqual({});
+  });
+
+  it("does not treat a bare From name as an email", () => {
+    const p = parseEmail("From: Dana\nSubject: hi\n\nbody", { evidenceId: "p", receivedAt: "2026-11-16T18:05:00Z" });
+    expect(p.sender).toEqual({ name: "Dana", email: undefined });
+  });
+
   it("requires a timestamp when the message has none", () => {
     expect(() => parseEmail("From: a@b.example\n\nhello", { evidenceId: "x" })).toThrow(/receivedAt/);
     expect(parseEmail("From: a@b.example\n\nhello", { evidenceId: "x", receivedAt: "2026-10-25T16:00:00Z" }).parent.receivedAt)
@@ -77,6 +89,11 @@ describe("parseWhatsApp", () => {
     expect(m.messages![0]!.text).toBe("line one\nline two");
     expect(m.messages![0]!.at).toBe("2027-01-06T00:05:00.000Z");
     expect(m.sender).toEqual({ phone: "+1 (206) 555-0101" });
+  });
+
+  it("supports day-first exports", () => {
+    const m = parseWhatsApp("[05/01/27, 16:05:00] Ana: hola", { evidenceId: "w", dateOrder: "DMY" });
+    expect(m.messages![0]!.at).toBe("2027-01-06T00:05:00.000Z");
   });
 });
 
