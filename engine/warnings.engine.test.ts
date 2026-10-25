@@ -69,6 +69,13 @@ describe("per-leg defer on a two-leg purchase order", () => {
     expect(defers[0]!.why).toBe("If it can wait, your low point rises by $14,000.");
   });
 
+  it("asks before the payment itself falls due, not before cash first dips for other reasons", () => {
+    // Cash dips below the line Nov 5 (the deposit); the 70% leg is due Nov 12. Ask by Nov 12 minus lead days.
+    const withLead = buildBrief({ ...input, profile: { ...profile, actionLeadDays: { defer: 3 } } }).brief;
+    const defer = withLead.all.find((w) => w.lever?.kind === "defer")!;
+    expect(defer.neededBy).toBe("2026-11-09");
+  });
+
   it("keeps the leg suffix once the deposit is paid, so a dismissed item stays dismissed", () => {
     const paid = { ...input, records: { ...input.records,
       settlements: [{ id: "s1", commitmentId: "po-1", amount: $(6000), currency: "USD", date: "2026-11-01", legIndex: 0, sourceRef: src }],
