@@ -28,7 +28,8 @@
     "rankFloor": 0.1,
     "relationshipPenalty": {},
     "staleAfterHours": 48,
-    "stressDelayDays": 3
+    "stressDelayDays": 3,
+    "splitIntervalDays": 14
   },
   "actionLeadDays": { "defer": 2, "pay_early": 1 },
   "signalSources": ["email"],

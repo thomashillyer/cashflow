@@ -1,6 +1,8 @@
 {
-  "note": "Restaurant: daily card sales, weekly payroll, no receivables. Zero code changes versus cascade_trade; only the profile differs.",
+  "note": "Restaurant: daily card sales, weekly payroll, no receivables. Zero code changes versus cascade_trade; only the profile differs. Expectations are hand-reasoned from the data, not copied from the engine: about $15,400/week of card sales (28-day history averaging $2,200/day) against $7,500 Friday payroll, Thursday produce bills ($3,800-$4,100) and noodles ($1,500 every other week), rent on the 1st and sales tax on the 20th. That drifts up about $1,000/week, plus $8,000 of December catering deposits, so mid-January cash is about $37,000 before the January hits: liquor license $2,500 (Jan 11), lease buyout $18,000 (Jan 14), estimated tax $4,000 and payroll on Fri Jan 15. Hand estimate of the low: $11,582 on 2027-01-15. Runners-up: Jan 22 (~$13,200), Feb 5 (~$13,900, rent week), Nov 20 (~$15,900). The tolerance stays below the $2,300 gap to the first non-January day.",
   "noReceivableEvents": true,
   "hasDailySales": true,
-  "lowPoint": { "scenario": "base", "date": "2026-11-20", "amount": 1738058, "tolerance": 50000 }
+  "lowPointMonth": "2027-01",
+  "lowPoint": { "scenario": "base", "date": "2027-01-15", "week": "2027-01-11", "amount": 1158200, "tolerance": 150000 },
+  "recurringHistory": { "category": "payroll", "minCount": 4 }
 }

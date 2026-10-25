@@ -13,6 +13,33 @@
       "kind": "supplier",
       "tags": [],
       "notes": []
+    },
+    {
+      "id": "party-wslcb",
+      "name": "Washington State Liquor and Cannabis Board",
+      "kind": "supplier",
+      "tags": [],
+      "notes": [
+        "Liquor license renews every January"
+      ]
+    },
+    {
+      "id": "party-pacific-leasing",
+      "name": "Pacific Restaurant Leasing",
+      "kind": "supplier",
+      "tags": [],
+      "notes": [
+        "Kitchen line lease ends in January with a buyout payment"
+      ]
+    },
+    {
+      "id": "party-catering-guests",
+      "name": "Holiday catering guests",
+      "kind": "customer",
+      "tags": [],
+      "notes": [
+        "Office holiday parties pay a deposit when they book"
+      ]
     }
   ],
   "commitments": [
@@ -37,23 +64,43 @@
       }
     },
     {
-      "id": "bill-NW-4401",
+      "id": "bill-NW-4400",
       "type": "bill",
       "direction": "out",
-      "reference": "NW-4401",
+      "reference": "NW-4400",
       "partyId": "party-noodle-wholesale",
-      "amount": 260000,
+      "amount": 150000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-12",
+        "due": "2026-11-19"
+      },
+      "status": "committed",
+      "outstanding": 150000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4400"
+      }
+    },
+    {
+      "id": "bill-FP-4401",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4401",
+      "partyId": "party-sound-produce",
+      "amount": 390000,
       "currency": "USD",
       "anchors": {
         "invoice": "2026-11-19",
         "due": "2026-11-26"
       },
       "status": "committed",
-      "outstanding": 260000,
+      "outstanding": 390000,
       "settlement": "open",
       "sourceRef": {
         "system": "zoho_books",
-        "record": "NW-4401"
+        "record": "FP-4401"
       }
     },
     {
@@ -77,6 +124,26 @@
       }
     },
     {
+      "id": "bill-NW-4402",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4402",
+      "partyId": "party-noodle-wholesale",
+      "amount": 150000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-26",
+        "due": "2026-12-03"
+      },
+      "status": "committed",
+      "outstanding": 150000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4402"
+      }
+    },
+    {
       "id": "bill-FP-4403",
       "type": "bill",
       "direction": "out",
@@ -97,19 +164,39 @@
       }
     },
     {
-      "id": "bill-NW-4404",
+      "id": "bill-FP-4404",
       "type": "bill",
       "direction": "out",
-      "reference": "NW-4404",
-      "partyId": "party-noodle-wholesale",
-      "amount": 260000,
+      "reference": "FP-4404",
+      "partyId": "party-sound-produce",
+      "amount": 380000,
       "currency": "USD",
       "anchors": {
         "invoice": "2026-12-10",
         "due": "2026-12-17"
       },
       "status": "committed",
-      "outstanding": 260000,
+      "outstanding": 380000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4404"
+      }
+    },
+    {
+      "id": "bill-NW-4404",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4404",
+      "partyId": "party-noodle-wholesale",
+      "amount": 150000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-12-10",
+        "due": "2026-12-17"
+      },
+      "status": "committed",
+      "outstanding": 150000,
       "settlement": "open",
       "sourceRef": {
         "system": "zoho_books",
@@ -157,23 +244,43 @@
       }
     },
     {
-      "id": "bill-NW-4407",
+      "id": "bill-NW-4406",
       "type": "bill",
       "direction": "out",
-      "reference": "NW-4407",
+      "reference": "NW-4406",
       "partyId": "party-noodle-wholesale",
-      "amount": 260000,
+      "amount": 150000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-12-24",
+        "due": "2026-12-31"
+      },
+      "status": "committed",
+      "outstanding": 150000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4406"
+      }
+    },
+    {
+      "id": "bill-FP-4407",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4407",
+      "partyId": "party-sound-produce",
+      "amount": 410000,
       "currency": "USD",
       "anchors": {
         "invoice": "2026-12-31",
         "due": "2027-01-07"
       },
       "status": "committed",
-      "outstanding": 260000,
+      "outstanding": 410000,
       "settlement": "open",
       "sourceRef": {
         "system": "zoho_books",
-        "record": "NW-4407"
+        "record": "FP-4407"
       }
     },
     {
@@ -197,6 +304,26 @@
       }
     },
     {
+      "id": "bill-NW-4408",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4408",
+      "partyId": "party-noodle-wholesale",
+      "amount": 150000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-01-07",
+        "due": "2027-01-14"
+      },
+      "status": "committed",
+      "outstanding": 150000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4408"
+      }
+    },
+    {
       "id": "bill-FP-4409",
       "type": "bill",
       "direction": "out",
@@ -217,19 +344,39 @@
       }
     },
     {
-      "id": "bill-NW-4410",
+      "id": "bill-FP-4410",
       "type": "bill",
       "direction": "out",
-      "reference": "NW-4410",
-      "partyId": "party-noodle-wholesale",
-      "amount": 260000,
+      "reference": "FP-4410",
+      "partyId": "party-sound-produce",
+      "amount": 400000,
       "currency": "USD",
       "anchors": {
         "invoice": "2027-01-21",
         "due": "2027-01-28"
       },
       "status": "committed",
-      "outstanding": 260000,
+      "outstanding": 400000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4410"
+      }
+    },
+    {
+      "id": "bill-NW-4410",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4410",
+      "partyId": "party-noodle-wholesale",
+      "amount": 150000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-01-21",
+        "due": "2027-01-28"
+      },
+      "status": "committed",
+      "outstanding": 150000,
       "settlement": "open",
       "sourceRef": {
         "system": "zoho_books",
@@ -274,6 +421,119 @@
       "sourceRef": {
         "system": "zoho_books",
         "record": "FP-4412"
+      }
+    },
+    {
+      "id": "bill-NW-4412",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4412",
+      "partyId": "party-noodle-wholesale",
+      "amount": 150000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-02-04",
+        "due": "2027-02-11"
+      },
+      "status": "committed",
+      "outstanding": 150000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4412"
+      }
+    },
+    {
+      "id": "bill-WSLCB-2027",
+      "type": "bill",
+      "direction": "out",
+      "reference": "WSLCB-2027",
+      "partyId": "party-wslcb",
+      "category": "license",
+      "amount": 250000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-01-04",
+        "due": "2027-01-11"
+      },
+      "status": "committed",
+      "outstanding": 250000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "WSLCB-2027"
+      }
+    },
+    {
+      "id": "bill-PRL-LEASE-88-BUYOUT",
+      "type": "bill",
+      "direction": "out",
+      "reference": "PRL-LEASE-88-BUYOUT",
+      "partyId": "party-pacific-leasing",
+      "category": "equipment lease",
+      "amount": 1800000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-01-07",
+        "due": "2027-01-14"
+      },
+      "status": "committed",
+      "outstanding": 1800000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "PRL-LEASE-88-BUYOUT"
+      }
+    },
+    {
+      "id": "plan-catering-2026-12-04",
+      "type": "plan",
+      "direction": "in",
+      "category": "catering",
+      "partyId": "party-catering-guests",
+      "amount": 200000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-12-04"
+      },
+      "status": "likely",
+      "sourceRef": {
+        "system": "owner",
+        "record": "catering-2026-12-04"
+      }
+    },
+    {
+      "id": "plan-catering-2026-12-11",
+      "type": "plan",
+      "direction": "in",
+      "category": "catering",
+      "partyId": "party-catering-guests",
+      "amount": 350000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-12-11"
+      },
+      "status": "likely",
+      "sourceRef": {
+        "system": "owner",
+        "record": "catering-2026-12-11"
+      }
+    },
+    {
+      "id": "plan-catering-2026-12-18",
+      "type": "plan",
+      "direction": "in",
+      "category": "catering",
+      "partyId": "party-catering-guests",
+      "amount": 250000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-12-18"
+      },
+      "status": "likely",
+      "sourceRef": {
+        "system": "owner",
+        "record": "catering-2026-12-18"
       }
     }
   ],
@@ -752,6 +1012,108 @@
       "sourceRef": {
         "system": "bank_csv",
         "record": "sales-2026-11-15"
+      }
+    },
+    {
+      "id": "bank-payroll-2026-10-09",
+      "legIndex": 0,
+      "date": "2026-10-09",
+      "amount": 738000,
+      "currency": "USD",
+      "amountBase": 738000,
+      "direction": "out",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "payroll run",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "payroll-2026-10-09"
+      }
+    },
+    {
+      "id": "bank-payroll-2026-10-16",
+      "legIndex": 0,
+      "date": "2026-10-16",
+      "amount": 752000,
+      "currency": "USD",
+      "amountBase": 752000,
+      "direction": "out",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "payroll run",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "payroll-2026-10-16"
+      }
+    },
+    {
+      "id": "bank-payroll-2026-10-23",
+      "legIndex": 0,
+      "date": "2026-10-23",
+      "amount": 746500,
+      "currency": "USD",
+      "amountBase": 746500,
+      "direction": "out",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "payroll run",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "payroll-2026-10-23"
+      }
+    },
+    {
+      "id": "bank-payroll-2026-10-30",
+      "legIndex": 0,
+      "date": "2026-10-30",
+      "amount": 761000,
+      "currency": "USD",
+      "amountBase": 761000,
+      "direction": "out",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "payroll run",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "payroll-2026-10-30"
+      }
+    },
+    {
+      "id": "bank-payroll-2026-11-06",
+      "legIndex": 0,
+      "date": "2026-11-06",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "payroll run",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "payroll-2026-11-06"
+      }
+    },
+    {
+      "id": "bank-payroll-2026-11-13",
+      "legIndex": 0,
+      "date": "2026-11-13",
+      "amount": 744500,
+      "currency": "USD",
+      "amountBase": 744500,
+      "direction": "out",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "payroll run",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "payroll-2026-11-13"
       }
     }
   ],

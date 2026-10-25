@@ -72,6 +72,7 @@ export type CashEvent = {
   confidence: number;        // 0..1
   basis: string;             // human-readable reason for this date and amount
   category?: string;
+  account?: string;          // bank account of a stored actual; matches BalanceSnapshot.account (opening-cash roll-forward)
   sourceRef: SourceRef;
   overriddenBy?: string[];   // rule, signal, or scenario ids applied to this event
 };
@@ -111,7 +112,7 @@ export type Rule = {
 export type Lever =
   | { kind: "chase"; commitmentId: string; assumeDate: string; legIndex?: number }   // legIndex omitted: the earliest remaining receipt
   | { kind: "defer"; commitmentId: string; days: number; legIndex?: number }          // legIndex omitted: the earliest remaining payment
-  | { kind: "split"; commitmentId: string; shares: number[] }
+  | { kind: "split"; commitmentId: string; shares: number[]; legIndex?: number }      // shares > 0, sum 1; spaced profile.thresholds.splitIntervalDays (default 30)
   | { kind: "pay_early"; commitmentId: string }
   | { kind: "ask_advance"; commitmentId: string; share: number };
 
