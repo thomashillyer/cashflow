@@ -6,7 +6,7 @@ Warnings are named, plain-code checks over a `ForecastRun`. Each one generates c
 
 | Warning | Fires when | Levers it generates |
 |---|---|---|
-| `projected_cash_gap(amount, horizon)` | A week's closing balance falls below the safety line within the horizon | Chase receivables due before the gap; defer payables a supplier will flex on; split or delay a purchase order; optional financing partner card |
+| `projected_cash_gap(amount, horizon)` | A daily closing balance falls below the safety line within the horizon (weekly view shows its containing week) | Chase receivables due before the gap; defer payables a supplier will flex on; split or delay a purchase order; optional financing partner card |
 | `idle_balance_over(threshold, weeks)` | Free cash stays above the threshold for at least that many weeks | Explain how much and for how long, with general options; optional treasury partner card |
 | `ar_concentration_risk(pct)` | One party holds more than pct of open receivables | Ask for a deposit or tighter terms on the next order |
 | `deal_affordability(deal)` | Taking a likely or possible deal pushes the low point below the safety line | The smallest upfront share that keeps cash above the line (search helper in `05-forecast-engine.md`), e.g. "ask for 40% instead of 30%" |
@@ -36,7 +36,7 @@ score = value × 1 / (1 + d / 7) × confidence × relationship
 ```
 
 - `value` — rise in the low point, or dollars saved.
-- `d` — days from today until the lever stops helping (`neededBy`).
+- `d` — days from today until the lever stops helping (`neededBy`), clamped to zero for today or past deadlines.
 - `confidence` — of the underlying events.
 - `relationship` — 1, or the profile's penalty for the party's tags (for example, 0.5 for deferring a party tagged `preferred`).
 
