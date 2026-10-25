@@ -52,7 +52,10 @@ export function horizonEnd(profile: Profile, asOf: string): string {
   return addDays(mondayOf(asOf), profile.horizonWeeks * 7);
 }
 
-// Opening cash: latest start-of-day snapshot per account on/before asOf, plus identified actuals since then.
+// Opening cash, per account: latest start-of-day snapshot on/before asOf, plus that account's actuals dated
+// on/after the snapshot and before asOf. Actuals without `account` go to the only account when there is one;
+// with several accounts they roll forward from the latest snapshot date (the only window certainly not in any
+// snapshot), and any in the earlier window, which may belong to an older account, are flagged for review.
 function openingBalance(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: string[]): number {
   const latest = new Map<string, Records["balances"][number]>();
   for (const b of records.balances) {
@@ -66,21 +69,40 @@ function openingBalance(records: Records, profile: Profile, asOf: string, fx: Re
   }
   let total = 0;
   let snapDate = "";
+  let oldestSnap = "";
   for (const b of latest.values()) {
     const base = toBase(b.amount, b.currency, profile, fx);
     if (base === undefined) warnings.push(`Balance for ${b.account} is in ${b.currency} with no FX rate; left out of opening cash.`);
     else total += base;
     if (b.asOf > snapDate) snapDate = b.asOf;
+    if (oldestSnap === "" || b.asOf < oldestSnap) oldestSnap = b.asOf;
   }
-  if (new Set([...latest.values()].map((b) => b.asOf)).size > 1) warnings.push("Account balances have different as-of dates; only actuals since the latest snapshot are rolled forward, so older accounts may be missing recent movements.");
   const staleHours = profile.thresholds.staleAfterHours;
   if (staleHours !== undefined && diffDays(asOf, snapDate) * 24 > staleHours) warnings.push(`Bank balance is from ${snapDate}, older than ${staleHours} hours; refresh before relying on this.`);
+  const only = latest.size === 1 ? [...latest.keys()][0] : undefined;
+  let ambiguous = 0;
   for (const e of records.events) {
-    if (e.date >= snapDate && e.date < asOf) {
-      const base = toBase(e.amount, e.currency, profile, fx);
-      if (base === undefined) warnings.push(`Actual ${e.id} is in ${e.currency} with no FX rate; left out of opening cash, which is understated or overstated by that amount (needs review).`);
-      else total += e.direction === "in" ? base : -base;
+    if (e.date >= asOf) continue;
+    const account = e.account ?? only;
+    let from: string;
+    if (account === undefined) {
+      if (e.date < snapDate && e.date >= oldestSnap) ambiguous++;
+      from = snapDate;
+    } else {
+      const snap = latest.get(account);
+      if (!snap) {
+        warnings.push(`Actual ${e.id} is tagged to account ${account}, which has no balance on or before the as-of date; left out of opening cash (needs review).`);
+        continue;
+      }
+      from = snap.asOf;
     }
+    if (e.date < from) continue;
+    const base = toBase(e.amount, e.currency, profile, fx);
+    if (base === undefined) warnings.push(`Actual ${e.id} is in ${e.currency} with no FX rate; left out of opening cash, which is understated or overstated by that amount (needs review).`);
+    else total += e.direction === "in" ? base : -base;
+  }
+  if (ambiguous > 0) {
+    warnings.push(`${ambiguous} actual${ambiguous === 1 ? "" : "s"} with no account dated ${oldestSnap} to before ${snapDate}, between the account balance dates, could not be matched to an account and ${ambiguous === 1 ? "was" : "were"} left out of opening cash; tag ${ambiguous === 1 ? "it" : "them"} with an account (needs review).`);
   }
   return total;
 }

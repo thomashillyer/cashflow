@@ -126,6 +126,68 @@ describe("opening-cash boundary", () => {
   });
 });
 
+describe("opening cash with several accounts", () => {
+  const snap = (account: string, amount: number, asOf: string, currency = "USD") => ({ id: `bal-${account}-${asOf}`, account, amount, currency, asOf, sourceRef: src });
+  const act = (id: string, date: string, amount: number, o: Partial<CashEvent> = {}): CashEvent => ({ id, legIndex: 0, date, amount, currency: "USD", amountBase: amount, direction: "in", status: "actual", confidence: 1, basis: "bank", sourceRef: src, ...o });
+  const run = (r: Records) => forecast(r, profile, base, "2026-10-25", {});
+
+  it("rolls each account forward from its own snapshot date", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-18"), snap("sav", $(1000), "2026-10-22")] };
+    r.events = [
+      act("chk-mid", "2026-10-20", $(10), { account: "chk" }), // after chk snapshot, before sav: counted
+      act("chk-late", "2026-10-23", $(5), { account: "chk", direction: "out" }),
+      act("sav-early", "2026-10-20", $(999), { account: "sav" }), // already in sav's snapshot
+      act("sav-mid", "2026-10-23", $(50), { account: "sav" }),
+      act("after", "2026-10-25", $(7), { account: "chk" }), // on as-of: a forecast actual, not opening
+    ];
+    const out = run(r);
+    expect(out.openingBalance).toBe($(100 + 10 - 5 + 1000 + 50));
+    expect(out.warnings.join(" ")).not.toMatch(/different as-of|could not be matched/);
+    expect(out.events.filter((e) => e.status === "actual").map((e) => e.id)).toEqual(["after"]);
+  });
+
+  it("an actual dated before its account's snapshot is excluded", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20"), snap("sav", $(0), "2026-10-15")] };
+    r.events = [act("chk-pre", "2026-10-18", $(999), { account: "chk" }), act("sav-in", "2026-10-18", $(3), { account: "sav" })];
+    expect(run(r).openingBalance).toBe($(103));
+  });
+
+  it("unattributed actuals go to the only account", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20")], events: [act("pre", "2026-10-19", $(999)), act("mid", "2026-10-22", $(10))] };
+    const out = run(r);
+    expect(out.openingBalance).toBe($(110));
+    expect(out.warnings.join(" ")).not.toMatch(/could not be matched/);
+  });
+
+  it("unattributed actuals with several accounts roll from the latest snapshot and the ambiguous ones are flagged", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-18"), snap("sav", $(1000), "2026-10-22")] };
+    r.events = [
+      act("old", "2026-10-10", $(999)), // before every snapshot: not ambiguous
+      act("amb-1", "2026-10-19", $(20)),
+      act("amb-2", "2026-10-21", $(30)),
+      act("new", "2026-10-23", $(4)),
+    ];
+    const out = run(r);
+    expect(out.openingBalance).toBe($(1104));
+    expect(out.warnings.join(" ")).toMatch(/2 actuals with no account dated 2026-10-18 to before 2026-10-22.*needs review/);
+  });
+
+  it("an actual with no FX rate in an account's roll-forward is left out with a warning", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-18"), snap("eur", $(50), "2026-10-22")] };
+    r.events = [act("eur-1", "2026-10-20", $(10), { account: "chk", currency: "EUR" }), act("usd-1", "2026-10-20", $(5), { account: "chk" })];
+    const out = run(r);
+    expect(out.openingBalance).toBe($(155));
+    expect(out.warnings.join(" ")).toMatch(/Actual eur-1 is in EUR with no FX rate; left out of opening cash/);
+  });
+
+  it("an actual tagged to an account with no snapshot is left out with a warning", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20")], events: [act("x", "2026-10-22", $(10), { account: "card" })] };
+    const out = run(r);
+    expect(out.openingBalance).toBe($(100));
+    expect(out.warnings.join(" ")).toMatch(/Actual x is tagged to account card, which has no balance/);
+  });
+});
+
 describe("legs, partial payments, overlap", () => {
   it("allocates legs exactly and consumes settled money in order", () => {
     const r = empty();
