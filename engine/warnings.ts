@@ -15,7 +15,6 @@ import { ENGINE_DEFAULTS, engineSettings } from "./settings";
 // Design 07 default when a payable has no confirmed `flexibility` rule; profile engine.deferDays overrides it.
 export const DEFAULT_DEFER_DAYS = ENGINE_DEFAULTS.deferDays;
 
-const minDate = (a: string, b: string) => (a < b ? a : b);
 const maxDate = (a: string, b: string) => (a > b ? a : b);
 
 export function commitmentDirection(c: Commitment): Direction | undefined {
@@ -118,7 +117,9 @@ export const projectedCashGap: Check = (run, records, profile) => {
           warning: "projected_cash_gap",
           lever: { kind: "defer", commitmentId: c.id, days, ...(legIndex !== undefined ? { legIndex } : {}) },
           evidenceRefs: [c.id, leg.id],
-          neededBy: addDays(minDate(leg.date, gapDate), -(lead.defer ?? 0)),
+          // Ask before this payment falls due: deferring it helps whenever it moves past the low point,
+          // even if cash first dips below the line earlier for other reasons.
+          neededBy: addDays(leg.date, -(lead.defer ?? 0)),
         });
       }
     }
