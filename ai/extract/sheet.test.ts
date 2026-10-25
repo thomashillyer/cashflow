@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { IntakeCandidate } from "../../schema/intake";
 import { validateCandidate } from "../normalize";
 import {
-  classifySheet, documentToCandidate, SHEET_MAX_COLUMNS, SHEET_MAX_ROWS, tableToCandidates,
+  classifySheet, documentStarts, documentToCandidate, documentsToCandidates, SHEET_MAX_COLUMNS, SHEET_MAX_ROWS, tableToCandidates,
   type SheetCell, type SheetContent,
 } from "./sheet";
 
@@ -96,7 +96,8 @@ describe("tableToCandidates: variations", () => {
     expect(val(c.fields.amount)).toBe(420000);
     expect(val(c.fields.dueDate)).toBe("2026-12-14");
     expect(val(c.fields.currency)).toBe("USD");
-    expect(c.notes.join(" ")).toMatch(/business default USD/);
+    expect(c.notes.join(" ")).toMatch(/currency assumed from profile default \(USD\); confirm/);
+    expect(c.extraction).toBe("partial");
     expect(validateCandidate(c)).toEqual([]);
   });
 
@@ -469,5 +470,232 @@ describe("direction and currency safety (review fixes)", () => {
     const c = tableToCandidates(sheet(rows), opts).candidates[0]!;
     expect(Date.now() - t).toBeLessThan(500);
     expect(c.fields.amount.state).toBe("missing");
+  });
+});
+
+describe("P4.15 follow-ups", () => {
+  describe("profile-default currency is a visible assumption", () => {
+    it("table: keeps the value, marks partial, notes it, and points evidence at the amount cell", () => {
+      const c = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["INV-1", "A", "1,000.00"]]), { ...opts, currency: "USD" }).candidates[0]!;
+      expect(val(c.fields.currency)).toBe("USD");
+      expect(c.fields.currency).toMatchObject({ evidence: [{ sheet: "S", row: 2, text: expect.stringMatching(/^1,000\.00.*assumed.*USD/) }] });
+      expect(c.extraction).toBe("partial");
+      expect(c.notes).toContain("currency assumed from profile default (USD); confirm");
+      expect(validateCandidate(c)).toEqual([]);
+    });
+
+    it("table: a currency stated in the sheet is not an assumption", () => {
+      const c = tableToCandidates(sheet([["Invoice #", "Customer", "Currency", "Amount"], ["INV-1", "A", "EUR", 10]]), { ...opts, currency: "USD" }).candidates[0]!;
+      expect(val(c.fields.currency)).toBe("EUR");
+      expect(c.extraction).toBe("ok");
+      expect(c.notes.join(" ")).not.toMatch(/assumed/);
+    });
+
+    it("document: same treatment", () => {
+      const rows: SheetCell[][] = [
+        ["Invoice #", "INV-1", null, "Bill to", "Puget Market"], ["Cascade Trade Co."], ["Due date", "2026-11-30"], ["Total due", "1,000.00"],
+      ];
+      const c = documentToCandidate(sheet(rows), { ...opts, currency: "USD" });
+      expect(val(c.fields.currency)).toBe("USD");
+      expect(c.fields.currency).toMatchObject({ evidence: [{ row: 4, text: expect.stringMatching(/assumed.*USD/) }] });
+      expect(c.extraction).toBe("partial");
+      expect(c.notes).toContain("currency assumed from profile default (USD); confirm");
+      expect(validateCandidate(c)).toEqual([]);
+    });
+  });
+
+  describe("footer rows with a total label outside the reference column", () => {
+    it("rejects them as totals rows", () => {
+      const r = tableToCandidates(sheet([
+        ["Invoice #", "Customer", "Amount"],
+        ["INV-1", "A", 1000], ["INV-2", "B", 2000],
+        ["Report 10/25", "Total outstanding", 3000],
+        ["Printed 10/25", "GRAND TOTAL: 3,000", 3000],
+        ["Note 2", "balance carried forward", 500],
+        ["Run 3", "Subtotal", 3000],
+      ]), opts);
+      expect(r.candidates.map((c) => val(c.fields.reference))).toEqual(["INV-1", "INV-2"]);
+      expect(r.rejectedRows.map((x) => x.row)).toEqual([4, 5, 6, 7]);
+      expect(r.rejectedRows.every((x) => /Totals/.test(x.reason))).toBe(true);
+    });
+
+    it("still keeps a customer whose name starts with Total", () => {
+      const r = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["INV-1", "Total Wine", 10], ["INV-2", "Totalis Ltd", 10]]), opts);
+      expect(r.candidates).toHaveLength(2);
+    });
+
+    it("a footer row does not make the invoice number before it look repeated", () => {
+      const r = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["INV-1", "A", 10], ["INV-1", "Total outstanding", 10]]), opts);
+      expect(r.candidates).toHaveLength(1);
+    });
+  });
+
+  describe("two stacked documents on one sheet", () => {
+    const stacked = (second: SheetCell[][]): SheetCell[][] => [
+      ["INVOICE"],
+      ["Cascade Trade Co."],
+      ["Invoice #", "INV-1", null, "Bill to", "Evergreen Home"],
+      ["Due date", "2026-11-01"],
+      ["Description", "Qty", "Amount"],
+      ["Mugs", 1, 100],
+      [null, "Total due", "USD 100.00"],
+      [null, null, null],
+      ...second,
+    ];
+    const secondByTitle: SheetCell[][] = [
+      ["INVOICE"],
+      ["Cascade Trade Co."],
+      ["Invoice #", "INV-2", null, "Bill to", "Puget Market"],
+      ["Due date", "2026-11-15"],
+      ["Description", "Qty", "Amount"],
+      ["Napkins", 1, 250],
+      [null, "Total due", "USD 250.00"],
+    ];
+
+    it("splits on a second title into separate candidates with row-stable ids and evidence", () => {
+      const out = documentsToCandidates(sheet(stacked(secondByTitle)), opts);
+      expect(out.map((c) => c.id)).toEqual(["cand-xlsx-1", "cand-xlsx-9"]);
+      expect(out.map((c) => val(c.fields.reference))).toEqual(["INV-1", "INV-2"]);
+      expect(out.map((c) => val(c.fields.amount))).toEqual([10000, 25000]);
+      expect(out.map((c) => val(c.fields.buyerName))).toEqual(["Evergreen Home", "Puget Market"]);
+      expect(out.map((c) => val(c.fields.sellerName))).toEqual(["Cascade Trade Co.", "Cascade Trade Co."]);
+      expect(out[1]!.fields.amount).toMatchObject({ evidence: [{ row: 15 }] });
+      expect(out.every((c) => c.kind === "invoice" && c.extraction === "ok")).toBe(true);
+      for (const c of out) expect(validateCandidate(c)).toEqual([]);
+    });
+
+    it("splits on a second invoice-number label after a total, with no title", () => {
+      const rows = stacked([["Cascade Trade Co."], ["Invoice #", "INV-2", null, "Bill to", "Puget Market"], ["Total due", "USD 250.00"]]);
+      const out = documentsToCandidates(sheet(rows), opts);
+      expect(out.map((c) => val(c.fields.reference))).toEqual(["INV-1", "INV-2"]);
+      expect(out.map((c) => val(c.fields.amount))).toEqual([10000, 25000]);
+      expect(val(out[1]!.fields.sellerName)).toBe("Cascade Trade Co.");
+    });
+
+    it("the same invoice number repeated in a footer is not a second document", () => {
+      const rows = [...stacked([]), ["Invoice #", "INV-1"]];
+      expect(documentsToCandidates(sheet(rows), opts)).toHaveLength(1);
+    });
+
+    it("documentToCandidate returns the first document only, flagged partial, never merging totals", () => {
+      const c = documentToCandidate(sheet(stacked(secondByTitle)), { ...opts, currency: "USD" });
+      expect(val(c.fields.reference)).toBe("INV-1");
+      expect(val(c.fields.amount)).toBe(10000);
+      expect(c.extraction).toBe("partial");
+      expect(c.notes.join(" ")).toMatch(/2 documents.*row 9.*only the first/);
+      expect(c.id).toBe("cand-xlsx");
+    });
+
+    it("an unclear second block (a stray title) returns the first with a note and partial", () => {
+      const rows = stacked([["Invoice"], ["Thank you for your business"]]);
+      const out = documentsToCandidates(sheet(rows), { ...opts, currency: "USD" });
+      expect(out).toHaveLength(1);
+      expect(out[0]!.extraction).toBe("partial");
+      expect(out[0]!.notes.join(" ")).toMatch(/2 documents/);
+      expect(val(out[0]!.fields.amount)).toBe(10000);
+    });
+
+    it("a single document is unchanged", () => {
+      const out = documentsToCandidates(load("single-invoice.json"), opts);
+      expect(out).toHaveLength(1);
+      expect(out[0]!.id).toBe("cand-xlsx");
+      expect(out[0]!.extraction).toBe("ok");
+    });
+  });
+
+  describe("table 'Amount due' / 'Balance due' columns", () => {
+    it("maps to outstanding when a total/amount column exists", () => {
+      const r = tableToCandidates(sheet([["Invoice #", "Customer", "Total", "Amount Due"], ["INV-1", "A", 1000, 400]]), { ...opts, currency: "USD" });
+      expect(r.proposedMapping.columns).toMatchObject({ amount: 2, outstanding: 3 });
+      const c = r.candidates[0]!;
+      expect(val(c.fields.amount)).toBe(100000);
+      expect(c.fields.outstanding && val(c.fields.outstanding)).toBe(40000);
+    });
+
+    it("maps to amount (and outstanding) only when it is the only money column, with a note", () => {
+      const r = tableToCandidates(sheet([["Invoice #", "Customer", "Balance Due"], ["INV-1", "A", 400]]), { ...opts, currency: "USD" });
+      expect(r.proposedMapping.columns).toMatchObject({ amount: 2, outstanding: 2 });
+      const c = r.candidates[0]!;
+      expect(val(c.fields.amount)).toBe(40000);
+      expect(c.fields.outstanding && val(c.fields.outstanding)).toBe(40000);
+      expect(c.notes.join(" ")).toMatch(/only money column.*Balance Due.*balance is less than the invoice total/);
+      expect(classifySheet(sheet([["Invoice #", "Customer", "Amount due"], ["INV-1", "A", 400]]))).toMatchObject({ layout: "table", headerRow: 1 });
+    });
+
+    it("an owner-mapped amount column wins over the inferred fallback", () => {
+      const rows: SheetCell[][] = [["Invoice #", "Customer", "Amount due", "Billed"], ["INV-1", "A", 400, 1000]];
+      const c = tableToCandidates(sheet(rows), { ...opts, columnMapping: { amount: 3 } }).candidates[0]!;
+      expect(val(c.fields.amount)).toBe(100000);
+      expect(c.fields.outstanding && val(c.fields.outstanding)).toBe(40000);
+      expect(c.notes.join(" ")).not.toMatch(/only money column/);
+    });
+  });
+});
+
+describe("P4.15 review fixes", () => {
+  it("a letterhead above the INVOICE title is not a second document", () => {
+    const rows: SheetCell[][] = [
+      ["Cascade Trade Co."], ["12 Pike St, Seattle"], ["INVOICE"],
+      ["Invoice #", "INV-1187", null, "Bill to", "Evergreen Home"], ["Due date", "2026-11-01"], ["Total due", "USD 100.00"],
+    ];
+    expect(documentStarts(rows)).toEqual([0]);
+    const c = documentToCandidate(sheet(rows), opts);
+    expect(val(c.fields.amount)).toBe(10000);
+    expect(val(c.fields.reference)).toBe("INV-1187");
+    expect(documentsToCandidates(sheet(rows), opts)).toHaveLength(1);
+  });
+
+  it("inline label+value cells read the value and do not throw", () => {
+    for (const [cell, ref] of [["Invoice INV-2", "INV-2"], ["Invoice # INV-2", "INV-2"], ["Invoice no 7", "7"], ["invoice 1187", "1187"]] as const) {
+      const rows: SheetCell[][] = [[cell], ["Bill to", "Puget Market"], ["Total due", "USD 5.00"]];
+      const c = documentToCandidate(sheet(rows), opts);
+      expect(val(c.fields.reference), cell).toBe(ref);
+    }
+    expect(() => documentToCandidate(sheet([["PO 123"], ["Total", "USD 5.00"]]), opts)).not.toThrow();
+  });
+
+  it("a footer that repeats the invoice number in another format is not a second document", () => {
+    const rows: SheetCell[][] = [
+      ["INVOICE"], ["Invoice #", "INV-1187", null, "Bill to", "Evergreen Home"], ["Total due", "USD 100.00"], [null], ["Invoice number 1187"], ["Invoice no. INV-1187/A"],
+    ];
+    expect(documentStarts(rows)).toEqual([0]);
+  });
+
+  it("a second block with an invoice number but no total is unclear: first document only, partial", () => {
+    const rows: SheetCell[][] = [
+      ["Invoice #", "INV-1", null, "Bill to", "Evergreen Home"], ["Total due", "USD 100.00"], [null], ["Invoice #", "INV-2"],
+    ];
+    const out = documentsToCandidates(sheet(rows), opts);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.extraction).toBe("partial");
+    expect(val(out[0]!.fields.amount)).toBe(10000);
+  });
+
+  it("a bare Balance column is not promoted to the amount; Balance due is", () => {
+    const ledger = tableToCandidates(sheet([["Invoice #", "Customer", "Balance"], ["INV-1", "A", 400]]), opts);
+    expect(ledger.candidates).toEqual([]);
+    expect(ledger.reason).toMatch(/mapping/);
+    const due = tableToCandidates(sheet([["Invoice #", "Customer", "Balance due"], ["INV-1", "A", 400]]), opts);
+    expect(val(due.candidates[0]!.fields.amount)).toBe(40000);
+  });
+
+  it("an owner mapping of outstanding is not undone by the fallback", () => {
+    const rows: SheetCell[][] = [["Invoice #", "Customer", "Amount due", "Open"], ["INV-1", "A", 400, 300]];
+    const r = tableToCandidates(sheet(rows), { ...opts, columnMapping: { outstanding: 3 } });
+    expect(r.proposedMapping.columns).toMatchObject({ outstanding: 3 });
+    expect(r.proposedMapping.columns.amount).toBeUndefined();
+    expect(r.candidates).toEqual([]);
+  });
+
+  it("customers like 'Total (UK) Ltd' survive when the invoice number is real", () => {
+    const r = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["INV-5", "Total (UK) Ltd", 10], ["INV-6", "Total 360", 10]]), opts);
+    expect(r.candidates).toHaveLength(2);
+  });
+
+  it("a long newline-laden cell is handled quickly", () => {
+    const rows: SheetCell[][] = [["Invoice #", "INV-1"], ["total " + "1 ".repeat(20000) + "\n", "x"], ["Total due", "USD 1.00"]];
+    const t = Date.now();
+    documentsToCandidates(sheet(rows), opts);
+    expect(Date.now() - t).toBeLessThan(500);
   });
 });
