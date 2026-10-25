@@ -258,7 +258,7 @@ function summary() {
         ? `Cash is ${money(short)} below your line right now.`
         : `Cash holds until ${shortDate(holdsUntil)}, then drops ${money(short)} below your line.`,
       sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}${causes.length ? `, when ${causes.join(" and ")} go out` : ""}.`,
-      take: cfoTake(), // the check count lives once, in the fold-out under today's things
+      take: review ? [review.message, review.reasons[0]?.message].filter(Boolean).join(" ") : cfoTake(),
       tone: "short",
     };
   }
@@ -749,7 +749,8 @@ function noteRow(n) {
   const dirButton = (to, label) => canSwitch
     ? `<button class="linklike dir-switch" data-action="note-direction" data-to="${to}" data-id="${esc(n.id)}">${label}</button>` : "";
   const dir = r.direction === "in" ? `Money in${dirButton("out", "Switch to money out")}`
-    : r.direction === "out" ? `Money out${dirButton("in", "Switch to money in")}` : "—";
+    : r.direction === "out" ? `Money out${dirButton("in", "Switch to money in")}`
+      : canSwitch ? `${dirButton("in", "Money in")}${dirButton("out", "Money out")}` : "—";
   const field = (k, label, v, input) => `<div><dt>${label}</dt><dd>${v != null ? v : input}</dd></div>`;
   const amountInput = `<input inputmode="decimal" placeholder="$ amount" data-note-field="amount" data-id="${esc(n.id)}" aria-label="Amount" />`;
   const dateInput = `<input type="date" data-note-field="date" data-id="${esc(n.id)}" aria-label="Date" />`;
