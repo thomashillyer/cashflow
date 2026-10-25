@@ -1,6 +1,6 @@
 # Five-person task board
 
-Claim one role by adding your name to its GitHub issue. The issue checkboxes track live progress; the committed role documents define scope, handoffs, and acceptance criteria. The primary design is [`docs/design/`](../docs/design/01-overview-and-architecture.md); lane ownership is in [09-api-repo-lanes](../docs/design/09-api-repo-lanes.md#five-people). These checklists came from the earlier [seven-hour plan](../docs/HACKATHON_PLAN.md) and still apply where they match the lanes. Event times in [11-plan-demo-risks](../docs/design/11-plan-demo-risks.md) replace the hour-based milestones below.
+Claim one role by adding your name to its GitHub issue. The issue checkboxes track live progress; the committed role documents define scope, handoffs, and acceptance criteria. The [technical implementation plan](../docs/TECHNICAL_PLAN.md) defines the two ingestion layers, transaction/API contracts, and current five-owner handoffs. The primary design is [`docs/design/`](../docs/design/01-overview-and-architecture.md); lane ownership is in [09-api-repo-lanes](../docs/design/09-api-repo-lanes.md#five-people). These checklists came from the earlier [seven-hour plan](../docs/HACKATHON_PLAN.md) and still apply where they match the lanes. Event times in [11-plan-demo-risks](../docs/design/11-plan-demo-risks.md) replace the hour-based milestones below.
 
 | Person | Role | Task list | Tracking issue |
 |---|---|---|---|
