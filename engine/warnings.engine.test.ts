@@ -65,7 +65,7 @@ describe("per-leg defer on a two-leg purchase order", () => {
       lever: { kind: "defer", commitmentId: "po-1", days: 10, legIndex: 1 },
       cashEffect: $(14000),
     });
-    expect(defers[0]!.title).toBe("Move PO-1 ($14,000 due 2026-11-12) by 10 days");
+    expect(defers[0]!.title).toBe("Move PO-1 ($14,000 due Nov 12) by 10 days");
     expect(defers[0]!.why).toBe("If it can wait, your low point rises by $14,000.");
   });
 

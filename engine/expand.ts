@@ -721,7 +721,7 @@ function flagLinkedCostsAfterCancel(deal: Commitment, byId: Map<string, Commitme
 
 // countedActuals: see PaymentContext; forecast() passes countedActualIds so uncounted bank lines never cancel a bill.
 export function expand(records: Records, profile: Profile, asOf: string, horizonEnd: string, fx: Record<string, number>, countedActuals?: Set<string>): Expanded {
-  const warnings = new Notes();
+  const warnings = new Notes(asOf);
   checkLegFlags(profile, warnings);
   const { commitments, amountSignals } = prepare(records);
   const byId = new Map(commitments.map((c) => [c.id, c]));

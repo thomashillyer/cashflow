@@ -7,6 +7,7 @@
 // the amount: the amount is the stated total, or missing.
 
 import type { CandidateFields, Field, FieldEvidence, IntakeCandidate } from "../../schema/intake";
+import { fmtDate } from "../labels";
 import { fieldFrom, minorUnitDigits, missing, parseAmount, parseDate } from "../normalize";
 
 // Cached values; formulas already resolved. Dates arrive as ISO strings (or Excel serial numbers).
@@ -149,7 +150,7 @@ function dateField(ctx: Ctx, row: number, cell: SheetCell | undefined, label: st
   return cellField(ctx.sheet, row, cell, (v) => {
     if (typeof cell === "number") return serialToIso(cell);
     const p = parseDate(v, { ...(ctx.dayFirst !== undefined ? { dayFirst: ctx.dayFirst } : {}) });
-    if (p?.ambiguous) ctx.notes.push(`${label} "${v}" (row ${row}) is ambiguous; read as ${p.date}. Check day/month order.`);
+    if (p?.ambiguous) ctx.notes.push(`${label} "${v}" (row ${row}) is ambiguous; read as ${fmtDate(p.date, "")}. Check day/month order.`);
     return p?.date;
   }, label, shown);
 }

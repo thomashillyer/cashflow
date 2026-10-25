@@ -77,8 +77,10 @@ export type Decision = {
   //   effect: what_if ("If <subject>, your lowest point falls to $X on Dec 28"); subject is code-built, dates human
   //   tightest: status over a long window ("Your tightest week starts Dec 21: $X on Dec 25"); weekStart is the Monday
   //   timing: lookup about when a party pays ("Evergreen usually pays about 14 days late, based on 8 payments"); subject is the party name
+  //   can_pay: "Can I make payroll?" ("No: payroll on Dec 25 takes you to -$5,500, $40,500 under your $35,000 line."); `pay` holds the computed figures
   lead?: {
-    kind: "short_before" | "effect" | "tightest" | "timing"; subject?: string; weekStart?: string;
+    kind: "short_before" | "effect" | "tightest" | "timing" | "can_pay"; subject?: string; weekStart?: string;
+    pay?: { name: string; date: string; closing: number; shortfall: number; answer: "yes" | "tight" | "no" };  // closing: cash after that payment; shortfall: safety line minus closing
     timing?: { days: number; samples: number; rule: boolean };  // days: + after the due date, - before; rule: a confirmed payment rule
   };
   recommendation?: {

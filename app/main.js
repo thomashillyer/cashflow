@@ -6,7 +6,7 @@ import { cashChart } from "./ui/chart.js";
 import { isQuestion } from "./ui/question.js";
 import { icon, logo, logoLarge } from "./ui/icons.js";
 import { speak, listen, canSpeak, canListen, speakable, spokenMoney } from "./ui/speech.js";
-import { addDays, dayDate, esc, greeting, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
+import { addDays, dayDate, esc, greeting, humanizeId, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -134,8 +134,9 @@ function summary() {
     // what causes the dip: the biggest outflows in the week up to the low point
     const window = run.events.filter((e) => e.direction === "out" && e.date <= low.date && e.date > addDays(low.date, -8));
     const causes = window.sort((a, b2) => b2.amountBase - a.amountBase).slice(0, 2).map((e) => {
-      const c = e.sourceRef?.record ?? "";
+      const rec = e.sourceRef?.record ?? "";
       const pn = name(commitmentParty(e.commitmentId));
+      const c = app.ctx.profile?.recurring?.find((r) => r.id === rec)?.name?.toLowerCase() ?? humanizeId(rec);
       return pn ? `${pn} (${money(e.amountBase)})` : `${c} (${money(e.amountBase)})`;
     });
     return {
@@ -1017,7 +1018,7 @@ function showWeek(start) {
 }
 function partyNameFor(e) {
   const pid = commitmentParty(e.commitmentId);
-  return app.ctx.parties.find((p) => p.id === pid)?.name ?? (e.sourceRef.system === "owner" ? "Your plan" : e.sourceRef.record);
+  return app.ctx.parties.find((p) => p.id === pid)?.name ?? (e.sourceRef.system === "owner" ? "Your plan" : (app.ctx.profile?.recurring?.find((r) => r.id === e.sourceRef.record)?.name ?? (/^(rec-|revenueModel\.)/.test(e.sourceRef.record) ? humanizeId(e.sourceRef.record) : e.sourceRef.record)));
 }
 
 async function showDraft(itemId) {

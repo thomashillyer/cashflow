@@ -20,6 +20,7 @@ import type { Profile } from "../../schema/profile";
 import type { Commitment, CommitmentDraft, Records, Rule } from "../../schema/records";
 import { INTENT_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
 import { fmtDate } from "../brief";
+import { humanizeId } from "../labels";
 import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../config";
 import { parseAmount } from "../normalize";
 import { resolveDatePhrase } from "../extract/signals";
@@ -496,18 +497,18 @@ export function resolveIntent(question: string, raw: AskIntentRaw, ctx: ResolveI
     need(`I couldn't read the date "${raw.datePhrase}". When would it happen?`);
   }
   if (kind === "afford" && !intent.draft && !commitmentId) {
-    if (matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? c.id).join(", ")}?`);
+    if (matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? humanizeId(c.id)).join(", ")}?`);
     else if (!raw.amountPhrase && !partyUnknown) need("How much is it?");
     else if (instructed) need("I set aside the instruction in that message. Ask the question again without it.");
   }
   if (kind === "what_if") {
-    if (!commitmentId && !intent.draft && matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? c.id).join(", ")}?`);
+    if (!commitmentId && !intent.draft && matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? humanizeId(c.id)).join(", ")}?`);
     if (!partyId && !commitmentId && !intent.draft && !partyUnknown) {
       need(raw.amountPhrase && !amount ? "How much is it?" : "Which customer, supplier, or order does this apply to?");
     }
     if (!intent.date) need(raw.datePhrase ? `I couldn't read the date "${raw.datePhrase}". When would it happen?` : "When would this happen?");
   }
-  if (kind === "lookup" && refToken && !commitmentId && matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? c.id).join(", ")}?`);
+  if (kind === "lookup" && refToken && !commitmentId && matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? humanizeId(c.id)).join(", ")}?`);
   if (kind === "lookup" && !partyId && !commitmentId && !partyUnknown) need("Which customer or supplier?");
   if (kind === "tell" && !isRule && !instructed && !intent.draft && !partyUnknown && !raw.amountPhrase) need("How much is it?");
 

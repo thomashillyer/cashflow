@@ -81,3 +81,16 @@ export function greeting(hour) {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
+
+// Plain words for an internal id ("rec-payroll" -> "payroll", "revenueModel.dailySales" -> "daily sales").
+// Same rule as ai/labels.ts humanizeId; the browser can't import the TypeScript.
+export function humanizeId(id) {
+  const words = String(id)
+    .replace(/^(?:rec|inv|bill|po|cmt|plan|evt)-/i, "")
+    .replace(/^revenueModel\./, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[-_.]+/g, " ")
+    .trim()
+    .toLowerCase();
+  return words || String(id);
+}

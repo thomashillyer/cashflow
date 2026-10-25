@@ -25,6 +25,7 @@ import { mondayOf } from "../../engine/dates";
 import { commitmentDirection, isOpen, pendingEventsByCommitment } from "../../engine/warnings";
 import { extractFigures } from "../number_check";
 import { fmtDate } from "../brief";
+import { humanizeId } from "../labels";
 import { fmtMoney } from "../money";
 import { askDraftId, draftCadence, intentAssumptions } from "./intent";
 
@@ -103,7 +104,7 @@ function partyName(records: Records, id: string | undefined): string | undefined
   return id ? records.parties.find((p) => p.id === id)?.name : undefined;
 }
 
-const commitmentLabel = (c: Commitment): string => c.reference ?? c.id;
+const commitmentLabel = (c: Commitment): string => c.reference ?? humanizeId(c.id);
 
 function minDay(run: ForecastRun, w: Window): Day | undefined {
   let low: Day | undefined;
@@ -137,6 +138,7 @@ function assemble(f: Figures, d: DecisionDraft): Decision {
   for (const h of d.headlineFacts) { addA(h.amount); addD(h.date); }
   addA(d.context.baseLowPoint?.amount); addD(d.context.baseLowPoint?.date);
   addA(d.context.safetyLine); addA(d.context.shortfall);
+  if (d.lead?.pay) { addA(d.lead.pay.closing); addA(d.lead.pay.shortfall); addD(d.lead.pay.date); }
   const r = d.recommendation;
   if (r) {
     addA(r.cashEffect); addA(r.resultingLowPoint?.amount); addD(r.resultingLowPoint?.date); addD(r.byDate);
@@ -372,7 +374,7 @@ function convict(
 // withDate: a chase names the date it assumes payment; the recommendation leaves it to byDate (one by-date in the answer).
 function leverAction(f: Figures, records: Records, lever: Lever, withDate = true): string {
   const c = records.commitments.find((x) => x.id === lever.commitmentId);
-  const ref = c ? commitmentLabel(c) : lever.commitmentId;
+  const ref = c ? commitmentLabel(c) : humanizeId(lever.commitmentId);
   const who = partyName(records, c?.partyId);
   switch (lever.kind) {
     case "chase":
@@ -471,6 +473,28 @@ function pathForOnTrack(world: World, run: ForecastRun, low: Day): Path {
   return { events, timingPartyIds: timingParties(world.records, ids) };
 }
 
+// "Can I make payroll?": a yes/no question about a named recurring payment. Code answers it from the run's
+// closing balances: "no" when cash goes negative on a payment day, "tight" when it stays above zero but under
+// the safety line, "yes" otherwise. Undefined when the question is not of that form or the item has no payment ahead.
+const YES_NO_RE = /^\W*(?:can|could|will|would|do|does|am|are)\s+(?:i|we)\b/i;
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function canPay(f: Figures, intent: AskIntent, ctx: DecideContext, run: ForecastRun): NonNullable<Decision["lead"]> | undefined {
+  if (!YES_NO_RE.test(intent.question)) return undefined;
+  const q = intent.question.toLowerCase();
+  const rec = ctx.profile.recurring.find((r) => [r.name, r.category].some((w) => w && new RegExp(`\\b${escapeRe(w.toLowerCase())}\\b`).test(q)));
+  if (!rec) return undefined;
+  const closings = run.events
+    .filter((e) => e.commitmentId === rec.id && e.direction === "out" && e.date >= run.asOf)
+    .map((e) => ({ date: e.date, closing: run.days.find((x) => x.date === e.date)?.closing }))
+    .filter((x): x is { date: string; closing: number } => x.closing !== undefined);
+  if (!closings.length) return undefined;
+  const worst = closings.find((x) => x.closing < 0) ?? closings.reduce((a, b) => (b.closing < a.closing ? b : a));
+  const answer = worst.closing < 0 ? "no" : worst.closing < run.safetyLine ? "tight" : "yes";
+  f.m(worst.closing); f.m(run.safetyLine - worst.closing); f.d(worst.date);
+  const name = rec.name.toLowerCase();
+  return { kind: "can_pay", subject: name, pay: { name, date: worst.date, closing: worst.closing, shortfall: run.safetyLine - worst.closing, answer } };
+}
+
 function lowFacts(label: string, d: Day) {
   return { label, amount: d.amount, date: d.date };
 }
@@ -500,10 +524,11 @@ function runFixGap(intent: AskIntent, ctx: DecideContext, window: Window | undef
   const headline: Decision["headlineFacts"] = [lowFacts(tightestLabel, gap.low), { label: "Safety line", amount: gap.run.safetyLine }];
   if (rec?.resultingLowPoint) headline.push(lowFacts("Lowest cash point after the move", rec.resultingLowPoint));
   const tightest = intent.kind === "status" && diffDays(win.to, win.from) >= 28;
+  const pay = intent.kind === "fix_gap" ? canPay(f, intent, ctx, gap.run) : undefined;
   return assemble(f, {
     ...skeleton(intent, ctx),
     verdict,
-    ...(tightest ? { lead: { kind: "tightest" as const, weekStart: f.d(mondayOf(gap.low.date)) } } : {}),
+    ...(tightest ? { lead: { kind: "tightest" as const, weekStart: f.d(mondayOf(gap.low.date)) } } : pay ? { lead: pay } : {}),
     headlineFacts: headline.slice(0, 3),
     context: {
       baseLowPoint: gap.low,
