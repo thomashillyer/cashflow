@@ -180,6 +180,15 @@ export class SupabaseStore implements Store {
     if (error) throw toStoreError(`save overrides ${id}`, error);
   }
 
+  async clearRecords(id: string): Promise<number> {
+    const tables = [...Object.values(TABLES), "change_proposals", "intake_candidates", "work_items", "scenarios", "review_decisions"];
+    for (const t of tables) {
+      const { error } = await this.db.from(t).delete().eq("business_id", id);
+      if (error && !MISSING.has(error.code)) throw toStoreError(`clear ${t} ${id}`, error);
+    }
+    return this.bumpRevision(id);
+  }
+
   // Synthetic only (the caller checks). Deleting the business cascades to every record table.
   async resetBusiness(b: { id: string; name: string; profile: StoredProfile }, records: Records): Promise<void> {
     const { error } = await this.db.from("businesses").delete().eq("id", b.id).eq("is_synthetic", true);

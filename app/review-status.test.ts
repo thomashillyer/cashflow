@@ -112,8 +112,10 @@ describe("forecast checks in the owner brief", () => {
     expect(output.summary.tone).toBe("short");
     expect(output.summary.headline).toContain("below your line");
     expect(output.html).toContain('href="#/review"');
-    expect(output.spoken.join(" ")).toContain("A payment date needs your OK.");
-    expect(output.summary.take).not.toContain("timing problem");
+    // Home keeps the cash advice in the brief and the specific checks in its fold-out.
+    expect(output.html).toContain("A payment date needs your OK.");
+    expect(output.spoken.join(" ")).toContain("Check the forecast items when you're parked.");
+    expect(output.summary.take).toContain("timing problem");
   });
 
   it("escapes source-derived reason text", () => {
