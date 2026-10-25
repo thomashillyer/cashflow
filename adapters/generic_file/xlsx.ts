@@ -3,7 +3,7 @@
 // Sheets over the row/column limit are still returned; ai/extract/sheet.ts reports the limit problem.
 
 import ExcelJS from "exceljs";
-import type { SheetCell, SheetContent } from "../../ai/extract/sheet";
+import { SHEET_MAX_COLUMNS, SHEET_MAX_ROWS, type SheetCell, type SheetContent } from "../../ai/extract/sheet";
 
 function cellValue(v: ExcelJS.CellValue): SheetCell {
   if (v === null || v === undefined) return null;
@@ -38,14 +38,15 @@ export async function readXlsx(bytes: Uint8Array, evidenceId: string): Promise<S
   const out: SheetContent[] = [];
   for (const ws of wb.worksheets) {
     if (ws.state !== "visible") continue;
+    // Read one row and one column past the limits so ai/extract/sheet.ts can still report "too big",
+    // without allocating for a sparse sheet that claims a million rows.
     const rows: SheetCell[][] = [];
-    ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-      const cells: SheetCell[] = [];
-      row.eachCell({ includeEmpty: true }, (cell, col) => { cells[col - 1] = cellValue(cell.value); });
-      for (let i = 0; i < cells.length; i++) cells[i] ??= null;
-      rows[rowNumber - 1] = cells;
-    });
-    for (let i = 0; i < rows.length; i++) rows[i] ??= [];
+    const lastRow = Math.min(ws.rowCount, SHEET_MAX_ROWS + 1);
+    const lastCol = Math.min(ws.columnCount, SHEET_MAX_COLUMNS + 1);
+    for (let r = 1; r <= lastRow; r++) {
+      const row = ws.getRow(r);
+      rows.push(Array.from({ length: lastCol }, (_, c) => cellValue(row.getCell(c + 1).value)));
+    }
     out.push({ evidenceId, sheet: ws.name, rows: trim(rows) });
   }
   return out;

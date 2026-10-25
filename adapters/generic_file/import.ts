@@ -9,7 +9,6 @@ import {
   classifySheet, documentToCandidate, tableToCandidates,
   type ColumnMapping, type ProposedMapping, type SheetContent,
 } from "../../ai/extract/sheet";
-import { dedupeEvidence } from "../core/dedupe";
 import { summarize, type ImportDiagnostics, type RowError, type RowErrorCode } from "../core/diagnostics";
 import { sha256Hex } from "../core/hash";
 import { fileEvidenceId } from "../core/ids";
@@ -50,6 +49,9 @@ const MIME: Record<string, string> = {
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 };
 
+const FORMATS: Record<string, Evidence["format"]> = { pdf: "pdf", eml: "eml", png: "image", jpg: "image", jpeg: "image", heic: "image", html: "html", htm: "html", csv: "csv", xlsx: "xlsx" };
+const formatFor = (name: string): Evidence["format"] => FORMATS[extOf(name)] ?? "text";
+
 function rowErrorCode(reason: string): RowErrorCode {
   if (/repeats with the same party/i.test(reason)) return "duplicate_in_file";
   if (/invoice number/i.test(reason)) return "missing_reference";
@@ -60,7 +62,7 @@ const isTotals = (reason: string) => /^Totals row/i.test(reason);
 
 function unsupported(input: FileInput, hash: string, now: string): FileImport {
   const evidence: Evidence = {
-    id: fileEvidenceId("upload", hash), channel: "upload", format: "xlsx", receivedAt: input.receivedAt,
+    id: fileEvidenceId("upload", hash), channel: "upload", format: formatFor(input.fileName), receivedAt: input.receivedAt,
     fileName: input.fileName, fileHash: hash, extraction: "unsupported",
     sourceRef: { system: "generic_file", record: input.fileName },
   };
@@ -97,7 +99,9 @@ export async function importFile(input: FileInput, opts: ImportOptions): Promise
     sourceRef: { system: "generic_file", record: input.fileName },
   };
 
-  const { unchanged } = dedupeEvidence(opts.existingEvidence ?? [], [evidence]);
+  // A repeat is the same bytes only. An edited file with the same name is new content.
+  const sameBytes = (opts.existingEvidence ?? []).find((e) => e.fileHash === hash);
+  const unchanged = sameBytes ? [sameBytes] : [];
   const repeat = unchanged.length > 0;
 
   const previews: SheetPreview[] = [];

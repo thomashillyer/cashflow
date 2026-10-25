@@ -49,6 +49,19 @@ describe("CSV import", () => {
     expect(again.diagnostics).toMatchObject({ rowsImported: 0, rowsDuplicate: 5, rowsRejected: 0 });
   });
 
+  it("treats an edited file with the same name as new content, not a repeat", async () => {
+    const first = await importFile({ fileName: "ar-aging.csv", bytes: csvBytes(), receivedAt: at }, opts);
+    const edited = new TextEncoder().encode("Invoice #,Customer,Amount\nINV-9,Acme,10.00\n");
+    const again = await importFile({ fileName: "ar-aging.csv", bytes: edited, receivedAt: at }, { ...opts, existingEvidence: [first.evidence] });
+    expect(again.repeat).toBe(false);
+    expect(again.diagnostics.rowsImported).toBe(1);
+  });
+
+  it("stores an unsupported file with its own format", async () => {
+    const r = await importFile({ fileName: "scan.pdf", bytes: new Uint8Array([1]), receivedAt: at }, opts);
+    expect(r.evidence.format).toBe("pdf");
+  });
+
   it("applies the owner's column mapping", async () => {
     const csv = "Ref,Who,Net\nA-1,Acme,100.00\nA-2,Beta,250.00\n";
     const r = await importFile({ fileName: "x.csv", bytes: new TextEncoder().encode(csv), receivedAt: at }, { ...opts, columnMapping: { reference: 0, party: 1, amount: 2 }, headerRow: 1, currency: "USD" });

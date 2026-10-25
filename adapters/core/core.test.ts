@@ -134,3 +134,13 @@ describe("import diagnostics", () => {
     expect(d.rowsRejected).toBe(1);
   });
 });
+
+describe("dedupeEvidence: failed re-reads", () => {
+  it("does not replace a readable evidence with a newer unreadable one", () => {
+    const good = { ...ev("r1", "2026-10-01T00:00:00Z"), text: "Invoice INV-1", extraction: "ok" as const };
+    const bad = { ...ev("r1", "2026-10-05T00:00:00Z"), extraction: "unreadable" as const };
+    const r = dedupeEvidence([good], [bad]);
+    expect(r.fresh).toEqual([]);
+    expect(r.unchanged).toEqual([good]);
+  });
+});

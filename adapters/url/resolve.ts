@@ -56,7 +56,9 @@ export const httpsTransport: Transport = (url, { timeoutMs, maxBytes }) =>
       }));
       res.on("error", reject);
     });
+    const deadline = setTimeout(() => req.destroy(new Error("timeout")), timeoutMs);   // overall, not just idle
     req.on("timeout", () => req.destroy(new Error("timeout")));
+    req.on("close", () => clearTimeout(deadline));
     req.on("error", reject);
     req.end();
   });

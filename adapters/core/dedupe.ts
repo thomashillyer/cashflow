@@ -22,7 +22,9 @@ export function dedupeEvidence(existing: Evidence[], incoming: Evidence[]): Dedu
     if (sameRef) {
       const newer = Date.parse(e.receivedAt) > Date.parse(sameRef.receivedAt);
       const sameKnownFile = e.fileHash !== undefined && e.fileHash === sameRef.fileHash;
-      if (newer && !sameKnownFile) {
+      // A failed re-read never replaces a good one: the stored text is what remains when the source is gone.
+      const failedReread = (e.extraction === "unreadable" || e.extraction === "unsupported") && sameRef.extraction === "ok";
+      if (newer && !sameKnownFile && !failedReread) {
         result.superseded.push({ old: sameRef, next: e });
         result.fresh.push(e);
         byRef.set(key, e);
