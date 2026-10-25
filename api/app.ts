@@ -19,6 +19,7 @@ import { ownerRoutes } from "./routes/owner";
 import { workRoutes } from "./routes/work";
 import { demoRoutes } from "./routes/demo";
 import { overrideRoutes } from "./routes/overrides";
+import { installMask, maskRoutes } from "./mask";
 import { SandboxStore, VISITOR_HEADER, VISITOR_ID } from "./sandbox";
 import { isBehind, type SchemaStatus, type SchemaStatusFn } from "./schema-status";
 
@@ -207,6 +208,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(demoRoutes(deps));
   await app.register(overrideRoutes(deps));
   await app.register(evidenceRoutes(deps));
+  await app.register(maskRoutes(deps));
+  installMask(app, deps);
 
   if (opts.staticDir && existsSync(opts.staticDir)) {
     // The committed app/config.js stays empty (the static preview publishes it). When this server serves the app,

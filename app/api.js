@@ -169,6 +169,11 @@ const preview = {
 // that sample instead of its default. A signed-in owner's own business comes from their session, so a
 // non-sample account sends no header.
 let openedBiz = null;
+// "Hide names" (Settings): ask the server to mask names and contact details, so real ones never reach this page.
+function maskHeader() {
+  try { return localStorage.getItem("neri.mask") === "1" ? { "x-neri-mask": "1" } : {}; } catch { return {}; }
+}
+
 function businessHeader() {
   const acc = readAccount() ?? memAccount;
   return openedBiz && (!acc || acc.sample) ? { "X-Neri-Business": openedBiz } : {};
@@ -193,7 +198,7 @@ function visitor() {
 
 async function http(path, init) {
   const token = await auth.accessToken().catch(() => null);
-  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader(), "X-Neri-Visitor": visitor() };
+  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader(), ...maskHeader(), "X-Neri-Visitor": visitor() };
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (res.status === 401) {
     await auth.signOut().catch(() => {});
