@@ -244,6 +244,17 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Sign-up and sign-in emails show the 6-digit code the app asks for (app/ui/auth.js signInWithOtp +
+# verifyOtp). The defaults only carry a link. Hosted project: apply with `supabase config push`, or paste
+# the same subject and HTML in Dashboard -> Authentication -> Email Templates.
+[auth.email.template.confirmation]
+subject = "Your Neri Cash sign-up code"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.magic_link]
+subject = "Your Neri Cash sign-in code"
+content_path = "./supabase/templates/magic_link.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

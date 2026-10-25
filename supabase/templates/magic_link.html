@@ -1,0 +1,10 @@
+<!-- Sign-in: the code a returning owner gets. The app asks for the 6-digit code (app/ui/auth.js verifyOtp),
+     so the email shows {{ .Token }}, not a link. Inline styles only: most mail clients drop <style>. -->
+<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f2433">
+  <p style="font-size:15px;margin:0 0 4px;color:#6b7080">Neri Cash</p>
+  <h1 style="font-size:22px;margin:0 0 16px">Your sign-in code</h1>
+  <p style="font-size:15px;line-height:1.5;margin:0 0 16px">Enter this code in Neri to sign in:</p>
+  <p style="font-size:32px;font-weight:700;letter-spacing:8px;margin:0 0 16px;padding:16px;background:#f2f3f8;border-radius:12px;text-align:center">{{ .Token }}</p>
+  <p style="font-size:14px;line-height:1.5;margin:0 0 8px;color:#6b7080">The code works once and expires soon. Neri never asks for a password.</p>
+  <p style="font-size:14px;line-height:1.5;margin:0;color:#6b7080">Didn't try to sign in? You can ignore this email; nobody can get in without the code.</p>
+</div>
