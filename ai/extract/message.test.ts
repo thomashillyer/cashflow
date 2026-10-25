@@ -25,6 +25,13 @@ describe("parseEmail", () => {
     const long = parseEmail(`From: "Evil\r\nBcc: x" <a@b.example>\nSubject: ${"x".repeat(400)}\nMessage-ID: <m1@b.example>\n\nbody`, { evidenceId: "ev-1", receivedAt: "2026-11-01T00:00:00Z" });
     expect(long.parent.sourceRef.subject).toHaveLength(200);
     expect(long.parent.sourceRef.from).not.toMatch(/[\r\n]/);
+    // Direction and zero-width characters (used to fake a title or sender) are dropped; an encoded subject is not shown raw.
+    const spoof = parseEmail("From: \"Acme\u202e Corp\" <a@b.example>\nSubject: Pay now\u200b\u202e now\nMessage-ID: <m2@b.example>\n\nbody", { evidenceId: "ev-3", receivedAt: "2026-11-01T00:00:00Z" });
+    expect(spoof.parent.sourceRef.subject).not.toMatch(/[\u200b\u202e]/);
+    expect(spoof.parent.sourceRef.from).not.toMatch(/\u202e/);
+    const encoded = parseEmail("From: A <a@b.example>\nSubject: =?UTF-8?B?UGHDrXMgcXVvdGU=?=\nMessage-ID: <m3@b.example>\n\nbody", { evidenceId: "ev-4", receivedAt: "2026-11-01T00:00:00Z" });
+    expect(encoded.parent.sourceRef.subject).toBeUndefined();
+    expect(encoded.parent.sourceRef.from).toBe("A <a@b.example>");
     const bare = parseEmail("Invoice: INV-1203 for $4,000", { evidenceId: "ev-2", receivedAt: "2026-11-01T00:00:00Z" });
     expect(bare.parent.sourceRef).toEqual({ system: "email", record: "ev-2" });
   });

@@ -190,6 +190,19 @@ describe("production uses the owner's data", () => {
     expect(html).not.toContain("Nothing to review");
   });
 
+  it("finds the sender and subject even when an attachment's evidence comes first", () => {
+    const html = screen(`app.reviewDocs = { storeRevision: 4, proposals: [
+      { proposal: { id: 'att', action: 'review', ops: [], conflicts: [], reasons: ['Missing amount'] }, candidate: { kind: 'invoice', extraction: 'partial', fields: {} }, evidence: [
+        { receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'm-9@x.example#att-1:invoice.pdf' } },
+        { receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'm-9@x.example', subject: 'Invoice for October', from: 'Billing <billing@supplier.example>' } }
+      ], notes: [] }
+    ] }; viewReview()`);
+    expect(html).toContain("Invoice for October");
+    expect(html).toContain("From Billing &lt;billing@supplier.example&gt;");
+    expect(html).not.toContain("m-9@x.example");
+    expect(html).not.toContain("Imported document");
+  });
+
   it("describes setup choices as preferences without simulated OAuth or success", () => {
     const html = screen("app.signup.name = 'Owner Co'; app.setup.picked.add('zoho_books'); viewSetup()");
     expect(html).toContain("Your choices are preferences");

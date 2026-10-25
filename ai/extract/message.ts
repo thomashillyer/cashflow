@@ -155,9 +155,15 @@ const PHONE_RE = /^\+?[\d\s().-]{7,}$/;
 // Email
 
 // One line of display text from a header value: no control characters, bounded. Undefined when nothing is left.
+// Also drops C1 controls and Unicode direction/zero-width characters, which can reorder or hide text on screen.
 const oneLine = (v: string | undefined, max: number): string | undefined => {
-  const t = (v ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  const t = (v ?? "").replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
   return t === "" ? undefined : t;
+};
+// An encoded header ("=?UTF-8?B?...?=") is not decoded here: showing it raw would be worse than "Message from <sender>".
+const readableSubject = (v: string | undefined): string | undefined => {
+  const t = oneLine(v, 200);
+  return t && !/=\?[\w-]+\?[bq]\?/i.test(t) ? t : undefined;
 };
 const displayFrom = (name: string | undefined, email: string | undefined): string | undefined =>
   oneLine(name && email ? `${name} <${email}>` : email ?? name, 200);
@@ -193,7 +199,7 @@ export function parseEmail(raw: string, opts: ParseOptions): MessageBundle {
   const messageId = headers["message-id"]?.replace(/[<>]/g, "") || opts.evidenceId;
   const parent: Evidence = {
     id: opts.evidenceId, channel: "email", format: "text", receivedAt, extraction: "ok",
-    sourceRef: { system: "email", record: messageId, ...(oneLine(headers.subject, 200) ? { subject: oneLine(headers.subject, 200)! } : {}), ...(displayFrom(name, email) ? { from: displayFrom(name, email)! } : {}) },
+    sourceRef: { system: "email", record: messageId, ...(readableSubject(headers.subject) ? { subject: readableSubject(headers.subject)! } : {}), ...(displayFrom(name, email) ? { from: displayFrom(name, email)! } : {}) },
   };
   const attachments = (headers["x-attachments"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const links = extractLinks(body);

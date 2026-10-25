@@ -799,8 +799,11 @@ function noteImpact(n) {
 // ---------------------------------------------------------------- Review
 // How the owner recognises an imported message: what it was about and who sent it, never its message id.
 function messageLabel(item) {
-  const ev = item.evidence?.[0];
-  const sr = ev?.sourceRef ?? {};
+  // Only the message itself carries the subject and sender; an attachment's evidence does not, and the store does
+  // not promise the message comes first.
+  const named = item.evidence?.find((e) => e.sourceRef?.subject || e.sourceRef?.from);
+  const ev = named ?? item.evidence?.[0];
+  const sr = named?.sourceRef ?? {};
   const when = ev?.receivedAt ? dayOf(ev.receivedAt) : "";
   const byline = [sr.from ? `From ${sr.from}` : "", when].filter(Boolean).join(", ");
   return { subject: sr.subject, from: sr.from, when, byline, title: sr.subject ?? (sr.from ? `Message from ${sr.from}` : "Imported document") };
