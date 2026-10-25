@@ -49,8 +49,9 @@ function fakeZoho(over: { status?: number; orgs?: unknown[]; pages?: boolean; in
     if (path === "bills") return ok({ bills, page_context: { has_more_page: false } });
     if (path === "customerpayments") return ok({ customerpayments, page_context: { has_more_page: false } });
     if (path === "vendorpayments") return ok({ vendorpayments, page_context: { has_more_page: false } });
-    const m = path.match(/^(?:customer|vendor)payments\/(.+)$/);
-    if (m) return ok({ payment: paymentDetail[m[1]!] });
+    // Real Zoho wraps a vendor payment's detail as `vendorpayment` and a customer payment's as `payment`.
+    const m = path.match(/^(customer|vendor)payments\/(.+)$/);
+    if (m) return ok(m[1] === "vendor" ? { code: 0, vendorpayment: paymentDetail[m[2]!] } : { code: 0, payment: paymentDetail[m[2]!] });
     return { status: 404, json: async () => ({}) };
   };
   return { fetch: f, calls };

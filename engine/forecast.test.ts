@@ -577,6 +577,40 @@ describe("recurrence, overdue, possible, signals", () => {
     const run = forecast(r, profile, base, "2026-10-25", {});
     expect(run.days.at(-1)?.closing).toBe($(100));
     expect(run.weeks.at(-1)?.pipelineClosing).toBe($(600));
+    expect(run.days.find((d) => d.date === "2026-11-01")?.pipeline).toBe($(100));
+    expect(run.days.find((d) => d.date === "2026-11-02")?.pipeline).toBe($(600));
+    expect(run.days.at(-1)?.pipeline).toBe($(600));
+  });
+
+  it("daily pipeline includes weighted possible costs and receipts without changing cash or safety", () => {
+    const r = empty();
+    r.balances = [bal($(100))];
+    r.commitments = [
+      com("rfq-cost", { type: "bill", status: "possible", probability: 0.5, amount: 10001, anchors: { due: "2026-10-28" } }),
+      com("rfq-sale", { type: "sales_deal", status: "possible", probability: 0.5, amount: 20001, anchors: { due: "2026-11-02" } }),
+      com("bill", { type: "bill", amount: $(20), anchors: { due: "2026-10-30" } }),
+    ];
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    // Per-event cent rounding: -10001 * 0.5 = -5000; +20001 * 0.5 = +10001.
+    expect(run.days.find((d) => d.date === "2026-10-28")).toMatchObject({ closing: 10000, pipeline: 5000 });
+    expect(run.days.find((d) => d.date === "2026-10-30")).toMatchObject({ closing: 8000, pipeline: 3000 });
+    expect(run.days.find((d) => d.date === "2026-11-02")).toMatchObject({ closing: 8000, pipeline: 13001 });
+    expect(run.lowPoint.amount).toBe(8000);
+    expect(run.days.flatMap((d) => d.eventIds)).not.toContain("evt-rfq-cost-0");
+    expect(run.days.every((d) => Number.isInteger(d.pipeline))).toBe(true);
+    for (const w of run.weeks) {
+      const last = run.days.filter((d) => mondayOf(d.date) === w.start).at(-1)!;
+      expect(w.pipelineClosing).toBe(last.pipeline);
+    }
+  });
+
+  it("daily pipeline equals cash when no possible amount has a probability", () => {
+    const r = empty();
+    r.balances = [bal($(100))];
+    r.commitments = [com("rfq", { type: "sales_deal", status: "possible", amount: $(1000), anchors: { due: "2026-11-02" } })];
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    expect(run.days.every((d) => d.pipeline === d.closing)).toBe(true);
+    expect(run.warnings.join(" ")).toMatch(/without a probability/);
   });
 
   it("applied date_change signals move the date; proposed ones do not", () => {

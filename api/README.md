@@ -79,8 +79,9 @@ Saved overrides live in the `scenarios` row `(business_id, 'base')`, apart from 
 
 Owner notes and plans go in as **applied** owner Signals: the owner's own words, confirmed by the owner's click. Messages from anyone else stay `proposed` until the owner applies them in Review.
 
+Forecast runs include `days[].pipeline` for the chart's separate probability-weighted possible-deals line; each week's `pipelineClosing` matches its last day's pipeline value. Possible deals never change the main cash balance.
+
 ## Not served yet
 
-- `days[].pipeline` on the run: the app can draw the band from `weeks[].pipelineClosing`.
 - Confirm is not one database transaction (the RPC can't apply ops yet); the revision check narrows the window.
 - Owner notes, the account details and import notes live in `businesses.profile.account` (no migration needed).
