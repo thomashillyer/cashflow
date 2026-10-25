@@ -68,3 +68,10 @@ it("tells the cascade_trade story: chase Evergreen's late INV-1187 first (design
     cashEffect: 1_950_000,
   });
 });
+
+it("values the demo_runway defer with the real simulate(): bill Oct 29 -> Nov 8 lifts the low point $20,000", () => {
+  // TECHNICAL_PLAN section 10 arithmetic: opening $15,000, bill -$20,000 Oct 29 (low -$5,000). Moving the bill
+  // past the Oct 30 receipts leaves the opening $15,000 as the low point.
+  const { brief } = buildBrief(load("demo_runway"));
+  expect(brief.today[0]).toMatchObject({ lever: { kind: "defer", commitmentId: "bill-supplier", days: 10 }, cashEffect: 2_000_000 });
+});

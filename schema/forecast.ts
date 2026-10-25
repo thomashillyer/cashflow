@@ -30,7 +30,11 @@ export type ForecastRun = {
 };
 
 // Warnings (person 5).
-export type Candidate = { warning: string; lever?: Lever; evidenceRefs: string[]; neededBy: string };
+export type Candidate = {
+  warning: string; lever?: Lever; evidenceRefs: string[]; neededBy: string;
+  cashEffect?: number;                                  // precomputed by the engine (deal_affordability); rank then skips simulate()
+  upfront?: { share: number; currentShare: number };   // deal_affordability: suggested vs current upfront share, 0..1
+};
 export type Check = (run: ForecastRun, records: Records, profile: Profile) => Candidate[];
 
 // Every user-facing Claude response.

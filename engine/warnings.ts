@@ -5,7 +5,9 @@
 
 import type { Candidate, Check, ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
-import type { CashEvent, Commitment, Direction, Records } from "../schema/records";
+import type { CashEvent, Commitment, Direction, Override, Records } from "../schema/records";
+import { isNonDeferrable } from "./adjust";
+import { runAtUpfrontShare, smallestUpfrontShare } from "./affordability";
 import { addDays } from "./dates";
 
 // Design 07 default when a payable has no confirmed `flexibility` rule. Move to the profile when the
@@ -47,12 +49,6 @@ function isReceivable(c: Commitment): boolean {
   return commitmentDirection(c) === "in" && c.type !== "sales_deal" && c.type !== "plan" && !c.funding;
 }
 
-// Profile recurring items marked nonDeferrable, or any commitment in one of their categories
-// (payroll detected from the bank file has its own id).
-function isNonDeferrable(c: Commitment, profile: Profile): boolean {
-  return profile.recurring.some((r) => r.nonDeferrable && (r.id === c.id || (!!c.category && r.category === c.category)));
-}
-
 // A party-specific confirmed flexibility rule wins over an all-parties one.
 function flexibilityRule(c: Commitment, records: Records) {
   const confirmed = records.rules.filter((r) => r.kind === "flexibility" && r.state === "confirmed"
@@ -61,8 +57,16 @@ function flexibilityRule(c: Commitment, records: Records) {
     ?? confirmed.find((r) => "all" in r.scope);
 }
 
-// A daily closing balance falls below the safety line: chase receivables that are overdue or land
-// after the gap, and defer payables that land on or before the gap or the low point.
+// The legs a lever acts on, one lever per leg. legIndex is set only when the commitment has more than one
+// remaining leg in that direction, so single-leg ids stay stable (`wi-...-chase-inv-104`).
+function legLevers(events: CashEvent[], dir: Direction): { leg: CashEvent; legIndex?: number }[] {
+  const mine = events.filter((e) => e.direction === dir);
+  return mine.map((leg) => (mine.length > 1 ? { leg, legIndex: leg.legIndex } : { leg }));
+}
+
+// A daily closing balance falls below the safety line: chase receivable legs that are overdue or land
+// after the gap, and defer payable legs that land on or before the gap or the low point. The engine's
+// chase/defer act on one leg (engine/adjust.ts), so each candidate names the leg its value comes from.
 export const projectedCashGap: Check = (run, records, profile) => {
   const gapDate = run.firstBelowSafety;
   if (!gapDate) return [];
@@ -74,38 +78,40 @@ export const projectedCashGap: Check = (run, records, profile) => {
   for (const c of records.commitments) {
     const events = pending.get(c.id);
     if (!events?.length || !isOpen(c) || c.funding) continue;
-    const dir = commitmentDirection(c);
 
     if (isReceivable(c)) {
       const reach = addDays(run.asOf, lead.chase ?? 0);
-      const last = events[events.length - 1]!;
-      const overdue = last.date < run.asOf;
-      // Overdue: collect as soon as the owner can reach them. Otherwise no earlier than the due date.
-      let assumeDate: string;
-      if (overdue) assumeDate = reach;
-      else if (c.anchors.due && last.date > gapDate) assumeDate = maxDate(c.anchors.due, reach);
-      else continue;
-      if (!overdue && assumeDate >= last.date) continue;
-      out.push({
-        warning: "projected_cash_gap",
-        lever: { kind: "chase", commitmentId: c.id, assumeDate },
-        evidenceRefs: [c.id, ...events.map((e) => e.id)],
-        neededBy: addDays(gapDate, -(lead.chase ?? 0)),
-      });
+      for (const { leg, legIndex } of legLevers(events, "in")) {
+        const overdue = leg.date < run.asOf;
+        // Overdue: collect as soon as the owner can reach them. Otherwise no earlier than the due date.
+        let assumeDate: string;
+        if (overdue) assumeDate = reach;
+        else if (c.anchors.due && leg.date > gapDate) assumeDate = maxDate(c.anchors.due, reach);
+        else continue;
+        if (!overdue && assumeDate >= leg.date) continue;
+        out.push({
+          warning: "projected_cash_gap",
+          lever: { kind: "chase", commitmentId: c.id, assumeDate, ...(legIndex !== undefined ? { legIndex } : {}) },
+          evidenceRefs: [c.id, leg.id],
+          neededBy: addDays(gapDate, -(lead.chase ?? 0)),
+        });
+      }
     }
 
-    if (dir === "out" && !isNonDeferrable(c, profile)) {
-      const before = events.filter((e) => e.date >= run.asOf && e.date <= deferUntil);
-      if (!before.length) continue;
+    if (commitmentDirection(c) === "out" && !isNonDeferrable(profile, c.id, c.category ?? events[0]?.category)) {
       const rule = flexibilityRule(c, records);
-      // The base run already applied this flexibility; deferring again would double-count it.
-      if (rule && before.some((e) => e.overriddenBy?.includes(rule.id))) continue;
-      out.push({
-        warning: "projected_cash_gap",
-        lever: { kind: "defer", commitmentId: c.id, days: (rule?.params.extraDays as number) ?? DEFAULT_DEFER_DAYS },
-        evidenceRefs: [c.id, ...before.map((e) => e.id)],
-        neededBy: addDays(minDate(before[0]!.date, gapDate), -(lead.defer ?? 0)),
-      });
+      const days = (rule?.params.extraDays as number | undefined) ?? DEFAULT_DEFER_DAYS;
+      for (const { leg, legIndex } of legLevers(events, "out")) {
+        if (leg.date < run.asOf || leg.date > deferUntil) continue;
+        // The base run already applied this flexibility; deferring again would double-count it.
+        if (rule && leg.overriddenBy?.includes(rule.id)) continue;
+        out.push({
+          warning: "projected_cash_gap",
+          lever: { kind: "defer", commitmentId: c.id, days, ...(legIndex !== undefined ? { legIndex } : {}) },
+          evidenceRefs: [c.id, leg.id],
+          neededBy: addDays(minDate(leg.date, gapDate), -(lead.defer ?? 0)),
+        });
+      }
     }
   }
   return out;
@@ -196,4 +202,35 @@ export const checks: Check[] = [projectedCashGap, earlyPayDiscount, idleBalanceO
 
 export function runChecks(run: ForecastRun, records: Records, profile: Profile): Candidate[] {
   return checks.flatMap((check) => check(run, records, profile));
+}
+
+// Taking a likely or possible deal pushes the low point below the safety line, and the deal itself is the
+// cause (engine/affordability.ts returns not_deal_driven otherwise; the cash-gap check owns that case).
+// `ok`: ask for the smallest upfront share that keeps cash above the line. `not_achievable`: explain only.
+// Not in `checks`: it needs the owner's base overrides, so buildBrief calls it directly.
+export function dealAffordability(run: ForecastRun, records: Records, profile: Profile, baseOverrides: Override[] = []): Candidate[] {
+  const lead = profile.actionLeadDays ?? {};
+  const out: Candidate[] = [];
+  for (const c of records.commitments) {
+    if (c.type !== "sales_deal" || !isOpen(c) || (c.status !== "likely" && c.status !== "possible")) continue;
+    const r = smallestUpfrontShare(records, profile, baseOverrides, c.id, run.asOf, run.fxRates);
+    if (r.kind !== "ok" && r.kind !== "not_achievable") continue;
+    const neededBy = addDays(c.anchors.order ?? run.asOf, -(lead.ask_advance ?? 0));
+    if (r.kind === "not_achievable") {
+      out.push({ warning: "deal_affordability", evidenceRefs: [c.id], neededBy,
+        upfront: { share: 1, currentShare: r.currentShare } });
+      continue;
+    }
+    const atCurrent = runAtUpfrontShare(records, profile, baseOverrides, c.id, run.asOf, run.fxRates, r.currentShare);
+    out.push({
+      warning: "deal_affordability",
+      // The lever records the ask for drafting; its dollar effect is the affordability search's, not simulate()'s.
+      lever: { kind: "ask_advance", commitmentId: c.id, share: r.share },
+      evidenceRefs: [c.id],
+      neededBy,
+      cashEffect: r.lowPoint - atCurrent.lowPoint.amount,
+      upfront: { share: r.share, currentShare: r.currentShare },
+    });
+  }
+  return out;
 }
