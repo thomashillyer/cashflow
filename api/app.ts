@@ -7,6 +7,8 @@ import { join } from "node:path";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { HttpError, sendError, type NeriRequest, type User } from "./http";
+import type Anthropic from "@anthropic-ai/sdk";
+import { AskLiveGuard, type AskLiveOptions } from "./ask-live";
 import type { AiMode } from "./engine";
 import type { Store } from "./store";
 import { readRoutes } from "./routes/read";
@@ -26,8 +28,12 @@ export type AppOptions = {
   verify: Verifier;
   demoMode?: boolean;              // DEMO_MODE=1: unauthenticated requests may use synthetic businesses
   defaultBusiness?: string;        // sample opened when the caller has no business of their own
-  aiMode?: AiMode;
-  staticDir?: string;              // serve the app (same origin) when present
+  aiMode?: AiMode;                 // brief, drafts and document intake
+  askMode?: AiMode;                // POST /ask only; default: aiMode
+  askClient?: Anthropic;           // tests inject a stub; live Ask otherwise builds a client from ANTHROPIC_API_KEY
+  askLive?: AskLiveOptions;        // timeout and hourly cap for live Ask (NERI_ASK_LIVE_MAX_PER_HOUR)
+  askCacheDirs?: { intent?: string; voice?: string }; // tests point the live cache at a temp dir
+  staticDir?: string;             // serve the app (same origin) when present
   // Public values for the served app/config.js (the anon key is public by design; never the service-role key).
   appConfig?: { supabaseUrl?: string; supabaseAnonKey?: string };
   now?: () => Date;
@@ -37,7 +43,10 @@ export type AppOptions = {
   schemaStatus?: SchemaStatusFn;   // GET /ready: repo vs database migration version (Supabase store only)
 };
 
-export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">> & {
+export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "askMode" | "now" | "allowReset">> & {
+  askGuard: AskLiveGuard;
+  askClient?: Anthropic;
+  askCacheDirs?: { intent?: string; voice?: string };
   schemaStatus?: SchemaStatusFn;
   sandboxes: SandboxStore;         // per-visitor copies of the synthetic samples (demo mode)
 };
@@ -91,6 +100,10 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     demoMode: opts.demoMode ?? false,
     defaultBusiness: opts.defaultBusiness ?? "cascade_trade",
     aiMode: opts.aiMode ?? "cache_only",
+    askMode: opts.askMode ?? opts.aiMode ?? "cache_only",
+    askGuard: new AskLiveGuard(opts.askLive),
+    ...(opts.askClient ? { askClient: opts.askClient } : {}),
+    ...(opts.askCacheDirs ? { askCacheDirs: opts.askCacheDirs } : {}),
     now: opts.now ?? (() => new Date()),
     allowReset: opts.allowReset ?? false,
     sandboxes: opts.sandboxes ?? new SandboxStore(),
@@ -123,7 +136,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   });
 
   // Liveness only: Fly health-checks this. It must stay 200 while the process is up, whatever the database says.
-  app.get("/health", async () => ({ ok: true, demoMode: deps.demoMode, aiMode: deps.aiMode }));
+  app.get("/health", async () => ({ ok: true, demoMode: deps.demoMode, aiMode: deps.aiMode, askMode: deps.askMode }));
 
   // Readiness: is the database migrated to what this code expects? Cached ~30s.
   let cached: { at: number; status: SchemaStatus | null } | undefined;
