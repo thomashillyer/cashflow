@@ -157,7 +157,7 @@ export type Settlement = {
 // Many Evidence records can describe one Commitment; evidence never creates cash by itself.
 export type Evidence = {
   id: string;
-  channel: "zoho_books" | "bank_csv" | "email" | "whatsapp" | "crm" | "upload" | "url" | "owner";
+  channel: "zoho_books" | "quickbooks" | "xero" | "bank_csv" | "email" | "whatsapp" | "crm" | "upload" | "url" | "owner";
   format: "csv" | "xlsx" | "pdf" | "text" | "eml" | "html" | "image" | "api";
   receivedAt: string;
   parentId?: string;         // attachment or link inside a message
