@@ -1,0 +1,19 @@
+{
+  "key": "427eb31b0294cbaccf0ac7b3d1dea1df4b49f100c6f2b0aa3bcd680e7a09c9b6",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "fix_gap",
+    "partyPhrase": null,
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": "on the 11th",
+    "windowPhrase": null,
+    "commitmentType": null,
+    "direction": null,
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

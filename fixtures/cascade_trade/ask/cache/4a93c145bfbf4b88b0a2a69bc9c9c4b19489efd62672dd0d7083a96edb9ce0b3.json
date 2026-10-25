@@ -1,0 +1,19 @@
+{
+  "key": "4a93c145bfbf4b88b0a2a69bc9c9c4b19489efd62672dd0d7083a96edb9ce0b3",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "afford",
+    "partyPhrase": "Harbor",
+    "referencePhrase": "the Harbor order",
+    "amountPhrase": null,
+    "datePhrase": null,
+    "windowPhrase": null,
+    "commitmentType": "sales_deal",
+    "direction": "in",
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

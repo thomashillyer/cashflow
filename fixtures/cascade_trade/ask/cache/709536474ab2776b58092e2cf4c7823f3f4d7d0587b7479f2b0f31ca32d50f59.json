@@ -1,0 +1,19 @@
+{
+  "key": "709536474ab2776b58092e2cf4c7823f3f4d7d0587b7479f2b0f31ca32d50f59",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "lookup",
+    "partyPhrase": "Jaipur",
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": null,
+    "windowPhrase": null,
+    "commitmentType": null,
+    "direction": "out",
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

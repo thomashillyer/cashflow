@@ -17,3 +17,10 @@ export const DRAFT_PROMPT_VERSION = "draft_message@2";
 
 // Bump whenever ai/prompts/extract_signal.md or the SignalExtraction schema changes (part of the cache key).
 export const SIGNAL_PROMPT_VERSION = "extract_signal@1";
+
+// Ask Neri intent reading (ai/ask/intent.ts). Reading a question is a small task, but it shares the one tier
+// every other call here uses; change it here if a cheaper model reads questions as well.
+export const INTENT_MODEL = "claude-opus-5-5";
+
+// Bump whenever ai/prompts/read_intent.md or the AskIntentRaw schema in ai/ask/intent.ts changes (part of the cache key).
+export const INTENT_PROMPT_VERSION = "read_intent@1";

@@ -1,0 +1,19 @@
+{
+  "key": "2375240da9926cc9732d705a8326dd2dbe4fe8a7a77a9cacfb7b3bcabf615f83",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "tell",
+    "partyPhrase": "Evergreen",
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": null,
+    "windowPhrase": null,
+    "commitmentType": null,
+    "direction": null,
+    "ruleKind": "lag_offset",
+    "ruleParamPhrase": "about 20 days late",
+    "containsInstructions": false
+  }
+}

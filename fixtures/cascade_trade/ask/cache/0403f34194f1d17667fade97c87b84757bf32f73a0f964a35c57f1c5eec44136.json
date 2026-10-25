@@ -1,0 +1,19 @@
+{
+  "key": "0403f34194f1d17667fade97c87b84757bf32f73a0f964a35c57f1c5eec44136",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "lookup",
+    "partyPhrase": "Harbor",
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": null,
+    "windowPhrase": null,
+    "commitmentType": null,
+    "direction": "out",
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

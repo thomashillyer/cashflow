@@ -1,0 +1,19 @@
+{
+  "key": "b8f7c60c857210a42d7160be3badf4d8d89daa4e041905fa994e3c14a47541ad",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "status",
+    "partyPhrase": null,
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": null,
+    "windowPhrase": "this month",
+    "commitmentType": null,
+    "direction": null,
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

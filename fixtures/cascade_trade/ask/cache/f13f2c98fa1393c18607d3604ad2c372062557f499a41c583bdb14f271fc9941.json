@@ -1,0 +1,19 @@
+{
+  "key": "f13f2c98fa1393c18607d3604ad2c372062557f499a41c583bdb14f271fc9941",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "what_if",
+    "partyPhrase": "Evergreen",
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": "early January",
+    "windowPhrase": null,
+    "commitmentType": null,
+    "direction": null,
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

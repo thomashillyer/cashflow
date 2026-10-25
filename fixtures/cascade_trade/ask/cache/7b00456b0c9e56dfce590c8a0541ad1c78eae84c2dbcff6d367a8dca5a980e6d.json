@@ -1,0 +1,19 @@
+{
+  "key": "7b00456b0c9e56dfce590c8a0541ad1c78eae84c2dbcff6d367a8dca5a980e6d",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "what_if",
+    "partyPhrase": null,
+    "referencePhrase": null,
+    "amountPhrase": "$6K a month",
+    "datePhrase": "from March",
+    "windowPhrase": null,
+    "commitmentType": "recurring",
+    "direction": "out",
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

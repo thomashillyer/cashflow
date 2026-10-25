@@ -1,0 +1,19 @@
+{
+  "key": "3a5cfdf6d3c3b100ec8950f6c9fcfa25d0112a7b0f71708ccc9a38300c235790",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "lookup",
+    "partyPhrase": "Evergreen",
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": null,
+    "windowPhrase": null,
+    "commitmentType": null,
+    "direction": null,
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "key": "9f0532376633723226c954554f1838451b7124d4854c260645bab415965c5f71",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "out_of_scope",
+    "partyPhrase": null,
+    "referencePhrase": null,
+    "amountPhrase": null,
+    "datePhrase": null,
+    "windowPhrase": null,
+    "commitmentType": null,
+    "direction": null,
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}
