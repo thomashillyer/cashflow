@@ -209,7 +209,7 @@ function neededSlots(intent: AskIntent): { question: string; why: string } | und
       if (!intent.draft && !intent.commitmentId) return { question: "How much is it, or which order or bill do you mean?", why: "No amount or existing order or bill was identified." };
       return undefined;
     case "what_if":
-      if (!intent.draft && !((intent.commitmentId || intent.partyId) && intent.date)) return { question: "Which customer or supplier, and on what date?", why: "A what-if needs a party or item and a date." };
+      if (!intent.draft && !((intent.commitmentId || intent.partyId) && (intent.date || intent.shiftDays)))return { question: "Which customer or supplier, and on what date?", why: "A what-if needs a party or item and a date." };
       return undefined;
     case "tell":
       if (!intent.draft && !intent.rule) {
@@ -936,7 +936,8 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
       subjects.push(dir === "in" ? `you win a ${f.m(base)} order paid on ${f.h(date)}` : `you pay ${f.m(base)} on ${f.h(date)}`);
     }
   } else {
-    const date = intent.date!;
+    const shift = intent.shiftDays;
+    const date = intent.date ?? "";
     const pending = pendingEventsByCommitment(baseRun);
     let targets: Commitment[];
     if (intent.commitmentId) {
@@ -948,10 +949,24 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
       targets = mine.filter((c) => dirOf(c) === dir);
     }
     if (targets.length === 0) return needInfo(intent, ctx, "Which invoice, bill, or order do you mean?", "Nothing open was found for that party.");
+    if (shift !== undefined && !intent.commitmentId && targets.length > 1) {
+      const who = partyName(ctx.records, targets[0]!.partyId);
+      assumptions.push(`${who ?? "That party"} has ${targets.length} open ${targets.every((c) => dirOf(c) === "in") ? "receivables" : "items"}, so I moved all of them ${Math.abs(shift)} days ${shift > 0 ? "later" : "earlier"}.`);
+    }
     targets.forEach((c, i) => {
       const legs = (pending.get(c.id) ?? []).filter((e) => e.direction === dirOf(c));
       const first = legs[0];
       const id = `ask-whatif-${tag}-${i}`;
+      if (shift !== undefined) {
+        // A relative delay: code shifts the expected date; Claude never supplies it.
+        whatIfOverrides.push({ id, target: { commitmentId: c.id }, change: { shiftDays: shift }, origin: "owner" });
+        const who = partyName(ctx.records, c.partyId);
+        const newDate = first ? addDays(first.date, shift) : undefined;
+        const mag = `${Math.abs(shift)} days ${shift > 0 ? "later" : "earlier"}`;
+        subjects.push(`${dirOf(c) === "in" ? (who ?? "the customer") : "you"} ${dirOf(c) === "in" ? "pays" : "pay"} ${commitmentLabel(c)} ${mag}${newDate ? ` (${f.h(newDate)})` : ""}`);
+        assumptions.push(`Assumed ${commitmentLabel(c)} is paid ${mag} than expected${first && newDate ? `, ${f.h(newDate)} instead of ${f.h(first.date)}` : ""}.`);
+        return;
+      }
       if (first && legs.length > 1) {
         whatIfOverrides.push({ id, target: { commitmentId: c.id }, change: { shiftDays: diffDays(date, first.date) }, origin: "owner" });
       } else {
