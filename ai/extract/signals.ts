@@ -115,6 +115,10 @@ const MONTH_RE = Object.keys(MONTHS).join("|");
 // Where in a month each vague part-of-month phrase is suggested to land.
 const PART_OF_MONTH: Record<string, number | "end"> = { early: 5, beginning: 5, start: 5, mid: 15, middle: 15, late: 25, end: "end" };
 
+// Conventions: "next <weekday>" is the first such weekday strictly after the message date (Friday, from a
+// Wednesday, is this week's Friday); "this <weekday>" and a bare weekday allow today. A part-of-month phrase
+// already past is clamped to the message date. Phrases it cannot read ("the 15th", "11/3", "next month")
+// return {} and produce no signal rather than a guess.
 export function resolveDatePhrase(phrase: string, receivedAt: string, timeZone: string): ResolvedDate {
   const today = localDate(receivedAt, timeZone);
   if (!today) return {};
@@ -168,7 +172,8 @@ export function resolveDatePhrase(phrase: string, receivedAt: string, timeZone: 
 
   // Absolute dates. Anything with a year goes through the shared parser.
   const explicit = parseDate(p);
-  if (explicit) return { date: explicit.date };
+  // "3/12/2026" could be March 12 or December 3: a guess the owner must confirm.
+  if (explicit) return explicit.ambiguous ? { date: explicit.date, vague: phrase.trim(), requiresOwnerDate: true } : { date: explicit.date };
   const clean = p.replace(/(\d)(?:st|nd|rd|th)\b/g, "$1").replace(/,/g, "");
   let month: number | undefined;
   let day: number | undefined;
@@ -197,7 +202,7 @@ export function signalSystemPrompt(): string {
 }
 
 // A message that contains a closing tag must not be able to end its own data block.
-const escapeData = (text: string) => text.replace(/<\/(message|conversation|context)/gi, "<\\/$1");
+const escapeData = (text: string) => text.replace(/<(\/?)(message|conversation|context)/gi, "<\\$1$2");
 const oneLine = (v: string) => v.replace(/\s+/g, " ").trim();
 
 export type MessageInput = {
@@ -212,8 +217,8 @@ export type MessageInput = {
 export function buildSignalContent(m: MessageInput): string {
   const ctx = [
     `channel: ${m.channel}`, `received_at: ${m.receivedAt}`,
-    ...(m.sender ? [`sender: ${oneLine(m.sender)}`] : []),
-    ...(m.subject ? [`subject: ${oneLine(m.subject)}`] : []),
+    ...(m.sender ? [`sender: ${escapeData(oneLine(m.sender))}`] : []),
+    ...(m.subject ? [`subject: ${escapeData(oneLine(m.subject))}`] : []),
   ].join("\n");
   return [
     `<context>\n${ctx}\n</context>`,
@@ -240,7 +245,7 @@ export async function callSignalModel(
     const res = await client.messages.create(
       {
         model,
-        max_tokens: 4000,
+        max_tokens: 16000, // headroom for default-on thinking, as in document.ts
         system: [{ type: "text", text: signalSystemPrompt(), cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content }],
         output_config: { effort: "low", format: zodOutputFormat(SignalExtraction) },
@@ -287,6 +292,17 @@ const mentions = (text: string, ref: string): boolean =>
   new RegExp(`(?<![A-Za-z0-9-])${ref.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9])`, "i").test(text);
 const PHONE_RE = /^\+?[\d\s().-]{7,}$/;
 
+// The confirmed party a message came from (email domain or phone on the party), or undefined. A similar
+// name alone is not confirmation (docs/design/06-signals.md step 1).
+export function resolveSender(bundle: MessageBundle, msg: BundleMessage | undefined, records: Records): string | undefined {
+  const sender: PartyHint | undefined = bundle.sender
+    ? { email: bundle.sender.email, phone: bundle.sender.phone, name: bundle.sender.name }
+    : msg ? (PHONE_RE.test(msg.sender) ? { phone: msg.sender } : { name: msg.sender }) : undefined;
+  if (!sender) return undefined;
+  const r = resolveParty(sender, records.parties);
+  return "partyId" in r ? r.partyId : undefined;
+}
+
 // The value must be supported by its own quote, or a real quote could vouch for a different value.
 const supported = (q: Quoted): q is NonNullable<Quoted> =>
   q !== null && q.value.trim() !== "" && squash(q.quote).includes(squash(q.value));
@@ -307,7 +323,7 @@ export function toSignal(
 
   // ---- locate quotes in the message
   const msg = ctx.message;
-  const locate = (q: Quoted, messageOnly = false): { start: number; end: number } | undefined => {
+  const locate = (q: Quoted | undefined, messageOnly = false): { start: number; end: number } | undefined => {
     if (!q) return undefined;
     if (msg) {
       const r = locateQuote([{ evidenceId: ctx.evidenceId, text: bundle.text.slice(msg.start, msg.end) }], q.quote);
@@ -338,14 +354,8 @@ export function toSignal(
   const newAmount = usable(extraction.newAmount, "new amount", true);
 
   // ---- who sent it
-  const sender: PartyHint | undefined = bundle.sender
-    ? { email: bundle.sender.email, phone: bundle.sender.phone, name: bundle.sender.name }
-    : msg ? (PHONE_RE.test(msg.sender) ? { phone: msg.sender } : { name: msg.sender }) : undefined;
-  let partyId: string | undefined;
-  if (sender) {
-    const r = resolveParty(sender, ctx.records.parties);
-    if ("partyId" in r) partyId = r.partyId;
-  }
+  let partyId = resolveSender(bundle, msg, ctx.records);
+  const senderConfirmed = partyId !== undefined || ctx.channel === "owner"; // the owner's own notes are trusted
   if (!partyId) notes.push("The sender is not a confirmed known party; matched by reference only.");
 
   // ---- match a commitment, in code
@@ -377,7 +387,8 @@ export function toSignal(
       });
       candidates = hits.map((c) => ({ commitmentId: c.id, reasons: [`same party; amount ${amountMentioned.value} is within 2% of ${c.reference ?? c.id}`] }));
     }
-    if (!candidates.length && partyId && pool.length) {
+    // Tier 3 is for messages that name no invoice; a stated reference that matches nothing is not fixed by guessing.
+    if (!candidates.length && partyId && pool.length && !reference) {
       candidates = pool.map((c) => ({
         commitmentId: c.id,
         reasons: [pool.length === 1 ? "same party; their only open commitment" : `same party; one of ${pool.length} open commitments`],
@@ -393,6 +404,14 @@ export function toSignal(
   let claim: SignalClaim;
   let confidence = clamp01(extraction.confidence);
   let primary: Quoted;
+  if (!senderConfirmed) {
+    notes.push("The sender is not a confirmed party; the owner must confirm this before relying on it.");
+    confidence = Math.min(confidence, 0.5);
+  }
+  if (extraction.dependsOn && extraction.dependsOn.trim()) {
+    notes.push(`The promise is conditional: ${oneLine(extraction.dependsOn).slice(0, 200)}`);
+    confidence = Math.min(confidence, 0.5);
+  }
   if (extraction.claim === "date_change") {
     if (!newDate) return { notes: [...notes, "The message gives no readable new date."] };
     const r = resolveDatePhrase(newDate.value, ctx.receivedAt, ctx.timeZone);
@@ -421,8 +440,9 @@ export function toSignal(
   }
 
   // ---- cite the words behind it
-  const cite = [primary, reference, amountMentioned, extraction.partyName].find((q) => q && locate(q));
-  const span = cite ? locate(cite) : undefined;
+  // The excerpt must be the analysed message's own words, not an earlier message of the chat.
+  const inMessage = (s: { start: number; end: number } | undefined) => (s && (!msg || (s.start >= msg.start && s.end <= msg.end)) ? s : undefined);
+  const span = [primary, reference, amountMentioned, extraction.partyName].map((q) => inMessage(locate(q))).find((s) => s);
   if (!span) return { notes: [...notes, "No quote from the message could be located, so no signal was created."] };
 
   const signal: Signal = {
@@ -503,6 +523,12 @@ export async function extractSignals(
 
   for (const u of messageUnits(bundle, channel)) {
     const { content, label } = u;
+    // Inbound streams (email, CRM) are read only from confirmed parties, and nothing else is sent to the model.
+    // Chats and notes the owner supplied themselves are read; their signals are capped when the sender is unconfirmed.
+    if ((channel === "email" || channel === "crm") && !resolveSender(bundle, u.message, opts.records)) {
+      notes.push(`${label}: ignored, the sender is not a known party.`);
+      continue;
+    }
     const key = signalCacheKey(content, model);
     let output: SignalExtraction | undefined;
     for (const dir of readDirs) {
