@@ -1,3 +1,5 @@
+// DO NOT COMMIT real values here. Cloudflare Pages publishes app/ as committed, including every PR preview.
+// Set live values only in your local copy, or in the host's own config for a private deployment.
 // Point the app at the team's API. Leave empty to run the built-in preview with sample businesses.
 // You can also pass ?api=http://localhost:8787 in the URL.
 window.NERI_API_BASE = "";
