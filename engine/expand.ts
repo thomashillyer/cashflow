@@ -34,10 +34,32 @@ export function defaultDirection(c: Commitment): Direction {
   return "out";
 }
 
-// An unknown patternId falls back to the type default (see unknownPattern, which warns and notes it in basis).
-function pickPattern(c: Commitment, profile: Profile): PaymentPattern | undefined {
+// The pattern a commitment's events follow, and why it is not the one asked for (for basis and review).
+// No explicit Commitment.direction: the patternId, else the type default (an unknown patternId falls back to the type
+// default; see unknownPattern, which warns and notes it in basis). Legs decide the direction, as before.
+// Explicit direction: never emit an event against it. Only patterns whose legs all go that way are used: the patternId,
+// else the first type default that matches. An explicit patternId whose legs disagree is `mismatch` (needs review);
+// with no matching default the result has no pattern, so the commitment pays in a single due-date leg in its direction.
+// linkedCosts are separate virtual outflow commitments, so a deal pattern with inflow legs and outflow costs still matches.
+export type PatternChoice = { pattern?: PaymentPattern; mismatch?: PaymentPattern; skippedDefault?: PaymentPattern };
+
+export function legsMatch(p: PaymentPattern, dir: Direction): boolean {
+  return p.legs.every((l) => l.direction === dir);
+}
+
+export function choosePattern(c: Commitment, profile: Profile): PatternChoice {
   const named = c.patternId ? profile.paymentPatterns.find((p) => p.id === c.patternId) : undefined;
-  return named ?? profile.paymentPatterns.find((p) => p.appliesTo === c.type && p.isDefault);
+  const defaults = profile.paymentPatterns.filter((p) => p.appliesTo === c.type && p.isDefault);
+  const dir = c.direction;
+  if (!dir) return { pattern: named ?? defaults[0] };
+  if (named && legsMatch(named, dir)) return { pattern: named };
+  const pattern = defaults.find((p) => legsMatch(p, dir));
+  const skippedDefault = !pattern && defaults[0] ? defaults[0] : undefined;
+  return { ...(pattern ? { pattern } : {}), ...(named ? { mismatch: named } : {}), ...(skippedDefault ? { skippedDefault } : {}) };
+}
+
+export function pickPattern(c: Commitment, profile: Profile): PaymentPattern | undefined {
+  return choosePattern(c, profile).pattern;
 }
 
 function unknownPattern(c: Commitment, profile: Profile): boolean {
@@ -340,8 +362,12 @@ function expandCommitment(
   if (c.type === "recurring" && !c.anchors.due) return []; // profile.recurring owns aggregate recurrences
   const covers = coveredByLinked(c, byId, warnings);
   const { total, paid, counted } = paidSoFar(c, records, amountSignal, covers.reduce((a, x) => a + x.amount, 0), ctx, warnings);
-  const pattern = pickPattern(c, profile);
+  const choice = choosePattern(c, profile);
+  const pattern = choice.pattern;
   const dir0 = defaultDirection(c);
+  const single = "a single due-date leg";
+  if (choice.mismatch)
+    warnings.review("pattern_direction_mismatch", `${label}: payment pattern ${choice.mismatch.id} has legs that are not money ${dir0 === "in" ? "coming in" : "going out"}, but the commitment is; used ${pattern ? `the ${c.type} default ${pattern.id}` : `${single} in its direction`} (needs review)`, [c.id, choice.mismatch.id]);
   const legs: Leg[] = pattern?.legs ?? [{ share: 1, anchor: "due", offsetDays: 0, direction: dir0 }];
   const touched: string[] = amountSignal?.claim.kind === "amount_change" ? [amountSignal.id] : [];
 
@@ -388,6 +414,8 @@ function expandCommitment(
     let date = addDays(anchor.date, leg.offsetDays);
     let basis = `${leg.anchor} ${anchor.date}${anchor.note ? ` [${anchor.note}]` : ""}${leg.offsetDays ? ` + ${leg.offsetDays} days` : ""}`;
     if (unknownPattern(c, profile)) basis += ` [unknown pattern ${c.patternId}; used ${pattern ? `default ${pattern.id}` : "a single due-date leg"}]`;
+    if (choice.mismatch) basis += ` [pattern ${choice.mismatch.id} is not money ${dir0 === "in" ? "in" : "out"}; used ${pattern ? `default ${pattern.id}` : `${single} ${dir0}`}]`;
+    else if (choice.skippedDefault) basis += ` [default ${choice.skippedDefault.id} is not money ${dir0 === "in" ? "in" : "out"}; used ${single} ${dir0}]`;
     let conf = c.status === "possible" ? (c.probability ?? tun.statusConfidence.possible) : tun.statusConfidence[c.status];
     const overriddenBy = [...touched];
     const lagged = legGetsLag(leg, c, tun);
