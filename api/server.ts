@@ -10,6 +10,7 @@ import { buildApp, type Verifier } from "./app";
 import { loadSamples } from "./demo";
 import { MemoryStore, type Store } from "./store";
 import { SupabaseStore } from "./supabase-store";
+import { isBehind, supabaseSchemaStatus } from "./schema-status";
 
 const env = process.env;
 const demoMode = env.DEMO_MODE === "1";
@@ -22,7 +23,10 @@ async function memoryStore(): Promise<Store> {
 }
 
 const useMemory = env.NERI_STORE === "memory";
-const store: Store = useMemory ? await memoryStore() : new SupabaseStore(getSupabase({ serviceRole: true }));
+const sb = useMemory ? null : getSupabase({ serviceRole: true });
+const store: Store = sb ? new SupabaseStore(sb) : await memoryStore();
+// The Dockerfile copies the whole repo, so supabase/migrations is in the image.
+const schemaStatus = sb ? supabaseSchemaStatus(sb, join(import.meta.dirname, "../supabase/migrations")) : undefined;
 
 // Supabase verifies the session token (anon-key client; getUser checks it with the auth server).
 const verify: Verifier = env.SUPABASE_URL && env.SUPABASE_ANON_KEY
@@ -47,7 +51,16 @@ const app = await buildApp({
     : {}),
   allowReset: demoMode || env.NERI_ALLOW_RESET === "1",
   logger: true,
+  ...(schemaStatus ? { schemaStatus } : {}),
 });
+
+// Startup check: warn loudly, never crash (the demo must keep serving).
+if (schemaStatus) {
+  const s = await schemaStatus().catch(() => null);
+  if (s && isBehind(s)) {
+    app.log.warn({ repo: s.repo, db: s.db }, `DATABASE IS BEHIND THE CODE: repo migration ${s.repo}, database ${s.db ?? "unknown (schema_version() missing, so its migration isn't applied)"}. Run npx supabase db push.`);
+  }
+}
 
 await app.listen({ port, host: env.HOST ?? "127.0.0.1" });
 app.log.info(`Neri API on http://localhost:${port} (store: ${useMemory ? "memory" : "supabase"}, demo mode: ${demoMode ? "on" : "off"})`);
