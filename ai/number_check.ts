@@ -257,11 +257,13 @@ export type ExtractedNumber = { raw: string; value: number; unit: NumberFact["un
 //   pct:   "40%", "12.5 %"
 //   days:  "10 days", "10 more days", "1 extra day"
 //   count: "8 payments", "6 samples", "3 invoices" (singular too)
-const pctRe = /(?<![\w.])(\d+(?:\.\d+)?)\s?%/g;
-const daysRe = /(?<![\w.])(\d+(?:\.\d+)?)\s+(?:(?:more|extra)\s+)?days?(?![A-Za-z])/gi;
-const countRe = /(?<![\w.])(\d+(?:\.\d+)?)\s+(?:payments?|samples?|invoices?)(?![A-Za-z])/gi;
+const pctRe = /(?<![\w.,$€£¥₹−–-])(\d+(?:\.\d+)?)\s?%/g;
+const daysRe = /(?<![\w.,$€£¥₹−–-])(\d+(?:\.\d+)?)\s+(?:(?:more|extra)\s+)?days?(?![A-Za-z])/gi;
+const countRe = /(?<![\w.,$€£¥₹−–-])(\d+(?:\.\d+)?)\s+(?:payments?|samples?|invoices?)(?![A-Za-z])/gi;
 
 const monthBeforeRe = new RegExp(`(?<!\\w)(${MONTHS})\\.?\\s+$`, "i");
+
+const monthDayCommaRe = new RegExp(`(?<!\\w)(?:${MONTHS})\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+$`, "i");
 
 export function extractNumbers(text: string): ExtractedNumber[] {
   const out: ExtractedNumber[] = [];
@@ -270,6 +272,8 @@ export function extractNumbers(text: string): ExtractedNumber[] {
       // "Jan 15 payment" is a date followed by a noun, not 15 payments.
       const month = monthBeforeRe.exec(text.slice(Math.max(0, m.index! - 12), m.index!));
       if (month && isMonthWord(month[1]!)) continue;
+      // ... and the year of "Dec 18, 2026 payment".
+      if (/^(?:19|20)\d{2}$/.test(m[1]!) && monthDayCommaRe.test(text.slice(Math.max(0, m.index! - 16), m.index!))) continue;
       out.push({ raw: m[0], value: Number(m[1]), unit, start: m.index!, end: m.index! + m[0].length });
     }
   };

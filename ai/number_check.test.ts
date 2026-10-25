@@ -308,6 +308,13 @@ describe("allowed.numbers: percentages, day counts, sample counts", () => {
     expect(unmatched("The Dec 15 payment and the Jan 3 invoices.")).toEqual([]);
   });
 
+  it("does not read money, identifiers, or years as counts", () => {
+    expect(unmatched("Collect the $28,000 invoice from Harbor by Dec 1.")).toEqual([]);
+    expect(unmatched("The $5,000 payment lands Dec 10; a $12.50 payment too; 1,200 invoices overall.")).toEqual([]);
+    expect(unmatched("Invoice INV-1187 payment is late. On Dec 18, 2026 payment arrives.")).toEqual([]);
+    expect(checkText("Collect the $28,000 invoice by Dec 1.", ["inv-1"], { ...withNumbers, dates: ["2026-12-01"] }, opts).ok).toBe(true);
+  });
+
   it("checks nothing when numbers are not provided", () => {
     expect(checkText("Ask for 60% up front and 15 more days.", ["inv-1"], allowed, opts).ok).toBe(true);
   });

@@ -193,6 +193,27 @@ describe("voice in live mode: checks, one retry, then the code-built voice", () 
     expect(checkVoice({ ...goodOutput(lookup) as CfoVoice }, lookup)).toEqual([]);
   });
 
+  it("counts a named party's refusal as a fallback, allows loan words in facts, and keeps whatWouldChange to the facts", () => {
+    const ok = goodOutput(harbor) as CfoVoice;
+    expect(checkVoice({ ...ok, why: `${ok.why} If Evergreen Home refuses, wait a week.` }, harbor).join(" ")).toMatch(/at most one fallback/);
+    expect(checkVoice({ ...ok, why: ok.why.replace("If they refuse", "If Jaipur Textiles refuses") }, harbor)).toEqual([]);
+    const loan = { ...harbor, recommendation: { ...harbor.recommendation!, action: "Defer the bank loan payment for 40% up front" } };
+    expect(checkVoice({ ...ok, why: "Deferring the bank loan payment lifts your lowest point by $16,000, to $37,500." }, loan)).toEqual([]);
+    const l = goodOutput(lookup) as CfoVoice;
+    expect(checkVoice({ ...l, whatWouldChange: "A late payment would change this." }, lookup).join(" ")).toMatch(/leave whatWouldChange null/);
+  });
+
+  it("accepts a headline whose percent the builder left out of allowed.numbers (share is always allowed)", () => {
+    const d = { ...harbor, allowed: { ...harbor.allowed, numbers: harbor.allowed.numbers!.filter((n) => n.unit !== "pct") } };
+    expect(checkVoice(goodOutput(harbor) as CfoVoice, d)).toEqual([]);
+  });
+
+  it("makes one call, not two, when the call itself fails", async () => {
+    const { client, requests } = fakeClient([new Error("timeout")]);
+    expect((await voice(harbor, live(client))).usedFallback).toBe(true);
+    expect(requests).toHaveLength(1);
+  });
+
   it("falls back after a refusal, a failed call, and bad JSON, never throwing", async () => {
     for (const reply of [new Error("network down"), "not json", { headline: 1 }]) {
       const { client } = fakeClient([reply]);

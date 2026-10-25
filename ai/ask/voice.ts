@@ -31,7 +31,7 @@ export type VoiceContext = {
   cacheDir?: string;
   model?: string;
   // Id of the persisted proposed Signal or Rule (verdict "proposed"); the caller persists the proposal, then
-  // passes its id. Default: a stable id derived from the proposal itself.
+  // passes its id. Default: a PLACEHOLDER id derived from the proposal (not a persisted record): always pass the real id.
   proposalId?: string;
 };
 
@@ -240,8 +240,10 @@ const LIST_RE = /^\s*(?:[-*•–]|\d+[.)]|\(\d+\))\s+\S/m;
 // Fallback phrasing: "If they refuse, ...", "failing that", "plan B", "backup". At most one, and only when the Decision has one.
 const FALLBACK_RE = /\bif\s+(?:they|he|she)\s+(?:refuses?|declines?|says?\s+no|won't|can't|cannot|doesn't|does\s+not|do\s+not|don't|will\s+not|is\s+unable|isn't\s+able)\b|\bfailing\s+that\b|\bplan\s+b\b|\b(?:back-?up|fall-?back)\b|\bfall\s+back\b/gi;
 // Claims that Neri (or anyone) already sent, paid, or applied something, or will. Neri only suggests.
-const CLAIM_RE = /\b(?:i|we)(?:'ve|\s+have)?\s+(?:already\s+|just\s+)?(?:sent|paid|wired|transferred|submitted|applied|approved|scheduled|booked)\b|\b(?:has|have|had)\s+been\s+(?:sent|paid|wired|transferred|submitted|applied|scheduled)\b|\b(?:i|we)(?:'ll|\s+will)\s+(?:send|pay|wire|transfer|apply|submit)\b|\bon\s+its\s+way\b|\balready\s+(?:sent|paid|applied)\b|\b(?:is|was)\s+(?:now\s+)?(?:sent|applied|scheduled)\b/i;
-const ADVICE_RE = /\b(?:borrow\w*|loans?|line\s+of\s+credit|invest\w*|financing|credit\s+card)\b/i;
+const CLAIM_RE = /\b(?:i|we)(?:'ve|\s+have)?\s+(?:already\s+|just\s+)?(?:sent|paid|wired|transferred|submitted|applied|approved|scheduled|booked)\b|\b(?:i|we)(?:'ll|\s+will)\s+(?:send|pay|wire|transfer|apply|submit)\b|\bon\s+its\s+way\b|\balready\s+sent\b/i;
+const ADVICE_RE = /\b(?:take\s+out\s+a\s+(?:bank\s+)?(?:loan|line\s+of\s+credit)|borrow(?:ing)?\s+(?:money|against|from)|(?:a|the)\s+(?:bank\s+)?loan\s+(?:would|could|to)|line\s+of\s+credit|invest(?:ing)?\s+(?:in|the|your)|put\s+(?:the\s+|your\s+)?cash\s+into|financing\s+(?:option|product|plan)|credit\s+card)\b/i;
+// A named party's refusal ("If Harbor and Hearth refuses, ...") is also a fallback. Case-sensitive: the name is capitalized.
+const NAMED_FALLBACK_RE = /\b[Ii]f\s+[A-Z][\w'&.-]*(?:\s+(?:and\s+|&\s+)?[A-Z][\w'&.-]*){0,3}\s+(?:refuses?|declines?|says?\s+no|won't|can't|cannot)\b/g;
 
 const STANCE: Partial<Record<Decision["verdict"], { re: RegExp; word: string }>> = {
   yes: { re: /\byes\b/i, word: "Yes" },
@@ -285,20 +287,25 @@ export function checkVoice(v: CfoVoice, d: Decision): string[] {
   if (!v.headline.trim() || !v.why.trim() || !v.convictionNote.trim()) problems.push("headline, why, and convictionNote must not be empty");
   if (wordCount(v.headline) > MAX_HEADLINE_WORDS) problems.push(`the headline must be one short sentence (at most ${MAX_HEADLINE_WORDS} words)`);
 
-  const r = checkText(text, d.citations, d.allowed, { currency: d.currency, asOf: d.asOf });
+  // The up-front share the headline states as a percent is always allowed, even if the builder left it out of numbers.
+  const share = d.recommendation?.upfrontShare;
+  const allowed = share === undefined ? d.allowed
+    : { ...d.allowed, numbers: [...(d.allowed.numbers ?? []), { label: "up-front share", value: Math.round(share * 100), unit: "pct" as const }] };
+  const r = checkText(text, d.citations, allowed, { currency: d.currency, asOf: d.asOf });
   for (const u of r.unmatched) problems.push(`${u.kind} "${u.raw}" is not in the facts`);
   for (const p of r.problems) problems.push(p);
 
   const menu = MENU_RE.exec(text);
   if (menu) problems.push(`menu language ("${menu[0].trim()}"): make the call and give one recommendation, never a list of options`);
   if (LIST_RE.test(text)) problems.push("no bulleted or numbered lists: write plain sentences");
-  const fallbacks = text.match(FALLBACK_RE)?.length ?? 0;
+  const fallbacks = (text.match(FALLBACK_RE)?.length ?? 0) + (text.match(NAMED_FALLBACK_RE)?.length ?? 0);
   if (fallbacks > (d.fallback ? 1 : 0)) {
     problems.push(d.fallback ? "at most one fallback, stated once" : "there is no fallback in the facts: do not invent one");
   }
 
   const stance = STANCE[d.verdict];
   if (stance && !stance.re.test(v.headline)) problems.push(`the headline must lead with the call: it should say "${stance.word}"`);
+  if (v.whatWouldChange?.trim() && !d.whatWouldChange) problems.push("the facts name nothing that would change the call: leave whatWouldChange null");
   const key = keyFactProblem(v.headline, d);
   if (key) problems.push(key);
 
@@ -388,7 +395,8 @@ export async function voice(decision: Decision, ctx: VoiceContext): Promise<CfoA
         storeVoice(ctx, key, model, res.output);
         return assemble(decision, clean(fromOutput(res.output)), false, ctx);
       }
-      if (!("problem" in res)) turns.push({ role: "assistant", content: JSON.stringify(res.output) }, { role: "user", content: retryFeedback(problems) });
+      if ("problem" in res) break; // the call itself failed (timeout, refusal, outage): no second paid attempt
+      turns.push({ role: "assistant", content: JSON.stringify(res.output) }, { role: "user", content: retryFeedback(problems) });
     }
   }
   return assemble(decision, clean(fallbackVoice(decision)), true, ctx);
