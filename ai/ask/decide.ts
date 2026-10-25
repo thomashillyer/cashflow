@@ -242,7 +242,11 @@ function decline(intent: AskIntent, ctx: DecideContext): Decision {
     conviction: "high",
     convictionReasons: ["The cash figures come straight from the current forecast."],
     citations: uniq(eventsOn(run, low.date)),
-    missingData: "I can't advise on investment or loan products, or on topics outside this business's cash. Here is where your cash stands.",
+    // A question that could not be read at all (no saved answer in demo mode, a failed call) keeps that
+    // reason; only a question read as out of scope gets the investment-and-loan decline.
+    missingData: intent.unresolved[0]
+      ? `${intent.unresolved[0]} Here is where your cash stands.`
+      : "I can't advise on investment or loan products, or on topics outside this business's cash. Here is where your cash stands.",
   });
 }
 
