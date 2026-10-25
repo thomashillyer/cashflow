@@ -72,6 +72,7 @@ export type CashEvent = {
   confidence: number;        // 0..1
   basis: string;             // human-readable reason for this date and amount
   category?: string;
+  account?: string;          // bank account of a stored actual; matches BalanceSnapshot.account (opening-cash roll-forward)
   sourceRef: SourceRef;
   overriddenBy?: string[];   // rule, signal, or scenario ids applied to this event
 };
