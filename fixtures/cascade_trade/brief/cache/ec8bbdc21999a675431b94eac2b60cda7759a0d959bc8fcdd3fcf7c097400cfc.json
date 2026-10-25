@@ -1,0 +1,10 @@
+{
+  "key": "ec8bbdc21999a675431b94eac2b60cda7759a0d959bc8fcdd3fcf7c097400cfc",
+  "promptVersion": "write_brief@1",
+  "model": "claude-opus-5-5",
+  "source": "live",
+  "output": {
+    "title": "Ask Jaipur Textiles to push PO-2302 back",
+    "why": "Your ₹2,000,000 PO-2302 with Jaipur Textiles has $12,000 payments expected Dec 1 and Dec 15. Asking for 10 more days, settled by Dec 12, lifts your lowest point from -$5,500 to $6,500."
+  }
+}

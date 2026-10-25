@@ -1,0 +1,83 @@
+[
+  {
+    "id": "wi-chase-INV-1187",
+    "warning": "projected_cash_gap",
+    "title": "",
+    "why": "",
+    "lever": {
+      "kind": "chase",
+      "commitmentId": "inv-INV-1187",
+      "assumeDate": "2026-12-18"
+    },
+    "cashEffect": 1950000,
+    "neededBy": "2026-12-18",
+    "confidence": 0.85,
+    "score": 297500,
+    "evidenceRefs": [
+      "inv-INV-1187"
+    ],
+    "actions": [
+      {
+        "kind": "draft_email"
+      },
+      {
+        "kind": "mark_done"
+      }
+    ],
+    "state": "open"
+  },
+  {
+    "id": "wi-defer-PO-2302",
+    "warning": "projected_cash_gap",
+    "title": "",
+    "why": "",
+    "lever": {
+      "kind": "defer",
+      "commitmentId": "po-PO-2302",
+      "days": 10
+    },
+    "cashEffect": 1200000,
+    "neededBy": "2026-12-12",
+    "confidence": 0.9,
+    "score": 114545,
+    "evidenceRefs": [
+      "po-PO-2302"
+    ],
+    "actions": [
+      {
+        "kind": "draft_email"
+      },
+      {
+        "kind": "mark_done"
+      }
+    ],
+    "state": "open"
+  },
+  {
+    "id": "wi-advance-HH-PO-552",
+    "warning": "projected_cash_gap",
+    "title": "",
+    "why": "",
+    "lever": {
+      "kind": "ask_advance",
+      "commitmentId": "po-HH-PO-552",
+      "share": 0.4
+    },
+    "cashEffect": 400000,
+    "neededBy": "2026-11-23",
+    "confidence": 0.8,
+    "score": 160000,
+    "evidenceRefs": [
+      "po-HH-PO-552"
+    ],
+    "actions": [
+      {
+        "kind": "draft_email"
+      },
+      {
+        "kind": "mark_done"
+      }
+    ],
+    "state": "open"
+  }
+]

@@ -177,6 +177,21 @@ describe("payment lag", () => {
     expect(lag.n).toBe(1);
   });
 
+  it("uses what history exists: one or two payments still count, with low confidence and the sample count shown", () => {
+    const p = { ...profile, defaultLagDays: 20 };
+    const none = partyLag(empty(), p, "cust");
+    const one = partyLag({ ...empty(), ...paid(1, 0) }, p, "cust");
+    const two = partyLag({ ...empty(), ...paid(2, 0) }, p, "cust");
+    const many = partyLag({ ...empty(), ...paid(12, 0) }, p, "cust");
+    expect([none.days, one.days, two.days, many.days]).toEqual([20, 15, 12, 4]); // each payment pulls toward the customer's real behavior
+    expect(none.confidence).toBeLessThan(one.confidence);
+    expect(one.confidence).toBeLessThan(two.confidence);
+    expect(two.confidence).toBeLessThan(many.confidence);
+    expect(one.basis).toMatch(/last 1 payment,/);
+    expect(two.basis).toMatch(/last 2 payments/);
+    expect(none.basis).toMatch(/no payment history/);
+  });
+
   it("uses the median and says how many payments it saw", () => {
     const r = { ...empty(), ...paid(12, 20) };
     const lag = partyLag(r, { ...profile, defaultLagDays: 0 }, "cust");

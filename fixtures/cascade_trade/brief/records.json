@@ -1,0 +1,105 @@
+{
+  "_comment": "Synthetic. Subset of fixtures/cascade_trade/records.json for the brief/draft tests, plus PO HH-PO-552 (from the intake fixtures) and an invoice link on INV-1187. work_items.json is illustrative: only the INV-1187 cashEffect comes from the engine. Regenerate with scripts/make-brief-fixture.ts.",
+  "parties": [
+    {
+      "id": "party-evergreen-home",
+      "name": "Evergreen Home",
+      "kind": "customer",
+      "tags": [
+        "slow_payer"
+      ],
+      "notes": [
+        "They always pay about two weeks late"
+      ]
+    },
+    {
+      "id": "party-jaipur-textiles",
+      "name": "Jaipur Textiles",
+      "kind": "supplier",
+      "tags": [
+        "preferred"
+      ],
+      "notes": [
+        "Good partner; prices in rupees"
+      ]
+    },
+    {
+      "id": "party-harbor-hearth",
+      "name": "Harbor and Hearth",
+      "kind": "customer",
+      "tags": [
+        "reliable"
+      ],
+      "notes": [
+        "On time, except holiday delays in December"
+      ]
+    }
+  ],
+  "commitments": [
+    {
+      "id": "inv-INV-1187",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "INV-1187",
+      "partyId": "party-evergreen-home",
+      "amount": 2800000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-10",
+        "due": "2026-12-10"
+      },
+      "status": "committed",
+      "outstanding": 2800000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1187"
+      },
+      "invoiceUrl": "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187"
+    },
+    {
+      "id": "po-PO-2302",
+      "type": "purchase_order",
+      "direction": "out",
+      "reference": "PO-2302",
+      "partyId": "party-jaipur-textiles",
+      "amount": 200000000,
+      "currency": "INR",
+      "anchors": {
+        "order": "2026-12-01",
+        "ship": "2026-12-15"
+      },
+      "patternId": "supplier_50_50",
+      "status": "committed",
+      "settlement": "open",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2302.xlsx"
+      }
+    },
+    {
+      "id": "po-HH-PO-552",
+      "type": "purchase_order",
+      "direction": "in",
+      "reference": "HH-PO-552",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "anchors": {
+        "order": "2026-11-02"
+      },
+      "status": "committed",
+      "settlement": "open",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "harbor-po-552.pdf"
+      }
+    }
+  ],
+  "events": [],
+  "signals": [],
+  "rules": [],
+  "settlements": [],
+  "balances": [],
+  "evidence": []
+}
