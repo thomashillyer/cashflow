@@ -78,3 +78,6 @@ export function writeCache(dir: string, entry: CacheEntry): void {
 
 // Committed demo entries for Ask Neri's CFO voice (ai/ask/voice.ts), hand-authored stand-ins until refreshed live.
 export const ASK_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/ask/cache");
+
+// Committed demo entries for Ask Neri intent reading (ai/ask/intent.ts), hand-authored stand-ins until refreshed live.
+export const INTENT_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/ask/intent-cache");
