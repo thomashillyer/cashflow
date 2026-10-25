@@ -532,14 +532,24 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
   const days = Math.max(1, Math.min(SALES_HISTORY_DAYS, diffDays(asOf, first)));
   if (days < SALES_HISTORY_DAYS) warnings.review("short_sales_history", `Sales history covers only ${days} days before ${asOf} (want ${SALES_HISTORY_DAYS}); the daily-sales average is less reliable (needs review).`, history.map((e) => e.id));
   // Receipts are bank deposits, so a deposit on day d carries the sales of day d - lag: weight it by that weekday.
-  const weightDays = dateRange(addDays(asOf, -days), asOf).reduce((a, d) => a + weights[dowOf(addDays(d, -lag))]! / meanW, 0);
   // Receipts in another currency convert at the run's FX rate; one with no rate is left out of the average, warned.
+  // A deposit day whose only receipts have no rate is dropped from the divisor too, so it does not drag the average down.
   let total = 0;
+  const counted = new Set<string>();
+  const skipped = new Set<string>();
   for (const e of history) {
     const b = toBase(e.amount, e.currency, profile, fx);
-    if (b === undefined) warnings.review("missing_fx", `Sales receipt ${e.id} is in ${e.currency} with no FX rate; left out of the daily-sales average (needs review).`, [e.id]);
-    else total += b;
+    if (b === undefined) {
+      warnings.review("missing_fx", `Sales receipt ${e.id} is in ${e.currency} with no FX rate; left out of the daily-sales average (needs review).`, [e.id]);
+      skipped.add(e.date);
+    } else {
+      total += b;
+      counted.add(e.date);
+    }
   }
+  const weightDays = dateRange(addDays(asOf, -days), asOf)
+    .filter((d) => !(skipped.has(d) && !counted.has(d)))
+    .reduce((a, d) => a + weights[dowOf(addDays(d, -lag))]! / meanW, 0);
   const avg = weightDays > 0 ? total / weightDays : 0;
   const booked = new Set(records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date >= asOf).map((e) => e.date));
   const out: CashEvent[] = [];
