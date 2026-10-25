@@ -29,3 +29,10 @@ export const INTENT_PROMPT_VERSION = "read_intent@1";
 // CfoVoice output schema changes; it is part of the cache key.
 export const CFO_VOICE_MODEL = "claude-opus-5-5";
 export const CFO_VOICE_PROMPT_VERSION = "cfo_voice@2";
+
+// Anthropic client options shared by every call. A user-level key (sk-ant-usr-...) is not scoped to a workspace,
+// so the API requires the workspace in a header: set ANTHROPIC_WORKSPACE_ID (wrkspc_...) for those keys.
+export function anthropicOptions(): { defaultHeaders?: Record<string, string> } {
+  const workspace = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
+  return workspace ? { defaultHeaders: { "anthropic-workspace-id": workspace } } : {};
+}

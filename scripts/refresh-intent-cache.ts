@@ -11,7 +11,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { callIntentModel, intentCacheKey, intentContent } from "../ai/ask/intent";
 import { INTENT_CACHE_DIR, writeCache } from "../ai/cache";
-import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../ai/config";
+import { INTENT_MODEL, INTENT_PROMPT_VERSION, anthropicOptions } from "../ai/config";
 import { INTENT_STANDINS } from "./intent-standins";
 
 if (!process.env.ANTHROPIC_API_KEY) {
@@ -21,7 +21,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 
 const wanted = process.argv.slice(2);
 const questions = wanted.length ? wanted : INTENT_STANDINS.map((s) => s.question);
-const client = new Anthropic();
+const client = new Anthropic(anthropicOptions());
 let failed = 0;
 
 for (const question of questions) {

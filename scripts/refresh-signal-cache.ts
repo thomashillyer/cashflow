@@ -9,7 +9,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_CACHE_DIR, writeCache } from "../ai/cache";
-import { EXTRACTION_MODEL, SIGNAL_PROMPT_VERSION } from "../ai/config";
+import { EXTRACTION_MODEL, SIGNAL_PROMPT_VERSION, anthropicOptions } from "../ai/config";
 import { callSignalModel, messageUnits, signalCacheKey } from "../ai/extract/signals";
 import { loadSignalBundle, SIGNAL_STANDINS, type SignalFixture } from "./signal-standins";
 
@@ -26,7 +26,7 @@ if (unknown.length) {
   process.exit(1);
 }
 const names = wanted.length ? (wanted as SignalFixture[]) : known;
-const client = new Anthropic();
+const client = new Anthropic(anthropicOptions());
 let failed = 0;
 
 for (const name of names) {

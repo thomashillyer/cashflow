@@ -10,7 +10,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ASK_CACHE_DIR, readCache, writeCache } from "../ai/cache";
-import { CFO_VOICE_MODEL, CFO_VOICE_PROMPT_VERSION } from "../ai/config";
+import { CFO_VOICE_MODEL, CFO_VOICE_PROMPT_VERSION, anthropicOptions } from "../ai/config";
 import { voice, voiceCacheKey } from "../ai/ask/voice";
 import { loadAskFixture } from "./ask-fixture";
 
@@ -20,7 +20,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 }
 
 const fx = loadAskFixture();
-const client = new Anthropic();
+const client = new Anthropic(anthropicOptions());
 // Live calls write into a scratch directory first; only validated entries are copied over the demo cache.
 const scratch = mkdtempSync(join(tmpdir(), "neri-voice-"));
 const ctx = { profile: fx.profile, business: fx.business, mode: "live" as const, client, cacheDir: scratch };
