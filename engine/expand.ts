@@ -89,18 +89,56 @@ function prepare(records: Records): Prepared {
   return { commitments, amountSignals };
 }
 
-// How much of a commitment is already covered by linked, same-direction invoices/bills (PO <-> invoice overlap).
-function coveredByLinked(c: Commitment, byId: Map<string, Commitment>, warnings: string[]): number {
-  let covered = 0;
+// Linked, same-direction, same-currency invoices/bills that replace part of a commitment (PO <-> invoice overlap).
+// Cross-currency links are skipped with a warning (TECHNICAL_PLAN 6.B.6: overlap only in the same currency).
+type Cover = { amount: number; cutoff?: string; id: string };
+function coveredByLinked(c: Commitment, byId: Map<string, Commitment>, warnings: string[]): Cover[] {
+  const out: Cover[] = [];
+  const label = c.reference ?? c.id;
   for (const id of c.linkedCommitmentIds ?? []) {
     const l = byId.get(id);
     if (!l || (l.type !== "invoice" && l.type !== "bill")) continue;
     if (defaultDirection(l) !== defaultDirection(c)) continue;
     if (l.settlement === "cancelled" || l.settlement === "credited") continue;
-    covered += l.amount;
+    if (l.currency !== c.currency) {
+      warnings.push(`${label}: linked ${l.reference ?? l.id} is in ${l.currency}, not ${c.currency}; not offset against it (check for double counting)`);
+      continue;
+    }
+    out.push({ amount: l.amount, cutoff: l.anchors.due ?? l.anchors.invoice, id: l.id });
   }
-  if (covered > c.amount) warnings.push(`${c.reference ?? c.id}: linked invoices (${money(covered, c.currency)}) exceed the amount (${money(c.amount, c.currency)}); check the allocation`);
-  return covered;
+  const covered = out.reduce((a, x) => a + x.amount, 0);
+  if (covered > c.amount) warnings.push(`${label}: linked invoices (${money(covered, c.currency)}) exceed the amount (${money(c.amount, c.currency)}); check the allocation`);
+  // Earliest-dated invoice first; undated last. Ties by id so the run is deterministic.
+  const key = (x: Cover) => `${x.cutoff ?? "9999-99-99"}|${x.id}`;
+  return out.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
+}
+
+// Total and still-to-move amount of a commitment. When `outstanding` is unset it is derived from recorded Settlements
+// in the commitment's currency, so a Settlement plus its bank line never count the money twice (TECHNICAL_PLAN 6
+// opening-cash boundary). An applied amount_change signal states the new total; what was already paid stays paid.
+function remaining(c: Commitment, records: Records, amountSignal: Signal | undefined, warnings: string[]): { total: number; target: number } {
+  const label = c.reference ?? c.id;
+  let settled = 0;
+  for (const s of records.settlements) {
+    if (s.commitmentId !== c.id) continue;
+    if (s.currency !== c.currency) {
+      warnings.push(`${label}: settlement ${s.id} is in ${s.currency}, not ${c.currency}; not deducted from what is outstanding (needs review)`);
+      continue;
+    }
+    settled += s.amount;
+  }
+  const outstanding = c.outstanding ?? Math.max(0, c.amount - settled);
+  if (c.settlement === "partial" && outstanding >= c.amount)
+    warnings.push(`${label}: marked partially paid but nothing is recorded as paid; forecasting the full ${money(c.amount, c.currency)} (needs review)`);
+  if (c.settlement === "paid" && c.outstanding !== undefined && c.outstanding > 0)
+    warnings.push(`${label}: marked paid but ${money(c.outstanding, c.currency)} is still outstanding; nothing forecast (needs review)`);
+  if (c.settlement === "open" && outstanding < c.amount)
+    warnings.push(`${label}: marked open but ${money(c.amount - outstanding, c.currency)} is already paid; forecasting only ${money(outstanding, c.currency)} (needs review)`);
+  if (amountSignal?.claim.kind === "amount_change") {
+    const total = amountSignal.claim.newAmount;
+    return { total, target: Math.max(0, total - (c.amount - outstanding)) };
+  }
+  return { total: c.amount, target: outstanding };
 }
 
 function expandCommitment(
@@ -112,38 +150,44 @@ function expandCommitment(
   amountSignal: Signal | undefined,
   warnings: string[],
 ): CashEvent[] {
-  if (c.settlement === "paid" || c.settlement === "cancelled" || c.settlement === "credited") return [];
+  if (c.settlement === "cancelled" || c.settlement === "credited") return [];
   if (c.type === "recurring" && !c.anchors.due) return []; // profile.recurring owns aggregate recurrences
+  const { total, target } = remaining(c, records, amountSignal, warnings);
+  if (c.settlement === "paid") return [];
   const label = c.reference ?? c.id;
   const pattern = pickPattern(c, profile);
   const dir0 = defaultDirection(c);
   const legs: Leg[] = pattern?.legs ?? [{ share: 1, anchor: "due", offsetDays: 0, direction: dir0 }];
-
-  let total = c.amount;
-  let target = c.outstanding ?? c.amount;
-  const touched: string[] = [];
-  if (amountSignal?.claim.kind === "amount_change") {
-    // The signal states the new total; keep what was already paid out of it.
-    const paid = c.amount - (c.outstanding ?? c.amount);
-    total = amountSignal.claim.newAmount;
-    target = Math.max(0, total - paid);
-    touched.push(amountSignal.id);
-  }
-  target = Math.max(0, target - coveredByLinked(c, byId, warnings));
+  const touched: string[] = amountSignal?.claim.kind === "amount_change" ? [amountSignal.id] : [];
 
   const legAmounts = allocate(total, legs.map((l) => l.share));
-  // Settled money consumes pattern legs: explicit Settlement.legIndex first, then legs in order.
+  const take = (i: number, want: number): number => {
+    const t = Math.max(0, Math.min(want, legAmounts[i]!));
+    legAmounts[i]! -= t;
+    return t;
+  };
+  // 1. Settled money consumes pattern legs: explicit Settlement.legIndex first, then legs in order.
   let consume = total - target;
   for (const s of records.settlements) {
-    if (s.commitmentId !== c.id || s.legIndex === undefined || legAmounts[s.legIndex] === undefined) continue;
-    const take = Math.min(s.amount, consume, legAmounts[s.legIndex]!);
-    legAmounts[s.legIndex]! -= take;
-    consume -= take;
+    if (s.commitmentId !== c.id || s.currency !== c.currency || s.legIndex === undefined || legAmounts[s.legIndex] === undefined) continue;
+    consume -= take(s.legIndex, Math.min(s.amount, consume));
   }
-  for (let i = 0; i < legAmounts.length && consume > 0; i++) {
-    const take = Math.min(consume, legAmounts[i]!);
-    legAmounts[i]! -= take;
-    consume -= take;
+  for (let i = 0; i < legAmounts.length && consume > 0; i++) consume -= take(i, consume);
+
+  // 2. Linked invoices/bills replace the legs they invoiced. Rule: each linked invoice (earliest first) first consumes
+  // the legs whose anchor date is on or before the invoice's due date (else its invoice date), since those are what it
+  // billed; any remainder then consumes the other legs in order. Legs with no resolvable anchor date are only reached
+  // by the remainder; an undated invoice consumes legs in order.
+  // Among the billed legs the order is ambiguous (a 70% balance bill dated at shipment is "on or after" both the
+  // deposit and the shipment leg), so we pick the conservative side: money out consumes the latest billed leg first
+  // (the earlier payment stays in the forecast), money in consumes the earliest billed leg first (the receipt stays late).
+  const legDates = legs.map((leg) => resolveAnchor(leg.anchor, c, profile).date);
+  const order = legs.map((_, i) => i);
+  const billedOrder = dir0 === "out" ? [...order].reverse() : order;
+  for (const cover of coveredByLinked(c, byId, warnings)) {
+    let left = cover.amount;
+    if (cover.cutoff) for (const i of billedOrder) if (left > 0 && legDates[i] !== undefined && legDates[i]! <= cover.cutoff) left -= take(i, left);
+    for (const i of order) if (left > 0) left -= take(i, left);
   }
 
   const events: CashEvent[] = [];
@@ -368,22 +412,28 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
 }
 
 // A sales deal's `linkedCosts` become virtual outflow commitments. A cost is suppressed only when a real linked
-// outflow commitment already covers it (same patternId, or same type as the cost pattern); linked invoices never suppress it.
-function linkedCostCommitments(deal: Commitment, profile: Profile, byId: Map<string, Commitment>, amount: number): Commitment[] {
+// outflow commitment already covers it: its pattern (explicit patternId, else the profile default for its type) is the
+// cost's pattern. Matching on type alone is allowed only when the deal pattern has exactly one linked cost, since
+// several costs (e.g. goods and freight) can share a type. Linked invoices never suppress a cost.
+// Virtual costs scale by the deal's remaining share (outstanding / amount, after settlements and amount signals), so a
+// half-paid deal carries half its supplier costs; every cost leg is scaled, none is assumed already paid.
+function linkedCostCommitments(deal: Commitment, records: Records, profile: Profile, byId: Map<string, Commitment>, amountSignal: Signal | undefined): Commitment[] {
   if (deal.settlement === "paid" || deal.settlement === "cancelled" || deal.settlement === "credited") return [];
-  const linked = (deal.linkedCommitmentIds ?? []).map((id) => byId.get(id)).filter((l): l is Commitment => !!l);
+  const linked = (deal.linkedCommitmentIds ?? []).map((id) => byId.get(id)).filter((l): l is Commitment => !!l && defaultDirection(l) === "out");
   const pattern = pickPattern(deal, profile);
+  const costs = pattern?.linkedCosts ?? [];
+  const { target } = remaining(deal, records, amountSignal, []); // warnings come from the deal's own expansion
   const out: Commitment[] = [];
-  for (const lc of pattern?.linkedCosts ?? []) {
+  for (const lc of costs) {
     const costPattern = profile.paymentPatterns.find((p) => p.id === lc.patternId);
     if (!costPattern) continue;
-    const covered = linked.some((l) => l.patternId === lc.patternId || (l.type === costPattern.appliesTo && defaultDirection(l) === "out"));
+    const covered = linked.some((l) => pickPattern(l, profile)?.id === lc.patternId || (costs.length === 1 && l.type === costPattern.appliesTo));
     if (covered) continue;
     out.push({
       id: `${deal.id}~${lc.patternId}`,
       type: costPattern.appliesTo,
       direction: "out",
-      amount: Math.round(amount * lc.share),
+      amount: Math.round(target * lc.share),
       currency: deal.currency,
       anchors: deal.anchors,
       patternId: lc.patternId,
@@ -404,9 +454,7 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
   const all: Commitment[] = [];
   for (const c of commitments) {
     all.push(c);
-    const sig = amountSignals.get(c.id)?.claim;
-    const dealAmount = sig?.kind === "amount_change" ? sig.newAmount : c.amount;
-    for (const virt of linkedCostCommitments(c, profile, byId, dealAmount)) all.push(virt);
+    for (const virt of linkedCostCommitments(c, records, profile, byId, amountSignals.get(c.id))) all.push(virt);
   }
   const recurringIds = new Set(profile.recurring.map((r) => r.id));
   for (const c of all) {
