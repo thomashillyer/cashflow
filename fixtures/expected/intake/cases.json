@@ -1,5 +1,5 @@
 {
-  "_comment": "Expected intake outcomes over fixtures/cascade_trade/intake/. 'eventsAdded' is the change in forecastable commitments/events after the owner confirms the proposal (or 0 when nothing may be confirmed).",
+  "_comment": "Expected intake outcomes over fixtures/cascade_trade/intake/. 'action' is the ChangeProposal the Review list shows; a message is never a document change, so a promise or a date from the owner is an evidence-only 'link' to the invoice it is about and the date itself is a Signal. 'eventsAdded' is the change in forecastable commitments/events after the owner confirms the proposal (or 0 when nothing may be confirmed).",
   "baseRecords": "fixtures/cascade_trade/intake/base_records.json",
   "cases": [
     { "id": "dup-pdf", "inputs": ["inv1187.pdf"],
@@ -8,10 +8,10 @@
       "expect": { "kind": "invoice", "direction": "in", "action": "link", "target": "inv-INV-1187", "eventsAdded": 0,
         "evidenceChildren": ["attachment", "invoiceUrl", "paymentUrl"], "settlement": "open" } },
     { "id": "whatsapp-promise", "inputs": ["whatsapp-evergreen.txt"],
-      "expect": { "kind": "conversational_update", "action": "review", "target": "inv-INV-1187",
+      "expect": { "kind": "conversational_update", "action": "link", "target": "inv-INV-1187",
         "signal": { "kind": "date_change", "resolvedFrom": "early January", "requiresOwnerDate": true }, "settlement": "open", "eventsAdded": 0 } },
     { "id": "owner-date-change", "inputs": ["owner-message-inv104.txt"], "receivedAt": "2026-10-25T16:00:00Z",
-      "expect": { "kind": "conversational_update", "action": "update", "target": "inv-INV-104",
+      "expect": { "kind": "conversational_update", "action": "link", "target": "inv-INV-104",
         "signal": { "kind": "date_change", "newDate": "2026-11-03" }, "settlement": "open", "eventsAdded": 0 } },
     { "id": "all-four-sources", "inputs": ["email-inv1187.eml", "inv1187.pdf", "whatsapp-evergreen.txt"],
       "expect": { "commitments": 1, "target": "inv-INV-1187", "evidenceLinked": ">=4", "eventsAdded": 0 } },

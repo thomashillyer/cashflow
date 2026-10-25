@@ -84,12 +84,15 @@ export function buildUserContent(segments: SourceSegment[], business: BusinessId
 }
 
 export function extractionCacheKey(segments: SourceSegment[], business: BusinessIdentity, model = EXTRACTION_MODEL): string {
+  const ids = [...new Set(segments.map((s) => s.evidenceId))];
   return cacheKey({
     promptVersion: PROMPT_VERSION,
     promptHash: createHash("sha256").update(systemPrompt()).digest("hex"), // editing the prompt invalidates the cache
     model,
     business: { name: business.name, aliases: [...new Set(business.aliases ?? [])].sort() },
-    segments: segments.map((s) => ({ evidenceId: s.evidenceId, page: s.page, text: s.text })),
+    // Evidence ids are labels the caller chooses (content hashes, an adapter's own ids); the same text must
+    // hit the same entry whatever it is called, so a segment is keyed by which source it belongs to.
+    segments: segments.map((s) => ({ source: ids.indexOf(s.evidenceId), page: s.page, text: s.text })),
   });
 }
 
@@ -134,6 +137,9 @@ export async function callModel(
 // ---------------------------------------------------------------------------
 // extractDocument: cache, then (live mode only) the model
 
+// The note on the review candidate returned for a cache_only miss; callers can tell a miss from a bad document.
+export const NO_CACHED_EXTRACTION = "no cached extraction (demo mode)";
+
 export type ExtractDocumentOptions = {
   business: BusinessIdentity;
   candidateId: string;
@@ -173,7 +179,7 @@ export async function extractDocument(segments: SourceSegment[], opts: ExtractDo
     // A cache entry that no longer fits the schema is a miss.
   }
   if (opts.mode === "cache_only") {
-    return reviewCandidate(base, "partial", ["no cached extraction (demo mode)"]);
+    return reviewCandidate(base, "partial", [NO_CACHED_EXTRACTION]);
   }
 
   const result = await callModel(opts.client, segments, opts.business, model);

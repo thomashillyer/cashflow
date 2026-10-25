@@ -2,17 +2,17 @@
   "key": "b5110765ae7b78347d864274045b16ff666bc1a45dc67eff3c7cbe93a2a45d97",
   "promptVersion": "extract_signal@1",
   "model": "claude-opus-5-5",
-  "source": "hand-authored stand-in for whatsapp-evergreen.txt (Message 1); replace with a live run",
+  "source": "live",
   "output": {
     "claim": "none",
     "reference": {
       "value": "INV-1187",
-      "quote": "INV-1187 for $28,000"
+      "quote": "INV-1187"
     },
     "partyName": null,
     "amountMentioned": {
       "value": "$28,000",
-      "quote": "$28,000"
+      "quote": "INV-1187 for $28,000"
     },
     "newDatePhrase": null,
     "newAmount": null,

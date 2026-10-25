@@ -10,6 +10,8 @@ import { forecast } from "./forecast";
 import { simulate } from "./simulate";
 import { partyLag } from "./lag";
 import { mondayOf } from "./dates";
+import { resolveEventSource } from "./resolve";
+import { signalEffect } from "./signal_effect";
 
 const root = join(import.meta.dirname, "..");
 const read = <T>(path: string): T => JSON.parse(readFileSync(join(root, path), "utf8")) as T;
@@ -76,6 +78,11 @@ describe.each(names)("fixture %s", (name) => {
     }
   });
 
+  it("every event in the base run resolves to a source record", () => {
+    const unresolved = run().events.filter((e) => resolveEventSource(e, records, profile, meta.asOf).kind === "unresolved").map((e) => e.id);
+    expect(unresolved).toEqual([]);
+  });
+
   it("stress never reduces a payment and changes the run hash", () => {
     const b = run();
     const s = forecast(records, profile, stress, meta.asOf, meta.fxRates);
@@ -130,6 +137,9 @@ describe.each(names)("fixture %s", (name) => {
       expect(applied.date).toBe(expected.signal.newDate);
       expect(applied.overriddenBy).toContain(sig.id);
       expect(sig.sourceRef.excerpt?.text).toBeTruthy();
+      const eff = signalEffect(records, profile, [], sig.id, meta.asOf, meta.fxRates)!;
+      const appliedRun = forecast({ ...records, signals: records.signals.map((s) => (s.id === sig.id ? { ...s, state: "applied" as const } : s)) }, profile, base, meta.asOf, meta.fxRates);
+      expect(eff).toEqual({ lowPointDelta: appliedRun.lowPoint.amount - run().lowPoint.amount, week: appliedRun.lowPoint.week });
     });
   }
 
