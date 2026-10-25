@@ -28,6 +28,8 @@ export type Normalized = {
 
 Adapters do not compute forecasts. Future cash events are created by the engine from commitments.
 
+The adapter output is an import preview, not permission to write accepted records. Layer 1 captures Evidence and maps/parses source fields into candidates; Layer 2 reconciles those candidates, confirms document-derived creates/links/updates, and applies profile rules before cash changes. The ingestion coordinator persists the accepted result. Keep `normalize` deterministic and synchronous; asynchronous AI document interpretation runs in `ai/` through the coordinator, outside database transactions. See the [technical implementation plan](../TECHNICAL_PLAN.md) for the candidate and confirmation contracts.
+
 ## Adapters for build day
 
 | Adapter | Produces | Live mode | No-setup fallback | Sunday |

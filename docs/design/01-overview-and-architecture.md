@@ -53,6 +53,10 @@ The test for every component: could a restaurant, a contractor, or an agency use
 
 The owner loop: approved actions, confirmed signals, and plans typed into Ask Neri return as new records, so the next run already knows them.
 
+## Two ingestion layers
+
+Layer 1 captures source Evidence and extracts/maps it into structured intake candidates. Layer 2 validates and reconciles candidates into accepted shared records, then applies profile payment patterns, payment lag, and confirmed overrides to produce CashEvents. Unconfirmed extraction cannot directly change forecast cash. The [technical implementation plan](../TECHNICAL_PLAN.md) defines exact handoffs, persistence, API behavior, and the five-owner execution sequence.
+
 ## Where each part is specified
 
 | Area | Doc |

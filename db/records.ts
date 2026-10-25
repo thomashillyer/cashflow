@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   BalanceSnapshot, CashEvent, Commitment, Evidence, Party, Records, Rule, Settlement, Signal,
 } from "../schema/records";
-import type { DocumentCandidate, ProposedUpdate } from "../schema/intake";
+import type { ChangeProposal, ConfirmationResult, IntakeCandidate } from "../schema/intake";
 import { TABLES, fromRow, toRow, type Row } from "./rows";
 
 async function selectAll<T>(db: SupabaseClient, table: string, businessId: string): Promise<T[]> {
@@ -45,10 +45,25 @@ export const upsertRules = (db: SupabaseClient, b: string, r: Rule[]) => upsert(
 export const upsertSettlements = (db: SupabaseClient, b: string, r: Settlement[]) => upsert(db, TABLES.settlements, b, r);
 export const upsertBalances = (db: SupabaseClient, b: string, r: BalanceSnapshot[]) => upsert(db, TABLES.balances, b, r);
 export const upsertEvidence = (db: SupabaseClient, b: string, r: Evidence[]) => upsert(db, TABLES.evidence, b, r);
-export const upsertDocumentCandidates = (db: SupabaseClient, b: string, r: DocumentCandidate[]) =>
-  upsert(db, "document_candidates", b, r);
-export const upsertProposedUpdates = (db: SupabaseClient, b: string, r: ProposedUpdate[]) =>
-  upsert(db, "proposed_updates", b, r);
+export const upsertIntakeCandidates = (db: SupabaseClient, b: string, r: IntakeCandidate[]) =>
+  upsert(db, "intake_candidates", b, r);
+export const upsertChangeProposals = (db: SupabaseClient, b: string, r: ChangeProposal[]) =>
+  upsert(db, "change_proposals", b, r);
+
+// Atomic confirm through the confirm_change_proposal RPC (one transaction). Errors carry the
+// codes STALE_REVIEW, PROPOSAL_NOT_PENDING, IDEMPOTENCY_CONFLICT, NOT_FOUND in the message.
+export async function confirmChangeProposal(
+  db: SupabaseClient, businessId: string, proposalId: string, expectedRevision: number, idempotencyKey: string,
+): Promise<ConfirmationResult> {
+  const { data, error } = await db.rpc("confirm_change_proposal", {
+    p_business_id: businessId,
+    p_proposal_id: proposalId,
+    p_expected_revision: expectedRevision,
+    p_idempotency_key: idempotencyKey,
+  });
+  if (error) throw new Error(`confirm ${proposalId}: ${error.message}`);
+  return data as ConfirmationResult;
+}
 
 // Write a whole Records bundle (e.g. an adapter's Normalized output or a fixture).
 export async function upsertRecords(db: SupabaseClient, businessId: string, records: Partial<Records>): Promise<void> {

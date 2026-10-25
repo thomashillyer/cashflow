@@ -1,0 +1,33 @@
+{
+  "_comment": "Expected intake outcomes over fixtures/cascade_trade/intake/. 'eventsAdded' is the change in forecastable commitments/events after the owner confirms the proposal (or 0 when nothing may be confirmed).",
+  "baseRecords": "fixtures/cascade_trade/intake/base_records.json",
+  "cases": [
+    { "id": "dup-pdf", "inputs": ["inv1187.pdf"],
+      "expect": { "kind": "invoice", "direction": "in", "action": "link", "target": "inv-INV-1187", "eventsAdded": 0 } },
+    { "id": "dup-email-bundle", "inputs": ["email-inv1187.eml", "inv1187.pdf"],
+      "expect": { "kind": "invoice", "direction": "in", "action": "link", "target": "inv-INV-1187", "eventsAdded": 0,
+        "evidenceChildren": ["attachment", "invoiceUrl", "paymentUrl"], "settlement": "open" } },
+    { "id": "whatsapp-promise", "inputs": ["whatsapp-evergreen.txt"],
+      "expect": { "kind": "conversational_update", "action": "review", "target": "inv-INV-1187",
+        "signal": { "kind": "date_change", "resolvedFrom": "early January", "requiresOwnerDate": true }, "settlement": "open", "eventsAdded": 0 } },
+    { "id": "owner-date-change", "inputs": ["owner-message-inv104.txt"], "receivedAt": "2026-10-25T16:00:00Z",
+      "expect": { "kind": "conversational_update", "action": "update", "target": "inv-INV-104",
+        "signal": { "kind": "date_change", "newDate": "2026-11-03" }, "settlement": "open", "eventsAdded": 0 } },
+    { "id": "all-four-sources", "inputs": ["email-inv1187.eml", "inv1187.pdf", "whatsapp-evergreen.txt"],
+      "expect": { "commitments": 1, "target": "inv-INV-1187", "evidenceLinked": ">=4", "eventsAdded": 0 } },
+    { "id": "conflict-currency", "inputs": ["inv1187-cad.pdf"],
+      "expect": { "kind": "invoice", "action": "conflict", "target": "inv-INV-1187", "conflictFields": ["currency"], "eventsAdded": 0 } },
+    { "id": "conflict-total", "inputs": ["inv1187-revised-total.pdf"],
+      "expect": { "kind": "invoice", "action": "conflict", "target": "inv-INV-1187", "conflictFields": ["amount"], "eventsAdded": 0 } },
+    { "id": "same-number-other-vendor", "inputs": ["ningbo-bill-0042.pdf"],
+      "expect": { "kind": "bill", "direction": "out", "action": "create", "notTarget": "bill-SC-0042", "party": "party-ningbo-pack" } },
+    { "id": "po-accepted", "inputs": ["harbor-po-552.pdf"],
+      "expect": { "kind": "purchase_order", "direction": "in", "action": "create", "status": "likely", "amount": 1000000 } },
+    { "id": "po-partial-invoice", "inputs": ["harbor-po-552.pdf", "email-harbor-inv1203.eml"],
+      "expect": { "invoice": { "amount": 400000, "linkedPo": "HH-PO-552" }, "poRemaining": 600000, "totalForecastIn": 1000000 } },
+    { "id": "unreadable-scan", "inputs": ["scanned-bill.pdf"],
+      "expect": { "extraction": "unreadable", "action": "review", "eventsAdded": 0, "noZeroAmount": true } },
+    { "id": "injection", "inputs": ["email-injection.eml"],
+      "expect": { "kindIn": ["none", "conversational_update"], "action": "review", "settlement": "open", "outstandingUnchanged": true, "eventsAdded": 0 } }
+  ]
+}

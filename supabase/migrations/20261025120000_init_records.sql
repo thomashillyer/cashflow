@@ -19,6 +19,9 @@ create table businesses (
   -- true for sandbox/demo businesses. The hackathon RLS policies below only
   -- expose synthetic businesses to the anon/authenticated keys.
   is_synthetic  boolean not null default true,
+  -- Monotonic business revision. Every confirmed change and profile edit bumps it;
+  -- proposals carry the revision they were computed against (docs/TECHNICAL_PLAN.md section 4).
+  store_revision  bigint not null default 0,
   created_at    timestamptz not null default now()
 );
 
@@ -31,6 +34,8 @@ create table parties (
   notes        text[] not null default '{}',
   contacts     jsonb,   -- { emailDomains?, phones? }
   lag_stats    jsonb,   -- { n, medianDaysLate, iqrDays, updatedAt }
+  source_refs  jsonb,   -- SourceRef[]: provider ids, the upsert key for parties
+  aliases      text[],  -- other confirmed display names
   created_at   timestamptz not null default now(),
   primary key (business_id, id)
 );
@@ -39,6 +44,10 @@ create table commitments (
   business_id            text not null references businesses (id) on delete cascade,
   id                     text not null,
   type                   text not null check (type in ('invoice', 'bill', 'recurring', 'sales_deal', 'purchase_order', 'plan')),
+  direction              text check (direction in ('in', 'out')),
+  reference              text,                     -- document number; not globally unique
+  category               text,
+  funding                boolean,                  -- true for loans/financing (TS: funding?: true)
   party_id               text,
   amount                 bigint not null,          -- original total
   currency               text not null check (char_length(currency) = 3),
@@ -63,21 +72,25 @@ create table commitments (
 -- One commitment per source record: re-importing an export is a no-op.
 create unique index commitments_source_key on commitments (business_id, source_system, source_record);
 create index commitments_party on commitments (business_id, party_id);
+-- Reconciliation lookup: same party + reference (then type/direction/currency in code).
+create index commitments_reference on commitments (business_id, party_id, reference) where reference is not null;
 
 -- Actual (in-the-bank) movements only. Future events are computed by the engine.
+-- amount_base / confidence / basis may be null on stored actuals; the engine fills them per run.
 create table cash_events (
   business_id    text not null references businesses (id) on delete cascade,
   id             text not null,
-  commitment_id  text not null,
+  commitment_id  text,              -- null for unmatched bank actuals (card sales, fees)
   leg_index      integer not null default 0,
   date           date not null,
   amount         bigint not null,
   currency       text not null check (char_length(currency) = 3),
-  amount_base    bigint not null,
+  amount_base    bigint,
   direction      text not null check (direction in ('in', 'out')),
   status         text not null check (status in ('actual', 'committed', 'likely', 'possible')),
-  confidence     double precision not null check (confidence between 0 and 1),
-  basis          text not null,
+  confidence     double precision check (confidence between 0 and 1),
+  basis          text,
+  category       text,
   source_ref     jsonb not null,
   source_system  text generated always as (source_ref ->> 'system') stored,
   source_record  text generated always as (source_ref ->> 'record') stored,
@@ -93,7 +106,8 @@ create table signals (
   channel         text not null check (channel in ('email', 'whatsapp', 'crm', 'owner')),
   received_at     timestamptz not null,
   party_id        text,
-  commitment_ref  text,
+  commitment_id     text,
+  match_candidates  jsonb,          -- { commitmentId, reasons[] }[] when ambiguous
   claim           jsonb not null,   -- SignalClaim
   confidence      double precision not null check (confidence between 0 and 1),
   effect          jsonb,            -- { lowPointDelta, week }, filled by the engine
@@ -112,7 +126,7 @@ create table rules (
   kind         text not null check (kind in ('lag_offset', 'preference', 'flexibility')),
   params       jsonb not null default '{}'::jsonb,
   from_note    text not null,
-  confirmed    boolean not null default false,
+  state        text not null default 'proposed' check (state in ('proposed', 'confirmed', 'dismissed')),
   created_at   timestamptz not null default now(),
   primary key (business_id, id)
 );
@@ -144,6 +158,7 @@ create table settlements (
   amount         bigint not null,
   currency       text not null check (char_length(currency) = 3),
   date           date not null,
+  leg_index      integer,           -- which pattern leg this pays, when known
   source_ref     jsonb not null,
   source_system  text generated always as (source_ref ->> 'system') stored,
   source_record  text generated always as (source_ref ->> 'record') stored,
@@ -170,14 +185,18 @@ create index balance_snapshots_as_of on balance_snapshots (business_id, as_of);
 create table evidence (
   business_id    text not null references businesses (id) on delete cascade,
   id             text not null,
-  channel        text not null check (channel in ('zoho_books', 'bank_csv', 'email', 'whatsapp', 'upload', 'url', 'owner')),
-  format         text not null check (format in ('csv', 'xlsx', 'pdf', 'text', 'html', 'api')),
+  channel        text not null check (channel in ('zoho_books', 'bank_csv', 'email', 'whatsapp', 'crm', 'upload', 'url', 'owner')),
+  format         text not null check (format in ('csv', 'xlsx', 'pdf', 'text', 'eml', 'html', 'image', 'api')),
   received_at    timestamptz not null,
   parent_id      text,
+  file_name      text,
+  mime           text,
+  storage_key    text,              -- where the original bytes live
   file_hash      text,
   url            text,
+  text           text,              -- extracted text (bounded)
   extraction     text not null check (extraction in ('ok', 'partial', 'unreadable', 'unsupported')),
-  commitment_id  text,              -- set only after the owner confirms the link
+  -- Links to commitments live only in commitments.evidence_ids.
   source_ref     jsonb not null,
   source_system  text generated always as (source_ref ->> 'system') stored,
   source_record  text generated always as (source_ref ->> 'record') stored,
@@ -186,7 +205,7 @@ create table evidence (
 );
 create unique index evidence_source_key on evidence (business_id, source_system, source_record);
 create index evidence_file_hash on evidence (business_id, file_hash) where file_hash is not null;
-create index evidence_commitment on evidence (business_id, commitment_id) where commitment_id is not null;
+create index commitments_evidence on commitments using gin (evidence_ids);
 
 create table scenarios (
   business_id  text not null references businesses (id) on delete cascade,
@@ -211,10 +230,12 @@ create table forecast_runs (
 );
 create index forecast_runs_lookup on forecast_runs (business_id, scenario_id, inputs_hash);
 
--- schema/intake.ts DocumentCandidate: extraction output awaiting reconciliation.
-create table document_candidates (
-  business_id       text not null references businesses (id) on delete cascade,
-  id                text not null,
+-- schema/intake.ts IntakeCandidate: extraction output awaiting reconciliation.
+create table intake_candidates (
+  business_id         text not null references businesses (id) on delete cascade,
+  id                  text not null,
+  revision            integer not null default 1,
+  extraction_version  text not null,
   evidence_ids      text[] not null default '{}',
   kind              text not null check (kind in ('invoice', 'bill', 'purchase_order', 'payment_evidence', 'conversational_update', 'none')),
   direction         text check (direction in ('in', 'out')),
@@ -228,27 +249,39 @@ create table document_candidates (
   primary key (business_id, id)
 );
 
--- schema/intake.ts ProposedUpdate: what the Review screen shows. Only a confirmed
--- proposal may change commitments or evidence.
-create table proposed_updates (
-  business_id           text not null references businesses (id) on delete cascade,
-  id                    text not null,
-  action                text not null check (action in ('create', 'link', 'update', 'conflict', 'review')),
-  candidate_id          text,
-  signal_id             text,
-  evidence_ids          text[] not null default '{}',
-  target_commitment_id  text,
-  match_candidates      text[],
-  draft                 jsonb,
-  changes               jsonb not null default '[]'::jsonb,
-  reasons               text[] not null default '{}',
-  conflicts             text[] not null default '{}',
-  state                 text not null default 'proposed' check (state in ('proposed', 'confirmed', 'dismissed')),
-  created_at            timestamptz not null default now(),
-  decided_at            timestamptz,
+-- schema/intake.ts ChangeProposal: what the Review screen shows. Only a confirmed
+-- proposal may change records, through confirm_change_proposal() below.
+create table change_proposals (
+  business_id              text not null references businesses (id) on delete cascade,
+  id                       text not null,
+  action                   text not null check (action in ('create', 'link', 'update', 'conflict', 'review')),
+  ops                      jsonb not null default '[]'::jsonb,  -- ProposalOp[], applied together
+  candidate_id             text,
+  candidate_revision       integer,
+  expected_store_revision  bigint not null,
+  evidence_ids             text[] not null default '{}',
+  target_commitment_id     text,
+  match_candidates         jsonb,          -- { commitmentId, reasons[] }[]
+  reasons                  text[] not null default '{}',
+  conflicts                jsonb not null default '[]'::jsonb,  -- { field, values[] }[]
+  owner_edits              jsonb,          -- CommitmentFieldChange[]
+  state                    text not null default 'proposed' check (state in ('proposed', 'confirmed', 'dismissed')),
+  source_ref               jsonb,
+  created_at               timestamptz not null default now(),  -- ChangeProposal.createdAt
+  decided_at               timestamptz,
   primary key (business_id, id)
 );
-create index proposed_updates_open on proposed_updates (business_id) where state = 'proposed';
+create index change_proposals_open on change_proposals (business_id) where state = 'proposed';
+
+-- Idempotency for confirmations: the same key replays the stored result.
+create table mutations (
+  business_id      text not null references businesses (id) on delete cascade,
+  idempotency_key  text not null,
+  proposal_id      text not null,
+  result           jsonb not null,
+  created_at       timestamptz not null default now(),
+  primary key (business_id, idempotency_key)
+);
 
 -- Learned spreadsheet layouts, keyed by a hash of the header row (docs/design/04-adapters.md).
 create table column_mappings (
@@ -269,6 +302,93 @@ create table aliases (
   created_at   timestamptz not null default now(),
   primary key (business_id, real_name)
 );
+
+-- ---------------------------------------------------------------------------
+-- Atomic confirmation (docs/TECHNICAL_PLAN.md section 4). Call through
+-- supabase.rpc('confirm_change_proposal', {...}); one call = one transaction.
+-- security invoker, so the caller's RLS policies still apply.
+--
+-- Errors (raised, so PostgREST returns them; map to HTTP 409 in the API):
+--   STALE_REVIEW            business revision moved since the proposal was computed
+--   PROPOSAL_NOT_PENDING    proposal already confirmed or dismissed
+--   IDEMPOTENCY_CONFLICT    same key used for a different proposal
+--   NOT_FOUND               unknown business or proposal
+-- ---------------------------------------------------------------------------
+create or replace function confirm_change_proposal(
+  p_business_id text,
+  p_proposal_id text,
+  p_expected_revision bigint,
+  p_idempotency_key text
+) returns jsonb
+language plpgsql
+security invoker
+as $$
+declare
+  v_revision bigint;
+  v_state text;
+  v_prior mutations%rowtype;
+  v_result jsonb;
+begin
+  -- Serialize confirmations per business.
+  select store_revision into v_revision from businesses
+   where id = p_business_id
+   for update;
+  if not found then
+    raise exception 'NOT_FOUND';
+  end if;
+
+  -- Replay a completed identical mutation before checking revisions. Checked under the
+  -- lock so a concurrent retry with the same key replays instead of failing as stale.
+  select * into v_prior from mutations
+   where business_id = p_business_id and idempotency_key = p_idempotency_key;
+  if found then
+    if v_prior.proposal_id <> p_proposal_id then
+      raise exception 'IDEMPOTENCY_CONFLICT';
+    end if;
+    return v_prior.result || jsonb_build_object('replayed', true);
+  end if;
+
+  if v_revision <> p_expected_revision then
+    raise exception 'STALE_REVIEW';
+  end if;
+
+  select state into v_state from change_proposals
+   where business_id = p_business_id and id = p_proposal_id
+   for update;
+  if not found then
+    raise exception 'NOT_FOUND';
+  end if;
+  if v_state <> 'proposed' then
+    raise exception 'PROPOSAL_NOT_PENDING';
+  end if;
+
+  -- TODO (persons 3/5): apply change_proposals.ops here, inside this transaction:
+  --   createParty / createCommitment (resolve tempIds), linkEvidence (append to
+  --   commitments.evidence_ids), linkCommitments (PO allocation), updateCommitment
+  --   (allowlisted fields only; never settlement), createSettlement. Fill
+  --   affectedRecordIds in the result. Until then this only records the decision.
+
+  update change_proposals
+     set state = 'confirmed', decided_at = now()
+   where business_id = p_business_id and id = p_proposal_id;
+
+  update businesses
+     set store_revision = store_revision + 1
+   where id = p_business_id
+  returning store_revision into v_revision;
+
+  v_result := jsonb_build_object(
+    'operationId', p_idempotency_key,
+    'replayed', false,
+    'storeRevision', v_revision,
+    'affectedRecordIds', '[]'::jsonb,
+    'warnings', '[]'::jsonb
+  );
+  insert into mutations (business_id, idempotency_key, proposal_id, result)
+  values (p_business_id, p_idempotency_key, p_proposal_id, v_result);
+  return v_result;
+end
+$$;
 
 -- ---------------------------------------------------------------------------
 -- Row level security
@@ -298,7 +418,7 @@ begin
   foreach t in array array[
     'parties', 'commitments', 'cash_events', 'signals', 'rules', 'work_items',
     'settlements', 'balance_snapshots', 'evidence', 'scenarios', 'forecast_runs',
-    'document_candidates', 'proposed_updates', 'column_mappings', 'aliases'
+    'intake_candidates', 'change_proposals', 'mutations', 'column_mappings', 'aliases'
   ]
   loop
     execute format('alter table %I enable row level security', t);

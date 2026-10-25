@@ -6,7 +6,7 @@ This repository contains the design and contributor checklists. The application 
 
 ## Start here
 
-1. Read [`CLAUDE.md`](CLAUDE.md) for the rules and conventions, then the [design](docs/design/01-overview-and-architecture.md).
+1. Read [`CLAUDE.md`](CLAUDE.md) for the rules and conventions, then the [design](docs/design/01-overview-and-architecture.md) and [technical implementation plan](docs/TECHNICAL_PLAN.md).
 2. Claim a role in the [task board](tasks/README.md); lane ownership is in [09-api-repo-lanes](docs/design/09-api-repo-lanes.md#five-people).
 3. Freeze [`schema/records.ts`](docs/design/03-data-model.md) at 11:00 and commit fixture records so every lane builds against the same data.
 4. Integrate at 1:00, freeze features at 3:00, submit by 5:30 ([timeline](docs/design/11-plan-demo-risks.md)).
@@ -42,6 +42,7 @@ The schema lives in `supabase/migrations/` and mirrors `schema/records.ts`; `db/
 - **Local:** `npx supabase start` (needs Docker), then `npx supabase db reset` to apply migrations. `npx supabase status` prints the local URL and keys.
 - **Shared hosted project:** `npx supabase link --project-ref <ref>`, then `npx supabase db push` to apply new migrations. Get the URL and anon key from Project Settings → API.
 - **Schema changes:** add a new file with `npx supabase migration new <name>`; never edit an applied migration.
+- **Confirming a review item** goes through the `confirm_change_proposal` RPC (`confirmChangeProposal` in `db/records.ts`): one transaction that checks the business revision and idempotency key. Applying the proposal's ops inside it is still TODO (persons 3/5).
 
 The row level security policies are hackathon-only: the anon/authenticated keys can read and write rows of businesses with `is_synthetic = true`, nothing else. Keep real data out of the hosted project until they are replaced with per-user policies.
 

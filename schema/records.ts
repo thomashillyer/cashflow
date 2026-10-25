@@ -1,6 +1,8 @@
 // Shared records: the contract between every lane. Source: docs/design/03-data-model.md.
 // Frozen at 11:00 on build day. After that, additive optional fields only.
 // Amounts are integer minor units; dates are YYYY-MM-DD; timestamps are ISO 8601 UTC.
+// These TS types are the source of truth. Runtime validation (zod) of LLM output and JSON input
+// lives next to its consumer and is declared `satisfies z.ZodType<T>` against these types.
 
 export type Status = "actual" | "committed" | "likely" | "possible";
 export type Direction = "in" | "out";
@@ -9,7 +11,7 @@ export type SourceRef = {
   system: string;            // "zoho_books" | "bank_csv" | "email" | "whatsapp" | "crm" | "owner" | "generic_file"
   record: string;            // id in that system: invoice number, bank line hash, message id
   url?: string;              // deep link when the system has one
-  excerpt?: { start: number; end: number };  // span in a message, for signals
+  excerpt?: { start: number; end: number; text?: string };  // span in a message, for signals; keep the words
 };
 
 export type Party = {
@@ -20,6 +22,8 @@ export type Party = {
   notes: string[];           // owner's words, verbatim
   contacts?: { emailDomains?: string[]; phones?: string[] };  // for signal matching
   lagStats?: { n: number; medianDaysLate: number; iqrDays: number; updatedAt: string };
+  sourceRefs?: SourceRef[];  // provider ids (Zoho contact id ...), the upsert key for parties
+  aliases?: string[];        // other confirmed display names
 };
 
 export type CommitmentType =
@@ -28,6 +32,10 @@ export type CommitmentType =
 export type Commitment = {
   id: string;
   type: CommitmentType;
+  direction?: Direction;     // in = receivable; required for purchase_order and plan, implied for invoice/bill
+  reference?: string;        // document number (INV-1187, PO-2291); not globally unique
+  category?: string;         // "payroll", "rent", "supplier balance" ...
+  funding?: true;            // loans/financing; excluded from the stress scenario while likely
   partyId?: string;
   amount: number;
   currency: string;
@@ -37,17 +45,23 @@ export type Commitment = {
   probability?: number;      // 0..1, required for "possible"
   discount?: { pct: number; byDate: string };  // early-payment terms, e.g. 2/10
   linkedCommitmentIds?: string[];  // a sales deal's supplier POs, freight, duties; a PO's invoices
-  outstanding?: number;      // remaining after partial settlements; `amount` stays the original total
+  // Remaining after partial settlements; `amount` stays the original total. The engine expands
+  // from outstanding when set; settlements consume pattern legs in order unless Settlement.legIndex says otherwise.
+  outstanding?: number;
   settlement?: "open" | "partial" | "paid" | "cancelled" | "credited";
   invoiceUrl?: string;       // hosted invoice link, kept for drafts
   paymentUrl?: string;       // "Pay now" link; never evidence of payment
-  evidenceIds?: string[];    // every Evidence record that describes this commitment
-  sourceRef: SourceRef;      // the first/authoritative source
+  evidenceIds?: string[];    // every Evidence record that describes this commitment (the only evidence link)
+  sourceRef: SourceRef;      // the first/authoritative source; for document-created commitments, the first evidence
 };
 
+// A commitment before it has an id. Used by signals, owner plans, and intake proposals.
+export type CommitmentDraft = Omit<Commitment, "id" | "sourceRef"> & { sourceRef?: SourceRef };
+
+// Stored actuals (bank lines) may lack amountBase/confidence/basis; the engine fills them per run.
 export type CashEvent = {
   id: string;
-  commitmentId: string;
+  commitmentId?: string;     // absent for unmatched bank actuals (card sales, fees)
   legIndex: number;
   date: string;
   amount: number;
@@ -57,23 +71,27 @@ export type CashEvent = {
   status: Status;
   confidence: number;        // 0..1
   basis: string;             // human-readable reason for this date and amount
+  category?: string;
   sourceRef: SourceRef;
   overriddenBy?: string[];   // rule, signal, or scenario ids applied to this event
 };
 
 export type SignalClaim =
-  | { kind: "date_change"; newDate: string }
+  | { kind: "date_change"; newDate: string; legIndex?: number }
   | { kind: "amount_change"; newAmount: number }
   | { kind: "cancel" }
-  | { kind: "new_commitment"; draft: Omit<Commitment, "id" | "sourceRef"> }
-  | { kind: "plan"; draft: Omit<Commitment, "id" | "sourceRef"> };
+  | { kind: "new_commitment"; draft: CommitmentDraft }
+  | { kind: "plan"; draft: CommitmentDraft };
+
+// Signals are confirmed through their own state (POST /signals/:id/apply); they are not ChangeProposals.
 
 export type Signal = {
   id: string;
   channel: "email" | "whatsapp" | "crm" | "owner";
   receivedAt: string;
   partyId?: string;
-  commitmentRef?: string;    // matched commitment id
+  commitmentId?: string;     // matched commitment
+  matchCandidates?: { commitmentId: string; reasons: string[] }[];  // when the match is ambiguous
   claim: SignalClaim;
   confidence: number;
   effect?: { lowPointDelta: number; week: string };  // filled by the engine
@@ -87,7 +105,7 @@ export type Rule = {
   kind: "lag_offset" | "preference" | "flexibility";
   params: Record<string, unknown>;   // { offsetDays: 20 } | { tag: "preferred" } | { extraDays: 15 }
   fromNote: string;          // the owner's original words
-  confirmed: boolean;
+  state: "proposed" | "confirmed" | "dismissed";
 };
 
 export type Lever =
@@ -131,6 +149,7 @@ export type Settlement = {
   amount: number;
   currency: string;
   date: string;              // actual paid date
+  legIndex?: number;         // which pattern leg this pays, when known (deposits)
   sourceRef: SourceRef;      // bank line, accounting payment, or owner confirmation
 };
 
@@ -138,22 +157,28 @@ export type Settlement = {
 // Many Evidence records can describe one Commitment; evidence never creates cash by itself.
 export type Evidence = {
   id: string;
-  channel: "zoho_books" | "bank_csv" | "email" | "whatsapp" | "upload" | "url" | "owner";
-  format: "csv" | "xlsx" | "pdf" | "text" | "html" | "api";
+  channel: "zoho_books" | "bank_csv" | "email" | "whatsapp" | "crm" | "upload" | "url" | "owner";
+  format: "csv" | "xlsx" | "pdf" | "text" | "eml" | "html" | "image" | "api";
   receivedAt: string;
   parentId?: string;         // attachment or link inside a message
+  fileName?: string;
+  mime?: string;
+  storageKey?: string;       // where the original bytes live, for preview
   fileHash?: string;         // byte-identical files dedupe on this
   url?: string;
-  extraction: "ok" | "partial" | "unreadable" | "unsupported";
-  commitmentId?: string;     // set only after the owner confirms the link
+  text?: string;             // extracted text (bounded), for excerpts after the original is gone
+  extraction: ExtractionState;
   sourceRef: SourceRef;
 };
+// Links to commitments live only in Commitment.evidenceIds (one evidence can describe several).
+
+export type ExtractionState = "ok" | "partial" | "unreadable" | "unsupported";
 
 // A change applied on top of the expanded events. Rules, applied signals, and levers all become overrides.
 export type Override = {
   id: string;
   target: { commitmentId: string; legIndex?: number };
-  change: { date?: string; amount?: number; exclude?: true };
+  change: { date?: string; shiftDays?: number; amount?: number; exclude?: true };
   origin: "rule" | "signal" | "lever" | "owner";
   originId?: string;
 };
