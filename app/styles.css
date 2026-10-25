@@ -90,13 +90,14 @@ a { color: var(--accent); }
 
 /* ---------- shell ---------- */
 .top {
-  position: sticky; top: 0; z-index: 20;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
   background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: saturate(1.4) blur(12px);
   border-bottom: 1px solid var(--rule);
 }
 .top-inner {
-  max-width: 1180px; margin: 0 auto; padding: 0 24px;
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px));
   height: 64px; display: flex; align-items: center; gap: 20px;
 }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); flex-shrink: 0; }
@@ -136,7 +137,11 @@ a { color: var(--accent); }
   font-size: 12.5px; color: var(--ink-faint);
 }
 
-main { max-width: 1180px; margin: 0 auto; padding: 20px 24px 120px; }
+main {
+  max-width: 1180px; margin: 0 auto; padding-block: 20px 120px;
+  padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 25; background: var(--bg); }
 
 /* ---------- buttons ---------- */
 .btn {
@@ -523,11 +528,11 @@ main { max-width: 1180px; margin: 0 auto; padding: 20px 24px 120px; }
 
 @media (max-width: 760px) {
   body { font-size: 15px; }
-  .top-inner { padding: 0 16px; height: 56px; gap: 10px; }
+  .top-inner { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); height: 56px; gap: 10px; }
   .tabs { display: none; }
   .brand b { font-size: 17px; }
   .biz { max-width: 150px; font-size: 12.5px; }
-  main { padding: 12px 16px calc(var(--nav-h) + 40px); }
+  main { padding-block: 12px calc(var(--nav-h) + 40px); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .preview-note { padding: 8px 16px 0; }
   .headline { font-size: 30px; }
   .subhead { font-size: 16px; margin-bottom: 24px; }
