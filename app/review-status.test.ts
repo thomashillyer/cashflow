@@ -22,7 +22,7 @@ const makeRun = (r: Records = records) => forecast(r, profile, base, asOf, {});
 // all-clear text in any of the owner-facing paths without introducing a DOM dependency.
 const main = readFileSync(new URL("./main.js", import.meta.url), "utf8");
 const ui = main.slice(0, main.lastIndexOf("\nload().catch")).replace(/^import .*;\n/gm, "");
-function render(run: ForecastRun) {
+function render(run: ForecastRun, mode = "live") {
   const drive = { innerHTML: "" };
   const supplied = {
     brief: { run, three: [], rest: [], watch: [], combined: null, shortfall: null },
@@ -34,7 +34,7 @@ function render(run: ForecastRun) {
     Object.assign(app, supplied);
     renderDrive();
     ({ summary: summary(), html: viewToday(), spoken: spokenBrief(), panel: typeof forecastReviewPanel === "function" ? forecastReviewPanel() : "", drive: drive.innerHTML });`, {
-    supplied, drive, api: { account: () => null },
+    supplied, drive, api: { account: () => null, mode },
     document: { addEventListener() {}, querySelector: () => drive },
     window: { addEventListener() {}, NERI_LOCK_MINUTES: 0 },
     localStorage: { getItem: () => null }, addEventListener() {}, setInterval() {},
@@ -77,6 +77,20 @@ describe("forecast checks in the owner brief", () => {
     expect(output.summary.tone).toBe("review");
     expect(output.html).toContain("forecast checks aren't available yet");
     expect(output.html).not.toContain("good shape");
+    expect(output.html).toContain("This server hasn't provided forecast checks");
+    expect(output.html).not.toContain("Refresh your sources");
+  });
+
+  it("explains that the static preview cannot provide checks without an impossible refresh action", () => {
+    const run = makeRun();
+    delete run.review;
+    const output = render(run, "preview");
+    expect(output.summary.tone).toBe("review");
+    expect(output.html).toContain("This preview doesn't include forecast checks");
+    expect(output.html).toContain("Forecast checks require the live Neri server");
+    expect(output.panel).not.toContain('href="#/sources"');
+    expect(output.html).not.toContain("Refresh your sources");
+    expect(output.spoken.join(" ")).not.toContain("Check the forecast items");
   });
 
   it("keeps cash-gap warnings visible and routes proposed messages to Review", () => {

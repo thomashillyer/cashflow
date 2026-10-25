@@ -97,12 +97,15 @@ function forecastReview(run = app.brief.run) {
   // Older/preview runs without the structured checks cannot establish an all-clear either.
   if (run.review?.needed === false) return null;
   const reasons = run.review?.reasons ?? [];
+  const preview = !run.review && api.mode === "preview";
   return {
-    title: run.review ? "Your forecast needs a check." : "Your forecast checks aren't available yet.",
-    message: run.review ? "Check the flagged items before relying on these dates and amounts." : "Refresh your sources before relying on these dates and amounts.",
+    title: run.review ? "Your forecast needs a check." : preview ? "This preview doesn't include forecast checks." : "Your forecast checks aren't available yet.",
+    message: run.review ? "Check the flagged items before relying on these dates and amounts." : preview
+      ? "Forecast checks require the live Neri server. Verify your source records before acting on these dates and amounts."
+      : "This server hasn't provided forecast checks. Verify your source records before acting on these dates and amounts.",
     reasons,
     messages: reasons.some((r) => r.code === "unconfirmed_signal"),
-    sources: !reasons.length || reasons.some((r) => r.code !== "unconfirmed_signal"),
+    sources: !preview && (!reasons.length || reasons.some((r) => r.code !== "unconfirmed_signal")),
   };
 }
 
@@ -189,7 +192,7 @@ function spokenBrief() {
     parts.push(open.length === 1 ? "One thing today." : `${["", "One", "Two", "Three"][open.length]} things today.`);
     open.forEach((i, n) => parts.push(`${open.length > 1 ? ["First", "Second", "Third"][n] + ". " : ""}${speakable(i.title)}.`));
   } else {
-    parts.push(forecastReview() ? "Check the forecast items when you're parked." : "Nothing needs you today.");
+    parts.push(forecastReview() ? (b.run.review ? "Check the forecast items when you're parked." : "Verify the forecast with your source records before acting.") : "Nothing needs you today.");
   }
   const waiting = app.review.length + app.notes.filter((n) => n.state === "new").length;
   if (waiting) parts.push(`${waiting === 1 ? "One item is" : `${waiting} items are`} waiting for your OK when you're parked.`);
@@ -317,7 +320,7 @@ function viewToday() {
         ${n > 1 ? `<div class="deck-nav"><button class="deck-arrow" data-action="deck" data-dir="-1" aria-label="Previous">${arrow("left")}</button><button class="deck-arrow" data-action="deck" data-dir="1" aria-label="Next">${arrow("right")}</button></div>` : ""}
       </div>
       ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}</ol>
-        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? "No cash actions are ranked yet. Check the forecast items above first." : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
+        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the forecast items above first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
     </section>
 
