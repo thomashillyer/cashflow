@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { Commitment, Records } from "../schema/records";
 import type { Profile } from "../schema/profile";
-import { currentUpfrontShare, smallestUpfrontShare } from "./affordability";
-import { simulate } from "./simulate";
+import { runAtUpfrontShare, smallestUpfrontShare } from "./affordability";
+import { forecast } from "./forecast";
 
 const $ = (n: number) => n * 100;
 const src = { system: "test", record: "x" };
@@ -42,7 +42,7 @@ function com(id: string, o: Partial<Commitment> & Pick<Commitment, "type" | "amo
 }
 
 // Opening cash $10,000. Order day: +$10,000 deposit - $30,000 supplier = -$10,000 low point, below the $5,000 line.
-// With share s advanced to asOf, the order-day balance is -$10,000 + $40,000 s, so s >= 0.375 is needed.
+// With upfront share X the order-day balance is -$20,000 + $50,000 X, so X >= 0.5 is needed.
 function records(opening = $(10000), status: Commitment["status"] = "likely", extra: Commitment[] = []): Records {
   return {
     parties: [],
@@ -60,32 +60,38 @@ function records(opening = $(10000), status: Commitment["status"] = "likely", ex
 }
 
 describe("smallestUpfrontShare", () => {
-  it("reads the current deposit share from the deal's pattern", () => {
-    expect(currentUpfrontShare(records().commitments[0]!, profile)).toBe(0.2);
+  it("grid point X = current share (20%) is exactly the base run", () => {
+    const base = forecast(records(), profile, { id: "base", kind: "base", overrides: [] }, asOf, {});
+    expect(runAtUpfrontShare(records(), profile, [], "deal", asOf, {}, 0.2)).toEqual(base);
+    expect(base.lowPoint.amount).toBe(-$(10000));
+  });
+
+  it("share X means the deposit is X of the deal, the rest on the other legs, dates unchanged, cents exact", () => {
+    const r = runAtUpfrontShare(records(), profile, [], "deal", asOf, {}, 0.45);
+    const legs = r.events.filter((e) => e.commitmentId === "deal").map((e) => [e.legIndex, e.date, e.amount]);
+    expect(legs).toEqual([
+      [0, "2026-11-09", $(22500)],
+      [1, "2026-12-07", $(27500)],
+    ]);
   });
 
   it("returns the smallest 5% grid share that keeps the low point at or above the safety line", () => {
     const r = smallestUpfrontShare(records(), profile, [], "deal", asOf, {});
-    expect(r.kind).toBe("ok");
+    expect(r).toMatchObject({ kind: "ok", share: 0.5, lowPoint: $(5000), currentShare: 0.2, upfrontLegs: [0] });
     if (r.kind !== "ok") return;
-    expect(r.share).toBe(0.4);
-    expect(r.lowPoint).toBe($(6000));
     expect(r.run.lowPoint.amount).toBeGreaterThanOrEqual(r.run.safetyLine);
-    // One step lower fails: 35% leaves $4,000 at the low point.
-    const lower = simulate(records(), profile, [], [{ kind: "ask_advance", commitmentId: "deal", share: 0.35 }], asOf, {}).run;
-    expect(lower.lowPoint.amount).toBe($(4000));
+    // One step lower fails: 45% leaves $2,500 at the low point.
+    expect(runAtUpfrontShare(records(), profile, [], "deal", asOf, {}, 0.45).lowPoint.amount).toBe($(2500));
   });
 
   it("low point is non-decreasing in share across the grid (binary search is safe)", () => {
-    const lows = [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.75, 1].map(
-      (share) => simulate(records(), profile, [], [{ kind: "ask_advance", commitmentId: "deal", share }], asOf, {}).run.lowPoint.amount,
-    );
+    const lows = [0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.75, 1].map((share) => runAtUpfrontShare(records(), profile, [], "deal", asOf, {}, share).lowPoint.amount);
     for (let i = 1; i < lows.length; i++) expect(lows[i]!).toBeGreaterThanOrEqual(lows[i - 1]!);
   });
 
   it("honors a custom step", () => {
     const r = smallestUpfrontShare(records(), profile, [], "deal", asOf, {}, { step: 0.01 });
-    expect(r).toMatchObject({ kind: "ok", share: 0.38, lowPoint: $(5200) });
+    expect(r).toMatchObject({ kind: "ok", share: 0.5, lowPoint: $(5000) });
   });
 
   it("already_ok when the current terms keep cash above the line", () => {
@@ -93,17 +99,39 @@ describe("smallestUpfrontShare", () => {
     expect(r).toMatchObject({ kind: "already_ok", share: 0.2, lowPoint: $(20000) });
   });
 
-  it("not_achievable when even 100% upfront leaves cash below the line", () => {
+  it("not_deal_driven when cash is below the line even without the deal", () => {
     const bill = com("bill", { type: "bill", amount: $(70000), anchors: { due: "2026-11-04" } });
     const r = smallestUpfrontShare(records($(10000), "likely", [bill]), profile, [], "deal", asOf, {});
-    expect(r).toMatchObject({ kind: "not_achievable", bestShare: 1, lowPoint: -$(40000) });
+    expect(r).toMatchObject({ kind: "not_deal_driven", lowPointWithoutDeal: -$(60000) });
+    // The without-deal run drops the deal's virtual linked supplier cost too.
+    expect(r.run.events.some((e) => e.commitmentId?.startsWith("deal"))).toBe(false);
+  });
+
+  it("not_achievable when even 100% upfront leaves cash below the line", () => {
+    // Supplier cost 120% of the deal: at 100% upfront the order day is $10,000 + $50,000 - $60,000 = $0.
+    const costly: Profile = { ...profile, paymentPatterns: profile.paymentPatterns.map((p) => (p.id === "deal_20_80" ? { ...p, linkedCosts: [{ patternId: "supplier_at_order", share: 1.2 }] } : p)) };
+    const r = smallestUpfrontShare(records(), costly, [], "deal", asOf, {});
+    expect(r).toMatchObject({ kind: "not_achievable", bestShare: 1, lowPoint: 0 });
+  });
+
+  it("with no deposit leg, the earliest receipt is the upfront leg and the result says so", () => {
+    const noDeposit: Profile = {
+      ...profile,
+      paymentPatterns: profile.paymentPatterns.map((p) =>
+        p.id === "deal_20_80" ? { ...p, legs: [{ share: 0.5, anchor: "delivery" as const, offsetDays: -28, direction: "in" as const }, { share: 0.5, anchor: "delivery" as const, offsetDays: 0, direction: "in" as const }] } : p,
+      ),
+    };
+    // Opening $5,000; Nov 9: +$50,000 X - $30,000 >= $0 needs X >= 0.6.
+    const r = smallestUpfrontShare(records($(5000)), noDeposit, [], "deal", asOf, {});
+    expect(r).toMatchObject({ kind: "ok", share: 0.6, currentShare: 0.5, upfrontLegs: [0], lowPoint: $(5000) });
+    expect(r.note).toMatch(/earliest receipt/);
   });
 
   it("evaluates a possible deal as if taken, without mutating the caller's records", () => {
     const recs = records($(10000), "possible");
     const before = JSON.stringify(recs);
     const r = smallestUpfrontShare(recs, profile, [], "deal", asOf, {});
-    expect(r).toMatchObject({ kind: "ok", share: 0.4, lowPoint: $(6000) });
+    expect(r).toMatchObject({ kind: "ok", share: 0.5, lowPoint: $(5000) });
     expect(JSON.stringify(recs)).toBe(before);
     // Same answer twice: pure and deterministic.
     expect(smallestUpfrontShare(recs, profile, [], "deal", asOf, {})).toEqual(r);
@@ -123,12 +151,16 @@ describe("smallestUpfrontShare on fixtures/cascade_trade", () => {
 
   it("rfq-harbor-spring (possible RFQ-77)", () => {
     const r = smallestUpfrontShare(recs, prof, [], "rfq-harbor-spring", meta.asOf, meta.fxRates);
-    expect({ kind: r.kind, share: r.kind === "not_achievable" ? r.bestShare : r.share, lowPoint: r.lowPoint, safety: r.run.safetyLine }).toMatchInlineSnapshot(`
+    const { run, ...rest } = r;
+    expect({ ...rest, safety: run.safetyLine }).toMatchInlineSnapshot(`
       {
-        "kind": "ok",
-        "lowPoint": 3680000,
+        "currentShare": 0.3,
+        "kind": "not_deal_driven",
+        "lowPointWithoutDeal": -550000,
         "safety": 3500000,
-        "share": 0.9,
+        "upfrontLegs": [
+          0,
+        ],
       }
     `);
   });
