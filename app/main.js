@@ -122,9 +122,11 @@ function spokenBrief() {
 }
 
 // ---------------------------------------------------------------- routing + shell
-const ROUTES = ["today", "forecast", "notes", "review", "sources", "ask", "settings"];
+const ROUTES = ["today", "details", "notes", "review", "sources", "settings"];
+const ALIASES = { forecast: "details", ask: "today", home: "today" };
 function route() {
-  const r = location.hash.replace(/^#\/?/, "") || "today";
+  let r = location.hash.replace(/^#\/?/, "") || "today";
+  r = ALIASES[r] ?? r;
   return ROUTES.includes(r) ? r : "today";
 }
 window.addEventListener("hashchange", () => {
@@ -147,7 +149,7 @@ function renderShell() {
     <div class="top-inner">
       <a class="brand" href="#/today" aria-label="Neri Cash home">${logo}<b>Neri <span>Cash</span></b></a>
       <nav class="tabs" aria-label="Main">
-        ${tab("today", "Today")}${tab("forecast", "Forecast")}${tab("notes", "Notes", notesWaiting())}${tab("review", "Review", waitingCount())}${tab("sources", "Sources")}${tab("ask", "Ask Neri")}
+        ${tab("today", "Home")}${tab("details", "Details")}${tab("notes", "Notes", notesWaiting())}${tab("review", "Review", waitingCount())}${tab("sources", "Sources")}
       </nav>
       <div class="top-right">
         <label class="sr" for="biz">Business</label>
@@ -161,10 +163,10 @@ function renderShell() {
   const nav = (id, label, ic, count) =>
     `<a href="#/${id}" ${r === id ? 'aria-current="page"' : ""}>${ic}${label}${count ? `<span class="count">${count}</span>` : ""}</a>`;
   $("#bottom").innerHTML =
-    nav("today", "Today", icon.today) + nav("forecast", "Forecast", icon.chart) + nav("notes", "Notes", icon.note, notesWaiting()) +
+    nav("today", "Home", icon.ask) + nav("details", "Details", icon.chart) + nav("notes", "Notes", icon.note, notesWaiting()) +
     nav("review", "Review", icon.inbox, waitingCount()) + nav("sources", "Sources", icon.plug);
-  $("#preview-note").textContent = app.ctx.business.synthetic
-    ? `Preview: ${app.ctx.business.name} is a fictional business. Today is set to ${dayDate(app.ctx.business.asOf)}.`
+  $("#preview-note").innerHTML = app.ctx.business.synthetic
+    ? `Preview with a fictional business<span class="wide-only">, ${esc(app.ctx.business.name.replace(/\.$/, ""))}. Today is set to ${dayDate(app.ctx.business.asOf)}</span>.`
     : "";
 }
 
@@ -172,9 +174,9 @@ function render() {
   if (!app.ctx) return;
   renderShell();
   const r = route();
-  const views = { today: viewToday, forecast: viewForecast, notes: viewNotes, review: viewReview, sources: viewSources, ask: viewAsk, settings: viewSettings };
+  const views = { today: viewToday, details: viewDetails, notes: viewNotes, review: viewReview, sources: viewSources, settings: viewSettings };
   $("#view").innerHTML = masked(views[r]());
-  document.title = `${{ today: "Today", forecast: "Forecast", notes: "Notes", review: "Review", sources: "Sources", ask: "Ask Neri", settings: "Settings" }[r]} · Neri Cash`;
+  document.title = `${{ today: "Home", details: "Details", notes: "Notes", review: "Review", sources: "Sources", settings: "Settings" }[r]} · Neri Cash`;
   if (app.drive) renderDrive();
 }
 
@@ -182,92 +184,71 @@ function render() {
 function viewToday() {
   const b = app.brief;
   const s = summary();
-  const run = b.run;
-  const vocab = app.ctx.profile.vocabulary ?? {};
-  const now = new Date();
-
-  const things = b.three.length
-    ? `<ol class="things">${b.three.map((i) => thingRow(i)).join("")}</ol>`
-    : `<div class="empty-three">Nothing needs you today. Neri will speak up if a payment moves or a bill needs a decision.</div>`;
-
-  const together = b.combined && b.three.filter((i) => i.state === "open").length > 1
-    ? `<p class="together">Do all three and your low point goes from <b>${money(run.lowPoint.amount)}</b> to <b>${money(b.combined.lowPoint.amount)}</b>.</p>`
-    : "";
-
-  const shortfall = b.shortfall
-    ? `<div class="shortfall"><h4>${esc(b.shortfall.title)}</h4><p>${esc(b.shortfall.why)}</p>${sampleCard(b.shortfall.partnerAction)}</div>`
-    : "";
-
-  const watch = b.watch.length
-    ? `<section class="watch"><h2 class="section-title">Keep an eye on</h2><p class="section-note">Nothing to do yet. Neri tells you if these turn into actions.</p>
-       ${b.watch.map((w) => `<div class="watch-item"><h4>${esc(w.title)}</h4>${w.warning === "ar_concentration_risk" ? `<button class="btn small quiet" data-action="draft" data-id="${w.id}">${icon.mail}Draft a terms note</button>` : ""}<p>${esc(w.why)}</p>${w.partnerAction ? `<div style="grid-column:1/-1;margin-top:8px">${sampleCard(w.partnerAction)}</div>` : ""}</div>`).join("")}</section>`
-    : "";
-
-  const more = b.rest.length
-    ? `<details style="margin-top:14px"><summary class="btn small quiet" style="list-style:none">See ${b.rest.length} more</summary><ol class="things" style="margin-top:8px">${b.rest.map((i) => thingRow(i)).join("")}</ol></details>`
-    : "";
-
+  const n = b.three.length;
+  const waitingRev = app.review.length;
+  const waitingNotes = notesWaiting();
+  const waiting = [waitingRev ? `${waitingRev} ${waitingRev === 1 ? "message" : "messages"}` : "", waitingNotes ? `${waitingNotes} ${waitingNotes === 1 ? "note" : "notes"}` : ""].filter(Boolean).join(" and ");
   return `
-  <div class="today">
-    <div>
-      <div class="day-line">
-        <span>${greeting(now.getHours())}, <b>${esc(app.ctx.business.owner)}</b>. ${dayDate(app.ctx.business.asOf)}</span>
-        ${canSpeak ? `<button class="listen" data-action="listen" aria-pressed="${app.stopSpeak ? "true" : "false"}"><span class="disc">${app.stopSpeak ? icon.stop : icon.play}</span>${app.stopSpeak ? "Stop" : "Play brief"} <small>${spokenLength()} sec</small></button>` : ""}
-      </div>
+  <div class="home">
+    <section class="home-top">
+      <p class="hello">${greeting(new Date().getHours())}, ${esc(app.ctx.business.owner)}</p>
       <h1 class="headline">${esc(s.headline)}</h1>
       <p class="subhead">${esc(s.sub)}</p>
+      <div class="home-links">
+        ${canSpeak ? `<button class="listen" data-action="listen" aria-pressed="${app.stopSpeak ? "true" : "false"}"><span class="disc">${app.stopSpeak ? icon.stop : icon.play}</span>${app.stopSpeak ? "Stop" : "Play brief"} <small>${spokenLength()} sec</small></button>` : ""}
+        <a class="btn quiet" href="#/details">See the numbers</a>
+      </div>
+    </section>
 
-      <h2 class="section-title">${b.three.length === 1 ? "One thing to do today" : b.three.length ? `${["", "One", "Two", "Three"][b.three.length]} things to do today` : "Today"}</h2>
-      <p class="section-note">Ranked by how much they help your cash and how soon they matter.</p>
-      ${things}
-      ${together}
-      ${shortfall}
-      ${more}
-      ${askBar("Ask Neri, or park a thought", [`Can I make payroll?`, `What if ${firstCustomer()} pays 10 days late?`, `Can I afford a $25K ${vocab.purchase ?? "purchase"} in January?`])}
-      ${watch}
+    <section class="today-list" aria-labelledby="today-h">
+      <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
+      ${n ? `<ol class="things">${b.three.map(homeRow).join("")}</ol>` : `<p class="calm">Nothing needs you today. Neri will speak up if a payment moves.</p>`}
+      ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
+    </section>
+
+    <section class="convo" aria-label="Conversation with Neri">${app.askLog.map(turnHtml).join("")}</section>
+    ${app.askLog.length ? "" : `<div class="ask-hints home-hints">${askHints().map((h) => `<button class="hint" data-action="hint" data-q="${esc(h)}">${esc(h)}</button>`).join("")}</div>`}
+
+    <div class="dock ${app.askLog.length ? "stick" : ""}">
+      ${askBar("Ask Neri, or park a thought")}
     </div>
-    <aside class="side">
-      <section class="panel">
-        <h2>Cash</h2>
-        <div class="figures">
-          <div class="fig"><small>Today</small><b>${money(run.openingBalance)}</b><span>Bank, ${shortDate(addDays(run.asOf, -1))}</span></div>
-          <div class="fig"><small>Lowest point</small><b class="${run.lowPoint.amount < 0 ? "below" : ""}">${money(run.lowPoint.amount)}</b><span>${dayDate(run.lowPoint.date)}</span></div>
-          <div class="fig"><small>Your line</small><b>${money(run.safetyLine)}</b><a class="link" href="#/settings" style="font-size:12.5px;font-weight:600;text-decoration:none">Change</a></div>
-          <div class="fig"><small>Weeks under your line</small><b>${run.weeksBelowSafety.length}</b><span>of ${run.weeks.length}</span></div>
-        </div>
-        <a class="mini" href="#/forecast" aria-label="Open forecast" style="display:block" data-chart="mini">${cashChart(run, { width: 318, height: 110, mini: true })}</a>
-        <div class="more"><span style="color:var(--ink-faint)">Next 13 weeks</span><a href="#/forecast">Open forecast</a></div>
-      </section>
-      ${inboxPanel()}
-      <section class="panel">
-        <h2>Reading from</h2>
-        ${app.ctx.business.sources.map((src) => `<div class="source-row"><span class="dot ${src.state === "ok" ? "" : "warn"}"></span>${esc(src.label)}<time>${syncTime(src.syncedAt)}</time></div>`).join("")}
-        <div class="more"><span></span><a href="#/sources">Add a source</a></div>
-      </section>
-    </aside>
   </div>`;
+}
+
+function askHints() {
+  const vocab = app.ctx.profile.vocabulary ?? {};
+  return ["Can I make payroll?", `What if ${firstCustomer()} pays 10 days late?`, `Planning a $25K ${vocab.purchase ?? "purchase"} in January`];
+}
+
+function homeRow(i) {
+  const done = i.state === "done";
+  const ref = i.evidenceRefs?.[0];
+  const draft = i.actions.some((a) => a.kind === "draft_email");
+  return `
+  <li class="thing home-row ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}">
+    <button class="check" data-action="done" data-id="${i.id}" aria-pressed="${done}" aria-label="${done ? "Done" : "Mark done"}: ${esc(i.title)}">${icon.check}</button>
+    <details>
+      <summary><span class="t">${esc(i.title)}</span><span class="e">${money(i.cashEffect, { signed: true })}</span></summary>
+      <p>${esc(i.why)}</p>
+      <div class="thing-actions">
+        <span class="by">Act by <b>${shortDate(i.neededBy)}</b></span>
+        ${draft ? `<button class="btn small" data-action="draft" data-id="${i.id}">${icon.mail}Draft email</button>` : ""}
+        ${ref ? `<button class="src" data-action="record" data-id="${ref}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
+      </div>
+    </details>
+  </li>`;
 }
 
 function thingRow(i) {
   const done = i.state === "done";
   const ref = i.evidenceRefs?.[0];
-  const actions = i.actions.map((a) => {
-    if (a.kind === "draft_email") return `<button class="btn small" data-action="draft" data-id="${i.id}">${icon.mail}Draft email</button>`;
-    return "";
-  }).join("");
+  const actions = i.actions.map((a) => (a.kind === "draft_email" ? `<button class="btn small" data-action="draft" data-id="${i.id}">${icon.mail}Draft email</button>` : "")).join("");
   return `
-  <li class="thing ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}">
+  <li class="thing ${done ? "done" : ""}">
     <button class="check" data-action="done" data-id="${i.id}" aria-pressed="${done}" aria-label="${done ? "Done" : "Mark done"}: ${esc(i.title)}">${icon.check}</button>
-    <div>
-      <h3>${esc(i.title)}</h3>
-      <p>${esc(i.why)}</p>
-    </div>
+    <div><h3>${esc(i.title)}</h3><p>${esc(i.why)}</p></div>
     <div class="effect"><b>${money(i.cashEffect, { signed: true })}</b><span>${i.warning === "early_pay_discount" ? "saved" : "to your low point"}</span></div>
-    <div class="thing-actions">
-      <span class="by">Act by <b>${shortDate(i.neededBy)}</b></span>
-      ${actions}
-      ${ref ? `<button class="src" data-action="record" data-id="${ref}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
-    </div>
+    <div class="thing-actions"><span class="by">Act by <b>${shortDate(i.neededBy)}</b></span>${actions}${ref ? `<button class="src" data-action="record" data-id="${ref}">${esc(refLabel(ref))}</button>` : ""}</div>
   </li>`;
 }
 
@@ -334,7 +315,38 @@ function chartWidth() {
   return Math.max(300, Math.min(1130, w));
 }
 
-function viewForecast() {
+function viewDetails() {
+  const b = app.brief;
+  const run = b.run;
+  const figures = `
+  <div class="kpis">
+    <div class="fig"><small>Cash today</small><b>${money(run.openingBalance)}</b><span>Bank, ${shortDate(addDays(run.asOf, -1))}</span></div>
+    <div class="fig"><small>Lowest point</small><b class="${run.lowPoint.amount < 0 ? "below" : ""}">${money(run.lowPoint.amount)}</b><span>${dayDate(run.lowPoint.date)}</span></div>
+    <div class="fig"><small>Your line</small><b>${money(run.safetyLine)}</b><a class="link" href="#/settings">Change</a></div>
+    <div class="fig"><small>Weeks under your line</small><b>${run.weeksBelowSafety.length}</b><span>of ${run.weeks.length}</span></div>
+  </div>`;
+  const together = b.combined && b.three.filter((i) => i.state === "open").length > 1
+    ? `<p class="together">Do all of today's things and your low point goes from <b>${money(run.lowPoint.amount)}</b> to <b>${money(b.combined.lowPoint.amount)}</b>.</p>` : "";
+  const shortfall = b.shortfall ? `<div class="shortfall"><h4>${esc(b.shortfall.title)}</h4><p>${esc(b.shortfall.why)}</p>${sampleCard(b.shortfall.partnerAction)}</div>` : "";
+  const rest = b.rest.length ? `<h2 class="section-title" style="margin-top:40px">More you could do</h2><ol class="things">${b.rest.map(thingRow).join("")}</ol>` : "";
+  const watch = b.watch.length
+    ? `<h2 class="section-title" style="margin-top:40px">Keep an eye on</h2><p class="section-note">Nothing to do yet. Neri tells you if these turn into actions.</p>
+       ${b.watch.map((w) => `<div class="watch-item"><h4>${esc(w.title)}</h4>${w.warning === "ar_concentration_risk" ? `<button class="btn small quiet" data-action="draft" data-id="${w.id}">${icon.mail}Draft a terms note</button>` : ""}<p>${esc(w.why)}</p>${w.partnerAction ? `<div style="grid-column:1/-1;margin-top:8px">${sampleCard(w.partnerAction)}</div>` : ""}</div>`).join("")}` : "";
+  return `
+  <div class="page-head"><div><h1>Details</h1><p>The numbers behind today's brief. Tap any week or source to see where a number comes from.</p></div></div>
+  ${figures}
+  ${forecastBody()}
+  <div class="details-grid">
+    <div>${together}${shortfall}${rest}${watch}</div>
+    <aside class="side">${inboxPanel()}
+      <section class="panel"><h2>Reading from</h2>
+        ${app.ctx.business.sources.map((src) => `<div class="source-row"><span class="dot ${src.state === "ok" ? "" : "warn"}"></span>${esc(src.label)}<time>${syncTime(src.syncedAt)}</time></div>`).join("")}
+        <div class="more"><span></span><a href="#/sources">Add a source</a></div></section>
+    </aside>
+  </div>`;
+}
+
+function forecastBody() {
   const run = app.scenario === "stress" && app.stressRun ? app.stressRun : app.brief.run;
   const base = app.brief.run;
   const narrow = window.innerWidth < 760;
@@ -347,8 +359,8 @@ function viewForecast() {
   });
   const lowWeek = run.lowPoint.week;
   return `
-  <div class="page-head">
-    <div><h1>Next 13 weeks</h1><p>Cash at the end of each day. Tap a week to see what's in it and where each number comes from.</p></div>
+  <div class="page-head sub">
+    <div><h2 class="section-title" style="font-size:18px">Next 13 weeks</h2></div>
     <div class="seg" role="group" aria-label="Scenario">
       <button data-action="scenario" data-s="base" aria-pressed="${app.scenario === "base"}">Expected</button>
       <button data-action="scenario" data-s="stress" aria-pressed="${app.scenario === "stress"}">If customers pay a week late</button>
@@ -527,26 +539,35 @@ function viewSources() {
 }
 
 // ---------------------------------------------------------------- Ask
-function viewAsk() {
-  const hints = ["When is my lowest point?", "Who should I call today?", "Can I make payroll?", `What if ${firstCustomer()} pays 10 days late?`];
-  return `
-  <div class="page-head"><div><h1>Ask Neri</h1><p>Ask about your cash, try a what-if, or tell Neri a plan. Every number comes from your books.</p></div></div>
-  <div class="convo">
-    ${askBar("Ask anything about your cash", app.askLog.length ? [] : hints)}
-    ${[...app.askLog].reverse().map(turnHtml).join("")}
-  </div>`;
+// Source chips: readable labels ("INV-1187", "Payroll Dec 24"), at most four, then a count.
+function citeLabel(cid) {
+  const ref = refLabel(cid);
+  if (ref !== "Source") return ref;
+  const name = app.ctx.parties.find((p) => p.id === app.ctx.partyOf?.(cid))?.name ?? "Record";
+  const d = cid.match(/(\d{4}-\d{2}-\d{2})$/);
+  return d ? `${name} ${shortDate(d[1])}` : name;
+}
+function citeChips(cites) {
+  if (!cites?.length) return "";
+  const uniq = [...new Set(cites)];
+  const shown = uniq.slice(0, 4);
+  return `<div class="cites">${shown.map((c) => `<button class="src" data-action="record" data-id="${esc(c)}">${esc(citeLabel(c))}</button>`).join("")}${uniq.length > 4 ? `<span class="by">+${uniq.length - 4} more</span>` : ""}</div>`;
 }
 
 function turnHtml(t, idx) {
-  const realIdx = app.askLog.length - 1 - idx;
-  if (t.pending) return `<div class="turn"><div class="q">${esc(t.q)}</div><div class="a missing">Thinking…</div></div>`;
+  if (t.pending) return `<div class="turn"><div class="q">${esc(t.q)}</div><div class="a missing">${t.parking ? "Parking it…" : "Thinking…"}</div></div>`;
+  if (t.note) {
+    const n = app.notes.find((x) => x.id === t.note);
+    if (!n) return `<div class="turn"><div class="q">${esc(t.q)}</div><div class="a missing">Removed.</div></div>`;
+    return `<div class="turn"><div class="q">${esc(t.q)}</div><div class="a">${n.state === "new" ? "Parked in your notes. Here's how I read it." : n.state === "added" ? "Added to your forecast." : "Kept as a note."}</div>${n.state === "new" ? noteRow(n).replace('<article class="note">', '<article class="note inline">') : ""}</div>`;
+  }
   const a = t.a;
   return `<div class="turn">
     <div class="q">${esc(t.q)}</div>
     <div class="a ${a.missingData ? "missing" : ""}">${esc(a.text)}</div>
-    ${a.citations?.length ? `<div class="cites">${[...new Set(a.citations)].slice(0, 8).map((c) => `<button class="src" data-action="record" data-id="${esc(c)}">${esc(refLabel(c) === "Source" ? c.replace(/^(rec|plan|bill|po|inv)-/, "") : refLabel(c))}</button>`).join("")}</div>` : ""}
-    ${a.scenario ? `<div class="scenario"><header><span>What-if: ${esc(a.scenario.label)}</span><span style="display:flex;gap:6px"><button class="btn small" data-action="show-whatif" data-i="${realIdx}">Show on forecast</button>${a.proposal && !t.added ? `<button class="btn small primary" data-action="add-plan" data-i="${realIdx}">Add to forecast</button>` : t.added ? `<span class="settled-tag">Added</span>` : ""}</span></header>
-      <div data-chart="ask-${realIdx}">${cashChart(app.brief.run, { width: Math.min(700, chartWidth()), height: 140, mini: true, whatIf: a.scenario.run })}</div></div>` : ""}
+    ${citeChips(a.citations)}
+    ${a.scenario ? `<div class="scenario"><header><span>What-if: ${esc(a.scenario.label)}</span><span style="display:flex;gap:6px"><button class="btn small" data-action="show-whatif" data-i="${idx}">Show in details</button>${a.proposal && !t.added ? `<button class="btn small primary" data-action="add-plan" data-i="${idx}">Add to forecast</button>` : t.added ? `<span class="settled-tag">Added</span>` : ""}</span></header>
+      <div data-chart="ask-${idx}">${cashChart(app.brief.run, { width: Math.min(620, chartWidth()), height: 130, mini: true, whatIf: a.scenario.run })}</div></div>` : ""}
   </div>`;
 }
 
@@ -778,7 +799,7 @@ function startCapture(target) {
         }
         renderDrive();
       } else if (target === "ask") {
-        if (text) await doAsk(text);
+        if (text) await doAsk(text, "voice");
         else render();
       } else {
         const btn = document.querySelector('[data-action="mic-note"]');
@@ -804,16 +825,32 @@ function readingSentence(n) {
 }
 
 // ---------------------------------------------------------------- actions
-async function doAsk(q) {
+// One bar for everything: questions get answers; anything else is a thought to park.
+const QUESTION = /\?\s*$|^(what|when|where|who|whom|why|how|can|could|will|would|should|shall|is|are|was|do|does|did|am|show|tell|give|list|explain)\b/i;
+
+async function doAsk(q, via = "typed") {
   q = q.trim();
   if (!q) return;
-  if (route() !== "ask") location.hash = "#/ask";
-  const turn = { q, pending: true };
+  if (route() !== "today") location.hash = "#/today";
+  const parking = !QUESTION.test(q);
+  const turn = { q, pending: true, parking };
   app.askLog.push(turn);
   render();
-  turn.a = await api.ask(q);
+  scrollToDock();
+  if (parking) {
+    const n = await api.parkNote(q, via);
+    app.notes = await api.notes();
+    turn.note = n.id;
+  } else {
+    turn.a = await api.ask(q);
+  }
   turn.pending = false;
   render();
+  scrollToDock();
+}
+
+function scrollToDock() {
+  requestAnimationFrame(() => document.querySelector(".dock")?.scrollIntoView({ block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
 }
 
 document.addEventListener("click", async (ev) => {
@@ -825,7 +862,7 @@ document.addEventListener("click", async (ev) => {
     closeSheet();
     if (app.selectedWeek) {
       app.selectedWeek = null;
-      if (route() === "forecast") render();
+      if (route() === "details") render();
     }
     return;
   }
@@ -841,7 +878,7 @@ document.addEventListener("click", async (ev) => {
   if (a === "record") return showRecord(id);
   if (a === "week") {
     showWeek(el.dataset.week);
-    if (route() === "forecast") {
+    if (route() === "details") {
       const holder = $('[data-chart="main"]');
       if (holder) holder.innerHTML = masked(viewForecastChartOnly());
     }
@@ -866,7 +903,7 @@ document.addEventListener("click", async (ev) => {
   if (a === "show-whatif") {
     const t = app.askLog[Number(el.dataset.i)];
     app.whatIf = t.a.scenario;
-    location.hash = "#/forecast";
+    location.hash = "#/details";
     return;
   }
   if (a === "add-plan") {
@@ -875,7 +912,7 @@ document.addEventListener("click", async (ev) => {
     t.added = true;
     app.whatIf = null;
     await refresh();
-    toast("Added to your forecast", `${money(t.a.proposal.amount)} on ${shortDate(t.a.proposal.date)}. Today's list is updated.`, "See Today", () => (location.hash = "#/today"));
+    toast("Added to your forecast", `${money(t.a.proposal.amount)} on ${shortDate(t.a.proposal.date)}. Today's list is updated.`);
     return;
   }
   if (a === "signal") {
@@ -883,7 +920,7 @@ document.addEventListener("click", async (ev) => {
     await refresh();
     if (res?.alert) {
       location.hash = "#/today";
-      toast(res.alert.title, `${res.alert.detail} Today's list is re-ranked.`, "Forecast", () => (location.hash = "#/forecast"));
+      toast(res.alert.title, `${res.alert.detail} Today's list is re-ranked.`, "Details", () => (location.hash = "#/details"));
     } else {
       toast("Dismissed", "The forecast stays as it was.");
     }
@@ -1018,7 +1055,7 @@ let resizeTimer;
 window.addEventListener("resize", () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    if (["forecast", "ask"].includes(route())) render();
+    if (["details", "today"].includes(route())) render();
   }, 150);
 });
 
