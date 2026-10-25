@@ -687,13 +687,24 @@ function viewSources() {
     return `<section class="cat"><h2>${cat.label}</h2><p>${cat.why}</p><div class="conn-grid">
       ${list.map((c) => {
         const on = connected.get(c.id);
-        return `<div class="conn">${logoTile(c)}<b>${esc(c.name)}</b>
-          <div class="state ${on ? "on" : ""}">${on ? `<i class="dot"></i>Connected` : `<button class="btn" data-action="connect" data-id="${esc(c.id)}">${c.availability === "live" ? "Connect" : app.interest.has(c.id) ? "Requested" : c.availability === "next" ? "Coming next" : "Request"}</button>`}</div>
-          <p class="reads">${on ? esc(on.detail) : esc(c.reads)}</p></div>`;
+        return `<div class="conn ${on ? "is-on" : ""}">${logoTile(c)}<b>${esc(c.name)}</b>
+          <div class="state ${on ? "on" : ""}">${on ? connState(c, on) : `<button class="btn" data-action="connect" data-id="${esc(c.id)}">${c.availability === "live" ? "Connect" : app.interest.has(c.id) ? "Requested" : c.availability === "next" ? "Coming next" : "Request"}</button>`}</div>
+          <p class="reads">${on ? `${esc(on.detail)}${on.syncedAt ? `<span class="synced"> · Read ${esc(syncTime(on.syncedAt))}</span>` : ""}` : esc(c.reads)}</p></div>`;
       }).join("")}
     </div></section>`;
   }).join("")}
   <p class="fineprint" style="margin-top:28px">${live} sources are ready now, ${CONNECTORS.length - live} more are on the way. Each one is read-only and can be turned off at any time.</p>`;
+}
+
+// A connected source: its status dot and a Reconnect that reads it again. Apps Neri can read pull fresh data;
+// file-based sources (bank statement, sales export) reconnect by uploading the newer file.
+function connState(c, on) {
+  const status = on.state === "ok" ? ["", "Connected"] : on.state === "error" ? ["bad", "Needs attention"] : ["warn", "Waiting"];
+  const label = `${icon.refresh}<span>Reconnect</span>`;
+  const btn = PULLABLE.has(c.id)
+    ? `<button class="btn reconnect ${on.state === "error" ? "primary" : ""}" data-action="reconnect" data-id="${esc(c.id)}" title="Read ${esc(c.name)} again">${label}</button>`
+    : `<label class="btn reconnect ${on.state === "error" ? "primary" : ""}" title="Upload a newer file">${label}<input type="file" accept=".csv,.xlsx,.xls,.pdf" data-change="upload" hidden /></label>`;
+  return `<span class="conn-status"><i class="dot ${status[0]}"></i>${status[1]}</span>${btn}`;
 }
 
 // ---------------------------------------------------------------- Ask
@@ -1567,6 +1578,17 @@ async function onClick(ev) {
     return;
   }
   if (a === "connect") return showConnect(id);
+  if (a === "reconnect") {
+    if (api.mode === "preview") {
+      toast("Reconnect runs on your Neri server", "This preview runs a fictional business with sample data, so there's nothing to read again.");
+      return;
+    }
+    el.disabled = true;
+    const results = await pullApps([id], (name) => { el.querySelector("span").textContent = `Reading ${name}…`; });
+    await load();
+    toast(results[0]?.ok ? "Up to date" : "Couldn't reconnect", pullSummary(results));
+    return;
+  }
   if (a === "connect-go") {
     if (api.mode === "preview" || !PULLABLE.has(id)) {
       toast("Sign-in opens on your Neri server", "This preview runs a fictional business with sample data.");

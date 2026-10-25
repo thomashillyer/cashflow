@@ -420,7 +420,21 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .conn .reads { margin: 0; font-size: 12.5px; color: var(--ink-faint); grid-column: 2; grid-row: 2; line-height: 1.35; }
 .conn .state { grid-column: 3; grid-row: 1 / span 2; font-size: 12.5px; font-weight: 600; }
 .conn .state .dot { display: inline-block; }
-.conn .state.on { color: var(--good); display: flex; align-items: center; gap: 6px; }
+/* Connected tiles: status and Reconnect get their own row, so they fit even in narrow tiles */
+.conn.is-on .reads { grid-column: 2 / span 2; }
+.conn .state.on {
+  grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--rule);
+}
+.conn-status { display: inline-flex; align-items: center; gap: 6px; color: var(--good); white-space: nowrap; }
+.conn-status:has(.dot.warn) { color: var(--sun); }
+.conn-status:has(.dot.bad) { color: var(--bad, #e5484d); }
+.dot.bad { background: var(--bad, #e5484d); }
+.conn .reconnect { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.conn .reconnect svg { width: 14px; height: 14px; }
+.conn .reconnect[disabled] svg { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.conn .synced { color: var(--ink-faint); white-space: nowrap; }
 .conn .state .btn { height: 30px; font-size: 12.5px; padding: 0 12px; }
 .avail { font-size: 11.5px; font-weight: 600; color: var(--ink-faint); }
 .upload-band {
