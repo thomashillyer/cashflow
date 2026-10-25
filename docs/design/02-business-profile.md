@@ -34,6 +34,8 @@ Every pattern is a list of legs: a share of the total, an anchor date, an offset
 ```
 
 - **Anchors are a fixed set:** `order`, `ship`, `delivery`, `invoice`, `due`, `month_end`, `weekday`. The engine stays generic because it only understands these.
+- **`month_end`** is the last day of the calendar month of the invoice date (else due, order, delivery); `offsetDays` counts from it, so "net 30 EOM" is `{ anchor: "month_end", offsetDays: 30 }`. **`weekday`** needs a leg `weekday` (0 = Monday .. 6 = Sunday) and resolves to the first such day on/after the invoice date (else order, else due), plus `offsetDays`; without `weekday` the leg is not scheduled and warns.
+- **Card settlement:** `revenueModel.settleLagDays` (dailySales, default 0) lands each day's sales that many days after the sale.
 - **`linkedCosts`** lets a sales deal pull in its supplier payments. That is how "can I afford this order?" works for any business that buys before it sells.
 - **Lead times** (`leadTimes.transitDays`, `leadTimes.productionDays`) let the engine estimate a missing anchor (for example, delivery = ship + transit).
 

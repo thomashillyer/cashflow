@@ -1,0 +1,53 @@
+{
+  "id": "agency",
+  "displayName": "Services and agency",
+  "baseCurrency": "USD",
+  "horizonWeeks": 13,
+  "freeCashLookaheadWeeks": 6,
+  "defaultLagDays": 15,
+  "lagShrinkageK": 3,
+  "safetyLine": { "kind": "weeksOfFixedCosts", "weeks": 4 },
+  "paymentPatterns": [
+    {
+      "id": "client_net60",
+      "appliesTo": "invoice",
+      "isDefault": true,
+      "legs": [{ "share": 1, "anchor": "invoice", "offsetDays": 60, "direction": "in" }]
+    },
+    {
+      "id": "milestones_50_50",
+      "appliesTo": "sales_deal",
+      "isDefault": true,
+      "legs": [
+        { "share": 0.5, "anchor": "order", "offsetDays": 60, "direction": "in" },
+        { "share": 0.5, "anchor": "delivery", "offsetDays": 60, "direction": "in" }
+      ]
+    },
+    {
+      "id": "vendor_due",
+      "appliesTo": "bill",
+      "isDefault": true,
+      "legs": [{ "share": 1, "anchor": "due", "offsetDays": 0, "direction": "out" }]
+    }
+  ],
+  "revenueModel": { "kind": "retainers" },
+  "recurring": [
+    { "id": "rec-retainers", "name": "Client retainers", "amount": 3000000, "direction": "in", "cadence": "monthly", "anchor": "2026-12-01", "category": "retainer" },
+    { "id": "rec-payroll", "name": "Payroll", "amount": 1800000, "cadence": "semimonthly", "anchor": "2026-11-15", "secondDay": 31, "category": "payroll", "nonDeferrable": true },
+    { "id": "rec-rent", "name": "Rent", "amount": 400000, "cadence": "monthly", "anchor": "2026-12-01", "category": "rent" },
+    { "id": "rec-software", "name": "Software subscriptions", "amount": 150000, "cadence": "monthly", "anchor": "2026-11-05", "category": "software" },
+    { "id": "rec-est-tax", "name": "Quarterly estimated taxes", "amount": 600000, "cadence": "quarterly", "anchor": "2027-01-15", "category": "tax", "nonDeferrable": true }
+  ],
+  "thresholds": {
+    "idleBalanceOver": { "amount": 5000000, "minWeeks": 4 },
+    "arConcentrationPct": 40,
+    "signalAutoApplyConfidence": 0.85,
+    "rankFloor": 0.1,
+    "relationshipPenalty": { "preferred": 0.5, "strategic": 0.5 },
+    "staleAfterHours": 72,
+    "stressDelayDays": 14
+  },
+  "actionLeadDays": { "chase": 5, "defer": 3, "split": 5, "pay_early": 1, "ask_advance": 7 },
+  "signalSources": ["email"],
+  "vocabulary": { "deal": "SOW", "recurring_revenue": "retainer", "milestone": "milestone" }
+}
