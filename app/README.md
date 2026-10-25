@@ -15,11 +15,11 @@ Cascade Trade Co. (trading, from `docs/design/10-testing-and-fixtures.md`) and P
 
 ## Hosting (Cloudflare Pages)
 
-The app is static files, so it deploys as-is. In Cloudflare: Workers & Pages → Create → Pages → Connect to Git →
-`thomashillyer/cashflow`, with **no build command** and **build output directory `app`**. Cloudflare then publishes
-`main`, and gives every pull request its own preview link. `app/_headers` sets the security headers. Custom domain:
-Pages project → Custom domains → `cash.neriapps.com`; if neriapps.com's DNS is at GoDaddy, add the CNAME it shows
-there. Without Git access: `npx wrangler pages deploy app --project-name neri-cash`.
+The app is static files, so it deploys as-is to the `neri-cash` Cloudflare Pages project at
+**https://neri-cash.pages.dev** (no custom domain). `.github/workflows/app-deploy.yml` publishes `main` to production
+and gives every same-repo pull request that touches `app/` its own preview link. It needs the repo secrets
+`CLOUDFLARE_API_TOKEN` (permission: Cloudflare Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID`, and skips cleanly without
+them. `app/_headers` sets the security headers. Manual deploy: `npx wrangler pages deploy app --project-name neri-cash`.
 
 The hosted site runs the preview with fictional businesses until `config.js` points at a live API.
 

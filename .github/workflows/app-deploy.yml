@@ -1,0 +1,51 @@
+name: App deploy (Cloudflare Pages)
+
+# Publishes app/ (static, no build) to the neri-cash Cloudflare Pages project.
+# main -> production (neri-cash.pages.dev); same-repo PRs -> a preview URL per branch.
+# Skips cleanly until CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set as repo secrets.
+# The hosted site is public: it runs the fictional sample businesses only (config.js must stay empty).
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", ".github/workflows/app-deploy.yml"]
+  pull_request:
+    paths: ["app/**", ".github/workflows/app-deploy.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Fork PRs get no secrets; only deploy from this repo.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip when Cloudflare secrets are missing
+        if: env.HAS_TOKEN != 'true'
+        run: echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set; skipping deploy."
+
+      - name: Refuse to publish live config
+        if: env.HAS_TOKEN == 'true'
+        run: |
+          if grep -E '^window\.NERI_(API_BASE|SUPABASE_URL|SUPABASE_ANON_KEY) = "[^"]+"' app/config.js; then
+            echo "::error::app/config.js has live values; every deploy is public. Keep them empty."
+            exit 1
+          fi
+
+      - name: Deploy to Cloudflare Pages
+        if: env.HAS_TOKEN == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy app --project-name=neri-cash --branch=${{ github.head_ref || github.ref_name }} --commit-dirty=true
