@@ -78,13 +78,14 @@ Four build lanes plus the product owner (five-person split in `docs/design/09-ap
 
 ## Commands
 
-Fill these in once the stack is set up (owner decides on Sunday morning whether to reuse the Neri prototype):
+Node 22, TypeScript strict, vitest. `dev` and `demo` are added when the api/app lands.
 
 ```
 npm install
-npm run dev        # api + app
-npm test           # engine golden tests over every fixture
-npm run demo       # loads demo profile + cached Claude responses
+npm test           # all tests, including golden tests over every fixture
+npm run typecheck  # tsc --noEmit
+npm run dev        # api + app (not yet)
+npm run demo       # demo profile + cached Claude responses (not yet)
 ```
 
 ## Definition of done (for any change)
