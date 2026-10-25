@@ -5,6 +5,7 @@ import type { CashEvent, Commitment, Lever, Override, Records, Scenario } from "
 import type { Profile } from "../schema/profile";
 import { addDays, diffDays } from "./dates";
 import { DAILY_SALES_ID, defaultDirection, money, toBase } from "./expand";
+import type { Notes } from "./review";
 
 export const DEFAULT_STRESS_DELAY_DAYS = 7;
 export const DEFAULT_SPLIT_INTERVAL_DAYS = 30;
@@ -13,7 +14,7 @@ export const DEFAULT_SPLIT_INTERVAL_DAYS = 30;
 // chase/defer/pay_early must not hit them all. Internal only; the shared Override record is unchanged.
 type LeverOverride = Override & { eventId?: string };
 
-type Ctx = { records: Records; profile: Profile; asOf: string; fx: Record<string, number>; commitments: Commitment[]; warnings: string[] };
+type Ctx = { records: Records; profile: Profile; asOf: string; fx: Record<string, number>; commitments: Commitment[]; warnings: Notes };
 
 // A deal's virtual linked costs (id `deal~pattern`) follow it when it is excluded, so cancelling a deal drops its supplier payments too.
 function matches(e: CashEvent, o: LeverOverride): boolean {
@@ -34,7 +35,15 @@ function setAmount(e: CashEvent, amount: number, ctx: Ctx): CashEvent {
 
 function applyOverride(events: CashEvent[], o: LeverOverride, ctx: Ctx): CashEvent[] {
   const hit = events.filter((e) => matches(e, o));
-  if (hit.length === 0) return events;
+  if (hit.length === 0) {
+    // An owner override or applied signal that matches nothing means the owner's statement is not in the forecast.
+    // Lever no-ops are what-if feedback and are warned where the lever is built.
+    if (o.origin === "owner" || o.origin === "signal") {
+      const leg = o.target.legIndex !== undefined ? ` leg ${o.target.legIndex}` : "";
+      ctx.warnings.review("override_unmatched", `${o.origin} override ${o.id} on ${o.target.commitmentId}${leg} matches no forecast event; nothing changed (needs review)`, [o.id, o.target.commitmentId]);
+    }
+    return events;
+  }
   if (o.change.exclude) {
     return events.filter((e) => !matches(e, o));
   }

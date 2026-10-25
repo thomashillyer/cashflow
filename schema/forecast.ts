@@ -26,8 +26,18 @@ export type ForecastRun = {
   weeksBelowSafety: string[];
   freeCash: { week: string; amount: number; weeksFree: number }[];
   warnings: string[];          // data quality: stale source, unresolved reviews, missing facts
+  // Structured needs-review flag (additive, optional): set by the engine whenever a warning means data is missing or
+  // unresolved, so the brief and UI can never go green by accident without parsing `warnings`. needed = reasons.length > 0.
+  review?: { needed: boolean; reasons: ReviewReason[] };
   events: CashEvent[];         // fully dated, with basis and overriddenBy
 };
+
+// code: stable machine key (no_opening_balance, stale_balance, overdue_receipt, overdue_payment, missing_fx,
+// missing_anchor, unknown_pattern, possibly_paid, linked_cost_unscheduled, possible_without_probability, ...).
+// message: the matching `warnings` string. refs are ids a consumer can resolve: record ids (commitment, settlement,
+// balance, signal, rule, override), run event ids (find in run.events, then engine/resolve.ts resolveEventSource),
+// profile recurring item ids, the daily-sales id ("daily-sales"), or virtual linked-cost ids `${dealId}~${patternId}`.
+export type ReviewReason = { code: string; message: string; refs: string[] };
 
 // Warnings (person 5).
 export type Candidate = { warning: string; lever?: Lever; evidenceRefs: string[]; neededBy: string };
