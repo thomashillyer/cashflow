@@ -1,0 +1,889 @@
+{
+  "id": "run-base-a7db28ad18c2",
+  "asOf": "2026-10-25",
+  "inputsHash": "a7db28ad18c2ea3b165a5e499944fc96555a1fd1ae5708c8db56509dbce13e1f",
+  "scenarioId": "base",
+  "fxRates": {
+    "USD": 1
+  },
+  "openingBalance": 1500000,
+  "safetyLine": 500000,
+  "days": [
+    {
+      "date": "2026-10-25",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1500000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-10-26",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1500000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-10-27",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1500000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-10-28",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1500000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-10-29",
+      "inflow": 0,
+      "outflow": 2000000,
+      "closing": -500000,
+      "eventIds": [
+        "evt-bill-supplier-0"
+      ]
+    },
+    {
+      "date": "2026-10-30",
+      "inflow": 5200000,
+      "outflow": 0,
+      "closing": 4700000,
+      "eventIds": [
+        "evt-inv-INV-104-0",
+        "evt-loan-0"
+      ]
+    },
+    {
+      "date": "2026-10-31",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 4700000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-01",
+      "inflow": 0,
+      "outflow": 1800000,
+      "closing": 2900000,
+      "eventIds": [
+        "evt-rec-payroll-0"
+      ]
+    },
+    {
+      "date": "2026-11-02",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-03",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-04",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-05",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-06",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-07",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-08",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-09",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-10",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-11",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-12",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-13",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-14",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-15",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-16",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-17",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-18",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-19",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-20",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-21",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-22",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-23",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-24",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-25",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-26",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-27",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-28",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-29",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-30",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-01",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-02",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-03",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-04",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-05",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-06",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-07",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-08",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-09",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-10",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-11",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-12",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-13",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-14",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-15",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-16",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-17",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-18",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-19",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-20",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-21",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-22",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-23",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-24",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-25",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-26",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-27",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-28",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-29",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-30",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-31",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-01",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-02",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-03",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-04",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-05",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-06",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-07",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-08",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-09",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-10",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-11",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-12",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-13",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-14",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-15",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-16",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-17",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "eventIds": []
+    }
+  ],
+  "weeks": [
+    {
+      "start": "2026-10-19",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1500000,
+      "minClosing": 1500000,
+      "pipelineClosing": 1500000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-10-26",
+      "inflow": 5200000,
+      "outflow": 3800000,
+      "closing": 2900000,
+      "minClosing": -500000,
+      "pipelineClosing": 2900000,
+      "eventIds": [
+        "evt-bill-supplier-0",
+        "evt-inv-INV-104-0",
+        "evt-loan-0",
+        "evt-rec-payroll-0"
+      ]
+    },
+    {
+      "start": "2026-11-02",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-11-09",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-11-16",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-11-23",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-11-30",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-12-07",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-12-14",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-12-21",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2026-12-28",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2027-01-04",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    },
+    {
+      "start": "2027-01-11",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2900000,
+      "minClosing": 2900000,
+      "pipelineClosing": 2900000,
+      "eventIds": []
+    }
+  ],
+  "lowPoint": {
+    "week": "2026-10-26",
+    "date": "2026-10-29",
+    "amount": -500000
+  },
+  "firstBelowSafety": "2026-10-29",
+  "firstNegative": "2026-10-29",
+  "weeksBelowSafety": [
+    "2026-10-26"
+  ],
+  "freeCash": [
+    {
+      "week": "2026-10-19",
+      "amount": -1000000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-10-26",
+      "amount": -1000000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-11-02",
+      "amount": 2400000,
+      "weeksFree": 11
+    },
+    {
+      "week": "2026-11-09",
+      "amount": 2400000,
+      "weeksFree": 10
+    },
+    {
+      "week": "2026-11-16",
+      "amount": 2400000,
+      "weeksFree": 9
+    },
+    {
+      "week": "2026-11-23",
+      "amount": 2400000,
+      "weeksFree": 8
+    },
+    {
+      "week": "2026-11-30",
+      "amount": 2400000,
+      "weeksFree": 7
+    },
+    {
+      "week": "2026-12-07",
+      "amount": 2400000,
+      "weeksFree": 6
+    },
+    {
+      "week": "2026-12-14",
+      "amount": 2400000,
+      "weeksFree": 5
+    },
+    {
+      "week": "2026-12-21",
+      "amount": 2400000,
+      "weeksFree": 4
+    },
+    {
+      "week": "2026-12-28",
+      "amount": 2400000,
+      "weeksFree": 3
+    },
+    {
+      "week": "2027-01-04",
+      "amount": 2400000,
+      "weeksFree": 2
+    },
+    {
+      "week": "2027-01-11",
+      "amount": 2400000,
+      "weeksFree": 1
+    }
+  ],
+  "warnings": [],
+  "events": [
+    {
+      "id": "evt-bill-supplier-0",
+      "commitmentId": "bill-supplier",
+      "legIndex": 0,
+      "date": "2026-10-29",
+      "amount": 2000000,
+      "currency": "USD",
+      "amountBase": 2000000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-10-29",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "BILL-1"
+      }
+    },
+    {
+      "id": "evt-inv-INV-104-0",
+      "commitmentId": "inv-INV-104",
+      "legIndex": 0,
+      "date": "2026-10-30",
+      "amount": 1200000,
+      "currency": "USD",
+      "amountBase": 1200000,
+      "direction": "in",
+      "status": "committed",
+      "confidence": 0.285,
+      "basis": "due 2026-10-30 + 0 days (profile default; no payment history)",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-104"
+      }
+    },
+    {
+      "id": "evt-loan-0",
+      "commitmentId": "loan",
+      "legIndex": 0,
+      "date": "2026-10-30",
+      "amount": 4000000,
+      "currency": "USD",
+      "amountBase": 4000000,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.7,
+      "basis": "due 2026-10-30",
+      "category": "funding",
+      "sourceRef": {
+        "system": "owner",
+        "record": "loan-note"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-0",
+      "commitmentId": "rec-payroll",
+      "legIndex": 0,
+      "date": "2026-11-01",
+      "amount": 1800000,
+      "currency": "USD",
+      "amountBase": 1800000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Payroll, from 2026-11-01 to 2026-11-01",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "note": "Design targets from docs/design/10-testing-and-fixtures.md: low point about -$6K in the week of Dec 21, about $60K free cash in late January. Amounts are cents; tolerance is $500.",
+  "lowPoint": { "scenario": "base", "week": "2026-12-21", "amount": -600000, "tolerance": 50000 },
+  "freeCash": { "week": "2027-01-18", "amount": 6000000, "tolerance": 100000 },
+  "lag": { "partyId": "party-evergreen-home", "commitmentId": "inv-INV-1187", "date": "2026-12-26" },
+  "signal": { "id": "sig-evergreen-jan", "commitmentId": "inv-INV-1187", "newDate": "2027-01-08" },
+  "possibleOutsideMainLine": "rfq-harbor-spring"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "demo_runway",
+  "profile": "fixtures/demo_runway/profile.json",
+  "asOf": "2026-10-25",
+  "fxRates": {}
+}
