@@ -809,6 +809,30 @@ describe("original files behind evidence (#155)", () => {
     await rebuild();
   });
 
+  it("a repeat import retries an original that failed to save the first time", async () => {
+    const real = blobs.putOriginal.bind(blobs);
+    let fail = true;
+    blobs.putOriginal = async (...a: Parameters<Blobs["putOriginal"]>) => { if (fail) throw new Error("storage down"); return real(...a); };
+    const payload = { base64: csv.toString("base64"), fileName: "ar-aging.csv" };
+    const first = (await upload("/import/upload", payload)).json();
+    expect(first.notes.some((n: { text: string }) => /original could not be saved/.test(n.text))).toBe(true);
+    expect((await evidenceOf("ar-aging.csv")).storageKey).toBeUndefined();
+    fail = false;
+    const again = (await upload("/import/upload", payload)).json();
+    expect(again.repeat).toBe(true);
+    const ev = await evidenceOf("ar-aging.csv");
+    expect(ev.storageKey).toMatch(/ar-aging\.csv$/);
+    expect((await original(ev.id)).statusCode).toBe(200);
+  });
+
+  it("an original in a shared sample business is not downloadable by a signed-in user who is not a member", async () => {
+    const { records } = await store.load("cascade_trade");
+    await store.upsertRecords("cascade_trade", { ...records, evidence: [...records.evidence, { id: "ev-shared", channel: "upload", format: "csv", receivedAt: "2026-10-25T00:00:00Z", extraction: "ok", fileName: "x.csv", storageKey: "cascade_trade/evidence/" + "a".repeat(64) + "-x.csv", sourceRef: { system: "generic_file", record: "x.csv" } }] });
+    await blobs.putOriginal("cascade_trade", { bytes: new TextEncoder().encode("a,b"), fileName: "x.csv", mime: "text/csv", hash: "a".repeat(64) });
+    const r = await original("ev-shared", { ...OTHER, "x-neri-business": "cascade_trade" });
+    expect(r.statusCode).toBe(404);
+  });
+
   it("a CSV upload keeps its original; the owner downloads the same bytes as a safe attachment", async () => {
     const res = await upload("/import/upload", { base64: csv.toString("base64"), fileName: "ar-aging.csv" });
     expect(res.statusCode).toBe(200);

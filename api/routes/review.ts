@@ -222,7 +222,13 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const { records, storeRevision } = await deps.store.load(b.id);
     const prep = await toInput(adapter, (req.body ?? {}) as Record<string, unknown>, nowIso(), records, businessIdentity(b), b.profile.baseCurrency);
     if ("repeat" in prep) {
-      // Same bytes as a file already imported: nothing to ingest, so nothing can change.
+      // Same bytes as a file already imported: nothing to ingest, so nothing can change. One exception: if the
+      // first import could not save the original, this upload is a chance to save it (the put is idempotent).
+      const had = records.evidence.find((e) => e.id === prep.repeat.evidenceId);
+      if (had && !had.storageKey) {
+        const again = await attachOriginals({ blobs: deps.blobs, businessId: b.id, body: req.body, input: { kind: "paste", text: "", receivedAt: nowIso() } }, { evidence: [had], notes: [] as IntakeNote[] });
+        if (again.evidence[0]?.storageKey) await deps.store.saveIntake(b.id, { evidence: again.evidence, candidates: [], proposals: [], signals: [] });
+      }
       return {
         evidence: [], candidates: [], proposals: [], signals: [], notes: [], storeRevision, repeat: true,
         repeatOf: prep.repeat.evidenceId, diagnostics: prep.repeat.diagnostics, preview: { candidates: 0, proposals: {}, signals: 0 },
