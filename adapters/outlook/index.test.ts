@@ -111,6 +111,18 @@ describe("pullOutlook", () => {
     expect(r.data.diagnostics.errors[0]!.nextStep).toMatch(/upload/);
   });
 
+  it("says a download failure is a download failure, not a size problem", async () => {
+    const files = [{ "@odata.type": "#microsoft.graph.fileAttachment", id: "gone", name: "inv.pdf", size: 3 }];
+    const g = graph([msg("N1", { hasAttachments: true })], { N1: [] });
+    const f: Fetch = async (url, init) => {
+      if (/\/attachments\?/.test(url)) return ok({ value: files });
+      return g.fetch(url, init);
+    };
+    const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: f });
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.diagnostics.errors[0]!.message).toMatch(/could not be downloaded from Outlook/);
+  });
+
   it("reads a named mailbox with /users/{upn}, and rejects an address that could change the path", async () => {
     const g = graph([msg("M1")]);
     const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", mailbox: "owner@cascade.com", fetch: g.fetch });
@@ -164,7 +176,8 @@ describe("pullOutlook", () => {
     const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: graph([msg("F1", { hasAttachments: true })], { F1: files }).fetch });
     if (!r.ok) throw new Error("expected ok");
     expect(r.data.diagnostics.errors[0]).toMatchObject({ code: "unsupported" });
-    expect(r.data.diagnostics.errors[0]!.nextStep).toMatch(/upload/);
+    expect(r.data.diagnostics.errors[0]!.message).toMatch(/is 50\.0 MB; Neri reads attachments up to 10\.0 MB/);
+    expect(r.data.diagnostics.errors[0]!.nextStep).toMatch(/Upload only the pages/);
   });
 
   it("recognises known senders and money words", () => {

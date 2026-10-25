@@ -99,8 +99,13 @@ async function pull(input: OutlookPullInput): Promise<OutlookPull> {
         }
       }
       if (f.isInline && !b64) continue;
-      if (size > MAX_ATTACHMENT_BYTES || !b64) {
-        errors.push({ row, code: "unsupported", message: `"${name}" on "${subject}" was too large or could not be downloaded.`, nextStep: "Download it from Outlook and upload it on the import screen." });
+      if (size > MAX_ATTACHMENT_BYTES) {
+        const mb = (n: number) => `${(n / 1_000_000).toFixed(1)} MB`;
+        errors.push({ row, code: "unsupported", message: `"${name}" on "${subject}" is ${mb(size)}; Neri reads attachments up to ${mb(MAX_ATTACHMENT_BYTES)}.`, nextStep: "Upload only the pages or sheets you need on the import screen, or a smaller export." });
+        continue;
+      }
+      if (!b64) {
+        errors.push({ row, code: "unsupported", message: `"${name}" on "${subject}" could not be downloaded from Outlook.`, nextStep: "Download it from Outlook and upload it on the import screen." });
         continue;
       }
       const bytes = new Uint8Array(Buffer.from(b64, "base64"));
