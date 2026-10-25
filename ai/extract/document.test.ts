@@ -355,6 +355,15 @@ describe("response cache", () => {
     expect(extractionCacheKey([{ ...segments[0]!, text: segments[0]!.text + " " }], CASCADE_BUSINESS)).not.toBe(k);
   });
 
+  it("does not depend on what the evidence ids are called, only on which segments share one", async () => {
+    const [seg] = await loadFixtureSegments("inv1187.pdf");
+    const k = extractionCacheKey([seg!], CASCADE_BUSINESS);
+    expect(extractionCacheKey([{ ...seg!, evidenceId: "ev-pdf-0123456789abcdef" }], CASCADE_BUSINESS)).toBe(k);
+    const two = [{ ...seg!, evidenceId: "a" }, { ...seg!, evidenceId: "b" }];
+    const one = [{ ...seg!, evidenceId: "a" }, { ...seg!, evidenceId: "a" }];
+    expect(extractionCacheKey(two, CASCADE_BUSINESS)).not.toBe(extractionCacheKey(one, CASCADE_BUSINESS));
+  });
+
   it("committed entries exist under the current keys, for the current prompt and model", async () => {
     for (const name of FIXTURE_NAMES) {
       const key = extractionCacheKey(await loadFixtureSegments(name), CASCADE_BUSINESS);

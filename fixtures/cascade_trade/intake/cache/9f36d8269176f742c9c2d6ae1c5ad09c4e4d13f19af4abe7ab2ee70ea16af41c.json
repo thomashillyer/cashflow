@@ -1,5 +1,5 @@
 {
-  "key": "70be92830cd16dba80c137dfa91a5105939f5e1f4ffbdd16070b695486e88dcc",
+  "key": "9f36d8269176f742c9c2d6ae1c5ad09c4e4d13f19af4abe7ab2ee70ea16af41c",
   "promptVersion": "extract_document@1",
   "model": "claude-opus-5-5",
   "source": "live",
@@ -24,8 +24,8 @@
         "quote": null
       },
       "amount": {
-        "value": "29,500.00",
-        "quote": "TOTAL DUE (USD) 29,500.00"
+        "value": "28,000.00",
+        "quote": "TOTAL DUE (USD) 28,000.00"
       },
       "outstanding": {
         "value": null,
@@ -33,7 +33,7 @@
       },
       "currency": {
         "value": "USD",
-        "quote": "TOTAL DUE (USD)"
+        "quote": "TOTAL DUE (USD) 28,000.00"
       },
       "issueDate": {
         "value": "November 10, 2026",
@@ -70,11 +70,9 @@
     },
     "coversReferences": [],
     "containsInstructions": false,
-    "confidence": 0.85,
+    "confidence": 0.95,
     "notes": [
-      "The printed subtotal and total do not match the sum of the listed line items.",
-      "A note says a freight surcharge was added in a revision, but no freight line item appears in the table.",
-      "The same link is labeled for both viewing and paying the invoice."
+      "The same link is labeled for both viewing and paying the invoice online."
     ]
   }
 }
