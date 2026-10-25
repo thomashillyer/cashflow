@@ -23,6 +23,25 @@ The owner asked for a CFO that infers and recommends with conviction, not a list
 - **Ask back only when it matters.** If a missing fact changes the call (which supplier? what amount?), ask one short question; otherwise assume the profile default and say so.
 - **Same guardrails.** Every figure passes `number_check` against `Decision.allowed`; citations required; code-built text on failure. Nothing is sent, paid, or applied: a stated plan or rule becomes a proposal with one-tap confirm. No investment or loan product advice (`out_of_scope` -> decline, with the cash facts).
 
+
+**Who judges.** Ask Neri moves judgment into code (the pick, conviction, and what would change the call); Claude reads the question and voices the decision. That is a stricter reading of "Code computes, Claude judges", chosen so a confident tone never rests on an unchecked figure.
+
+**Engine path per intent** (all in `engine/`; `Decision` amounts are in the profile base currency):
+
+| Intent | Path | byDate |
+|---|---|---|
+| afford (inbound deal) | inject the draft as a synthetic commitment (`ask-draft-<hash>`), then `smallestUpfrontShare`; `cashEffect` = `runAtUpfrontShare(...).lowPoint.amount` minus the base low point; `not_deal_driven` -> verdict `act_now` with the fix_gap path | date of the upfront leg in the run |
+| afford (outbound plan, e.g. a deposit) | inject the draft; `forecast` base vs with-draft; low point stays at or above the safety line -> `yes`; else `buildBrief` with the draft in `baseOverrides`, take the top lever, re-`simulate` to confirm it clears the line -> `yes_if`; nothing clears it -> `no` | the lever's `neededBy` |
+| fix_gap | `buildBrief`; recommendation = `today[0]` (or `all[0]` if `today` is empty below the rank floor; none -> `on_track`); fallback = the next item on a different commitment or party | `WorkItem.neededBy` |
+| what_if | express as overrides (a date move is a `chase`-style `assumeDate` on the commitment; a hire is a recurring draft); run `buildBrief` with them as `baseOverrides`; report the new low point and the top move; `scenario` carries the overrides for the chart | the move's `neededBy` |
+| status | `forecast` over `intent.window` (default horizon); tightest day from daily minima; `on_track` when above the safety line, else `act_now` via fix_gap | n/a |
+| lookup | `partyLag`/`lagStats`, open commitments, settlements; `info` | n/a |
+| tell | plan -> a proposed owner Signal (`claim: "plan"`); rule -> a proposed Rule; verdict `proposed` | n/a |
+
+**Conviction inputs** (thresholds from `profile.thresholds.conviction`, defaults: high needs >= 6 lag samples and 0 pending reviews; medium needs >= 3): lag samples (`partyLag().n`; a confirmed lag rule counts as high, not "no history"), pending intake reviews (passed in by the caller, `pendingReviewCount`), stale balances (`BalanceSnapshot.asOf` vs `thresholds.staleAfterHours`), tentative or possible money on the path (`run.events` status/confidence), and vague dates (`intent.dateVague`). `whatWouldChange` names the lowest-confidence event on the path.
+
+**number_check for answers.** `CfoAnswer.text` joins the voice fields, so the existing check covers them; percentages and day/count numbers are checked against `Decision.allowed.numbers`, an extension of `ai/number_check.ts` that the voice task adds.
+
 | Question | Intent | Decision |
 |---|---|---|
 | "Can I afford a $40K deposit in December?" | afford | yes / no / yes_if with the cheapest change that keeps cash above the safety line |
