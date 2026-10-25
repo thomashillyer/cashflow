@@ -8,6 +8,7 @@ import type { ForecastRun } from "../schema/forecast";
 import { addDays, dateRange, diffDays, mondayOf } from "./dates";
 import { expand, money, toBase } from "./expand";
 import { adjust } from "./adjust";
+import { Notes } from "./review";
 
 export const ENGINE_VERSION = "engine-1";
 
@@ -48,6 +49,9 @@ export function inputsHash(records: Records, profile: Profile, scenario: Scenari
   return createHash("sha256").update(JSON.stringify(body)).digest("hex");
 }
 
+// Balance age that needs review when the profile sets no thresholds.staleAfterHours (#44 moves this to the profile).
+const FALLBACK_STALE_DAYS = 7;
+
 export function horizonEnd(profile: Profile, asOf: string): string {
   return addDays(mondayOf(asOf), profile.horizonWeeks * 7);
 }
@@ -69,7 +73,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 // Actuals tagged to an account with no snapshot on/before asOf are left out of opening cash AND of the main line
 // (the account's starting balance is unknown, so its movements alone would mislead), with one warning per account
 // covering actuals on/after the oldest snapshot date (asOf - 90 days when there is no snapshot at all).
-export function openingCash(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: string[]): OpeningCash {
+export function openingCash(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: Notes): OpeningCash {
   const latest = new Map<string, Records["balances"][number]>();
   for (const b of records.balances) {
     if (b.asOf > asOf) continue;
@@ -81,29 +85,34 @@ export function openingCash(records: Records, profile: Profile, asOf: string, fx
   let total = 0;
   let newest = "";
   let oldest = "";
-  if (latest.size === 0) warnings.push("No opening balance on or before the as-of date; the forecast starts from $0.00 and cannot be trusted.");
+  if (latest.size === 0) warnings.review("no_opening_balance", "No opening balance on or before the as-of date; the forecast starts from $0.00 and cannot be trusted.");
   const staleHours = profile.thresholds.staleAfterHours;
   for (const b of [...latest.values()].sort((x, y) => (x.account < y.account ? -1 : 1))) {
     const base = toBase(b.amount, b.currency, profile, fx);
-    if (base === undefined) warnings.push(`Balance for ${b.account} is in ${b.currency} with no FX rate; left out of opening cash.`);
+    if (base === undefined) warnings.review("missing_fx", `Balance for ${b.account} is in ${b.currency} with no FX rate; left out of opening cash.`, [b.id]);
     else total += base;
     if (b.asOf > newest) newest = b.asOf;
     if (oldest === "" || b.asOf < oldest) oldest = b.asOf;
-    if (staleHours !== undefined && diffDays(asOf, b.asOf) * 24 > staleHours) warnings.push(`Bank balance for ${b.account} is from ${b.asOf}, older than ${staleHours} hours; refresh before relying on this.`);
+    if (staleHours !== undefined && diffDays(asOf, b.asOf) * 24 > staleHours) warnings.review("stale_balance", `Bank balance for ${b.account} is from ${b.asOf}, older than ${staleHours} hours; refresh before relying on this.`, [b.id]);
+    // Fallback until the profile always carries a threshold (#44): with none set, a balance older than 7 days still
+    // needs review rather than passing silently.
+    if (staleHours === undefined && diffDays(asOf, b.asOf) > FALLBACK_STALE_DAYS)
+      warnings.review("no_staleness_threshold", `Bank balance for ${b.account} is from ${b.asOf}, more than ${FALLBACK_STALE_DAYS} days old, and the profile sets no staleness threshold; refresh before relying on this.`, [b.id]);
   }
   const windowStart = latest.size > 0 ? oldest : addDays(asOf, -90);
   const only = latest.size === 1 ? [...latest.keys()][0] : undefined;
   const signed = (e: CashEvent, base: number) => (e.direction === "in" ? base : -base);
-  const orphans = new Map<string, { n: number; net: number; noFx: number }>();
-  const amb = { n: 0, out: 0, inn: 0 };
+  const orphans = new Map<string, { n: number; net: number; noFx: number; ids: string[] }>();
+  const amb = { n: 0, out: 0, inn: 0, ids: [] as string[] };
   for (const e of records.events) {
     const account = e.account ?? only;
     const base = toBase(e.amount, e.currency, profile, fx);
     if (account !== undefined && !latest.has(account)) {
       excluded.add(e.id);
       if (e.date < windowStart) continue;
-      const o = orphans.get(account) ?? { n: 0, net: 0, noFx: 0 };
+      const o = orphans.get(account) ?? { n: 0, net: 0, noFx: 0, ids: [] };
       o.n++;
+      o.ids.push(e.id);
       if (base === undefined) o.noFx++;
       else o.net += signed(e, base);
       orphans.set(account, o);
@@ -120,12 +129,13 @@ export function openingCash(records: Records, profile: Profile, asOf: string, fx
       continue;
     }
     if (base === undefined) {
-      warnings.push(`Actual ${e.id} is in ${e.currency} with no FX rate; left out of opening cash, which is understated or overstated by that amount (needs review).`);
+      warnings.review("missing_fx", `Actual ${e.id} is in ${e.currency} with no FX rate; left out of opening cash, which is understated or overstated by that amount (needs review).`, [e.id]);
       continue;
     }
     if (e.date < from) {
       // untagged, several accounts, between the oldest and latest snapshot
       amb.n++;
+      amb.ids.push(e.id);
       if (e.direction === "in") {
         amb.inn += base;
         continue;
@@ -138,16 +148,20 @@ export function openingCash(records: Records, profile: Profile, asOf: string, fx
   const cur = profile.baseCurrency;
   const netText = (net: number) => `net ${money(Math.abs(net), cur)} ${net >= 0 ? "in" : "out"}`;
   if (amb.n > 0) {
-    warnings.push(
+    warnings.review(
+      "unassigned_actual",
       `${amb.n} ${plural(amb.n, "actual", "actuals")} with no account dated ${oldest} to before ${newest}, between the account balance dates, could not be matched to an account (${netText(amb.inn - amb.out)}); ` +
         `to be safe, outflows (${money(amb.out, cur)}) are counted in opening cash and inflows (${money(amb.inn, cur)}) left out; tag ${plural(amb.n, "it", "them")} with an account (needs review).`,
+      amb.ids,
     );
   }
   for (const [account, o] of [...orphans].sort(([a], [b]) => (a < b ? -1 : 1))) {
     const fxNote = o.noFx > 0 ? `, ${o.noFx} with no FX rate not in that total` : "";
-    warnings.push(
+    warnings.review(
+      "account_without_balance",
       `${o.n} ${plural(o.n, "actual", "actuals")} tagged to account ${account}, which has no balance on or before ${asOf} (${netText(o.net)}${fxNote}), ` +
         `${plural(o.n, "is", "are")} left out of opening cash and the forecast; add a balance for ${account} (needs review).`,
+      o.ids,
     );
   }
   return { opening: total, counted, excluded };
@@ -157,16 +171,16 @@ export function openingCash(records: Records, profile: Profile, asOf: string, fx
 // main line on/after asOf). Actuals left out (ambiguous inflows, no-snapshot account, no FX rate) are not in it,
 // so they must not be treated as payment of an expected item.
 export function countedActualIds(records: Records, profile: Profile, asOf: string, fxRates: Record<string, number>): Set<string> {
-  return openingCash(records, profile, asOf, { [profile.baseCurrency]: 1, ...fxRates }, []).counted;
+  return openingCash(records, profile, asOf, { [profile.baseCurrency]: 1, ...fxRates }, new Notes()).counted;
 }
 
-function actualEvents(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: string[], excluded: Set<string>): CashEvent[] {
+function actualEvents(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: Notes, excluded: Set<string>): CashEvent[] {
   const out: CashEvent[] = [];
   for (const e of records.events) {
     if (e.date < asOf || excluded.has(e.id)) continue;
     const base = toBase(e.amount, e.currency, profile, fx);
     if (base === undefined) {
-      warnings.push(`Actual ${e.id} is in ${e.currency} with no FX rate; excluded.`);
+      warnings.review("missing_fx", `Actual ${e.id} is in ${e.currency} with no FX rate; excluded.`, [e.id]);
       continue;
     }
     out.push({ ...e, status: "actual", amountBase: base, confidence: e.confidence ?? 1, basis: e.basis ?? `actual ${e.date}` });
@@ -203,7 +217,7 @@ function normalize(r: Records): Records {
 // (matchPayments/paidSoFar), so what is left here is unpaid.
 // Not rolled, kept past-dated with a warning: virtual linked costs (`deal~pattern`) and legs dated from an estimated
 // anchor, since no source document says they are due.
-function rollOverdueOutflows(events: CashEvent[], profile: Profile, asOf: string, warnings: string[]): CashEvent[] {
+function rollOverdueOutflows(events: CashEvent[], profile: Profile, asOf: string, warnings: Notes): CashEvent[] {
   const label = (e: CashEvent) => `${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} payment dated ${e.date}`;
   const overdue = (e: CashEvent) => e.date < asOf && e.direction === "out" && e.status !== "actual" && e.status !== "possible";
   // Warn in date order so the run reads chronologically.
@@ -212,26 +226,47 @@ function rollOverdueOutflows(events: CashEvent[], profile: Profile, asOf: string
   for (const e of order) {
     if (!overdue(e)) continue;
     if (e.commitmentId?.includes("~") || /estimated/.test(e.basis.split(";")[0]!)) {
-      warnings.push(`Overdue: ${label(e)} is before ${asOf}; past-dated linked/estimated cost, not counted (needs review).`);
+      warnings.review("linked_cost_unscheduled", `Overdue: ${label(e)} is before ${asOf}; past-dated linked/estimated cost, not counted (needs review).`, [e.id, e.commitmentId]);
       continue;
     }
-    warnings.push(`Overdue: ${label(e)} is before ${asOf}; assumed payable now and counted on ${asOf} (needs review).`);
+    warnings.review("overdue_payment", `Overdue: ${label(e)} is before ${asOf}; assumed payable now and counted on ${asOf} (needs review).`, [e.id, e.commitmentId]);
     rolled.set(e, { ...e, date: asOf, basis: `${e.basis}; overdue since ${e.date}, assumed payable now` });
   }
   return events.map((e) => rolled.get(e) ?? e);
+}
+
+// Proposed signals and rules change nothing until the owner approves them, so the run says so instead of looking settled.
+function unconfirmed(records: Records, profile: Profile, warnings: Notes): void {
+  const byId = new Map(records.commitments.map((c) => [c.id, c]));
+  for (const s of records.signals) {
+    if (s.state !== "proposed") continue;
+    const c = s.commitmentId ? byId.get(s.commitmentId) : undefined;
+    const ref = c?.reference ?? s.commitmentId ?? "an unmatched item";
+    const k = s.claim;
+    const says =
+      k.kind === "date_change" ? `${ref} moves to ${k.newDate}`
+      : k.kind === "amount_change" ? `${ref} changes to ${money(k.newAmount, c?.currency ?? profile.baseCurrency)}`
+      : k.kind === "cancel" ? `${ref} is cancelled`
+      : `there is a new ${k.kind === "plan" ? "plan" : "commitment"}`;
+    warnings.review("unconfirmed_signal", `Unconfirmed: ${s.channel} message says ${says}; not in the forecast until approved.`, [s.id, s.commitmentId]);
+  }
+  for (const r of records.rules) {
+    if (r.state !== "proposed") continue;
+    warnings.review("unconfirmed_rule", `Unconfirmed: ${r.kind} rule ${r.id} from an owner note is not applied until confirmed.`, [r.id]);
+  }
 }
 
 export function forecast(input: Records, profile: Profile, scenario: Scenario, asOf: string, fxRates: Record<string, number>): ForecastRun {
   const records = normalize(input);
   const end = horizonEnd(profile, asOf);
   const horizonDays = diffDays(end, asOf);
-  const warnings: string[] = [];
+  const warnings = new Notes();
   const fx = { [profile.baseCurrency]: 1, ...fxRates };
 
   const cash = openingCash(records, profile, asOf, fx, warnings);
   const opening = cash.opening;
   const expanded = expand(records, profile, asOf, end, fx, cash.counted);
-  warnings.push(...expanded.warnings);
+  warnings.merge(expanded);
 
   // Fixed costs behind a "weeks of fixed costs" safety line: recurring outflows inside the horizon.
   const recurringIds = new Set([...profile.recurring.map((r) => r.id), ...records.commitments.filter((c) => c.type === "recurring").map((c) => c.id)]);
@@ -252,9 +287,11 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
 
   for (const e of events) {
     if (e.date < asOf && e.direction === "in" && e.status !== "actual" && e.status !== "possible") {
-      warnings.push(`Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} receipt dated ${e.date} is before ${asOf}; kept at its date, not moved to today (needs review).`);
+      warnings.review("overdue_receipt", `Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} receipt dated ${e.date} is before ${asOf}; kept at its date, not moved to today (needs review).`, [e.id, e.commitmentId]);
     }
   }
+
+  unconfirmed(records, profile, warnings);
 
   const inHorizon = (e: CashEvent) => e.date >= asOf && e.date < end;
   const main = events.filter((e) => e.status !== "possible" && inHorizon(e));
@@ -319,7 +356,7 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
   });
   if (weeks.length <= H) warnings.push(`Free-cash lookahead (${H} weeks) is longer than the modeled horizon; free cash is only checked through ${end}.`);
 
-  if (records.commitments.length === 0 && records.events.length === 0) warnings.push("No commitments or actuals loaded; the forecast reflects only recurring items and opening cash.");
+  if (records.commitments.length === 0 && records.events.length === 0) warnings.review("no_data", "No commitments or actuals loaded; the forecast reflects only recurring items and opening cash.");
 
   const hash = inputsHash(records, profile, scenario, asOf, fx);
   return {
@@ -337,7 +374,8 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     ...(firstNegative ? { firstNegative } : {}),
     weeksBelowSafety: weeks.filter((w) => w.minClosing < safety).map((w) => w.start),
     freeCash,
-    warnings: [...new Set(warnings)],
+    warnings: warnings.list,
+    review: warnings.summary,
     events,
   };
 }

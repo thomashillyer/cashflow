@@ -1,4 +1,5 @@
 {
+  "review": { "needed": false, "codes": [] },
   "note": "Hand-calculated in docs/HACKATHON_PLAN.md. Amounts are cents.",
   "checks": [
     { "name": "base falls to -$5,000 on Oct 29", "scenario": "base", "day": "2026-10-29", "closing": -500000 },
