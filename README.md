@@ -52,6 +52,8 @@ Some tools, such as Zoho Books and Outlook, can link straight to Neri once they 
 
 Anything that could change your cash waits in **Review** for your OK. Until your data is in, Neri tells you what is missing instead of making numbers up.
 
+To try Neri without your own data, [download the sample files](https://neri-cash.fly.dev/samples/) (a fictional business; the list and upload order are in [README.txt](https://neri-cash.fly.dev/samples/README.txt)) and upload them in that order.
+
 ## Your daily routine (5 minutes)
 
 1. **Read the brief** on **Home**. Or tap **Play brief** and listen.

@@ -162,7 +162,7 @@ async function toInput(adapter: string, body: Record<string, unknown>, now: stri
   let kind = adapter;
   if (adapter === "upload") {
     const ext = (fileName ?? "").toLowerCase().split(".").pop();
-    kind = ext === "pdf" ? "pdf" : ext === "eml" ? "email" : ext === "csv" || ext === "xlsx" ? "sheet" : ext === "zip" ? "whatsapp" : ext === "txt" || ext === undefined ? "paste" : `.${ext}`;
+    kind = ext === "pdf" ? "pdf" : ext === "eml" ? "email" : ext === "csv" || ext === "xlsx" ? "sheet" : ext === "zip" ? "whatsapp" : ext === "txt" || ext === undefined ? (looksLikeWhatsAppTxt(fileName, body) ? "whatsapp" : "paste") : `.${ext}`;
   }
   const sheetOptions = () => ({
     currency: typeof body.currency === "string" && /^[A-Za-z]{3}$/.test(body.currency) ? body.currency.toUpperCase() : currency,
@@ -204,6 +204,13 @@ async function toInput(adapter: string, body: Record<string, unknown>, now: stri
     default:
       throw new HttpError(415, "UNSUPPORTED", "Neri reads CSV and Excel (.xlsx) spreadsheets, PDFs, emails (.eml), WhatsApp exports and pasted text here. Export your file as one of those, or paste the details.");
   }
+}
+
+// A .txt that is a WhatsApp export (two or more "[date, time] Name:" lines) is read as a chat, not as one pasted note.
+function looksLikeWhatsAppTxt(fileName: string | undefined, body: Record<string, unknown>): boolean {
+  if (!/\.txt$/i.test(fileName ?? "") || typeof body.base64 !== "string") return false;
+  const chat = normalizeChat(Buffer.from(body.base64, "base64").toString("utf8"));
+  return chat.split("\n").filter((l) => /^‎?\[\d{1,2}\/\d{1,2}\/\d{2,4},/.test(l)).length >= 2;
 }
 
 const COLUMN_KEYS = ["reference", "party", "amount", "currency", "issueDate", "dueDate", "outstanding"];
