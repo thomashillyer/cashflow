@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CashEvent, Records } from "./records";
-import type { DocumentCandidate, Field } from "./intake";
+import type { IntakeCandidate, Field } from "./intake";
 
 // Compile-time checks that the contracts fit the examples in docs/design/03-data-model.md.
 describe("schema", () => {
@@ -26,7 +26,7 @@ describe("schema", () => {
 
   it("represents a missing amount without a zero", () => {
     const missing: Field<number> = { state: "missing", reason: "blank Total column" };
-    const candidate: Pick<DocumentCandidate, "kind" | "extraction"> & { amount: Field<number> } = {
+    const candidate: Pick<IntakeCandidate, "kind" | "extraction"> & { amount: Field<number> } = {
       kind: "invoice", extraction: "partial", amount: missing,
     };
     expect(candidate.amount).not.toHaveProperty("value");
