@@ -154,20 +154,41 @@ type Payments = {
 // lags: per-run memo of partyLag by partyId (the lag depends only on records, profile and party), so a run with
 // thousands of receivables does not rescan payment history for each one.
 // settings: engineSettings(profile), resolved once per run (expand() fills it in; absent means resolve from the profile).
-export type PaymentContext = { snapDate: string; horizonEnd: string; countedActuals?: Set<string>; byId: Map<string, Commitment>; lags?: Map<string | undefined, Lag>; settings?: EngineSettings };
+// payments: settlements and tagged bank lines grouped by commitmentId once per run (indexPayments), so matching a
+// commitment's payments does not rescan every record; absent means scan the records.
+export type PaymentContext = { snapDate: string; horizonEnd: string; countedActuals?: Set<string>; byId: Map<string, Commitment>; lags?: Map<string | undefined, Lag>; settings?: EngineSettings; payments?: PaymentIndex };
+
+// Settlements and tagged events by commitmentId, each list in record order (so matching is unchanged).
+export type PaymentIndex = { settlements: Map<string, Settlement[]>; events: Map<string, CashEvent[]> };
+export function indexPayments(records: Records): PaymentIndex {
+  const settlements = new Map<string, Settlement[]>();
+  for (const s of records.settlements) {
+    const list = settlements.get(s.commitmentId);
+    if (list) list.push(s);
+    else settlements.set(s.commitmentId, [s]);
+  }
+  const events = new Map<string, CashEvent[]>();
+  for (const e of records.events) {
+    if (e.commitmentId === undefined) continue;
+    const list = events.get(e.commitmentId);
+    if (list) list.push(e);
+    else events.set(e.commitmentId, [e]);
+  }
+  return { settlements, events };
+}
 
 // The payment identity rule (TECHNICAL_PLAN 6 opening-cash boundary: a Settlement and its bank line count once).
 // Candidate pairs share amount and currency and lie within `matchDays` (profile engine.settlementMatchDays); they are matched greedily by date
 // distance, then settlement id, then actual id, so each side is used at most once and the result is deterministic.
 // Tagged actuals the run counts are payments on any date before the (exclusive) horizon end, including future-dated
 // (scheduled) bank payments. Actuals in the other direction (refunds) are not payments toward the commitment.
-export function matchPayments(c: Commitment, records: Records, horizonEnd: string, warnings: Notes | string[], countedActuals?: Set<string>, matchDays: number = SETTLEMENT_MATCH_DAYS): Payments {
+export function matchPayments(c: Commitment, records: Records, horizonEnd: string, warnings: Notes | string[], countedActuals?: Set<string>, matchDays: number = SETTLEMENT_MATCH_DAYS, index?: PaymentIndex): Payments {
   // Exported for tests and callers that only want strings; inside a run it gets the Notes collector.
   const flag = (code: string, msg: string, refs: string[]) => (warnings instanceof Notes ? warnings.review(code, msg, refs) : warnings.push(msg));
   const label = c.reference ?? c.id;
   const dir = defaultDirection(c);
   const settlements: Settlement[] = [];
-  for (const s of records.settlements) {
+  for (const s of index ? (index.settlements.get(c.id) ?? []) : records.settlements) {
     if (s.commitmentId !== c.id) continue;
     if (s.currency !== c.currency) {
       flag("missing_fx", `${label}: settlement ${s.id} is in ${s.currency}, not ${c.currency}; not deducted from what is outstanding (needs review)`, [c.id, s.id]);
@@ -176,7 +197,7 @@ export function matchPayments(c: Commitment, records: Records, horizonEnd: strin
     settlements.push(s);
   }
   const actuals: CashEvent[] = [];
-  for (const e of records.events) {
+  for (const e of index ? (index.events.get(c.id) ?? []) : records.events) {
     if (e.commitmentId !== c.id || e.direction !== dir || e.date >= horizonEnd) continue;
     if (countedActuals && !countedActuals.has(e.id)) continue; // not in the run's cash, so not proof of payment here
     if (e.currency !== c.currency) {
@@ -229,7 +250,7 @@ function paidSoFar(
 ): { total: number; paid: number; counted: Set<string> } {
   const label = c.reference ?? c.id;
   const counted = new Set<string>();
-  const pay = matchPayments(c, records, ctx.horizonEnd, warnings, ctx.countedActuals, ctx.settings?.settlementMatchDays);
+  const pay = matchPayments(c, records, ctx.horizonEnd, warnings, ctx.countedActuals, ctx.settings?.settlementMatchDays, ctx.payments);
   const pairsSum = pay.pairs.reduce((a, p) => a + p.actual.amount, 0);
   for (const p of pay.pairs) counted.add(p.settlement.id);
   const bankIds = pay.actuals.map((e) => e.id).join(", ");
@@ -311,7 +332,7 @@ function expandCommitment(
   };
   // 1. Paid money consumes pattern legs: explicit Settlement.legIndex first, then legs in order.
   let consume = paid;
-  if (counted.size > 0) for (const s of records.settlements) {
+  if (counted.size > 0) for (const s of ctx.payments ? (ctx.payments.settlements.get(c.id) ?? []) : records.settlements) {
     if (!counted.has(s.id) || s.legIndex === undefined || legAmounts[s.legIndex] === undefined) continue;
     consume -= take(s.legIndex, Math.min(s.amount, consume));
   }
@@ -669,7 +690,7 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
   for (const b of records.balances) if (b.asOf <= asOf && b.asOf > snapDate) snapDate = b.asOf;
   if (!snapDate) snapDate = asOf;
   const settings = engineSettings(profile);
-  const ctx: PaymentContext = { snapDate, horizonEnd, countedActuals, byId, lags: new Map(), settings };
+  const ctx: PaymentContext = { snapDate, horizonEnd, countedActuals, byId, lags: new Map(), settings, payments: indexPayments(records) };
   const recurringIds = new Set(profile.recurring.map((r) => r.id));
   for (const c of all) {
     if (recurringIds.has(c.id)) continue; // overrides the profile recurring item of the same id (expandRecurring)

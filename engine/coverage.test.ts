@@ -345,6 +345,14 @@ describe("performance (docs/design/05-forecast-engine.md: a few thousand events 
       r.commitments.push(com(`inv-${i}`, { type: "invoice", partyId: `cust-${i % 50}`, amount: $(500) + i, anchors: { due: addDays("2026-11-16", i % 80) }, sourceRef: { system: "test", record: `inv-${i}` } }));
       r.commitments.push(com(`bill-${i}`, { type: "bill", partyId: `vend-${i % 30}`, amount: $(400) + i, anchors: { due: addDays("2026-11-16", (i * 7) % 85) }, sourceRef: { system: "test", record: `bill-${i}` } }));
     }
+    // #120: partial payments on open items, so matchPayments has real work. 300 invoices each have a $100 settlement and
+    // its matching bank line (one payment); 300 bills each have a $50 bank-only payment.
+    const line = (id: string, commitmentId: string, date: string, amount: number, direction: "in" | "out"): CashEvent => ({ id, commitmentId, legIndex: 0, date, amount, currency: "USD", amountBase: amount, direction, status: "actual", confidence: 1, basis: "bank", sourceRef: src });
+    for (let i = 0; i < 300; i++) {
+      r.settlements.push({ id: `set-inv-${i}`, commitmentId: `inv-${i}`, partyId: `cust-${i % 50}`, amount: $(100), currency: "USD", date: "2026-11-10", sourceRef: src });
+      r.events.push(line(`bank-inv-${i}`, `inv-${i}`, "2026-11-11", $(100), "in"));
+      r.events.push(line(`bank-bill-${i}`, `bill-${i}`, "2026-11-12", $(50), "out"));
+    }
     return r;
   }
 
@@ -356,7 +364,11 @@ describe("performance (docs/design/05-forecast-engine.md: a few thousand events 
     const trading = (await import("../profiles/trading.json")).default as Profile;
     const r = big();
     const run = () => forecast(r, trading, base, "2026-11-16", {});
-    expect(run().events.length).toBeGreaterThanOrEqual(3000); // the size this test claims
+    const first = run();
+    expect(first.events.filter((e) => e.status !== "actual").length).toBeGreaterThanOrEqual(3000); // the size this test claims
+    // the partial payments were matched and deducted: inv-0 $500 - $100, bill-0 $400 - $50
+    expect(first.events.filter((e) => e.commitmentId === "inv-0" && e.status !== "actual").map((e) => e.amount)).toEqual([$(400)]);
+    expect(first.events.filter((e) => e.commitmentId === "bill-0" && e.status !== "actual").map((e) => e.amount)).toEqual([$(350)]);
     for (let i = 0; i < 3; i++) run(); // warm up the JIT: the target is for reruns on every slider move
     const times: number[] = [];
     for (let i = 0; i < 7; i++) {
