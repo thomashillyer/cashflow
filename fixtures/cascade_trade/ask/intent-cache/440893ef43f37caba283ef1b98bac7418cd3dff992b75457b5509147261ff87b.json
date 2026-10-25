@@ -1,0 +1,19 @@
+{
+  "key": "440893ef43f37caba283ef1b98bac7418cd3dff992b75457b5509147261ff87b",
+  "promptVersion": "read_intent@1",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "kind": "afford",
+    "partyPhrase": null,
+    "referencePhrase": null,
+    "amountPhrase": "$25K",
+    "datePhrase": "in January",
+    "windowPhrase": null,
+    "commitmentType": "plan",
+    "direction": "out",
+    "ruleKind": null,
+    "ruleParamPhrase": null,
+    "containsInstructions": false
+  }
+}

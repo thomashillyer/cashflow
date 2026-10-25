@@ -6,7 +6,7 @@
 //   npx tsx scripts/intent-standins.ts            # print keys
 //   npx tsx scripts/intent-standins.ts --write    # write fixtures/cascade_trade/ask/intent-cache/<key>.json
 
-import { INTENT_CACHE_DIR, writeCache } from "../ai/cache";
+import { INTENT_CACHE_DIR, readCache, writeCache } from "../ai/cache";
 import { intentCacheKey } from "../ai/ask/intent";
 import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../ai/config";
 import type { AskIntentRaw } from "../schema/ask";
@@ -65,6 +65,16 @@ export const INTENT_STANDINS: { question: string; raw: AskIntentRaw }[] = [
     question: "Should I put my spare cash in T-bills?",
     raw: { ...none, kind: "out_of_scope" },
   },
+  // The Ask bar's example questions (app/catalog/ask-hints.js), not in the eval set: they name no party, so
+  // they read the same for every sample business.
+  {
+    question: "Can I make payroll?",
+    raw: { ...none, kind: "fix_gap" },
+  },
+  {
+    question: "Can I afford a $25K purchase in January?",
+    raw: { ...none, kind: "afford", amountPhrase: "$25K", datePhrase: "in January", commitmentType: "plan", direction: "out" },
+  },
   // Guards: an ambiguous party (the test adds a second "Harbor" party to the books) and an injected instruction.
   {
     question: "What do I owe Harbor?",
@@ -81,7 +91,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   for (const { question, raw } of INTENT_STANDINS) {
     const key = intentCacheKey(question);
     console.log(`${key}  ${question}`);
-    if (write) {
+    // Never overwrite a live reading with a stand-in: only new keys and existing stand-ins are written.
+    const existing = readCache(INTENT_CACHE_DIR, key);
+    if (write && existing && existing.source !== "stand-in") console.log(`  kept the ${existing.source} entry`);
+    else if (write) {
       writeCache(INTENT_CACHE_DIR, {
         key, promptVersion: INTENT_PROMPT_VERSION, model: INTENT_MODEL,
         source: "stand-in", // hand-authored; replace with a live run (scripts/refresh-intent-cache.ts)

@@ -1,6 +1,7 @@
 import { api, SANDBOXES, suggestBusinessName, authLive } from "./api.js";
 import { currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
+import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
 import { icon, logo } from "./ui/icons.js";
 import { speak, listen, canSpeak, canListen, speakable, spokenMoney } from "./ui/speech.js";
@@ -284,9 +285,9 @@ function viewToday() {
   </div>`;
 }
 
+// Fixed text, shared with the demo intent cache, so every hint gets a real answer with no API key.
 function askHints() {
-  const vocab = app.ctx.profile.vocabulary ?? {};
-  return ["Can I make payroll?", `What if ${firstCustomer()} pays 10 days late?`, `Planning a $25K ${vocab.purchase ?? "purchase"} in January`];
+  return ASK_HINTS;
 }
 
 function homeRow(i) {
@@ -354,11 +355,6 @@ function dayOf(iso) {
 function syncTime(iso) {
   const day = new Date(iso).toLocaleDateString("en-CA", { timeZone: tz() });
   return day === app.ctx.business.asOf ? clock(iso) : `${dayOf(iso)}, ${clock(iso)}`;
-}
-
-function firstCustomer() {
-  const c = app.ctx.parties.find((p) => p.kind === "customer" && p.lagStats) ?? app.ctx.parties.find((p) => p.kind === "customer");
-  return c ? c.name.split(" ")[0] : "a customer";
 }
 
 function spokenLength() {

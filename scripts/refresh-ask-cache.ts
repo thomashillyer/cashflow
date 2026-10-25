@@ -6,12 +6,13 @@
 //
 //   ANTHROPIC_API_KEY=... npx tsx scripts/refresh-ask-cache.ts ["question" ...]
 //
-// With no arguments, every eval question is refreshed.
+// With no arguments, every eval question and every Ask bar example (app/catalog/ask-hints.js) is refreshed.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { copyFileSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ASK_HINTS } from "../app/catalog/ask-hints.js";
 import { askNeri } from "../ai/ask/index";
 import { intentCacheKey } from "../ai/ask/intent";
 import { ASK_CACHE_DIR, INTENT_CACHE_DIR } from "../ai/cache";
@@ -30,7 +31,7 @@ const profile: Profile = JSON.parse(readFileSync(join(import.meta.dirname, "../p
 const evalSet = JSON.parse(readFileSync(join(dir, "ask/eval.json"), "utf8")) as { id: string; question: string }[];
 
 const wanted = process.argv.slice(2);
-const questions = wanted.length ? wanted : evalSet.map((e) => e.question);
+const questions = wanted.length ? wanted : [...new Set([...evalSet.map((e) => e.question), ...ASK_HINTS])];
 const client = new Anthropic();
 const scratch = mkdtempSync(join(tmpdir(), "neri-ask-"));
 const intentDir = join(scratch, "intent");
