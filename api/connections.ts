@@ -1,15 +1,19 @@
 // A server-configured, read-only Books connection belongs to exactly one private business.
 // Credentials stay inside this service; neither discovery nor sync returns provider payloads.
 import { pullZoho } from "../adapters/zoho_books";
+import { pullOutlook } from "../adapters/outlook";
+import { ingest } from "../ai/intake";
+import type { AiMode } from "./engine";
 import { ZOHO_REGIONS, type ZohoRegion } from "../adapters/zoho_books/client";
 import { HttpError } from "./http";
 import { persistImport, type PersistSummary } from "./persist";
 import { refreshPending } from "./routes/review";
 import type { Business, Store } from "./store";
 
+export type ConnectionId = "zoho_books" | "outlook";
 export type ConnectionStatus = {
-  id: "zoho_books";
-  name: "Zoho Books";
+  id: ConnectionId;
+  name: "Zoho Books" | "Outlook";
   available: boolean;
   state: "waiting" | "ok" | "error";
   lastSyncedAt?: string;
@@ -18,15 +22,15 @@ export type ConnectionStatus = {
 export type ConnectionList = { connections: ConnectionStatus[] };
 export type ConnectionSyncResult = {
   connection: ConnectionStatus;
-  counts: { parties: number; commitments: number; settlements: number; evidence: number; rejected: number };
-  summary: PersistSummary;
+  counts: { parties: number; commitments: number; settlements: number; evidence: number; rejected: number; proposals?: number; signals?: number; messages?: number; duplicates?: number; failed?: number };
+  summary?: PersistSummary;
   storeRevision: number;
 };
 export interface ConnectionService {
   list(business: Business): ConnectionList;
-  sync(business: Business, store: Store, now: () => Date): Promise<ConnectionSyncResult>;
+  sync(business: Business, store: Store, now: () => Date, provider?: ConnectionId): Promise<ConnectionSyncResult>;
 }
-export type ConnectionOptions = { pull?: typeof pullZoho; fetch?: typeof fetch };
+export type ConnectionOptions = { pull?: typeof pullZoho; fetch?: typeof fetch; outlookPull?: typeof pullOutlook; ingest?: typeof ingest; aiMode?: AiMode };
 
 const identity = { id: "zoho_books", name: "Zoho Books" } as const;
 const unavailable = "Zoho Books isn't configured for this business. Ask your team to connect it, or upload an export.";
@@ -41,7 +45,7 @@ function regionOf(domain: string | undefined): ZohoRegion | undefined {
   } catch { return; }
 }
 
-export function buildConnectionService(env: NodeJS.ProcessEnv, options: ConnectionOptions = {}): ConnectionService {
+function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionOptions = {}): ConnectionService {
   const businessId = env.NERI_CONNECTOR_BUSINESS_ID?.trim();
   const region = regionOf(env.ZOHO_API_DOMAIN);
   const clientId = env.ZOHO_CLIENT_ID;
@@ -141,6 +145,121 @@ export function buildConnectionService(env: NodeJS.ProcessEnv, options: Connecti
       if (b.isSynthetic || (businessId && b.id !== businessId)) throw new HttpError(403, "FORBIDDEN", "This business cannot use that connection.");
       if (!configured || !bound(b)) throw new HttpError(503, "CONNECTOR_NOT_CONFIGURED", unavailable);
       // One in-flight pull per configured company prevents duplicate revision bumps on double-click.
+      if (syncing) return syncing;
+      syncing = perform(b, store, now);
+      try { return await syncing; } finally { syncing = undefined; }
+    },
+  };
+}
+
+// Email messages become proposed intake only. Each pull is capped at ten recent messages so a click
+// cannot silently process an entire mailbox or trigger an unbounded set of model calls.
+export function buildConnectionService(env: NodeJS.ProcessEnv, options: ConnectionOptions = {}): ConnectionService {
+  const zoho = buildZohoConnectionService(env, options);
+  const businessId = env.NERI_CONNECTOR_BUSINESS_ID?.trim();
+  const tenant = env.MICROSOFT_TENANT_ID?.trim();
+  const clientId = env.MICROSOFT_CLIENT_ID;
+  const clientSecret = env.MICROSOFT_CLIENT_SECRET;
+  const mailbox = env.MICROSOFT_MAILBOX_UPN?.trim();
+  const configured = Boolean(businessId && tenant && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant) && clientId && clientSecret && mailbox && /^[^\s/?#]+@[^\s/?#]+$/.test(mailbox));
+  const name = { id: "outlook", name: "Outlook" } as const;
+  const missing = "Outlook isn't configured for this business. Ask your team to connect it, or upload an email.";
+  const failed = "Outlook couldn't finish reading your messages. Check the connection and try again, or upload an email.";
+  const fetchImpl = options.fetch ?? fetch;
+  const pull = options.outlookPull ?? pullOutlook;
+  const read = options.ingest ?? ingest;
+  let access: { value: string; expiresAt: number } | undefined;
+  let renewing: Promise<string> | undefined;
+  let syncing: Promise<ConnectionSyncResult> | undefined;
+  let errorMessage: string | undefined;
+  const bound = (b: Business) => !b.isSynthetic && b.id === businessId;
+  function status(b: Business): ConnectionStatus {
+    if (!configured || !bound(b)) return { ...name, available: false, state: "waiting", message: missing };
+    const prior = b.profile.account?.connections?.find((c) => c.id === "outlook") as { state: string; lastSyncedAt?: string } | undefined;
+    return { ...name, available: true, state: errorMessage || prior?.state === "error" ? "error" : prior?.state === "ok" ? "ok" : "waiting",
+      ...(prior?.lastSyncedAt ? { lastSyncedAt: prior.lastSyncedAt } : {}),
+      message: errorMessage ?? "Sync reads up to 10 recent messages from the last 30 days. Changes wait for your review." };
+  }
+  async function token(): Promise<string> {
+    if (access && access.expiresAt > Date.now()) return access.value;
+    if (renewing) return renewing;
+    renewing = (async () => {
+      try {
+        const response = await fetchImpl(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+          method: "POST", redirect: "error", signal: AbortSignal.timeout(10_000), headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ grant_type: "client_credentials", client_id: clientId!, client_secret: clientSecret!, scope: "https://graph.microsoft.com/.default" }),
+        });
+        if (!response.ok) throw new Error("token rejected");
+        const body = await response.json() as { access_token?: unknown; expires_in?: unknown };
+        if (typeof body.access_token !== "string" || !body.access_token) throw new Error("token missing");
+        const expires = typeof body.expires_in === "number" && body.expires_in > 0 ? Math.min(body.expires_in, 3600) : 3600;
+        access = { value: body.access_token, expiresAt: Date.now() + Math.max(1, expires - 60) * 1000 };
+        return access.value;
+      } catch { access = undefined; throw new HttpError(502, "CONNECTOR_AUTH", failed, { retryable: true }); }
+    })();
+    try { return await renewing; } finally { renewing = undefined; }
+  }
+  async function perform(b: Business, store: Store, now: () => Date): Promise<ConnectionSyncResult> {
+    const at = now().toISOString();
+    try {
+      const result = await pull({ token, mailbox, now: at, since: new Date(Date.parse(at) - 30 * 86400000).toISOString(), fetch: async (raw, init) => {
+        const url = new URL(raw);
+        if (url.origin !== "https://graph.microsoft.com") throw new Error("unsupported host");
+        const list = /\/messages$/.test(url.pathname);
+        if (list) url.searchParams.set("$top", "10");
+        const response = await fetchImpl(url.toString(), { ...init, redirect: "error" });
+        return { status: response.status, json: async () => {
+          const body = await response.json() as Record<string, unknown>;
+          if (list && body && typeof body === "object") {
+            delete body["@odata.nextLink"];
+            if (Array.isArray(body.value)) body.value = body.value.slice(0, 10);
+          }
+          return body;
+        } };
+      } });
+      if (!result.ok) { if (result.error.kind === "auth") access = undefined; throw new Error("pull failed"); }
+      const inputs = result.data.inputs.slice(0, 10);
+      const counts = { parties: 0, commitments: 0, settlements: 0, evidence: 0, rejected: result.data.diagnostics.rowsRejected, proposals: 0, signals: 0, messages: inputs.length, duplicates: 0, failed: 0 };
+      for (const input of inputs) {
+        try {
+          const { records, storeRevision } = await store.load(b.id);
+          if (input.source?.evidenceId && records.evidence.some((e) => e.id === input.source!.evidenceId && e.extraction === "ok")) { counts.duplicates++; continue; }
+          const out = await read(input, { records, storeRevision, business: { name: b.name, aliases: b.profile.account?.aliases }, mode: options.aiMode ?? "cache_only", now: at,
+            ...(b.profile.account?.timezone ? { timeZone: b.profile.account.timezone } : {}) });
+          const prior = new Map((await store.listProposals(b.id)).map((p) => [p.id, p]));
+          const proposals = out.proposals.filter((p) => !prior.has(p.id)).map((p) => ({ ...p, state: "proposed" as const }));
+          const known = new Set(records.signals.map((s) => s.id));
+          const signals = out.signals.filter((s) => !known.has(s.id)).map((s) => ({ ...s, state: "proposed" as const }));
+          const incomplete = out.candidates.some((c) => c.extraction !== "ok") || out.evidence.some((e) => e.extraction === "partial" || e.extraction === "unreadable" || e.extraction === "unsupported")
+            || out.notes.some((n) => /could not|no cached|unreadable|unavailable/i.test(n.text));
+          // A successful source read can still have failed interpretation. Keep that message retryable.
+          const evidence = incomplete ? out.evidence.map((e) => e.id === input.source?.evidenceId ? { ...e, extraction: "partial" as const } : e) : out.evidence;
+          await store.saveIntake(b.id, { evidence: [], candidates: out.candidates, proposals, signals });
+          await store.saveIntake(b.id, { evidence, candidates: [], proposals: [], signals: [] });
+          if (incomplete) counts.failed++;
+          counts.evidence += out.evidence.filter((e) => !records.evidence.some((old) => old.id === e.id)).length;
+          counts.proposals += proposals.length; counts.signals += signals.length;
+        } catch { counts.failed++; }
+      }
+      const revision = (await store.load(b.id)).storeRevision;
+      const partial = counts.failed > 0 || counts.rejected > 0;
+      const message = partial ? "Some messages couldn't be read. Successfully read items are waiting in Review; sync again to retry the rest." : "Recent messages were read. Proposed changes wait for your review.";
+      const latest = await store.getBusiness(b.id);
+      if (!latest || !bound(latest)) throw new Error("business unavailable");
+      const account = latest.profile.account ?? {};
+      const saved = { ...name, state: partial ? "error" as const : "ok" as const, lastSyncedAt: at };
+      await store.saveProfile(b.id, { ...latest.profile, account: { ...account, connections: [...(account.connections ?? []).filter((c) => c.id !== name.id), saved] } });
+      errorMessage = partial ? message : undefined;
+      return { connection: { ...name, available: true, state: partial ? "error" : "ok", lastSyncedAt: at, message }, counts, storeRevision: revision };
+    } catch { errorMessage = failed; throw new HttpError(502, "CONNECTOR_UNAVAILABLE", failed, { retryable: true }); }
+  }
+  return {
+    list: (b) => ({ connections: [...zoho.list(b).connections, status(b)] }),
+    async sync(b, store, now, provider = "zoho_books") {
+      if (provider === "zoho_books") return zoho.sync(b, store, now);
+      if (provider !== "outlook") throw new HttpError(404, "NOT_FOUND", "That connection isn't available.");
+      if (b.isSynthetic || (businessId && b.id !== businessId)) throw new HttpError(403, "FORBIDDEN", "This business cannot use that connection.");
+      if (!configured || !bound(b)) throw new HttpError(503, "CONNECTOR_NOT_CONFIGURED", missing);
       if (syncing) return syncing;
       syncing = perform(b, store, now);
       try { return await syncing; } finally { syncing = undefined; }

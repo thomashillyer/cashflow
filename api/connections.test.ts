@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
 import { buildAccounting } from "../adapters/accounting/common";
+import type { IntakeInput, IntakeContext, IntakeResult } from "../ai/intake";
+import { reviewCandidate } from "../ai/extract/document";
+import { propose } from "../ai/reconcile/match";
 import type { ZohoPullInput } from "../adapters/zoho_books";
 import { buildConnectionService } from "./connections";
 import { sendError, type NeriRequest } from "./http";
@@ -20,6 +23,96 @@ const output = (at: string) => buildAccounting({
     kind: "invoice", providerId: "source-1", number: "INV-1", partyId: "customer-1", partyName: "Example Customer",
     currency: "USD", total: 100, balance: 100, issued: "2026-10-20", due: "2026-11-20", status: "open", raw: { revision: 1 }, sheet: "invoices", row: 1,
   }],
+});
+
+const microsoft = { ...env, MICROSOFT_TENANT_ID: "00000000-0000-0000-0000-000000000001", MICROSOFT_CLIENT_ID: "fake-ms-client", MICROSOFT_CLIENT_SECRET: "fake-ms-secret", MICROSOFT_MAILBOX_UPN: "owner@example.com" };
+const email = (id: string): Extract<IntakeInput, { kind: "email" }> => ({ kind: "email", raw: `From: supplier@example.com\nTo: owner@example.com\nSubject: Invoice update\nMessage-ID: <${id}>\n\nPlease review the invoice.`, source: { evidenceId: `email-${id}`, sourceRef: { system: "email", record: id } } });
+const readEmail = async (input: IntakeInput, ctx: IntakeContext): Promise<IntakeResult> => {
+  const id = input.source!.evidenceId!;
+  const candidate = { ...reviewCandidate({ candidateId: `candidate-${id}`, revision: 1, evidenceIds: [id] }, "partial", ["Review the invoice."]), extraction: "ok" as const };
+  return {
+    evidence: [{ id, channel: "email", format: "eml", receivedAt: ctx.now, extraction: "ok", sourceRef: input.source!.sourceRef! }],
+    candidates: [candidate], proposals: [propose(candidate, ctx.records, { storeRevision: ctx.storeRevision, now: ctx.now })],
+    signals: [{ id: `signal-${id}`, channel: "email", receivedAt: ctx.now, claim: { kind: "date_change", newDate: "2026-12-01" }, confidence: 0.8, state: "applied", sourceRef: input.source!.sourceRef! }], notes: [],
+  };
+};
+
+describe("tenant-bound Outlook review intake", () => {
+  it("keeps email results proposed, preserves accepted records, and skips already-read messages", async () => {
+    const { store, business, other } = await setup();
+    const pull = vi.fn(async () => ({ ok: true as const, data: { inputs: [email("one")], diagnostics: output(now().toISOString()).diagnostics } }));
+    const ingest = vi.fn(readEmail);
+    const service = buildConnectionService(microsoft, { outlookPull: pull, ingest, aiMode: "live" });
+    expect(service.list(business).connections[1]).toMatchObject({ id: "outlook", available: true, state: "waiting" });
+    await expect(service.sync(other, store, now, "outlook")).rejects.toMatchObject({ status: 403 });
+    expect(pull).not.toHaveBeenCalled();
+    const first = await service.sync(business, store, now, "outlook");
+    expect(first).toMatchObject({ counts: { evidence: 1, proposals: 1, signals: 1 }, storeRevision: 0 });
+    expect(ingest.mock.calls[0]?.[1].mode).toBe("live");
+    const saved = await store.load(business.id);
+    expect(saved.records.commitments).toEqual([]);
+    expect(saved.records.settlements).toEqual([]);
+    expect(saved.records.balances).toEqual([]);
+    expect(saved.records.signals[0]?.state).toBe("proposed");
+    expect((await store.listProposals(business.id))[0]?.state).toBe("proposed");
+    const second = await service.sync((await store.getBusiness(business.id))!, store, now, "outlook");
+    expect(second.counts.duplicates).toBe(1);
+    expect(ingest).toHaveBeenCalledTimes(1);
+    expect((await store.load(other.id)).records.evidence).toEqual([]);
+  });
+
+  it("uses only the fixed Microsoft token host and bounds real adapter reads to ten messages", async () => {
+    const { store, business } = await setup();
+    const fetch = vi.fn<typeof globalThis.fetch>(async (raw) => {
+      const url = new URL(String(raw));
+      if (url.hostname === "login.microsoftonline.com") return new Response(JSON.stringify({ access_token: "ms-private-token", expires_in: 3600 }));
+      expect(url.origin).toBe("https://graph.microsoft.com");
+      expect(url.searchParams.get("$top")).toBe("10");
+      return new Response(JSON.stringify({ value: [{ id: "m1", internetMessageId: "one", subject: "Invoice update", body: { content: "Please check the invoice." }, from: { emailAddress: { address: "supplier@example.com" } }, receivedDateTime: now().toISOString(), hasAttachments: false }], "@odata.nextLink": "https://graph.microsoft.com/private-next-page" }));
+    });
+    const service = buildConnectionService(microsoft, { fetch, ingest: readEmail });
+    const result = await service.sync(business, store, now, "outlook");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[0]?.[0]).toBe(`https://login.microsoftonline.com/${microsoft.MICROSOFT_TENANT_ID}/oauth2/v2.0/token`);
+    expect(fetch.mock.calls[0]?.[1]).toMatchObject({ redirect: "error" });
+    expect(JSON.stringify(result)).not.toMatch(/ms-private-token|fake-ms-secret|owner@example.com/);
+    expect(result.counts.messages).toBe(1);
+  });
+
+  it("reports per-message failure while retaining successful pending intake", async () => {
+    const { store, business } = await setup();
+    const service = buildConnectionService(microsoft, { outlookPull: async () => ({ ok: true, data: { inputs: [email("good"), email("bad")], diagnostics: output(now().toISOString()).diagnostics } }), ingest: async (input, ctx) => { if (input.source?.evidenceId === "email-bad") throw new Error("private source body"); return readEmail(input, ctx); } });
+    const result = await service.sync(business, store, now, "outlook");
+    expect(result.connection.state).toBe("error");
+    expect(result.counts).toMatchObject({ failed: 1, evidence: 1, proposals: 1 });
+    expect((await store.load(business.id)).records.evidence).toHaveLength(1);
+    expect(result.connection.message).not.toContain("private source body");
+    expect(service.list((await store.getBusiness(business.id))!).connections[1]?.state).toBe("error");
+  });
+
+  it("validates Microsoft configuration and does not leak failed authorization details", async () => {
+    const { store, business } = await setup();
+    const invalid = buildConnectionService({ ...microsoft, MICROSOFT_TENANT_ID: "../attacker" });
+    await expect(invalid.sync(business, store, now, "outlook")).rejects.toMatchObject({ status: 503 });
+    const service = buildConnectionService(microsoft, { fetch: async () => { throw new Error("fake-ms-secret"); }, outlookPull: async (input) => { await input.token("outlook"); return { ok: true, data: { inputs: [], diagnostics: output(now().toISOString()).diagnostics } }; } });
+    await expect(service.sync(business, store, now, "outlook")).rejects.toMatchObject({ status: 502 });
+    expect(JSON.stringify(service.list(business))).not.toContain("fake-ms-secret");
+    expect((await store.getBusiness(business.id))!.profile.account?.connections).toBeUndefined();
+  });
+
+  it("keeps partial interpretation retryable instead of permanently deduplicating it", async () => {
+    const { store, business } = await setup();
+    const ingest = vi.fn(async (input: IntakeInput, ctx: IntakeContext) => {
+      const result = await readEmail(input, ctx);
+      return { ...result, notes: [{ scope: input.source!.evidenceId!, text: "Could not check this message for payment claims." }] };
+    });
+    const service = buildConnectionService(microsoft, { outlookPull: async () => ({ ok: true, data: { inputs: [email("partial")], diagnostics: output(now().toISOString()).diagnostics } }), ingest });
+    expect((await service.sync(business, store, now, "outlook")).connection.state).toBe("error");
+    expect((await store.load(business.id)).records.evidence[0]?.extraction).toBe("partial");
+    await service.sync(business, store, now, "outlook");
+    expect(ingest).toHaveBeenCalledTimes(2);
+    expect(await store.listProposals(business.id)).toHaveLength(1);
+  });
 });
 async function setup() {
   const store = new MemoryStore();
