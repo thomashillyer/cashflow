@@ -17,6 +17,7 @@ import { ownerRoutes } from "./routes/owner";
 import { workRoutes } from "./routes/work";
 import { demoRoutes } from "./routes/demo";
 import { overrideRoutes } from "./routes/overrides";
+import { SandboxStore, VISITOR_HEADER, VISITOR_ID } from "./sandbox";
 import { isBehind, type SchemaStatus, type SchemaStatusFn } from "./schema-status";
 
 // Verifies a Supabase access token. Returns null for an invalid or expired token.
@@ -35,10 +36,14 @@ export type AppOptions = {
   now?: () => Date;
   allowReset?: boolean;            // POST /demo/reset (synthetic businesses only)
   logger?: boolean | { stream: NodeJS.WritableStream }; // tests pass a stream to capture log lines
+  sandboxes?: SandboxStore;        // tests inject one to control the clock and limits
   schemaStatus?: SchemaStatusFn;   // GET /ready: repo vs database migration version (Supabase store only)
 };
 
-export type Deps = Required<Pick<AppOptions, "store" | "blobs" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">> & { schemaStatus?: SchemaStatusFn };
+export type Deps = Required<Pick<AppOptions, "store" | "blobs" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">> & {
+  schemaStatus?: SchemaStatusFn;
+  sandboxes: SandboxStore;         // per-visitor copies of the synthetic samples (demo mode)
+};
 
 const READY_CACHE_MS = 30_000;
 
@@ -75,6 +80,12 @@ function bearer(req: FastifyRequest): string | null {
   return m ? m[1]! : "";
 }
 
+// The visitor's random id (X-Neri-Visitor), or null when absent or malformed.
+function visitorOf(req: FastifyRequest): string | null {
+  const v = req.headers[VISITOR_HEADER];
+  return typeof v === "string" && VISITOR_ID.test(v) ? v : null;
+}
+
 const BUSINESS_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
@@ -86,6 +97,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     aiMode: opts.aiMode ?? "cache_only",
     now: opts.now ?? (() => new Date()),
     allowReset: opts.allowReset ?? false,
+    sandboxes: opts.sandboxes ?? new SandboxStore(),
     ...(opts.schemaStatus ? { schemaStatus: opts.schemaStatus } : {}),
   };
   // disableRequestLogging: the onResponse hook below writes the one structured line per request.
@@ -133,10 +145,13 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   app.addHook("preHandler", async (req) => {
     if (!isApiPath(req.url)) return;
     const r = req as NeriRequest;
+    r.store = deps.store;
+    const visitor = visitorOf(req);
+    if (visitor) r.visitorId = visitor;
     const token = bearer(req);
     if (token !== null) {
       const user = token ? await opts.verify(token).catch(() => null) : null;
-      if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Your session ended. Sign in again with a new code.");
+      if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Your session ended. Sign in again with your email and password.");
       r.user = user;
     } else if (!deps.demoMode) {
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to see your numbers.");
@@ -160,6 +175,16 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     if (!business) throw notFound;
     if (!business.isSynthetic && !(r.user && await deps.store.isMember(business.id, r.user.id))) throw notFound;
     r.business = business;
+    // Demo samples are shared, so a visitor works on a private copy; the real store is never written.
+    if (deps.demoMode && business.isSynthetic) {
+      if (visitor) {
+        r.store = await deps.sandboxes.storeFor(visitor, business, deps.store);
+        r.sandboxed = true;
+        r.business = (await r.store.getBusiness(business.id)) ?? business;   // the visitor's profile and notes
+      } else if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
+        throw new HttpError(403, "FORBIDDEN", "The sample is shared. Reload the page to get your own copy.");
+      }
+    }
   });
 
   await app.register(readRoutes(deps));

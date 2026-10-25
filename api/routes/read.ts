@@ -7,7 +7,7 @@ import { simulate } from "../../engine/simulate";
 import { findCommitment, resolveEventSource, type EventSource } from "../../engine/resolve";
 import type { Deps } from "../app";
 import { briefFor, loadForRun, runInputs, savedScenario } from "../engine";
-import { businessOf, HttpError } from "../http";
+import { storeFor, businessOf, HttpError } from "../http";
 import type { Business } from "../store";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -40,7 +40,7 @@ const SCENARIOS = new Set(["base", "stress"]);
 export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.get("/context", async (req) => {
     const b = businessOf(req);
-    const { records, storeRevision } = await deps.store.load(b.id);
+    const { records, storeRevision } = await storeFor(req).load(b.id);
     const { profile, asOf } = runInputs(b, deps.now);
     const acc = b.profile.account ?? {};
     const partyByCommitment = Object.fromEntries(records.commitments.filter((c) => c.partyId).map((c) => [c.id, c.partyId!]));
@@ -59,13 +59,13 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   // { three, rest, watch, combined, shortfall, run } from one engine run, plus storeRevision and inputsHash.
-  app.get("/brief", async (req) => briefFor(deps.store, businessOf(req), deps.aiMode, deps.now));
+  app.get("/brief", async (req) => briefFor(storeFor(req), businessOf(req), deps.aiMode, deps.now));
 
   app.get("/forecast", async (req) => {
     const b = businessOf(req);
     const scenario = String((req.query as Record<string, unknown>).scenario ?? "base");
     if (!SCENARIOS.has(scenario)) throw new HttpError(400, "INVALID_ARGUMENT", "Pick the base or stress view.", { fieldIssues: [{ field: "scenario", issue: "base or stress" }] });
-    const { records, overrides } = await loadForRun(deps.store, b.id);
+    const { records, overrides } = await loadForRun(storeFor(req), b.id);
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
     // Stress runs on the same saved overrides as base; forecast() adds the stress delays.
     return forecast(records, profile, savedScenario(overrides, scenario as "base" | "stress"), asOf, fxRates);
@@ -76,7 +76,7 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const b = businessOf(req);
     const levers = (req.body as { levers?: unknown } | undefined)?.levers;
     if (!Array.isArray(levers) || levers.length > 20) throw new HttpError(400, "INVALID_ARGUMENT", "Send up to 20 levers to try.");
-    const { records, overrides } = await loadForRun(deps.store, b.id);
+    const { records, overrides } = await loadForRun(storeFor(req), b.id);
     for (const l of levers as Lever[]) {
       if (!l || typeof l !== "object" || !records.commitments.some((c) => c.id === l.commitmentId)) {
         throw new HttpError(400, "INVALID_ARGUMENT", "One of those changes points at a record we don't have.");
@@ -96,7 +96,7 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.get("/records/:id", async (req) => {
     const b = businessOf(req);
     const { id } = req.params as { id: string };
-    const { records, overrides } = await loadForRun(deps.store, b.id);
+    const { records, overrides } = await loadForRun(storeFor(req), b.id);
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
     const run = forecast(records, profile, savedScenario(overrides), asOf, fxRates);
     const notFound = () => new HttpError(404, "NOT_FOUND", "That record isn't in your books any more.");
