@@ -19,6 +19,7 @@ export type OutlookPullInput = {
   now: string;
   since: string;                      // ISO instant; how far back to read
   knownDomains?: string[];            // sender domains of known customers and suppliers
+  mailbox?: string;                   // read this user's mail (app-only token); default: the signed-in user
   fetch?: Fetch;
 };
 
@@ -54,7 +55,7 @@ export async function pullOutlook(input: OutlookPullInput): Promise<PullResult<O
 }
 
 async function pull(input: OutlookPullInput): Promise<OutlookPull> {
-  const client = new OutlookClient(input.token, input.fetch);
+  const client = new OutlookClient(input.token, input.fetch, input.mailbox);
   const known = new Set((input.knownDomains ?? []).map((d) => d.toLowerCase()));
   const { records, truncated } = await client.messages(input.since);
   const errors: RowError[] = [];

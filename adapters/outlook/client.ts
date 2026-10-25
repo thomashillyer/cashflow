@@ -18,8 +18,15 @@ const fail = (kind: "network" | "unsupported", message: string, nextStep: string
 
 export class OutlookClient {
   private readonly fetchImpl: Fetch;
-  constructor(private readonly token: TokenProvider, fetchImpl?: Fetch) {
+  private readonly user: string;
+  // `mailbox` (a UPN or address) reads that user's mail with an app-only token; without it, the signed-in
+  // user's own mail (/me). The value is validated and encoded, so it cannot change the path.
+  constructor(private readonly token: TokenProvider, fetchImpl?: Fetch, mailbox?: string) {
     this.fetchImpl = fetchImpl ?? ((url, init) => fetch(url, init));
+    if (mailbox !== undefined && !/^[^\s@/\\]+@[^\s@/\\]+$/.test(mailbox)) {
+      throw new ConnectorFailure({ kind: "config", message: "That mailbox address is not valid.", nextStep: "Check the email address you connected, or paste the message instead.", fallback: FALLBACK });
+    }
+    this.user = mailbox ? `users/${encodeURIComponent(mailbox)}` : "me";
   }
 
   private async get(url: string): Promise<GraphRecord> {
@@ -49,7 +56,7 @@ export class OutlookClient {
   async messages(since: string): Promise<{ records: GraphRecord[]; truncated: boolean }> {
     const select = "id,internetMessageId,subject,from,toRecipients,receivedDateTime,body,hasAttachments";
     const q = new URLSearchParams({ $top: String(PAGE_SIZE), $select: select, $orderby: "receivedDateTime desc", $filter: `receivedDateTime ge ${since}` });
-    let url: string | undefined = `${GRAPH_BASE}/me/messages?${q}`;
+    let url: string | undefined = `${GRAPH_BASE}/${this.user}/messages?${q}`;
     const records: GraphRecord[] = [];
     for (let page = 0; page < MAX_PAGES && url; page++) {
       const body = await this.get(url);
@@ -62,12 +69,12 @@ export class OutlookClient {
   // Metadata only: names and sizes decide what is worth downloading.
   async attachments(messageId: string): Promise<GraphRecord[]> {
     const q = new URLSearchParams({ $top: "20", $select: "id,name,size,isInline,contentType" });
-    const body = await this.get(`${GRAPH_BASE}/me/messages/${encodeURIComponent(messageId)}/attachments?${q}`);
+    const body = await this.get(`${GRAPH_BASE}/${this.user}/messages/${encodeURIComponent(messageId)}/attachments?${q}`);
     return Array.isArray(body.value) ? (body.value as GraphRecord[]) : [];
   }
 
   // One attachment with its content (base64).
   async attachment(messageId: string, attachmentId: string): Promise<GraphRecord> {
-    return this.get(`${GRAPH_BASE}/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`);
+    return this.get(`${GRAPH_BASE}/${this.user}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`);
   }
 }
