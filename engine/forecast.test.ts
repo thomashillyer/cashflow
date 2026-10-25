@@ -243,6 +243,72 @@ describe("recurrence, overdue, possible, signals", () => {
     expect(run.events[0]?.date).toBe("2026-10-01");
   });
 
+  it("overdue unpaid bills stay in the balance on asOf, tagged and warned (#61)", () => {
+    const r = empty();
+    r.balances = [bal($(100000), "2026-10-26")];
+    r.commitments = [com("bill-old", { type: "bill", amount: $(80000), anchors: { due: "2026-10-20" } })];
+    const run = forecast(r, profile, base, "2026-10-26", {});
+    expect(closing(run, "2026-10-26")).toBe($(20000));
+    const e = run.events.find((x) => x.commitmentId === "bill-old")!;
+    expect(e.date).toBe("2026-10-26");
+    expect(e.basis).toMatch(/overdue since 2026-10-20, assumed payable now/);
+    expect(run.warnings.join(" ")).toMatch(/Overdue: .*payment dated 2026-10-20/);
+    // Safety ($5,000) is breached on day one once the bill is a little bigger.
+    r.commitments = [com("bill-old", { type: "bill", amount: $(96000), anchors: { due: "2026-10-20" } })];
+    expect(forecast(r, profile, base, "2026-10-26", {}).firstBelowSafety).toBe("2026-10-26");
+  });
+
+  it("overdue bills that are paid or only possible do not roll into the balance", () => {
+    const r = empty();
+    r.balances = [bal($(100000), "2026-10-26")];
+    r.commitments = [
+      com("bill-paid", { type: "bill", amount: $(1000), settlement: "paid", anchors: { due: "2026-10-20" } }),
+      com("bill-maybe", { type: "bill", amount: $(2000), status: "possible", anchors: { due: "2026-10-20" } }),
+    ];
+    const run = forecast(r, profile, base, "2026-10-26", {});
+    expect(run.days.at(-1)?.closing).toBe($(100000));
+  });
+
+  it("deferring an overdue bill counts the days from asOf", () => {
+    const r = empty();
+    r.balances = [bal($(100000), "2026-10-26")];
+    r.commitments = [com("bill-old", { type: "bill", amount: $(80000), anchors: { due: "2026-10-20" } })];
+    const sim = simulate(r, profile, [], [{ kind: "defer", commitmentId: "bill-old", days: 3 }], "2026-10-26", {});
+    expect(sim.run.events.find((x) => x.commitmentId === "bill-old")?.date).toBe("2026-10-29");
+    expect(closing(sim.run, "2026-10-28")).toBe($(100000));
+    expect(closing(sim.run, "2026-10-29")).toBe($(20000));
+  });
+
+  it("stress never makes an overdue receipt come back into the horizon (#60)", () => {
+    const r = empty();
+    r.balances = [bal($(100000), "2026-10-26")];
+    r.commitments = [
+      com("inv-old", { type: "invoice", amount: $(50000), anchors: { due: "2026-10-23" } }),
+      com("bill", { type: "bill", amount: $(106000), anchors: { due: "2026-11-02" } }),
+    ];
+    const b = forecast(r, profile, base, "2026-10-26", {});
+    const s = forecast(r, profile, stress, "2026-10-26", {});
+    expect(b.lowPoint.amount).toBe($(-6000));
+    expect(s.lowPoint.amount).toBeLessThanOrEqual(b.lowPoint.amount);
+    const old = s.events.find((x) => x.commitmentId === "inv-old")!;
+    expect(old.date).toBe("2026-10-23");
+    expect(old.overriddenBy ?? []).not.toContain("stress");
+  });
+
+  it("stress delays customer receipts but not card/POS daily sales (#69)", () => {
+    const r = empty();
+    r.balances = [bal($(1000), "2026-10-26")];
+    r.events = [{ id: "sale-1", date: "2026-10-20", amount: $(2800), currency: "USD", direction: "in", category: "sales", basis: "pos", sourceRef: src } as CashEvent];
+    r.commitments = [com("inv-cust", { type: "invoice", amount: $(500), anchors: { due: "2026-10-28" } })];
+    const p: Profile = { ...profile, revenueModel: { kind: "dailySales", weekdayWeights: [1, 1, 1, 1, 1, 1, 1] } };
+    const b = forecast(r, p, base, "2026-10-26", {});
+    const s = forecast(r, p, stress, "2026-10-26", {});
+    const sales = (x: typeof b) => x.events.filter((e) => e.commitmentId === "daily-sales").map((e) => `${e.date}:${e.amount}`);
+    expect(sales(s).length).toBeGreaterThan(0);
+    expect(sales(s)).toEqual(sales(b));
+    expect(s.events.find((e) => e.commitmentId === "inv-cust")?.date).toBe("2026-11-04");
+  });
+
   it("possible deals stay out of the main line and feed only the pipeline band", () => {
     const r = empty();
     r.balances = [bal($(100))];

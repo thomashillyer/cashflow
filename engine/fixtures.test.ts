@@ -98,6 +98,19 @@ describe.each(names)("fixture %s", (name) => {
     expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
   });
 
+  it("stress stays at or below base with an overdue receipt added", () => {
+    // Due far enough back that the profile's payment lag still lands it before asOf.
+    const due = new Date(Date.parse(`${meta.asOf}T00:00:00Z`) - (profile.defaultLagDays + 3) * 86400000).toISOString().slice(0, 10);
+    const r: Records = {
+      ...records,
+      commitments: [...records.commitments, { id: "inv-overdue-probe", type: "invoice", amount: Math.max(1, Math.abs(run().openingBalance)), currency: profile.baseCurrency, anchors: { due }, status: "committed", sourceRef: { system: "test", record: "probe" } }],
+    };
+    const b = forecast(r, profile, base, meta.asOf, meta.fxRates);
+    const s = forecast(r, profile, stress, meta.asOf, meta.fxRates);
+    expect(s.lowPoint.amount).toBeLessThanOrEqual(b.lowPoint.amount);
+    for (const x of [b, s]) expect(x.days.some((d) => d.eventIds.some((id) => x.events.find((e) => e.id === id)?.commitmentId === "inv-overdue-probe"))).toBe(false);
+  });
+
   it("simulate leaves the base untouched", () => {
     const c = records.commitments.find((x) => x.direction === "out" && x.settlement !== "paid");
     if (!c) return;

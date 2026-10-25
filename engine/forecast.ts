@@ -146,7 +146,14 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     commitments: expanded.commitments,
     warnings,
   });
-  const events = [...all].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1));
+  // Overdue unpaid payments are still owed: count them on asOf instead of letting them fall out of the balance.
+  // Overdue receipts keep their date and stay out of the balance (TECHNICAL_PLAN section 6); both are warned below.
+  const rolled = all.map((e) => {
+    if (!(e.date < asOf && e.direction === "out" && e.status !== "actual" && e.status !== "possible")) return e;
+    warnings.push(`Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} payment dated ${e.date} is before ${asOf}; assumed payable now and counted on ${asOf} (needs review).`);
+    return { ...e, date: asOf, basis: `${e.basis}; overdue since ${e.date}, assumed payable now` };
+  });
+  const events = [...rolled].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1));
 
   for (const e of events) {
     if (e.date < asOf && e.status !== "actual" && e.status !== "possible") {
