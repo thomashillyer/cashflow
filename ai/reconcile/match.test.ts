@@ -169,6 +169,15 @@ describe("poAllocated / poRemaining (read helpers; the engine owns coverage in t
     expect(poRemaining(r, po.id)).toBe(600000);
   });
 
+  it("ignores cancelled or credited invoices, like the engine does", () => {
+    const r = withLinks();
+    const inv = r.commitments.find((c) => c.id === "inv-INV-1203")!;
+    inv.settlement = "cancelled";
+    expect(poRemaining(r, "po-HH-PO-552")).toBe(1000000);
+    inv.settlement = "credited";
+    expect(poRemaining(r, "po-HH-PO-552")).toBe(1000000);
+  });
+
   it("is undefined for a non-PO and the full amount when nothing is linked", () => {
     const r = withLinks();
     expect(poRemaining(r, "inv-INV-1203")).toBeUndefined();
