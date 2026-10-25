@@ -1,7 +1,7 @@
 // How the server gets a connected source's token for a business. The hosted Connect flow (per-owner OAuth,
 // tokens in the store) is #128; until it lands, a deployment can allow the operator to use the server's own Zoho
-// and Microsoft app credentials: the business named by NERI_SOURCE_BUSINESS, or the signed-in user whose VERIFIED
-// email is NERI_SOURCE_EMAIL (the email comes from the verified session token, never from the request body).
+// and Microsoft app credentials: the business named by NERI_SOURCE_BUSINESS, or a signed-in user whose VERIFIED
+// email is in NERI_SOURCE_EMAIL (comma-separated) (the email comes from the verified session token, never from the request body).
 // Everyone else gets "not connected", so one owner can never pull the operator's accounts into their own books.
 
 import { ConnectorFailure } from "../adapters/connector";
@@ -15,8 +15,9 @@ type Cached = { token: string; until: number };
 
 export function envSourceAccess(env: NodeJS.ProcessEnv, now: () => number = Date.now, doFetch: typeof fetch = fetch): SourceAccessFn | undefined {
   const onlyBusiness = env.NERI_SOURCE_BUSINESS;
-  const onlyEmail = env.NERI_SOURCE_EMAIL?.trim().toLowerCase();
-  if (!onlyBusiness && !onlyEmail) return undefined;
+  // One or more verified emails, comma-separated (the operator's accounts).
+  const onlyEmails = new Set((env.NERI_SOURCE_EMAIL ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+  if (!onlyBusiness && onlyEmails.size === 0) return undefined;
   const cache = new Map<string, Cached>();
   // A refused or failed token exchange is an auth/network problem the owner can act on, never "unreadable data".
   // The provider's answer is never put in the message.
@@ -60,7 +61,7 @@ export function envSourceAccess(env: NodeJS.ProcessEnv, now: () => number = Date
 
   return ({ business, user }, source) => {
     if (business.isSynthetic) return undefined;
-    const allowed = (onlyBusiness !== undefined && business.id === onlyBusiness) || (onlyEmail !== undefined && user?.email?.trim().toLowerCase() === onlyEmail);
+    const allowed = (onlyBusiness !== undefined && business.id === onlyBusiness) || (!!user?.email && onlyEmails.has(user.email.trim().toLowerCase()));
     if (!allowed) return undefined;
     if ((source === "zoho_books" || source === "zoho_crm") && zohoRegion && env.ZOHO_REFRESH_TOKEN) {
       return { token: zohoToken(zohoRegion), region: zohoRegion, ...(source === "zoho_books" && env.ZOHO_ORG_ID ? { organizationId: env.ZOHO_ORG_ID } : {}) };
