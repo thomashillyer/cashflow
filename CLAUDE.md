@@ -84,6 +84,9 @@ Node 22, TypeScript strict, vitest. `dev` and `demo` are added when the api/app 
 npm install
 npm test           # all tests, including golden tests over every fixture
 npm run typecheck  # tsc --noEmit
+npx supabase start     # local Postgres + API (Docker); `npx supabase status` for keys
+npx supabase db reset  # apply supabase/migrations/ locally
+npx supabase db push   # apply migrations to the linked shared project
 npm run dev        # api + app (not yet)
 npm run demo       # demo profile + cached Claude responses (not yet)
 ```

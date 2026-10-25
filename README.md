@@ -35,4 +35,15 @@ Run Claude Code on the hackathon API credits without touching your normal login:
 
 Public demos and committed fixtures must be synthetic. Real exports live in `data/private/` (gitignored); secrets go in `.env` only.
 
+## Database (Supabase)
+
+The schema lives in `supabase/migrations/` and mirrors `schema/records.ts`; `db/` has the typed client (`getSupabase`, `loadRecords`, `upsert*`). Copy `.env.example` to `.env` for keys.
+
+- **Local:** `npx supabase start` (needs Docker), then `npx supabase db reset` to apply migrations. `npx supabase status` prints the local URL and keys.
+- **Shared hosted project:** `npx supabase link --project-ref <ref>`, then `npx supabase db push` to apply new migrations. Get the URL and anon key from Project Settings → API.
+- **Schema changes:** add a new file with `npx supabase migration new <name>`; never edit an applied migration.
+- **Confirming a review item** goes through the `confirm_change_proposal` RPC (`confirmChangeProposal` in `db/records.ts`): one transaction that checks the business revision and idempotency key. Applying the proposal's ops inside it is still TODO (persons 3/5).
+
+The row level security policies are hackathon-only: the anon/authenticated keys can read and write rows of businesses with `is_synthetic = true`, nothing else. Keep real data out of the hosted project until they are replaced with per-user policies.
+
 The earlier [seven-hour plan](docs/HACKATHON_PLAN.md) is superseded by `docs/design/`, but keeps the duplicate-evidence demo story and its daily fixture arithmetic.
