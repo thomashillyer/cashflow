@@ -174,9 +174,26 @@ function businessHeader() {
   return openedBiz && (!acc || acc.sample) ? { "X-Neri-Business": openedBiz } : {};
 }
 
+// A random id per browser (kept in localStorage when allowed). The demo API gives each visitor a private
+// copy of the shared samples keyed by it, so nobody sees a stranger's edits.
+let visitorId = null;
+function visitor() {
+  if (visitorId) return visitorId;
+  try {
+    visitorId = localStorage.getItem("neri.visitor");
+  } catch {}
+  if (!visitorId) {
+    visitorId = crypto.randomUUID();
+    try {
+      localStorage.setItem("neri.visitor", visitorId);
+    } catch {}
+  }
+  return visitorId;
+}
+
 async function http(path, init) {
   const token = await auth.accessToken().catch(() => null);
-  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader() };
+  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader(), "X-Neri-Visitor": visitor() };
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (res.status === 401) {
     await auth.signOut().catch(() => {});
