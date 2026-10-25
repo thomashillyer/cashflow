@@ -1005,14 +1005,14 @@
     }
   ],
   "warnings": [
-    "Unconfirmed: whatsapp message says INV-1187 moves to 2027-01-05; not in the forecast until approved."
+    "Unconfirmed: whatsapp message says INV-1187 moves to Jan 5, 2027; not in the forecast until approved."
   ],
   "review": {
     "needed": true,
     "reasons": [
       {
         "code": "unconfirmed_signal",
-        "message": "Unconfirmed: whatsapp message says INV-1187 moves to 2027-01-05; not in the forecast until approved.",
+        "message": "Unconfirmed: whatsapp message says INV-1187 moves to Jan 5, 2027; not in the forecast until approved.",
         "refs": [
           "sig-ev-whatsapp-evergreen-2",
           "inv-INV-1187"

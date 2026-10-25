@@ -10,6 +10,7 @@
 import type {
   ChangeProposal, Field, FieldEvidence, IntakeCandidate, ProposalAction, ProposalOp,
 } from "../../schema/intake";
+import { fmtDate, humanizeId } from "../labels";
 import type { Commitment, CommitmentDraft, CommitmentType, Direction, Records } from "../../schema/records";
 
 export type ProposeContext = { storeRevision: number; now: string };
@@ -126,7 +127,7 @@ export function propose(candidate: IntakeCandidate, records: Records, ctx: Propo
     const existing = (candidate.partyCandidates ?? []).filter((p) => p.partyId);
     if (existing.length) {
       return review("Counterparty not confirmed; pick the right party.", {
-        reasons: ["Counterparty not confirmed; pick the right party.", ...existing.map((p) => `${p.partyId}: ${p.reason}`)],
+        reasons: ["Counterparty not confirmed; pick the right party.", ...existing.map((p) => `${records.parties.find((x) => x.id === p.partyId)?.name ?? humanizeId(p.partyId!)}: ${p.reason}`)],
       });
     }
     const name = direction === "in" ? found(f.buyerName) : found(f.sellerName);
@@ -254,7 +255,7 @@ function reconcileWithTarget(
   if (due && due !== target.anchors.due) {
     ops.push({ op: "updateCommitment", commitmentId: target.id, change: { field: "anchors.due", from: target.anchors.due, to: due }, evidence: evidenceOf(f.dueDate) });
     action = "update";
-    reasons.push(`due date differs (${target.anchors.due ?? "none"} -> ${due})`);
+    reasons.push(`due date differs (${target.anchors.due ? fmtDate(target.anchors.due, base.createdAt.slice(0, 10)) : "none"} -> ${fmtDate(due, base.createdAt.slice(0, 10))})`);
   }
   for (const key of ["invoiceUrl", "paymentUrl"] as const) {
     const url = found(f[key]);
