@@ -3,7 +3,7 @@
 // service-role read or write. Nothing here sends a message, pays a bill or moves money.
 
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { HttpError, sendError, type NeriRequest, type User } from "./http";
@@ -242,7 +242,13 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       app.get("/config.js", async (_req, reply) =>
         reply.type("application/javascript; charset=utf-8").header("cache-control", "no-cache").send(served));
     }
-    await app.register(fastifyStatic, { root: opts.staticDir, prefix: "/", index: ["index.html"] });
+    await app.register(fastifyStatic, {
+      root: opts.staticDir, prefix: "/", index: ["index.html"],
+      // The sample files (app/samples/) are downloads; their README.txt stays readable in the browser.
+      setHeaders: (res, path) => {
+        if (/[\\/]samples[\\/]/.test(path) && !/README\.txt$/.test(path)) res.setHeader("content-disposition", `attachment; filename="${basename(path)}"`);
+      },
+    });
   }
   return app;
 }

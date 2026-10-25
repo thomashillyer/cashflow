@@ -171,6 +171,7 @@ function viewEmptyForecast(title = "Add your business data") {
     <section class="panel" style="max-width:760px"><h2>No forecast yet</h2>
       <p>Upload your bank statement and books export, paste a message, or sync an available source. Review anything that needs your OK.</p>
       <a class="btn primary" href="#/sources">Add your first source</a>
+      <p class="fineprint">No files handy? <a href="/samples/"><b>Download sample files</b></a></p>
       ${waitingCount() ? `<a class="btn" href="#/review">Review imported items</a>` : ""}
     </section>${bankBalanceForm()}`;
 }
@@ -766,6 +767,7 @@ function viewSources() {
   <div class="upload-band">
     <p><b>Start with a file.</b> Upload a bank statement, invoices, bills or a books export.</p>
     <label class="btn">${icon.upload}Upload a file<input type="file" accept=".csv,.xlsx,.pdf,.eml,.txt,.zip" data-change="upload" hidden /></label>
+    <p class="fineprint">No files handy? <a href="/samples/"><b>Download sample files</b></a></p>
   </div>
   ${app.ctx.business.sources.length ? `<section class="panel" style="max-width:760px;margin-block:24px"><h2>Your source records</h2>${app.ctx.business.sources.map((src) => `<p><b>${esc(src.id === "owner" ? "Owner-entered records" : src.label)}</b> — ${esc(src.state === "ok" ? src.detail || "Records imported" : "Waiting for data")}</p>`).join("")}</section>` : ""}
   ${api.mode === "live" ? bankBalanceForm() : ""}
