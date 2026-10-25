@@ -82,8 +82,11 @@ function cascadeTrade(): Records {
     party("party-shenzhen-ceramics", "Shenzhen Ceramics Co.", "supplier", ["preferred", "reliable"], ["Best quality; slow around Lunar New Year"]),
     party("party-jaipur-textiles", "Jaipur Textiles", "supplier", ["preferred"], ["Good partner; prices in rupees"]),
     party("party-ningbo-pack", "Ningbo Pack", "supplier", ["avoid"], ["Quality issues last year"]),
+    party("party-cascade-customs", "Cascade Customs Brokerage", "supplier", [], ["Bills duties and landing costs when a container clears"]),
   ];
-  r.balances = [balance("bal-cascade", 0, "2026-11-16")]; // opening cash is set below so the low point lands near the design target
+  // Opening cash is a fixed literal, chosen once by hand so the base low point sits near the design target (about -$6K in
+  // the week of Dec 21). It is never tuned against the engine, so fixtures/expected/engine/cascade_trade.json stays independent.
+  r.balances = [balance("bal-cascade", $(145000), "2026-11-16")];
   const eg = history("EG", "party-evergreen-home", [13, 15, 14, 14, 16, 13, 14, 15], "2026-02-10", $(20000));
   const pm = history("PM", "party-puget-market", [-7, -8, -6, -7, -7, -9, -6, -7], "2026-02-15", $(15000));
   const hh = history("HH", "party-harbor-hearth", [0, 1, 0, 0], "2026-07-20", $(10000));
@@ -91,7 +94,10 @@ function cascadeTrade(): Records {
   r.settlements = [...eg.settlements, ...pm.settlements, ...hh.settlements];
   r.commitments.push(
     invoice("INV-1187", "party-evergreen-home", $(28000), "2026-12-10", "2026-11-10"),
-    invoice("INV-1203", "party-harbor-hearth", $(12000), "2026-12-20", "2026-11-20"),
+    // The due date matters: with Harbor's learned lag (holiday delay) INV-1203 lands about Jan 6, after rent on Jan 1. So when
+    // the Evergreen signal moves INV-1187 into January, nothing refills the account between Dec 25 and rent and the dip
+    // deepens (about -$12K on Jan 1). Due earlier, INV-1203 lands before rent and the signal no longer moves the low point.
+    invoice("INV-1203", "party-harbor-hearth", $(12000), "2026-12-28", "2026-11-28"),
     invoice("INV-1215", "party-puget-market", $(115000), "2027-01-12", "2026-12-13"),
     {
       id: "po-PO-2291", type: "purchase_order", direction: "out", reference: "PO-2291", partyId: "party-shenzhen-ceramics", amount: $(60000), currency: "USD",
@@ -101,7 +107,10 @@ function cascadeTrade(): Records {
       id: "po-PO-2302", type: "purchase_order", direction: "out", reference: "PO-2302", partyId: "party-jaipur-textiles", amount: 200_000_000, currency: "INR",
       anchors: { order: "2026-12-01", ship: "2026-12-15" }, patternId: "supplier_50_50", status: "committed", settlement: "open", sourceRef: src("generic_file", "po-2302.xlsx"),
     },
-    { id: "bill-duties-2291", type: "bill", direction: "out", reference: "DUTIES-2291", category: "duties", amount: $(9000), currency: "USD", anchors: { due: "2026-12-18" }, status: "likely", settlement: "open", sourceRef: src("generic_file", "po-2291.pdf") },
+    {
+      id: "bill-duties-2291", type: "bill", direction: "out", reference: "DUTIES-2291", partyId: "party-cascade-customs", category: "duties", amount: $(9000), currency: "USD",
+      anchors: { due: "2026-12-18" }, status: "likely", settlement: "open", sourceRef: src("generic_file", "broker-inv-2291.pdf"),
+    },
     {
       id: "rfq-harbor-spring", type: "sales_deal", direction: "in", reference: "RFQ-77", partyId: "party-harbor-hearth", amount: $(60000), currency: "USD",
       anchors: { order: "2026-12-05", delivery: "2027-02-01" }, status: "possible", probability: 0.4, sourceRef: src("email", "rfq-77"),
@@ -145,8 +154,8 @@ function pikeNoodle(): Records {
   return r;
 }
 
-const fixtures: { name: string; profile: string; asOf: string; fxRates: Record<string, number>; records: Records; openingTarget?: { lowPoint: number } }[] = [
-  { name: "cascade_trade", profile: "profiles/trading.json", asOf: "2026-11-16", fxRates: { INR: 0.012 }, records: cascadeTrade(), openingTarget: { lowPoint: -$(6000) } },
+const fixtures: { name: string; profile: string; asOf: string; fxRates: Record<string, number>; records: Records }[] = [
+  { name: "cascade_trade", profile: "profiles/trading.json", asOf: "2026-11-16", fxRates: { INR: 0.012 }, records: cascadeTrade() },
   { name: "pike_noodle", profile: "profiles/restaurant.json", asOf: "2026-11-16", fxRates: {}, records: pikeNoodle() },
 ];
 const demo = demoRunway();
@@ -156,12 +165,6 @@ fixtures.unshift({ name: "demo_runway", profile: "fixtures/demo_runway/profile.j
 for (const f of fixtures) {
   const profile = JSON.parse(readFileSync(join(root, f.profile), "utf8")) as Profile;
   const base = { id: "base", kind: "base" as const, overrides: [] };
-  if (f.openingTarget) {
-    // Tune opening cash (to the nearest $1,000) so the base low point matches the design target.
-    f.records.balances[0]!.amount = 0;
-    const at0 = forecast(f.records, profile, base, f.asOf, f.fxRates).lowPoint.amount;
-    f.records.balances[0]!.amount = Math.round((f.openingTarget.lowPoint - at0) / $(1000)) * $(1000);
-  }
   write(`fixtures/${f.name}/fixture.json`, { name: f.name, profile: f.profile, asOf: f.asOf, fxRates: f.fxRates });
   write(`fixtures/${f.name}/records.json`, f.records);
   const run = forecast(f.records, profile, base, f.asOf, f.fxRates);

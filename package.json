@@ -6,6 +6,7 @@
   "scripts": {
     "test": "tsc --noEmit && vitest run",
     "typecheck": "tsc --noEmit",
+    "prepare": "node scripts/prepare.mjs",
     "setup:supabase": "node scripts/setup-supabase.mjs"
   },
   "devDependencies": {
