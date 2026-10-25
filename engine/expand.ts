@@ -12,7 +12,7 @@ export type Expanded = { events: CashEvent[]; commitments: Commitment[]; warning
 
 type Leg = PaymentPattern["legs"][number];
 
-const STATUS_CONFIDENCE = { actual: 1, committed: 0.95, likely: 0.7, possible: 0.3 } as const;
+export const STATUS_CONFIDENCE = { actual: 1, committed: 0.95, likely: 0.7, possible: 0.3 } as const;
 
 // Anchors that mean "wait for the customer to pay", so the party's lag applies. `order` and `ship` are our own dates.
 const LAGGED_ANCHORS: Anchor[] = ["due", "invoice", "delivery", "month_end"];
