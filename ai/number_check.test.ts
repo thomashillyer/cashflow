@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Answer } from "../schema/forecast";
 import {
-  allowedFromToolResults, checkAnswer, extractFigures, guardAnswer,
+  allowedFromToolResults, checkAnswer, checkText, extractFigures, guardAnswer,
 } from "./number_check";
 
 const opts = { currency: "USD", asOf: "2026-10-25" };
@@ -212,5 +212,68 @@ describe("allowedFromToolResults", () => {
     const o: Record<string, unknown> = { amount: 5 };
     o.self = o;
     expect(allowedFromToolResults([o, null, 3, "x"]).amounts).toEqual([5]);
+  });
+});
+
+describe("review hardening", () => {
+  it("extracts codes, glued codes, grouped bare numbers, and European formats", () => {
+    const m = (t: string) => amounts(t).map((a) => a.minor);
+    expect(m("owes 48,000 CAD")).toEqual([4_800_000]);
+    expect(m("USD5,000 and CHF500 and usd500")).toEqual([500_000, 50_000, 50_000]);
+    expect(m("balance of 5,000")).toEqual([500_000]);
+    expect(m("500 US dollars")).toEqual([50_000]);
+    expect(m("1.234,56 EUR")).toEqual([123_456]);
+    expect(m("12,34,567 INR")).toEqual([123_456_700]);
+    expect(extractFigures("5,000 yen", opts).amounts[0]!.minor).toBe(5000);
+  });
+
+  it("never lets an unparseable marked figure pass", () => {
+    const a = amounts("it cost $1.5.3");
+    expect(a).toHaveLength(1);
+    expect(Number.isNaN(a[0]!.minor)).toBe(true);
+    expect(checkAnswer(ans("it cost $1.5.3"), { amounts: [123, 12_300], dates: [] }, opts).ok).toBe(false);
+  });
+
+  it("does not read identifiers or the word 'try' as money", () => {
+    expect(amounts("INV28K and A1187 and try 5 times")).toEqual([]);
+  });
+
+  it("K/M figures use rounding only; the 5% band is for hedged figures", () => {
+    expect(checkAnswer(ans("$28K"), { amounts: [2_900_000], dates: [] }, opts).ok).toBe(false);
+    expect(checkAnswer(ans("about $28K"), { amounts: [2_900_000], dates: [] }, opts).ok).toBe(true);
+  });
+
+  it("rejects a positive statement of a negative balance but allows shortfall framing", () => {
+    const neg = { amounts: [-1_234_500], dates: [] };
+    expect(checkAnswer(ans("You will have $12,345 left."), neg, opts).ok).toBe(false);
+    expect(checkAnswer(ans("You will be $12,345 short."), neg, opts).ok).toBe(true);
+    expect(checkAnswer(ans("Closing balance is -$12,345."), neg, opts).ok).toBe(true);
+  });
+
+  it("matches a past date without a year against any nearby year", () => {
+    const r = checkAnswer(ans("Invoice was due Jan 15", { citations: [] }), { amounts: [], dates: ["2026-01-15"] }, opts);
+    expect(r.ok).toBe(true);
+  });
+
+  it("extracts both ends of a date range and more numeric formats", () => {
+    expect(dates("Nov 3-5")).toEqual(["2026-11-03", "2026-11-05"]);
+    expect(dates("2026/11/03 and 03.11.2026")).toEqual(["2026-11-03", "2026-11-03"]);
+    expect(dates("Nov 3-5, 2026")).toEqual(["2026-11-03", "2026-11-05"]);
+    const r = checkAnswer(ans("due Nov 5-6", { citations: [] }), { amounts: [], dates: ["2026-11-09"] }, opts);
+    expect(r.unmatched).toHaveLength(2);
+  });
+
+  it("checkText applies the same rules to non-Answer text", () => {
+    expect(checkText("Collect $28,000 by Dec 24", ["inv-1"], allowed, opts).ok).toBe(true);
+    expect(checkText("Collect $28,000", [], allowed, opts).problems).toContain("amounts without citations");
+  });
+
+  it("matches whole key words and ignores message text fields", () => {
+    const a = allowedFromToolResults([{
+      accountBalance: 700_000, discountAmount: 5_000, weeksFree: 3,
+      signal: { excerpt: "pay on 2026-11-30, $9,999", amount: 12_000 },
+    }]);
+    expect(a.amounts).toEqual([5_000, 12_000, 700_000]);
+    expect(a.dates).toEqual([]);
   });
 });
