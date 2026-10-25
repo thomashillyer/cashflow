@@ -5,7 +5,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ChangeProposal, CommitmentFieldChange } from "../../schema/intake";
-import type { Commitment, Override, Records, Signal } from "../../schema/records";
+import type { Commitment, Override, Records, Rule, Signal } from "../../schema/records";
 import { forecast } from "../../engine/forecast";
 import { ingest, type IntakeInput, type IntakeNote } from "../../ai/intake";
 import { ApplyError, applyProposal, type ApplyErrorCode } from "../../ai/reconcile/apply";
@@ -410,6 +410,26 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       },
     };
     const out = await commit(deps.store, b.id, key.key, hash, { expectedRevision: expected, records: { signals: [next] }, proposals: [], response }, "Your books changed. Review it again.");
+    if (!out.replay) await refreshPending(deps.store, b.id, nextRecords, Number(out.body.storeRevision), nowIso());
+    return out.body;
+  });
+
+  // The owner approves or dismisses a standing rule that Ask Neri proposed. Only a confirmed rule reaches the forecast.
+  app.post("/rules/:id/:decision", async (req) => {
+    const b = businessOf(req);
+    const { id, decision } = req.params as { id: string; decision: string };
+    if (decision !== "confirm" && decision !== "dismiss") throw new HttpError(404, "NOT_FOUND", "Confirm or dismiss.");
+    const key = idempotencyKey(req);
+    const hash = requestHash(`rule-${decision}`, id, {});
+    const prior = await priorDecision(deps.store, b.id, key, hash);
+    if (prior) return prior.body;
+    const { records, storeRevision } = await deps.store.load(b.id);
+    const rule = records.rules.find((r) => r.id === id);
+    if (!rule) throw new HttpError(404, "NOT_FOUND", "That rule is no longer in your list.");
+    if (rule.state !== "proposed") throw new HttpError(409, "NOT_PROPOSED", `This rule was already ${rule.state}.`, { revision: storeRevision });
+    const next: Rule = { ...rule, state: decision === "confirm" ? "confirmed" : "dismissed" };
+    const nextRecords = { ...records, rules: records.rules.map((r) => (r.id === id ? next : r)) };
+    const out = await commit(deps.store, b.id, key.key, hash, { expectedRevision: storeRevision, records: { rules: [next] }, proposals: [], response: { rule: next } }, "Your books changed. Reload and try again.");
     if (!out.replay) await refreshPending(deps.store, b.id, nextRecords, Number(out.body.storeRevision), nowIso());
     return out.body;
   });

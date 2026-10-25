@@ -706,6 +706,53 @@ describe("atomic, idempotent decisions (#191)", () => {
     expect([a, b].find((r) => r.statusCode === 200)!.json().storeRevision).toBe(storeRevision);
   });
 
+  describe("POST /rules/:id/confirm|dismiss", () => {
+    const seedRule = async (id = "rule-test-1") => {
+      await store.upsertRecords("cascade_trade", { rules: [{ id, scope: { all: true }, kind: "lag_offset", params: { offsetDays: 14 }, fromNote: "Customers pay about two weeks late", state: "proposed" }] });
+      return id;
+    };
+
+    it("confirm sets the state and bumps the revision", async () => {
+      const id = await seedRule();
+      const before = (await store.load("cascade_trade")).storeRevision;
+      const res = await app.inject({ method: "POST", url: `/rules/${id}/confirm`, headers: OTHER });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({ rule: { id, state: "confirmed" }, storeRevision: before + 1 });
+      const { records, storeRevision } = await store.load("cascade_trade");
+      expect(storeRevision).toBe(before + 1);
+      expect(records.rules.find((r) => r.id === id)!.state).toBe("confirmed");
+    });
+
+    it("dismiss works", async () => {
+      const id = await seedRule();
+      const res = await app.inject({ method: "POST", url: `/rules/${id}/dismiss`, headers: OTHER });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().rule.state).toBe("dismissed");
+      expect((await store.load("cascade_trade")).records.rules.find((r) => r.id === id)!.state).toBe("dismissed");
+    });
+
+    it("a second confirm is 409 NOT_PROPOSED", async () => {
+      const id = await seedRule();
+      await app.inject({ method: "POST", url: `/rules/${id}/confirm`, headers: OTHER });
+      const again = await app.inject({ method: "POST", url: `/rules/${id}/confirm`, headers: OTHER });
+      expect(again.statusCode).toBe(409);
+      expect(again.json().error.code).toBe("NOT_PROPOSED");
+    });
+
+    it("two concurrent confirms: one 200, one 409", async () => {
+      const id = await seedRule();
+      const go = () => app.inject({ method: "POST", url: `/rules/${id}/confirm`, headers: OTHER });
+      const [a, b] = await Promise.all([go(), go()]);
+      expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
+    });
+
+    it("an unknown id is 404, and a bad decision is 404", async () => {
+      expect((await app.inject({ method: "POST", url: "/rules/nope/confirm", headers: OTHER })).statusCode).toBe(404);
+      const id = await seedRule();
+      expect((await app.inject({ method: "POST", url: `/rules/${id}/approve`, headers: OTHER })).statusCode).toBe(404);
+    });
+  });
+
   it("the same Idempotency-Key and body replays the stored response without writing", async () => {
     const id = await pendingProposal();
     const headers = { ...OTHER, "idempotency-key": "k-1" };

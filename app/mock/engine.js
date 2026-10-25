@@ -387,6 +387,13 @@ export function createEngine(fixture) {
     };
   }
 
+  function decideRule(id, decision) {
+    const r = fixture.rules.find((x) => x.id === id);
+    if (!r) throw new Error("No such rule");
+    r.state = decision === "confirm" ? "confirmed" : "dismissed";
+    return { rule: r };
+  }
+
   // ---- drafts ----------------------------------------------------------------------
   function draft(itemId) {
     const b = brief();
@@ -693,6 +700,7 @@ export function createEngine(fixture) {
     brief,
     review,
     decideSignal,
+    decideRule,
     draft,
     markDone,
     ask,

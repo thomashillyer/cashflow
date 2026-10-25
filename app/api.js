@@ -121,6 +121,9 @@ const preview = {
   async decideSignal(id, decision) {
     return engine.decideSignal(id, decision);
   },
+  async decideRule(id, decision) {
+    return engine.decideRule(id, decision);
+  },
   async draft(itemId) {
     return engine.draft(itemId);
   },
@@ -235,6 +238,9 @@ const live = {
   },
   async decideSignal(id, decision) {
     return http(`/signals/${encodeURIComponent(id)}/${decision === "apply" ? "apply" : "dismiss"}`, { method: "POST" });
+  },
+  async decideRule(id, decision) {
+    return http(`/rules/${encodeURIComponent(id)}/${decision === "confirm" ? "confirm" : "dismiss"}`, { method: "POST" });
   },
   async draft(itemId) {
     return http(`/work-items/${encodeURIComponent(itemId)}/draft`, { method: "POST" });

@@ -63,6 +63,7 @@ Errors are `{ error: { code, message, fieldIssues, retryable }, revision? }`; `m
 | `POST /review/:id/confirm` | `{ expectedRevision?, commitmentId?, ownerEdits? }` -> `applyProposal` -> upsert -> revision +1 -> rebuild other pending proposals | `{ storeRevision, affectedRecordIds, warnings }`; `ApplyError` -> 409/422/404 per `ai/README.md` |
 | `POST /review/:id/dismiss` | Dismiss a proposal | `{ id, state }` |
 | `POST /signals/:id/apply` / `dismiss` | `{ expectedRevision?, commitmentId?, newDate? }` | `{ signal, storeRevision, lowPoint, alert }` |
+| `POST /rules/:id/confirm` / `dismiss` | The owner approves or dismisses a rule Ask Neri proposed (`proposed` -> `confirmed` / `dismissed`). One atomic `commitDecision` (Idempotency-Key honoured); `404` unknown rule, `409 NOT_PROPOSED` if already decided. Only a confirmed rule changes the forecast (lag offset in `engine/lag.ts`, flexibility in `engine/warnings.ts`) | `{ rule, storeRevision }` |
 | `GET /notes`, `POST /notes` | Owner notes (`{ text, via }`) with Neri's reading and priced effect | `Thought[]` / `Thought` |
 | `PATCH /notes/:id` | Correct the reading (`amount`, `date`, `direction`, `status`, `probability`, `partyId`, `kind`) | `Thought` |
 | `POST /notes/:id/add\|keep\|remove` | `add` writes an owner Signal (date change on the named invoice, or a plan) | `{ id, state, ... }` |
