@@ -3,16 +3,25 @@
 // push(): informational note only. review(): data is missing or unresolved; records both the warning and a reason.
 
 import type { ForecastRun, ReviewReason } from "../schema/forecast";
+import { humanizeDates } from "../ai/labels";
 
 export class Notes {
   private readonly warnings: string[] = [];
   private readonly reasons: ReviewReason[] = [];
 
-  push(...messages: string[]): void {
-    this.warnings.push(...messages);
+  // With asOf, every ISO date in an owner-facing message is written the way the brief writes dates ("Jan 8").
+  constructor(private readonly asOf?: string) {}
+
+  private words(m: string): string {
+    return this.asOf ? humanizeDates(m, this.asOf) : m;
   }
 
-  review(code: string, message: string, refs: (string | undefined)[] = []): void {
+  push(...messages: string[]): void {
+    this.warnings.push(...messages.map((m) => this.words(m)));
+  }
+
+  review(code: string, rawMessage: string, refs: (string | undefined)[] = []): void {
+    const message = this.words(rawMessage);
     this.warnings.push(message);
     this.reasons.push({ code, message, refs: [...new Set(refs.filter((r): r is string => !!r))] });
   }

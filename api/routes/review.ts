@@ -16,7 +16,7 @@ import { enrichEvidence, prepareFileImport, type PreparedImport } from "../../ad
 import type { Deps } from "../app";
 import { inferWhatsAppDateOrder, normalizeChat } from "../../adapters/whatsapp/export";
 import { businessIdentity, loadForRun, runInputs, savedScenario } from "../engine";
-import { businessOf, HttpError, isIsoDate } from "../http";
+import { storeFor, businessOf, HttpError, isIsoDate } from "../http";
 import type { Business, DecisionWrite, Store } from "../store";
 import { importBank } from "./bank";
 
@@ -220,8 +220,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (b.isSynthetic && deps.demoMode) throw new HttpError(403, "FORBIDDEN", "The sample already has its documents. Set up your business to upload your own files.");
     const { adapter } = req.params as { adapter: string };
     // Bank statements are history and a balance, not documents to interpret (api/routes/bank.ts).
-    if (adapter === "bank") return importBank(deps, b, (req.body ?? {}) as Record<string, unknown>, nowIso());
-    const { records, storeRevision } = await deps.store.load(b.id);
+    if (adapter === "bank") return importBank(storeFor(req), b, (req.body ?? {}) as Record<string, unknown>, nowIso());
+    const { records, storeRevision } = await storeFor(req).load(b.id);
     const prep = await toInput(adapter, (req.body ?? {}) as Record<string, unknown>, nowIso(), records, businessIdentity(b), b.profile.baseCurrency);
     if ("repeat" in prep) {
       // Same bytes as a file already imported: nothing to ingest, so nothing can change.
@@ -237,19 +237,19 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     });
     const result = { ...ingested, evidence: enrichEvidence(ingested.evidence, prep.prepared?.fileEvidence) };
     // Same input gives the same ids: never reopen a decided proposal, never reset a decided signal.
-    const existing = new Map((await deps.store.listProposals(b.id)).map((p) => [p.id, p]));
+    const existing = new Map((await storeFor(req).listProposals(b.id)).map((p) => [p.id, p]));
     const proposals = result.proposals.filter((p) => existing.get(p.id)?.state !== "confirmed" && existing.get(p.id)?.state !== "dismissed");
     const known = new Set(records.signals.map((s) => s.id));
     const signals = result.signals.filter((s) => !known.has(s.id));
     // Evidence last: it carries the file hash that makes a later upload a repeat, so a failure partway
     // through must leave the file importable again.
-    await deps.store.saveIntake(b.id, { evidence: [], candidates: result.candidates, proposals, signals });
-    await deps.store.saveIntake(b.id, { evidence: result.evidence, candidates: [], proposals: [], signals: [] });
+    await storeFor(req).saveIntake(b.id, { evidence: [], candidates: result.candidates, proposals, signals });
+    await storeFor(req).saveIntake(b.id, { evidence: result.evidence, candidates: [], proposals: [], signals: [] });
     if (result.notes.length) {
       const acc = b.profile.account ?? {};
       const seen = new Set((acc.intakeNotes ?? []).map((n) => `${n.scope}\u0000${n.text}`));
       const add: IntakeNote[] = result.notes.filter((n) => !seen.has(`${n.scope}\u0000${n.text}`));
-      await deps.store.saveProfile(b.id, { ...b.profile, account: { ...acc, intakeNotes: [...(acc.intakeNotes ?? []), ...add].slice(-MAX_NOTES) } });
+      await storeFor(req).saveProfile(b.id, { ...b.profile, account: { ...acc, intakeNotes: [...(acc.intakeNotes ?? []), ...add].slice(-MAX_NOTES) } });
     }
     const byAction: Record<string, number> = {};
     for (const p of result.proposals) byAction[p.action] = (byAction[p.action] ?? 0) + 1;
@@ -262,7 +262,7 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   // The app's Review list: proposed signals with the words, the invoice, and the priced effect.
   app.get("/review", async (req) => {
     const b = businessOf(req);
-    const { records, overrides } = await loadForRun(deps.store, b.id);
+    const { records, overrides } = await loadForRun(storeFor(req), b.id);
     return records.signals.filter((s) => s.state === "proposed").map((s) => signalItem(b, records, overrides, s, deps)).filter((x) => x !== null);
   });
 
@@ -271,7 +271,7 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.get("/review/proposals", async (req) => {
     const b = businessOf(req);
     const [{ records, storeRevision }, proposals, candidates] = await Promise.all([
-      deps.store.load(b.id), deps.store.listProposals(b.id), deps.store.listCandidates(b.id),
+      storeFor(req).load(b.id), storeFor(req).listProposals(b.id), storeFor(req).listCandidates(b.id),
     ]);
     const notes = b.profile.account?.intakeNotes ?? [];
     const notesFor = (...ids: (string | undefined)[]) => notes.filter((n) => ids.includes(n.scope)).map((n) => n.text);
@@ -298,9 +298,9 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = (req.body ?? {}) as { expectedRevision?: unknown; commitmentId?: unknown; ownerEdits?: unknown };
     const key = idempotencyKey(req);
     const hash = requestHash("confirm", id, body);
-    const prior = await priorDecision(deps.store, b.id, key, hash);
+    const prior = await priorDecision(storeFor(req), b.id, key, hash);
     if (prior) return prior.body;
-    const [{ records, storeRevision }, proposals] = await Promise.all([deps.store.load(b.id), deps.store.listProposals(b.id)]);
+    const [{ records, storeRevision }, proposals] = await Promise.all([storeFor(req).load(b.id), storeFor(req).listProposals(b.id)]);
     let proposal = proposals.find((p) => p.id === id);
     if (!proposal) throw new HttpError(404, "NOT_FOUND", "That item is no longer in Review.");
     if (proposal.state !== "proposed") throw new HttpError(409, "NOT_PROPOSED", `This item was already ${proposal.state}.`, { revision: storeRevision });
@@ -327,12 +327,12 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     }
     // Code computed the change above; the store commits records + proposal + revision in one atomic step,
     // only while the revision is still the one this request loaded.
-    const out = await commit(deps.store, b.id, key.key, hash, {
+    const out = await commit(storeFor(req), b.id, key.key, hash, {
       expectedRevision: expected, records: applied.records, proposals: [{ ...proposal, state: "confirmed", decidedAt: nowIso() }],
       response: { affectedRecordIds: applied.affectedRecordIds, warnings: applied.warnings },
     }, STALE_MESSAGE);
     if (out.replay) return out.body;
-    await refreshPending(deps.store, b.id, applied.records, Number(out.body.storeRevision), nowIso());
+    await refreshPending(storeFor(req), b.id, applied.records, Number(out.body.storeRevision), nowIso());
     return out.body;
   });
 
@@ -342,19 +342,19 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = (req.body ?? {}) as { expectedRevision?: unknown };
     const key = idempotencyKey(req);
     const hash = requestHash("dismiss", id, body);
-    const prior = await priorDecision(deps.store, b.id, key, hash);
+    const prior = await priorDecision(storeFor(req), b.id, key, hash);
     if (prior) return prior.body;
-    const [{ records, storeRevision }, proposals] = await Promise.all([deps.store.load(b.id), deps.store.listProposals(b.id)]);
+    const [{ records, storeRevision }, proposals] = await Promise.all([storeFor(req).load(b.id), storeFor(req).listProposals(b.id)]);
     const proposal = proposals.find((p) => p.id === id);
     if (!proposal) throw new HttpError(404, "NOT_FOUND", "That item is no longer in Review.");
     if (proposal.state !== "proposed") throw new HttpError(409, "NOT_PROPOSED", `This item was already ${proposal.state}.`);
-    const out = await commit(deps.store, b.id, key.key, hash, {
+    const out = await commit(storeFor(req), b.id, key.key, hash, {
       expectedRevision: typeof body.expectedRevision === "number" ? body.expectedRevision : storeRevision,
       records: {}, proposals: [{ ...proposal, state: "dismissed", decidedAt: nowIso() }], response: { id, state: "dismissed" },
     }, STALE_MESSAGE);
     if (out.replay) return out.body;
     // The commit moved the revision: rebuild the other pending proposals against it.
-    await refreshPending(deps.store, b.id, records, Number(out.body.storeRevision), nowIso());
+    await refreshPending(storeFor(req), b.id, records, Number(out.body.storeRevision), nowIso());
     return out.body;
   });
 
@@ -366,9 +366,9 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = (req.body ?? {}) as { expectedRevision?: unknown; commitmentId?: unknown; newDate?: unknown };
     const key = idempotencyKey(req);
     const hash = requestHash(`signal-${decision}`, id, body);
-    const prior = await priorDecision(deps.store, b.id, key, hash);
+    const prior = await priorDecision(storeFor(req), b.id, key, hash);
     if (prior) return prior.body;
-    const { records, storeRevision } = await deps.store.load(b.id);
+    const { records, storeRevision } = await storeFor(req).load(b.id);
     const signal = records.signals.find((s) => s.id === id);
     if (!signal) throw new HttpError(404, "NOT_FOUND", "That message is no longer in Review.");
     if (signal.state !== "proposed") throw new HttpError(409, "NOT_PROPOSED", `This message was already ${signal.state}.`, { revision: storeRevision });
@@ -393,13 +393,13 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const nextRecords = { ...records, signals: records.signals.map((s) => (s.id === id ? next : s)) };
     const expected = typeof body.expectedRevision === "number" ? body.expectedRevision : storeRevision;
     if (decision === "dismiss") {
-      const out = await commit(deps.store, b.id, key.key, hash, { expectedRevision: expected, records: { signals: [next] }, proposals: [], response: { signal: next, alert: null } }, "Your books changed. Review it again.");
-      if (!out.replay) await refreshPending(deps.store, b.id, nextRecords, Number(out.body.storeRevision), nowIso());
+      const out = await commit(storeFor(req), b.id, key.key, hash, { expectedRevision: expected, records: { signals: [next] }, proposals: [], response: { signal: next, alert: null } }, "Your books changed. Review it again.");
+      if (!out.replay) await refreshPending(storeFor(req), b.id, nextRecords, Number(out.body.storeRevision), nowIso());
       return out.body;
     }
 
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
-    const scenario = savedScenario(await deps.store.loadOverrides(b.id));
+    const scenario = savedScenario(await storeFor(req).loadOverrides(b.id));
     const before = forecast(records, profile, scenario, asOf, fxRates).lowPoint;
     const after = forecast(nextRecords, profile, scenario, asOf, fxRates).lowPoint;
     const c = nextRecords.commitments.find((x) => x.id === next.commitmentId);
@@ -412,8 +412,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         detail: `Your low point is now ${money(after.amount)} on ${fmtDate(after.date, asOf)}${after.amount < before.amount ? `, down ${money(before.amount - after.amount)}` : ""}.`,
       },
     };
-    const out = await commit(deps.store, b.id, key.key, hash, { expectedRevision: expected, records: { signals: [next] }, proposals: [], response }, "Your books changed. Review it again.");
-    if (!out.replay) await refreshPending(deps.store, b.id, nextRecords, Number(out.body.storeRevision), nowIso());
+    const out = await commit(storeFor(req), b.id, key.key, hash, { expectedRevision: expected, records: { signals: [next] }, proposals: [], response }, "Your books changed. Review it again.");
+    if (!out.replay) await refreshPending(storeFor(req), b.id, nextRecords, Number(out.body.storeRevision), nowIso());
     return out.body;
   });
 
@@ -424,16 +424,16 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (decision !== "confirm" && decision !== "dismiss") throw new HttpError(404, "NOT_FOUND", "Confirm or dismiss.");
     const key = idempotencyKey(req);
     const hash = requestHash(`rule-${decision}`, id, {});
-    const prior = await priorDecision(deps.store, b.id, key, hash);
+    const prior = await priorDecision(storeFor(req), b.id, key, hash);
     if (prior) return prior.body;
-    const { records, storeRevision } = await deps.store.load(b.id);
+    const { records, storeRevision } = await storeFor(req).load(b.id);
     const rule = records.rules.find((r) => r.id === id);
     if (!rule) throw new HttpError(404, "NOT_FOUND", "That rule is no longer in your list.");
     if (rule.state !== "proposed") throw new HttpError(409, "NOT_PROPOSED", `This rule was already ${rule.state}.`, { revision: storeRevision });
     const next: Rule = { ...rule, state: decision === "confirm" ? "confirmed" : "dismissed" };
     const nextRecords = { ...records, rules: records.rules.map((r) => (r.id === id ? next : r)) };
-    const out = await commit(deps.store, b.id, key.key, hash, { expectedRevision: storeRevision, records: { rules: [next] }, proposals: [], response: { rule: next } }, "Your books changed. Reload and try again.");
-    if (!out.replay) await refreshPending(deps.store, b.id, nextRecords, Number(out.body.storeRevision), nowIso());
+    const out = await commit(storeFor(req), b.id, key.key, hash, { expectedRevision: storeRevision, records: { rules: [next] }, proposals: [], response: { rule: next } }, "Your books changed. Reload and try again.");
+    if (!out.replay) await refreshPending(storeFor(req), b.id, nextRecords, Number(out.body.storeRevision), nowIso());
     return out.body;
   });
 };

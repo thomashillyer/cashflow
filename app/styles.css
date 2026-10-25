@@ -527,7 +527,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .drive-btn.main[aria-label="Stop"] svg { transform: none; }
 .drive-btn.rec { background: #3a2a10; color: #f7c47a; }
 .drive-btn.rec[aria-pressed="true"] { background: #f5a93f; color: #2a1800; animation: pulse 1.4s infinite; }
-.drive-btn svg { width: 32px; height: 32px; }
+.drive-btn svg { width: 46px; height: 46px; }
+.drive-btn.main svg { width: 66px; height: 66px; }
 .drive-caption { text-align: center; color: #8a91ad; font-size: 15px; margin-top: 12px; min-height: 22px; }
 
 /* ---------- mobile nav ---------- */
@@ -640,8 +641,22 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 }
 .askbar.branded input { font-weight: 500; }
 .askbar.branded input::placeholder { color: var(--ink-soft); font-weight: 450; }
-.ask-mark { display: grid; place-items: center; flex-shrink: 0; }
-.ask-mark .mark { width: 34px; height: 34px; border-radius: 50%; box-shadow: 0 0 0 1px var(--rule); }
+.attach-btn {
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; cursor: pointer;
+  color: var(--ink-soft); background: var(--sunken); transition: background .15s, color .15s;
+}
+.attach-btn:hover { color: var(--ink); background: color-mix(in srgb, var(--accent) 14%, var(--sunken)); }
+.attach-btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.attach-btn svg { width: 20px; height: 20px; stroke-width: 2; }
+.attach-list { list-style: none; display: flex; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; margin: 0 0 8px; padding: 0 4px; }
+.attach-list::-webkit-scrollbar { display: none; }
+.attach-chip {
+  display: inline-flex; flex-shrink: 0; align-items: center; gap: 4px; max-width: 240px; padding: 2px 2px 2px 12px; border-radius: 999px;
+  font-size: 13px; background: var(--surface); border: 1px solid var(--rule); color: var(--ink);
+}
+.attach-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-chip button { border: 0; background: none; color: var(--ink-faint); font-size: 18px; line-height: 1; width: 32px; height: 32px; border-radius: 50%; }
+.attach-chip button:hover { background: var(--sunken); color: var(--ink); }
 
 /* Suggested questions sit in one row right on top of the bar; the row scrolls sideways when it runs long */
 .dock-hints {
@@ -685,10 +700,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   }
   .dock .askbar { box-shadow: none; padding: 4px 4px 4px 16px; }
   .dock .askbar.branded { padding-left: 6px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
-  .ask-mark .mark { width: 30px; height: 30px; }
+  .attach-btn { width: 34px; height: 34px; }
   .dock-hints { margin-bottom: 8px; }
   .dock-hints .hint { font-size: 13px; padding: 5px 11px; }
   .home:has(.dock-hints) { padding-bottom: 116px; }
+  .home:has(.attach-list) { padding-bottom: 160px; }
   .dock .askbar input { font-size: 16px; padding: 8px 0; }
   .wide-only { display: none; }
   .kpis { grid-template-columns: 1fr 1fr; }

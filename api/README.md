@@ -28,20 +28,36 @@ Tests: `npx vitest run api` (Fastify `inject()`, in-memory store, no network, no
 | `SUPABASE_SERVICE_ROLE_KEY` | Server reads and writes, only after the auth and membership check. Never in the browser. |
 | `ANTHROPIC_API_KEY` | Live Claude for imports, brief words and drafts. Without it (or with `NERI_AI_MODE=cache_only`) the server runs on the committed caches and code-built text. |
 | `NERI_AI_MODE` | `live` or `cache_only`. Default: live when a key is set, except in `DEMO_MODE`, where it is `cache_only` unless set to `live`. |
-| `DEMO_MODE=1` | Requests without a token may open the synthetic samples (public preview, judges); uploads (`/import`) still need sign-in, because the samples are shared. Private businesses still need a member's token. Also enables `POST /demo/reset`. |
+| `DEMO_MODE=1` | Requests without a token may open the synthetic samples (public preview, judges); uploads (`/import`) still need sign-in, because the samples are shared. Private businesses still need a member's token. Visitors get a private sandbox copy of each sample (see Demo sandbox). |
 | `NERI_DEFAULT_BUSINESS` | Sample opened when the caller has no business of their own (default `cascade_trade`). |
 | `NERI_STORE=memory` | In-memory store seeded from the fixtures, instead of Supabase. |
-| `NERI_ALLOW_RESET=1` | Enable `POST /demo/reset` outside demo mode. |
+| `NERI_ALLOW_RESET=1` | Let `POST /demo/reset` without a visitor id reseed the shared samples (admin use, tests). Off by default, also in demo mode. |
 | `NERI_STATIC_DIR` | Directory served at `/` (default `app/`). |
 | `PORT`, `HOST` | Default `8787`, `127.0.0.1`. Set `HOST=0.0.0.0` in a container. |
 
 ## Auth and tenant scope
 
+The hosted app creates accounts and signs in with email and password directly through Supabase. Email confirmations are disabled for the hackathon, so neither action sends mail. Passwords never pass through this API. Private-business access still checks the verified session's user ID and membership, not its unverified email address.
+
+- **Email-link callback:** set the hosted Supabase Authentication Site URL to `https://neri-cash.fly.dev` (for local development, use the app's local origin). The frontend uses that default destination without a redirect override or wildcard allowlist. The default email template works unchanged: open the link in the browser/device where sign-in started so the stored PKCE verifier is available. Existing businesses are restored through `GET /context`; signing in does not call `POST /setup` again. Six-digit OTP templates remain supported.
+- **Email delivery:** without custom SMTP, the built-in sender is limited to team addresses and currently two emails/hour. A configured provider such as SendGrid supports its own recipient and rate-limit policy; the frontend also accepts its six-digit-code templates. Keep anonymous samples available for judges. No sender credentials or auth-confirmation settings are changed by this frontend flow. Configure hosted Auth separately from app deployment; do not push the local `supabase/config.toml` wholesale. [Supabase SMTP limits](https://supabase.com/docs/guides/auth/auth-smtp).
 - Every route except `GET /health` and `GET /ready` reads `Authorization: Bearer <supabase access token>` and verifies it with `supabase.auth.getUser` (anon-key client). A bad or expired token is `401` (the app then returns to sign-in). No token is `401` unless `DEMO_MODE=1`.
 - **Which business:** the `X-Neri-Business` header (or `?business=`) if sent; else the caller's own business; else the default sample. The app does not send one yet, so a signed-in owner sees their own business and everyone else sees the sample.
 - **Membership:** synthetic businesses are open to any verified caller (and to anonymous callers in demo mode). A private business needs membership: a row in `memberships` (tenant-access migration, branch `p3/tenant-access`) or, until that migration is applied, the owner recorded at `POST /setup` (`profile.account.ownerUserId`). Anything else is `404`, the same answer as an unknown id.
 - Reads and writes then use the service-role client, scoped by that business id.
-- Synthetic samples are shared: anyone who can open them can apply a signal or add a note. `POST /demo/reset` puts them back.
+- Synthetic samples are shared and read-only for anonymous visitors in demo mode; see Demo sandbox below.
+
+## Demo sandbox
+
+In `DEMO_MODE=1`, a request on a synthetic business gets a per-visitor, copy-on-write sandbox (`api/sandbox.ts`), so one visitor's edits never reach the shared sample or another visitor.
+
+- The app creates a random id once (`crypto.randomUUID`, kept in localStorage) and sends it as `X-Neri-Visitor` on every call.
+- The preHandler resolves a per-request store (`req.store`, read in routes with `storeFor(req)`). With a visitor id it is an in-memory `MemoryStore` copy of that business, seeded lazily from the real store (records, proposals, candidates, profile and notes, overrides, work items) on first access and keyed by (visitor, business). The real store is only read, never written.
+- Notes, plans, profile, Review confirm/apply/dismiss, signals, rules, overrides and Ask Neri all write to the copy.
+- At most 500 sandboxes (least recently used evicted), expiring after 2 hours idle. A restart or eviction gives the visitor a fresh copy of the sample.
+- `POST /demo/reset` with a visitor id drops only that visitor's copy. Without one it is `403` unless the server runs with `NERI_ALLOW_RESET=1`, which reseeds the shared samples (`npm run seed:demo` talks to the database directly and is unaffected).
+- A write (POST/PUT/PATCH/DELETE) on a sample with no visitor id is `403` "The sample is shared. Reload the page to get your own copy."; reads still work. `/import` on samples is unchanged (sign-in required).
+- Signed-in members of real businesses are unaffected.
 
 ## Routes
 

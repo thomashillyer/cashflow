@@ -152,6 +152,20 @@ export class MemoryStore implements Store {
     this.need(businessId).members.add(userId);
   }
 
+  // Copies a whole business in (the demo sandbox seeds itself from the real store this way).
+  async seedBusiness(s: {
+    business: Business; records: Records; storeRevision: number; proposals: ChangeProposal[]; candidates: IntakeCandidate[];
+    workItems: WorkItem[]; inputsHash?: string; overrides: Override[];
+  }): Promise<void> {
+    const c = structuredClone(s);
+    this.biz.set(c.business.id, {
+      ...c.business, records: c.records, storeRevision: c.storeRevision, members: new Set(),
+      proposals: new Map(c.proposals.map((p) => [p.id, p])), candidates: new Map(c.candidates.map((x) => [x.id, x])),
+      workItems: new Map(c.workItems.map((w) => [w.id, w])), ...(c.inputsHash ? { workItemsHash: c.inputsHash } : {}),
+      overrides: c.overrides, decisions: new Map(),
+    });
+  }
+
   async getBusiness(id: string): Promise<Business | null> {
     const b = this.biz.get(id);
     return b ? { id: b.id, name: b.name, isSynthetic: b.isSynthetic, profile: structuredClone(b.profile) } : null;

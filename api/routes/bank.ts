@@ -5,9 +5,8 @@
 
 import type { BankMapping } from "../../adapters/bank_csv";
 import { prepareBankImport } from "../../adapters/prepare";
-import type { Deps } from "../app";
 import { HttpError } from "../http";
-import type { Business } from "../store";
+import type { Business, Store } from "../store";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const BANK_COLUMNS = ["date", "description", "amount", "debit", "credit", "balance", "currency"];
@@ -22,7 +21,8 @@ function bankMapping(v: unknown): BankMapping | undefined {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
-export async function importBank(deps: Deps, b: Business, body: Record<string, unknown>, now: string) {
+// `store` is the request's own view (storeFor(req)): on the public demo a visitor's statement goes to their private copy.
+export async function importBank(store: Pick<Store, "load" | "upsertRecords">, b: Business, body: Record<string, unknown>, now: string) {
   const text = typeof body.text === "string" ? body.text : undefined;
   const fileName = typeof body.fileName === "string" && body.fileName.trim() !== "" ? body.fileName.slice(0, 200) : "statement.csv";
   let bytes: Uint8Array;
@@ -44,7 +44,7 @@ export async function importBank(deps: Deps, b: Business, body: Record<string, u
   // An owner correcting how the file is read is never told "already imported".
   const retry = ["columnMapping", "headerRow", "dayFirst", "currency", "account"].some((f) => body[f] !== undefined);
 
-  const { records, storeRevision } = await deps.store.load(b.id);
+  const { records, storeRevision } = await store.load(b.id);
   const prep = await prepareBankImport({
     fileName, bytes, receivedAt: now, records, currency, retry,
     ...(account ? { account } : {}), ...(dayFirst !== undefined ? { dayFirst } : {}),
@@ -64,8 +64,8 @@ export async function importBank(deps: Deps, b: Business, body: Record<string, u
   }
   // Events and balance first, the evidence (which carries the file hash that makes a later upload a repeat) last:
   // a failure partway through leaves the file importable again. All ids are stable, so a re-run upserts.
-  await deps.store.upsertRecords(b.id, { events: bank.events, balances: bank.balances });
-  const revision = await deps.store.upsertRecords(b.id, { evidence: [bank.evidence] });
+  await store.upsertRecords(b.id, { events: bank.events, balances: bank.balances });
+  const revision = await store.upsertRecords(b.id, { evidence: [bank.evidence] });
   // The engine adds the latest balance of every account. A balance already on file under another name would be
   // counted on top of this one, so say so while the owner can still fix it (import again with the account's name).
   const savedAs = bank.balances[0]?.account;

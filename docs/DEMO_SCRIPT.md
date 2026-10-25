@@ -37,8 +37,8 @@ then their next morning.”**
 
 | Time | Presenter action | Say | Check before continuing |
 |---|---|---|---|
-| 0:00–0:20 | On the welcome screen, enter `dana@cascade.example` in **Work email**, then **Continue**. | “Start with your business email. The production sign-in flow uses a one-time code. This preview simulates it locally.” | **Check your email**, **Code**, and **Business name** appear. No email is delivered with the committed preview configuration. |
-| 0:20–0:35 | Enter `123456`; set **Business name** to `Cascade Trade Co.`; click **Create account**. | “No password to manage. These six digits work only in the preview.” | **Set up Cascade Trade Co.** opens. |
+| 0:00–0:20 | On the welcome screen, enter `dana@cascade.example` in **Work email**, then **Continue**. | “The hosted app creates accounts with an email and password, without sending a verification email. This browser-only rehearsal simulates onboarding.” | **Check your email**, **Code**, and **Business name** appear. No email is delivered with the committed preview configuration. |
+| 0:20–0:35 | Enter `123456`; set **Business name** to `Cascade Trade Co.`; click **Create account**. | “These six digits are a browser-only preview step. On the hosted app, choose a password instead.” | **Set up Cascade Trade Co.** opens. |
 | 0:35–1:00 | Choose **Trading and import**. Point to the suggested apps, then enter `35,000` in **Keep at least**. Leave apps unselected. | “Choose a starting profile and the minimum cash you want to keep. Sources can come from files or pasted messages. We are using the bundled sample, so these connections are simulated.” | The safety reserve is $35,000. The button says **Skip for now**. |
 | 1:00–1:15 | Click **Skip for now**. | “For this rehearsal, we can explore the product before connecting any accounts.” | **Home** loads, with the banner explaining that the preview shows a sample trading business. This is not a forecast built from the new email address. |
 | 1:15–1:30 | Point to the short brief and today's actions. | “The starting point is a short list of actions: what to do, by when, and how much it could help cash.” | Each action has its reason, cash effect, and source links. |
@@ -115,7 +115,7 @@ records can differ from `app/mock/`, so the preview amounts above are not its
 acceptance criteria. Cache-only mode uses committed responses or deterministic
 fallback text rather than a live model call.
 
-Live onboarding requires configured Supabase Auth and a real one-time code;
+Live onboarding requires configured Supabase Auth with email confirmations disabled, plus an email and password;
 `123456` is not a live credential. Live **imports** and **POST /setup** require
 sign-in even in demo mode. For imports, first complete setup and use the resulting
 private business; shared synthetic samples are read-only for imports.
@@ -125,7 +125,7 @@ Never present simulated connections as completed OAuth or a live bank sync.
 | If this happens | Presenter recovery |
 |---|---|
 | The browser opens an old account or no pending Evergreen card appears | Reset the preview with a full reload; use Settings to sign out if onboarding needs repeating. Start again before applying anything. |
-| A real code is requested, or the API cannot be reached | Return to a fresh window at `http://localhost:4300` with empty committed API/auth config. Explain the switch to the bundled preview. |
+| A real sign-in email is requested, or the API cannot be reached | Return to a fresh window at `http://localhost:4300` with empty committed API/auth config. Explain the switch to the bundled preview. |
 | A connector is unavailable or email is slow | Continue with the sample. Mention file/paste alternatives; show a live upload only after separately rehearsing authenticated API mode. |
 | Ask Neri returns its unsupported-question fallback | Use the exact question above. If still unsupported, skip the what-if and finish on the reviewed change and draft. |
 | Copy is blocked by browser permissions | Highlight the editable draft to show it is ready for Dana; close it and continue. |
