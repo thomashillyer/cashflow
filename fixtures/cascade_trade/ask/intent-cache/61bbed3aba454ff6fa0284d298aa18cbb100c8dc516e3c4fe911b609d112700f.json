@@ -2,7 +2,7 @@
   "key": "61bbed3aba454ff6fa0284d298aa18cbb100c8dc516e3c4fe911b609d112700f",
   "promptVersion": "read_intent@1",
   "model": "claude-opus-5-5",
-  "source": "stand-in",
+  "source": "live",
   "output": {
     "kind": "lookup",
     "partyPhrase": null,

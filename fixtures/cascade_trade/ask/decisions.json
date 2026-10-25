@@ -251,11 +251,11 @@
       ],
       "context": {
         "baseLowPoint": {
-          "date": "2027-01-14",
-          "amount": -3350000
+          "date": "2026-12-25",
+          "amount": -550000
         },
         "safetyLine": 3500000,
-        "shortfall": 6850000
+        "shortfall": 4050000
       },
       "recommendation": {
         "action": "Ask Jaipur Textiles for 10 more days on PO-2302",
@@ -305,6 +305,10 @@
         ]
       },
       "scenarioId": "whatif-evergreen-2027-01-15",
+      "lead": {
+        "kind": "effect",
+        "subject": "Evergreen Home pays on Jan 15"
+      },
       "citations": [
         "inv-INV-1187",
         "po-PO-2302",
@@ -318,7 +322,7 @@
           400000,
           1200000,
           3500000,
-          6850000
+          4050000
         ],
         "dates": [
           "2026-12-12",
@@ -434,6 +438,15 @@
         }
       ],
       "context": {},
+      "lead": {
+        "kind": "timing",
+        "subject": "Evergreen Home",
+        "timing": {
+          "days": 14,
+          "samples": 8,
+          "rule": false
+        }
+      },
       "assumptions": [],
       "conviction": "high",
       "convictionReasons": [

@@ -47,11 +47,11 @@ function fakeClient(replies: (object | Error | string | { stop_reason: string })
 }
 
 describe("committed stand-in cache", () => {
-  it("answers every stand-in question with no model call, and marks each entry a stand-in", () => {
+  it("answers every stand-in question with no model call, and marks each entry a stand-in or live", () => {
     for (const { question } of INTENT_STANDINS) {
       const entry = readCache(INTENT_CACHE_DIR, intentCacheKey(question));
       expect(entry, question).toBeDefined();
-      expect(entry!.source).toBe("stand-in");
+      expect(["stand-in", "live"]).toContain(entry!.source);
       expect(entry!.promptVersion).toBe(INTENT_PROMPT_VERSION);
       expect(entry!.model).toBe(INTENT_MODEL);
     }
@@ -105,7 +105,7 @@ describe("readIntent over the cascade_trade fixtures (asOf 2026-11-16)", () => {
     expect(i.partyId).toBe("party-evergreen-home");
     expect(i.commitmentId).toBe("inv-INV-1187");
     expect(i.date).toBe("2027-01-05");
-    expect(i.dateVague).toBe("early January");
+    expect(i.dateVague).toMatch(/^(?:in )?early January$/); // the live reading keeps the "in"
     expect(i.draft).toBeUndefined();
     expect(i.unresolved).toEqual([]);
   });

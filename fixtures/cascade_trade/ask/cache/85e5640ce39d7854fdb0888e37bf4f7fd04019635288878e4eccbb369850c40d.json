@@ -1,11 +1,11 @@
 {
-  "key": "feb5f3bad3f77c2e4e7b3f22c2834bc820841390eab1ec87b13e348e42ba5e5d",
-  "promptVersion": "cfo_voice@1",
+  "key": "85e5640ce39d7854fdb0888e37bf4f7fd04019635288878e4eccbb369850c40d",
+  "promptVersion": "cfo_voice@2",
   "model": "claude-opus-5-5",
   "source": "stand-in",
   "output": {
     "headline": "Yes, if Harbor and Hearth pays 40% up front by Dec 1.",
-    "why": "Without a deposit, your cash drops to $21,500 on Dec 25, $13,500 under your $35,000 safety line. A 40% deposit lifts your lowest point by $16,000, to $37,500. If they refuse, ask Jaipur Textiles for 10 more days, which lifts it by $12,000 on its own.",
+    "why": "Without a deposit, your cash drops to $21,500 on Dec 25, $13,500 under your $35,000 safety line. A 40% deposit lifts your lowest point by $16,000, to $37,500. If that doesn't work, ask Jaipur Textiles for 10 more days, which lifts it by $12,000 on its own.",
     "nextStep": "Ask Harbor and Hearth for the 40% deposit by Dec 1.",
     "convictionNote": "Medium confidence: Harbor and Hearth has only 4 payments on record.",
     "whatWouldChange": "If the deposit arrives later than Dec 1, the low point moves."

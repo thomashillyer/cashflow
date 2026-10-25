@@ -21,8 +21,10 @@ import { forecast, horizonEnd } from "../../engine/forecast";
 import { buildBrief } from "../../engine/brief";
 import { simulate } from "../../engine/simulate";
 import { confirmedLagRule, lagSamples, partyLag } from "../../engine/lag";
+import { mondayOf } from "../../engine/dates";
 import { commitmentDirection, isOpen, pendingEventsByCommitment } from "../../engine/warnings";
 import { extractFigures } from "../number_check";
+import { fmtDate } from "../brief";
 import { fmtMoney } from "../money";
 import { askDraftId, draftCadence, intentAssumptions } from "./intent";
 
@@ -48,7 +50,7 @@ class Figures {
   readonly amounts = new Set<number>();
   readonly dates = new Set<string>();
   readonly numbers: NumberFact[] = [];
-  constructor(readonly currency: string) {}
+  constructor(readonly currency: string, readonly asOf: string) {}
 
   m(minor: number): string {
     this.amounts.add(minor);
@@ -57,6 +59,11 @@ class Figures {
   d(date: string): string {
     this.dates.add(date);
     return date;
+  }
+  // A date written for the owner ("Dec 10"); registered as allowed like d().
+  h(date: string): string {
+    this.dates.add(date);
+    return fmtDate(date, this.asOf);
   }
   private fact(label: string, value: number, unit: NumberFact["unit"]): void {
     if (!this.numbers.some((n) => n.value === value && n.unit === unit && n.label === label)) this.numbers.push({ label, value, unit });
@@ -173,7 +180,7 @@ function skeleton(intent: AskIntent, ctx: DecideContext): Pick<DecisionDraft, "i
 // need_info and decline
 
 function needInfo(intent: AskIntent, ctx: DecideContext, question: string, why: string): Decision {
-  const f = new Figures(ctx.profile.baseCurrency);
+  const f = new Figures(ctx.profile.baseCurrency, ctx.asOf);
   // The question may come from the resolver; any figure it states is its own, so it is allowed.
   const figs = extractFigures(question, { currency: ctx.profile.baseCurrency, asOf: ctx.asOf });
   for (const a of figs.amounts) if (Number.isFinite(a.minor)) f.amounts.add(a.minor);
@@ -222,7 +229,7 @@ function baseWorld(ctx: DecideContext): World {
 }
 
 function decline(intent: AskIntent, ctx: DecideContext): Decision {
-  const f = new Figures(ctx.profile.baseCurrency);
+  const f = new Figures(ctx.profile.baseCurrency, ctx.asOf);
   const w = baseWorld(ctx);
   const run = forecast(w.records, w.profile, { id: "base", kind: "base", overrides: w.overrides }, ctx.asOf, ctx.fxRates);
   const low: Day = { date: run.lowPoint.date, amount: run.lowPoint.amount };
@@ -321,7 +328,7 @@ function convict(
   const snap = records.balances.reduce<string | undefined>((m, b) => (m === undefined || b.asOf > m ? b.asOf : m), undefined);
   if (t.staleAfterHours !== undefined && snap !== undefined && diffDays(ctx.asOf, snap) * 24 > t.staleAfterHours) {
     caps++;
-    reasons.push(`The bank balance was last updated on ${f.d(snap)}, ${f.days("balance age", diffDays(ctx.asOf, snap))} old.`);
+    reasons.push(`The bank balance was last updated on ${f.h(snap)}, ${f.days("balance age", diffDays(ctx.asOf, snap))} old.`);
   }
   const tentative = uniq(
     path.events
@@ -334,7 +341,7 @@ function convict(
   }
   if (assumedDate !== undefined) {
     caps++;
-    reasons.push(assumedDate ? `The date is an assumption: ${f.d(assumedDate)}.` : "The date is an assumption.");
+    reasons.push(assumedDate ? `The date is an assumption: ${f.h(assumedDate)}.` : "The date is an assumption.");
   }
   if (caps >= 2) level = "low";
   else if (caps === 1) level = lower(level, "medium");
@@ -347,7 +354,7 @@ function convict(
     const who = partyName(records, c?.partyId);
     const what = eventNoun(records, profile, least);
     const money = f.m(least.amountBase);
-    const when = f.d(least.date);
+    const when = f.h(least.date);
     if (isSynthetic(least.commitmentId)) whatWouldChange = `Least certain: ${what} of ${money}, expected ${when}.`;
     else if (least.direction === "in") whatWouldChange = `Least certain: the ${money} receipt${who ? ` from ${who}` : ""} (${what}), expected ${when}.`;
     else whatWouldChange = `Least certain: the ${money} payment${who ? ` to ${who}` : ""} (${what}), expected ${when}.`;
@@ -358,13 +365,15 @@ function convict(
 // ---------------------------------------------------------------------------------------------------------
 // Levers as actions, and the fix_gap pick
 
-function leverAction(f: Figures, records: Records, lever: Lever): string {
+// withDate: a chase names the date it assumes payment; the recommendation leaves it to byDate (one by-date in the answer).
+function leverAction(f: Figures, records: Records, lever: Lever, withDate = true): string {
   const c = records.commitments.find((x) => x.id === lever.commitmentId);
   const ref = c ? commitmentLabel(c) : lever.commitmentId;
   const who = partyName(records, c?.partyId);
   switch (lever.kind) {
     case "chase":
-      return who ? `Chase ${who} to pay ${ref} by ${f.d(lever.assumeDate)}` : `Chase payment of ${ref} by ${f.d(lever.assumeDate)}`;
+      if (!withDate) return who ? `Chase ${who} to pay ${ref}` : `Chase payment of ${ref}`;
+      return who ? `Chase ${who} to pay ${ref} by ${f.h(lever.assumeDate)}` : `Chase payment of ${ref} by ${f.h(lever.assumeDate)}`;
     case "defer":
       return who ? `Ask ${who} for ${f.days("days asked", lever.days, true)} on ${ref}` : `Move ${ref} out by ${f.days("days asked", lever.days)}`;
     case "pay_early":
@@ -427,7 +436,7 @@ function fixGap(ctx: DecideContext, world: World, window: Window | undefined, mu
 // Recommendation, fallback, and conviction path for a Gap's pick.
 function moveParts(f: Figures, world: World, gap: Gap) {
   const rec: NonNullable<Decision["recommendation"]> | undefined = gap.pick && {
-    action: leverAction(f, world.records, gap.pick.lever),
+    action: leverAction(f, world.records, gap.pick.lever, false),
     lever: gap.pick.lever,
     byDate: f.d(gap.pick.item.neededBy),
     cashEffect: gap.pick.cashEffect,
@@ -435,14 +444,13 @@ function moveParts(f: Figures, world: World, gap: Gap) {
   };
   if (rec?.resultingLowPoint) f.d(rec.resultingLowPoint.date);
   const fb: Decision["fallback"] | undefined = gap.fallback && {
-    action: `If that does not work: ${lowerFirst(leverAction(f, world.records, gap.fallback.lever))}`,
+    action: leverAction(f, world.records, gap.fallback.lever),
     lever: gap.fallback.lever,
     cashEffect: gap.fallback.cashEffect,
   };
   return { rec, fb };
 }
 
-const lowerFirst = (s: string) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : s);
 
 function pathForMove(world: World, gap: Gap): Path {
   if (!gap.pick) return { events: [], timingPartyIds: [] };
@@ -467,7 +475,7 @@ function lowFacts(label: string, d: Day) {
 // fix_gap and status
 
 function runFixGap(intent: AskIntent, ctx: DecideContext, window: Window | undefined, tightestLabel: string, extraAssumptions: string[] = []): Decision {
-  const f = new Figures(ctx.profile.baseCurrency);
+  const f = new Figures(ctx.profile.baseCurrency, ctx.asOf);
   const world = baseWorld(ctx);
   const win = window ?? { from: ctx.asOf, to: horizonEnd(ctx.profile, ctx.asOf) };
   const gap = fixGap(ctx, world, win, false);
@@ -487,9 +495,11 @@ function runFixGap(intent: AskIntent, ctx: DecideContext, window: Window | undef
   }
   const headline: Decision["headlineFacts"] = [lowFacts(tightestLabel, gap.low), { label: "Safety line", amount: gap.run.safetyLine }];
   if (rec?.resultingLowPoint) headline.push(lowFacts("Lowest cash point after the move", rec.resultingLowPoint));
+  const tightest = intent.kind === "status" && diffDays(win.to, win.from) >= 28;
   return assemble(f, {
     ...skeleton(intent, ctx),
     verdict,
+    ...(tightest ? { lead: { kind: "tightest" as const, weekStart: f.d(mondayOf(gap.low.date)) } } : {}),
     headlineFacts: headline.slice(0, 3),
     context: {
       baseLowPoint: gap.low,
@@ -530,7 +540,7 @@ function resolveDate(intent: AskIntent, ctx: DecideContext, f: Figures, assumpti
   const given = intent.date ?? a?.due ?? a?.order ?? a?.delivery ?? a?.invoice;
   if (given) return given;
   const date = addDays(ctx.asOf, DEFAULT_DATE_OFFSET_DAYS);
-  assumptions.push(`No date was given; assumed ${f.d(date)}, ${f.days("default date offset", DEFAULT_DATE_OFFSET_DAYS)} out.`);
+  assumptions.push(`No date was given; assumed ${f.h(date)}, ${f.days("default date offset", DEFAULT_DATE_OFFSET_DAYS)} out.`);
   return date;
 }
 
@@ -596,6 +606,7 @@ function actNowWithout(
   return assemble(f, {
     ...skeleton(intent, ctx),
     verdict: "act_now",
+    lead: { kind: "short_before" },
     headlineFacts: headline.slice(0, 3),
     context: { baseLowPoint: gap.low, safetyLine: gap.run.safetyLine, shortfall: Math.max(0, gap.run.safetyLine - gap.low.amount) },
     ...(rec ? { recommendation: rec } : {}),
@@ -610,7 +621,7 @@ function actNowWithout(
 }
 
 function runAfford(intent: AskIntent, ctx: DecideContext): Decision {
-  const f = new Figures(ctx.profile.baseCurrency);
+  const f = new Figures(ctx.profile.baseCurrency, ctx.asOf);
   const assumptions = baseAssumptions(intent, ctx, f);
   const records = ctx.records;
   if (intent.draft?.type === "recurring" && !intent.commitmentId) return affordRecurring(intent, ctx);
@@ -670,7 +681,7 @@ function runAfford(intent: AskIntent, ctx: DecideContext): Decision {
   const spendAmount = legs.length > 0 ? legs.reduce((a, e) => a + e.amountBase, 0) : target.amount;
   const spendDate = legs.length > 0 ? legs.map((e) => e.date).sort()[0]! : dateOf;
   const amountText = f.m(spendAmount);
-  const planDate = f.d(spendDate);
+  const planDate = f.h(spendDate);
   const spend: Decision["headlineFacts"][number] = { label: synthetic ? "Planned payment" : "Payment", amount: spendAmount, date: spendDate };
   // baseLowPoint is the run without the payment (design table), so the shortfall is measured on it too; the low
   // point with the payment is headlineFacts[0].
@@ -855,7 +866,7 @@ function affordDeal(
 // what_if
 
 function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
-  const f = new Figures(ctx.profile.baseCurrency);
+  const f = new Figures(ctx.profile.baseCurrency, ctx.asOf);
   const assumptions = baseAssumptions(intent, ctx, f);
   const baseOverrides = ctx.baseOverrides ?? [];
   const baseWorldV = baseWorld(ctx);
@@ -868,6 +879,7 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
   let changedIds: string[] = [];
   let extraFact: Decision["headlineFacts"][number] | undefined;
   let dateAssumed: string | undefined;
+  const subjects: string[] = [];
   const draft = intent.draft;
 
   if (draft) {
@@ -884,6 +896,7 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
       world = { ...world, profile: { ...ctx.profile, recurring: [...ctx.profile.recurring, item] } };
       scenarioInputs = { recurring: [item] };
       extraFact = { label: `Recurring cost (${item.cadence})`, amount: base, date };
+      subjects.push(`you add a ${f.m(base)} ${item.cadence} cost from ${f.h(date)}`);
     } else {
       const dir = draft.direction ?? (draft.type === "sales_deal" ? "in" : "out");
       const c = syntheticCommitment(ctx, intent, dir === "in" ? "deal" : "plan", date, base);
@@ -891,6 +904,7 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
       scenarioInputs = { commitments: [c] };
       changedIds = [c.id];
       extraFact = { label: dir === "in" ? "Order amount" : "Planned payment", amount: base, date };
+      subjects.push(dir === "in" ? `you win a ${f.m(base)} order paid on ${f.h(date)}` : `you pay ${f.m(base)} on ${f.h(date)}`);
     }
   } else {
     const date = intent.date!;
@@ -915,7 +929,8 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
         whatIfOverrides.push({ id, target: { commitmentId: c.id }, change: { date }, origin: "owner" });
       }
       const who = partyName(ctx.records, c.partyId);
-      assumptions.push(`Assumed ${who ? `${who} ` : ""}${dirOf(c) === "in" ? "pays" : "is paid"} ${commitmentLabel(c)} on ${f.d(date)}${first ? `, instead of ${f.d(first.date)}` : ""}.`);
+      subjects.push(`${dirOf(c) === "in" ? (who ?? "the customer") : "you"} ${dirOf(c) === "in" ? "pays" : "pay"} ${commitmentLabel(c)}${dirOf(c) === "out" && who ? ` to ${who}` : ""} on ${f.h(date)}`);
+      assumptions.push(`Assumed ${who ? `${who} ` : ""}${dirOf(c) === "in" ? "pays" : "is paid"} ${commitmentLabel(c)} on ${f.h(date)}${first ? `, instead of ${f.h(first.date)}` : ""}.`);
     });
     world = { ...world, overrides: [...baseOverrides, ...whatIfOverrides] };
     changedIds = targets.map((c) => c.id);
@@ -938,6 +953,7 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
   return assemble(f, {
     ...skeleton(intent, ctx),
     verdict,
+    ...(subjects.length ? { lead: { kind: "effect" as const, subject: subjects.slice(0, 2).join(" and ") } } : {}),
     headlineFacts: headline.slice(0, 3),
     context: {
       baseLowPoint: baseLow,
@@ -966,8 +982,11 @@ function median(xs: number[]): number {
   return s.length % 2 ? s[mid]! : (s[mid - 1]! + s[mid]!) / 2;
 }
 
+// "When does Evergreen usually pay?", "how late is Harbor?": a timing question, not a balance question.
+const TIMING_RE = /\bwhen\b[^?]*\bpay(?:s|ing|ment)?\b|\bwhen\b[^?]*\bpaid\b|\bhow\s+(?:late|long|early|fast|quickly|soon)\b|\busually\b|\btypically\b|\bnormally\b|\bon\s+average\b|\bpay(?:s)?\s+(?:late|early|on\s+time)\b|\blag\b/i;
+
 function runLookup(intent: AskIntent, ctx: DecideContext): Decision {
-  const f = new Figures(ctx.profile.baseCurrency);
+  const f = new Figures(ctx.profile.baseCurrency, ctx.asOf);
   const world = baseWorld(ctx);
   const { records, profile } = ctx;
   const commitment = intent.commitmentId ? records.commitments.find((c) => c.id === intent.commitmentId) : undefined;
@@ -1008,11 +1027,17 @@ function runLookup(intent: AskIntent, ctx: DecideContext): Decision {
   if (next) headline.push({ label: "Next expected", amount: next.amountBase, date: next.date });
   if (settle && lastBase !== undefined) headline.push({ label: "Last payment", amount: lastBase, date: settle.date });
 
+  // A question about when they pay is answered with the lag first (from the rule, else the payment history).
+  const timing = TIMING_RE.test(intent.question)
+    ? { days: rule ? lag.days : samples.length > 0 ? Math.floor(median(samples) + 0.5) : lag.days, samples: samples.length, rule: !!rule }
+    : undefined;
+  if (timing) { f.stat("days", Math.abs(timing.days), "days"); f.stat("payments on record", timing.samples, "count"); }
   const hasInbound = records.commitments.some((c) => c.partyId === party.id && dirOf(c) === "in");
   const conv = convict(ctx, f, world, { events: [], timingPartyIds: hasInbound ? [party.id] : [] }, undefined);
   return assemble(f, {
     ...skeleton(intent, ctx),
     verdict: "info",
+    ...(timing ? { lead: { kind: "timing" as const, subject: party.name, timing } } : {}),
     headlineFacts: headline.slice(0, 3),
     context: { safetyLine: run.safetyLine },
     assumptions,
@@ -1026,7 +1051,7 @@ function runLookup(intent: AskIntent, ctx: DecideContext): Decision {
 // tell
 
 function runTell(intent: AskIntent, ctx: DecideContext): Decision {
-  const f = new Figures(ctx.profile.baseCurrency);
+  const f = new Figures(ctx.profile.baseCurrency, ctx.asOf);
   const { records } = ctx;
   const assumptions = baseAssumptions(intent, ctx, f);
   const world = baseWorld(ctx);
@@ -1072,7 +1097,7 @@ function runTell(intent: AskIntent, ctx: DecideContext): Decision {
   return assemble(f, {
     ...base,
     headlineFacts: [{ label: dir === "in" ? "Planned receipt" : "Planned payment", amount, date }],
-    recommendation: { action: `Confirm to add the ${f.m(amount)} ${dir === "in" ? "receipt" : "payment"} on ${f.d(date)} to your forecast` },
+    recommendation: { action: `Confirm to add the ${f.m(amount)} ${dir === "in" ? "receipt" : "payment"} on ${f.h(date)} to your forecast` },
     assumptions,
     conviction: conv.conviction,
     convictionReasons: ["You stated this plan directly; nothing changes until you confirm.", ...conv.convictionReasons.filter((r) => !r.startsWith("The call does not rest"))],

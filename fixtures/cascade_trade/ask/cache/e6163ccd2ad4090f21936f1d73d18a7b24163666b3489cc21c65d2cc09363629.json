@@ -1,0 +1,13 @@
+{
+  "key": "e6163ccd2ad4090f21936f1d73d18a7b24163666b3489cc21c65d2cc09363629",
+  "promptVersion": "cfo_voice@2",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "headline": "Act now: chase Evergreen Home on INV-1187 so their $28,000 lands by Dec 18.",
+    "why": "Your cash dips to -$5,500 on Dec 25, $40,500 under your $35,000 safety line. Evergreen Home's $28,000 is due Dec 10 but is expected Dec 26, after your lowest point, so getting it by Dec 18 lifts your lowest point by $19,500, to $14,000. If that doesn't work, ask Jaipur Textiles for 10 more days, which lifts it by $12,000 on its own.",
+    "nextStep": "Ask Evergreen Home to pay INV-1187 by Dec 18.",
+    "convictionNote": "High confidence: Evergreen Home has 8 payments on record and no tentative money sits on the path.",
+    "whatWouldChange": "If Evergreen Home pays later than Dec 26, the low point drops again."
+  }
+}

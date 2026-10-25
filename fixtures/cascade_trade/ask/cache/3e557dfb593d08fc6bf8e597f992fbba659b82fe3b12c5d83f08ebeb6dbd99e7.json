@@ -1,0 +1,13 @@
+{
+  "key": "3e557dfb593d08fc6bf8e597f992fbba659b82fe3b12c5d83f08ebeb6dbd99e7",
+  "promptVersion": "cfo_voice@2",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "headline": "Act now: chase Evergreen Home to pay INV-1187 by Dec 12.",
+    "why": "Your lowest cash point is −$5,500 on Dec 25, against a safety line of $35,000. That is $40,500 short. Doing this moves your lowest point to $22,500 on Dec 25. If that doesn't work, ask Cascade Customs Brokerage for 10 more days on DUTIES-2291, which lifts your lowest point by $9,000 on its own.",
+    "nextStep": "Chase Evergreen Home to pay INV-1187 by Dec 12.",
+    "convictionNote": "High confidence: Based on 8 payments from Evergreen Home.",
+    "whatWouldChange": "Least certain: the $28,000 receipt from Evergreen Home (INV-1187), expected Dec 26."
+  }
+}

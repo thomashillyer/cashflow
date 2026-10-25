@@ -1,0 +1,13 @@
+{
+  "key": "8e2f8e8fb859197350aaf859754f0e8af6693b1b5a44990151c4d15c53992da7",
+  "promptVersion": "cfo_voice@2",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "headline": "Evergreen Home usually pays about 14 days late, based on 8 payments.",
+    "why": "That is the typical lag after the due date. INV-1187 ($28,000) is due Dec 10, so expect it around Dec 24.",
+    "nextStep": null,
+    "convictionNote": "High confidence: based on 8 payments and no pending reviews.",
+    "whatWouldChange": null
+  }
+}
