@@ -114,9 +114,9 @@ npm run demo       # demo profile + cached Claude responses (not yet)
 - **Agent step:** run `npm run setup:supabase`. It checks `.env` is gitignored, that the three variables are set and look like the right keys for the right project (prints names and lengths only, never values), and runs a read-only connectivity check. Add `-- --require-service-role` for server/importer work.
 - **Optional:** someone already logged in to the Supabase org (`! npx -y supabase@2 login`) can run `npm run setup:supabase -- --from-cli [--with-service-role]` to fetch the keys into `.env` instead of pasting.
 - **Rules:**
-  - The hosted project ("Cashflow") holds synthetic data only.
+  - The hosted project ("Cashflow") may hold private owner data under membership checks and tenant RLS. Thomas authorized real-data production on 2026-10-25; public previews and committed fixtures remain synthetic.
   - Never commit `.env` or paste keys into PRs, issues, or chat.
-  - The anon key is read-only (SELECT on synthetic businesses, plus the `confirm_change_proposal` RPC); other writes go through server code with the service role.
+  - The anon key cannot read private businesses. Authenticated members can read their own business under tenant RLS; API writes verify session and membership before using the server-only service role.
   - Schema changes are a new migration file (timestamp after `20261025120000`) in a PR, never dashboard edits.
 
 ## Definition of done (for any change)

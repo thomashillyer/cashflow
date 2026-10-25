@@ -11,6 +11,7 @@ import { loadSamples } from "./demo";
 import { MemoryStore, type Store } from "./store";
 import { SupabaseStore } from "./supabase-store";
 import { isBehind, supabaseSchemaStatus } from "./schema-status";
+import { buildConnectionService } from "./connections";
 
 const env = process.env;
 const demoMode = env.DEMO_MODE === "1";
@@ -45,13 +46,15 @@ const verify: Verifier = env.SUPABASE_URL && env.SUPABASE_ANON_KEY
     }
   : async () => null;
 
+const aiMode = env.ANTHROPIC_API_KEY && (env.NERI_AI_MODE === "live" || (!demoMode && env.NERI_AI_MODE !== "cache_only")) ? "live" : "cache_only";
 const app = await buildApp({
   store,
   verify,
   demoMode,
   defaultBusiness: env.NERI_DEFAULT_BUSINESS ?? "cascade_trade",
   // Live Claude only with a key, and never by default on the public demo (anonymous callers could spend it).
-  aiMode: env.ANTHROPIC_API_KEY && (env.NERI_AI_MODE === "live" || (!demoMode && env.NERI_AI_MODE !== "cache_only")) ? "live" : "cache_only",
+  aiMode,
+  connections: buildConnectionService(env, { aiMode }),
   staticDir: env.NERI_STATIC_DIR ?? join(import.meta.dirname, "../app"),
   appConfig: { supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY },
   allowReset: demoMode && !production && env.NERI_ALLOW_RESET === "1",

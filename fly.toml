@@ -1,4 +1,4 @@
-# Neri Cash live demo on Fly.io: API + app on one origin. Deploy: `fly deploy` (or the fly-deploy workflow on main).
+# Neri Cash production service on Fly.io: API + app on one origin. Deploy: `fly deploy` (or the fly-deploy workflow on main).
 # Secrets: fly secrets set SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... [ANTHROPIC_API_KEY=...]
 app = "neri-cash"
 primary_region = "sjc"
@@ -6,8 +6,10 @@ primary_region = "sjc"
 [build]
 
 [env]
-  DEMO_MODE = "1"
-  NERI_DEFAULT_BUSINESS = "cascade_trade"
+  NODE_ENV = "production"
+  DEMO_MODE = "0"
+  NERI_STORE = "supabase"
+  NERI_AI_MODE = "live"
 
 [http_service]
   internal_port = 8080
