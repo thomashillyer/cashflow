@@ -78,3 +78,6 @@ export function writeCache(dir: string, entry: CacheEntry): void {
   writeFileSync(tmp, JSON.stringify(entry, null, 2) + "\n");
   renameSync(tmp, file); // atomic: a reader never sees a half-written entry
 }
+
+// Committed demo entries for Ask Neri's CFO voice (ai/ask/voice.ts), hand-authored stand-ins until refreshed live.
+export const ASK_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/ask/cache");

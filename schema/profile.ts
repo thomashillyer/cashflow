@@ -17,7 +17,7 @@ export type Profile = {
   paymentPatterns: PaymentPattern[];
   revenueModel:
     | { kind: "deals" }                                   // deals/RFQs/invoices
-    | { kind: "dailySales"; weekdayWeights: number[] }    // restaurants, retail
+    | { kind: "dailySales"; weekdayWeights: number[]; settleLagDays?: number }  // restaurants, retail; settleLagDays: card sales land N days after the sale (default 0)
     | { kind: "retainers" };
   recurring: {
     id: string;                       // stable; becomes the commitment id so overrides can target it
@@ -46,6 +46,7 @@ export type Profile = {
       maxPendingReviewsForHigh?: number;
     };
     stressDelayDays?: number;         // stress scenario: delay unsettled receipts by this many days (default 7)
+    splitIntervalDays?: number;       // split lever: days between installments (default 30)
   };
   actionLeadDays?: Partial<Record<Lever["kind"], number>>;  // e.g. { chase: 3, defer: 3 }
   signalSources: ("email" | "whatsapp" | "crm" | "owner")[];

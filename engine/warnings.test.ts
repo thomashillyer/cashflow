@@ -107,6 +107,8 @@ function forecastOf(events: CashEvent[], opening = 1_500_000): ForecastRun {
   };
 }
 
+// Moves every event of the lever's commitment. Every commitment here has one leg, so this matches the engine's
+// one-leg chase/defer; multi-leg behavior is tested against the real simulate() in warnings.engine.test.ts.
 function simulator(base: ForecastRun, records: Records): SimulateLevers {
   return (levers: Lever[]) => {
     const events = base.events.map((e) => {

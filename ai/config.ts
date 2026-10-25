@@ -24,3 +24,8 @@ export const INTENT_MODEL = "claude-opus-5-5";
 
 // Bump whenever ai/prompts/read_intent.md or the AskIntentRaw schema in ai/ask/intent.ts changes (part of the cache key).
 export const INTENT_PROMPT_VERSION = "read_intent@1";
+
+// Ask Neri's CFO voice (ai/ask/voice.ts). Bump CFO_VOICE_PROMPT_VERSION whenever ai/prompts/cfo_voice.md or the
+// CfoVoice output schema changes; it is part of the cache key.
+export const CFO_VOICE_MODEL = "claude-opus-5-5";
+export const CFO_VOICE_PROMPT_VERSION = "cfo_voice@1";
