@@ -292,6 +292,14 @@ Use the same `BriefContext` and the `WorkItem` loaded for `:id` from the same ru
 - **Model ids and prompt versions** live in `ai/config.ts` (`EXTRACTION_MODEL`, `BRIEF_MODEL`, `DRAFT_MODEL`, `*_PROMPT_VERSION`). Bumping a prompt version invalidates its cache entries. Do not hard-code model ids in routes.
 - Pass `client` (an `Anthropic` instance) to reuse one; otherwise the default client reads `ANTHROPIC_API_KEY`.
 
+## Ask Neri: reading the question
+
+`readIntent(question, { records, profile, asOf, timeZone?, mode, client?, cacheDir? })` (`ai/ask/intent.ts`) returns an `AskIntent` (`schema/ask.ts`) and never throws. Claude returns only a kind and verbatim phrases; code resolves the party, the existing commitment, the amount, the date or window, the synthetic `draft` or proposed `rule`, and `unresolved` (the required slots in `docs/design/08-claude-layer.md`). Demo mode reads `INTENT_CACHE_DIR` = `fixtures/cascade_trade/ask/intent-cache` (hand-authored stand-ins, `source: "stand-in"`; refresh with `scripts/refresh-intent-cache.ts`). A question that cannot be read (demo miss, failed call) returns `kind: "out_of_scope"` with the reason in `unresolved`.
+
+- A hire is a `type: "recurring"` draft with `anchors.due` = the start date and the cadence in `category` (`cadence:monthly`; `draftCadence(draft)` reads it); the decision step turns it into a profile `recurring` item. `askDraftId(question)` is the `ask-draft-<hash>` id for any synthetic item.
+- `intentAssumptions(intent, { profile, asOf })` lists what code assumed (base currency, a vague date, a default date, "linked costs unknown") for `Decision.assumptions`.
+- `containsInstructions` always means no draft and no rule; an `afford` or `what_if` left with nothing to answer returns an `unresolved` question, and a `tell` becomes `out_of_scope`.
+
 ## Where `number_check` fits
 
 `writeBrief` and `draftMessage` already run it; routes do nothing. If you add free text from Claude elsewhere (`POST /ask`), wrap it in `guardAnswer(generate, allowed, fallback, { currency, asOf })` from `ai/number_check.ts`, with `allowed` from `allowedFromToolResults(toolResults)`.
@@ -312,4 +320,4 @@ Use the same `BriefContext` and the `WorkItem` loaded for `:id` from the same ru
 - **Input:** `ctx = { profile, business: { name }, mode, client?, cacheDir?, proposalId? }`. For verdict `proposed`, persist the proposal first and pass its id as `proposalId`.
 - **Never throws, never sends.** Checks: amounts, dates, percentages, day counts, and sample counts against `decision.allowed`; no menus (options, "you could", lists, a second fallback); the headline leads with the verdict and the recommendation's key fact; no sent/paid claims. One retry with feedback, then a code-built voice (`usedFallback: true`).
 - **`need_info`, `decline`, `proposed`** always use the code-built voice (no model call).
-- **Cache:** committed stand-ins in `fixtures/cascade_trade/ask/cache` (from `scripts/make-voice-standins.ts`); `scripts/refresh-voice-cache.ts` replaces them with live output. Hand-built Decisions: `fixtures/cascade_trade/ask/decisions.json`.
+- **Cache:** committed stand-ins in `fixtures/cascade_trade/ask/intent-cache` (from `scripts/make-voice-standins.ts`); `scripts/refresh-voice-cache.ts` replaces them with live output. Hand-built Decisions: `fixtures/cascade_trade/ask/decisions.json`.
