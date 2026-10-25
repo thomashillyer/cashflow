@@ -304,3 +304,12 @@ Use the same `BriefContext` and the `WorkItem` loaded for `:id` from the same ru
 4. Signals change state only; the owner picks the commitment (if ambiguous) and the date (if vague).
 5. Brief and draft use one run's `run`/`records`/`profile`; drafts are text only.
 6. Review renders `Field<T>` states with quotes, conflicts, match candidates, and notes as plain text; links are never "paid".
+
+## Ask Neri: `voice(decision, ctx)` (P4.21)
+
+`voice` in [`ai/ask/voice.ts`](ask/voice.ts) turns a code-built `Decision` (`schema/ask.ts`) into the owner-facing `CfoAnswer`. Claude writes only the `CfoVoice` (headline, why, nextStep, convictionNote, whatWouldChange); code fills in verdict, conviction, question, proposal, citations, scenarioId, and missingData from the Decision, and `text` is the voice fields joined, so `number_check` covers every word.
+
+- **Input:** `ctx = { profile, business: { name }, mode, client?, cacheDir?, proposalId? }`. For verdict `proposed`, persist the proposal first and pass its id as `proposalId`.
+- **Never throws, never sends.** Checks: amounts, dates, percentages, day counts, and sample counts against `decision.allowed`; no menus (options, "you could", lists, a second fallback); the headline leads with the verdict and the recommendation's key fact; no sent/paid claims. One retry with feedback, then a code-built voice (`usedFallback: true`).
+- **`need_info`, `decline`, `proposed`** always use the code-built voice (no model call).
+- **Cache:** committed stand-ins in `fixtures/cascade_trade/ask/cache` (from `scripts/make-voice-standins.ts`); `scripts/refresh-voice-cache.ts` replaces them with live output. Hand-built Decisions: `fixtures/cascade_trade/ask/decisions.json`.

@@ -9,6 +9,7 @@
 // Money is integer minor units throughout; amount text is parsed with BigInt digit math, never
 // through float arithmetic.
 
+import type { NumberFact } from "../schema/ask";
 import type { Answer } from "../schema/forecast";
 import { minorUnitDigits } from "./normalize";
 
@@ -27,8 +28,10 @@ export type ExtractedAmount = {
 export type ExtractedDate = { raw: string; date: string; start: number; end: number; alts?: string[] };
 export type Figures = { amounts: ExtractedAmount[]; dates: ExtractedDate[] };
 
-export type Allowed = { amounts: number[]; dates: string[] };
-export type Unmatched = { kind: "amount" | "date"; raw: string };
+// `numbers` (Ask Neri, Decision.allowed.numbers): when present, "N%", "N days" / "N more days", and
+// "N payments|samples|invoices" are checked against it. When absent, those stay unchecked.
+export type Allowed = { amounts: number[]; dates: string[]; numbers?: NumberFact[] };
+export type Unmatched = { kind: "amount" | "date" | "number"; raw: string };
 export type CheckResult = { ok: boolean; unmatched: Unmatched[]; problems: string[] };
 export type GuardResult = { answer: Answer; attempts: number; usedFallback: boolean };
 
@@ -246,6 +249,40 @@ export function extractDates(text: string, opts: { asOf: string }): ExtractedDat
   return out;
 }
 
+// ---------------------------------------------------------------- percentages, day counts, sample counts
+
+export type ExtractedNumber = { raw: string; value: number; unit: NumberFact["unit"]; start: number; end: number };
+
+// Only these three shapes are checked; any other bare number ("Net 30", "week 3", "2 of 3") stays ignored.
+//   pct:   "40%", "12.5 %"
+//   days:  "10 days", "10 more days", "1 extra day"
+//   count: "8 payments", "6 samples", "3 invoices" (singular too)
+const pctRe = /(?<![\w.,$€£¥₹−–-])(\d+(?:\.\d+)?)\s?%/g;
+const daysRe = /(?<![\w.,$€£¥₹−–-])(\d+(?:\.\d+)?)\s+(?:(?:more|extra)\s+)?days?(?![A-Za-z])/gi;
+const countRe = /(?<![\w.,$€£¥₹−–-])(\d+(?:\.\d+)?)\s+(?:payments?|samples?|invoices?)(?![A-Za-z])/gi;
+
+const monthBeforeRe = new RegExp(`(?<!\\w)(${MONTHS})\\.?\\s+$`, "i");
+
+const monthDayCommaRe = new RegExp(`(?<!\\w)(?:${MONTHS})\\.?\\s+\\d{1,2}(?:st|nd|rd|th)?,?\\s+$`, "i");
+
+export function extractNumbers(text: string): ExtractedNumber[] {
+  const out: ExtractedNumber[] = [];
+  const add = (re: RegExp, unit: NumberFact["unit"]) => {
+    for (const m of text.matchAll(re)) {
+      // "Jan 15 payment" is a date followed by a noun, not 15 payments.
+      const month = monthBeforeRe.exec(text.slice(Math.max(0, m.index! - 12), m.index!));
+      if (month && isMonthWord(month[1]!)) continue;
+      // ... and the year of "Dec 18, 2026 payment".
+      if (/^(?:19|20)\d{2}$/.test(m[1]!) && monthDayCommaRe.test(text.slice(Math.max(0, m.index! - 16), m.index!))) continue;
+      out.push({ raw: m[0], value: Number(m[1]), unit, start: m.index!, end: m.index! + m[0].length });
+    }
+  };
+  add(pctRe, "pct");
+  add(daysRe, "days");
+  add(countRe, "count");
+  return out.sort((a, b) => a.start - b.start);
+}
+
 export function extractFigures(text: string, opts: CheckOpts): Figures {
   return { amounts: extractAmounts(text, opts), dates: extractDates(text, opts) };
 }
@@ -292,6 +329,13 @@ const checkParts = (parts: (string | undefined)[], citations: string[] | undefin
     for (const a of figs.amounts) {
       if (!amountMatches(a, allowed.amounts, sentenceAround(part, a.start, a.end))) {
         unmatched.push({ kind: "amount", raw: a.raw });
+      }
+    }
+    if (allowed.numbers) {
+      for (const n of extractNumbers(part)) {
+        if (!allowed.numbers.some((f) => f.unit === n.unit && Math.abs(f.value - n.value) < 1e-9)) {
+          unmatched.push({ kind: "number", raw: n.raw });
+        }
       }
     }
     // A date with an inferred year matches if any candidate year (asOf year +-1) is allowed.

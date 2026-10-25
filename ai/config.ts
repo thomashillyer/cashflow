@@ -17,3 +17,8 @@ export const DRAFT_PROMPT_VERSION = "draft_message@2";
 
 // Bump whenever ai/prompts/extract_signal.md or the SignalExtraction schema changes (part of the cache key).
 export const SIGNAL_PROMPT_VERSION = "extract_signal@1";
+
+// Ask Neri's CFO voice (ai/ask/voice.ts). Bump CFO_VOICE_PROMPT_VERSION whenever ai/prompts/cfo_voice.md or the
+// CfoVoice output schema changes; it is part of the cache key.
+export const CFO_VOICE_MODEL = "claude-opus-5-5";
+export const CFO_VOICE_PROMPT_VERSION = "cfo_voice@1";
