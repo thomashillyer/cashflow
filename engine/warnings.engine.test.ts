@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import type { Profile } from "../schema/profile";
 import type { Commitment, Records } from "../schema/records";
+import { buildFacts } from "../ai/brief";
 import { buildBrief } from "./brief";
 
 const $ = (n: number) => n * 100;
@@ -98,12 +99,19 @@ describe("deal_affordability", () => {
     expect(brief.today.map((w) => w.id)).toContain("wi-deal_affordability-ask_advance-deal");
   });
 
-  it("weighs a possible deal by its probability", () => {
-    const { brief } = buildBrief({ records: records($(10000), [deal({ status: "possible", probability: 0.5 })]),
-      profile, asOf, fxRates: {} });
-    expect(brief.all.find((w) => w.warning === "deal_affordability")).toMatchObject({ confidence: 0.5, cashEffect: $(15000) });
-    const noProbability = buildBrief({ records: records($(10000), [deal({ status: "possible" })]), profile, asOf, fxRates: {} });
-    expect(noProbability.brief.all.find((w) => w.warning === "deal_affordability")?.confidence).toBe(0.3);
+  it("explains a possible deal without a dollar figure, so it never reaches today", () => {
+    // The base run excludes a possible deal, so "low point + cashEffect" (ai/brief.ts buildFacts) would mix a
+    // no-deal low point with a with-deal effect ($10,000 + $15,000 = $25,000 vs a true $5,000).
+    const input = { records: records($(10000), [deal({ status: "possible", probability: 0.5 })]), profile, asOf, fxRates: {} };
+    const { run, brief } = buildBrief(input);
+    const item = brief.all.find((w) => w.warning === "deal_affordability")!;
+    expect(item).toMatchObject({ cashEffect: 0, confidence: 0.5, score: 0 });
+    expect(item.lever).toBeUndefined();
+    expect(item.title).toBe("If you take DEAL, ask the customer for 50% upfront");
+    expect(item.why).toBe("At 20% upfront this quote would take cash below your safety line; 50% keeps it above.");
+    expect(`${item.title} ${item.why}`).not.toMatch(/\$/);
+    expect(brief.today.map((w) => w.id)).not.toContain(item.id);
+    expect(buildFacts(item, { run, records: input.records, profile }).amountAfterLever).toBeUndefined();
   });
 
   it("skips a deal whose order date has passed", () => {
