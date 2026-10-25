@@ -1,4 +1,4 @@
-import { api, SANDBOXES } from "./api.js";
+import { api, SANDBOXES, suggestBusinessName } from "./api.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
 import { cashChart } from "./ui/chart.js";
 import { icon, logo } from "./ui/icons.js";
@@ -8,7 +8,10 @@ import { addDays, dayDate, esc, greeting, money, moneyShort, parseDate, shortDat
 const $ = (sel, root = document) => root.querySelector(sel);
 
 const app = {
-  bizId: localStorage.getItem("neri.biz") || SANDBOXES[0].id,
+  account: api.account(),
+  bizId: null,
+  signup: { step: "email", email: "", name: "", error: "", personal: false },
+  setup: { kind: "trading", picked: new Set(), reserve: "", connecting: false },
   ctx: null,
   brief: null,
   review: [],
@@ -35,8 +38,18 @@ try {
 
 // ---------------------------------------------------------------- data
 async function load() {
+  app.account = api.account();
+  if (!app.account) {
+    app.ctx = null;
+    if (!["welcome", "setup"].includes(rawRoute())) history.replaceState(null, "", "#/welcome");
+    return render();
+  }
+  app.bizId = app.account.sandbox ?? SANDBOXES[0].id;
   await api.open(app.bizId);
   app.ctx = await api.context();
+  if (app.account.reserve && !app.account.reserveApplied) {
+    await api.setSafetyLine(app.account.reserve);
+  }
   await refresh();
 }
 
@@ -96,15 +109,37 @@ function summary() {
         ? `Cash is ${money(short)} below your line right now.`
         : `Cash holds until ${shortDate(holdsUntil)}, then drops ${money(short)} below your line.`,
       sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}${causes.length ? `, when ${causes.join(" and ")} go out` : ""}.`,
+      take: cfoTake(),
       tone: "short",
     };
   }
   const idle = b.watch.find((w) => w.warning === "idle_balance_over");
   return {
     headline: `You're above your line for all ${run.weeks.length} weeks.`,
-    sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}.${idle ? ` ${idle.title}.` : ""}`,
+    sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}.`,
+    take: idle ? `You're in good shape. The real question is the idle cash: ${idle.title.charAt(0).toLowerCase()}${idle.title.slice(1)}, and that money should be working.` : "You're in good shape. Nothing needs a decision this week.",
     tone: "ok",
   };
+}
+
+// Neri's read, the way a CFO would say it: the diagnosis, then what closes it, then what's left to decide.
+// Every figure comes from the forecast run and the ranked items; nothing here is estimated.
+function cfoTake() {
+  const b = app.brief;
+  const run = b.run;
+  const end = run.weeks[run.weeks.length - 1].closing;
+  const timing = end >= run.safetyLine;
+  const open = b.three.filter((i) => i.state === "open" && i.lever);
+  const diag = timing ? "This is a timing problem, not a profit problem." : `This isn't only timing: you finish the 13 weeks at ${money(end)}, still under your line.`;
+  if (!open.length) return `${diag} ${timing ? "Hold spending until the late money lands." : "The fix is margin or spend, not chasing."}`;
+  const after = b.combined?.lowPoint.amount ?? run.lowPoint.amount + open[0].cashEffect;
+  const fixes = open.length === 1 ? "Today's one move" : `Today's ${["", "", "two", "three"][open.length]} moves`;
+  if (after >= run.safetyLine) return `${diag} ${fixes} keep you above your line.`;
+  const rest = run.safetyLine - after;
+  return `${diag} ${fixes} lift the low point to ${money(after)}. The last ${money(rest)} needs a decision from you before ${shortDate(run.firstBelowSafety)}.`;
+}
+function ownerName() {
+  return app.account?.owner || app.ctx?.business.owner || "";
 }
 function commitmentParty(cid) {
   return app.ctx.partyOf?.(cid);
@@ -114,7 +149,7 @@ function spokenBrief() {
   const s = summary();
   const b = app.brief;
   const open = b.three.filter((i) => i.state !== "done");
-  const parts = [`${greeting(new Date().getHours())}, ${app.ctx.business.owner}. ${speakable(s.headline)} ${speakable(s.sub)}`];
+  const parts = [`${greeting(new Date().getHours())}, ${ownerName()}. ${speakable(s.headline)} ${speakable(s.take ?? s.sub)}`];
   if (open.length) {
     parts.push(open.length === 1 ? "One thing today." : `${["", "One", "Two", "Three"][open.length]} things today.`);
     open.forEach((i, n) => parts.push(`${open.length > 1 ? ["First", "Second", "Third"][n] + ". " : ""}${speakable(i.title)}.`));
@@ -127,11 +162,15 @@ function spokenBrief() {
 }
 
 // ---------------------------------------------------------------- routing + shell
-const ROUTES = ["today", "details", "notes", "review", "sources", "settings"];
-const ALIASES = { forecast: "details", ask: "today", home: "today" };
+const ROUTES = ["today", "details", "notes", "review", "sources", "settings", "welcome", "setup"];
+const ALIASES = { forecast: "details", ask: "today", home: "today", signup: "welcome" };
+function rawRoute() {
+  return location.hash.replace(/^#\/?/, "") || "today";
+}
 function route() {
-  let r = location.hash.replace(/^#\/?/, "") || "today";
-  r = ALIASES[r] ?? r;
+  let r = ALIASES[rawRoute()] ?? rawRoute();
+  if (!app.account) return r === "setup" && app.signup.step === "done" ? "setup" : "welcome";
+  if (r === "welcome") return "today";
   return ROUTES.includes(r) ? r : "today";
 }
 window.addEventListener("hashchange", () => {
@@ -148,6 +187,15 @@ function notesWaiting() {
 
 function renderShell() {
   const r = route();
+  const portal = r === "welcome" || r === "setup";
+  document.body.classList.toggle("portal", portal);
+  if (portal) {
+    $("#top").innerHTML = `<div class="top-inner"><span class="brand">${logo}<b>Neri <span>Cash</span></b></span></div>`;
+    $("#bottom").innerHTML = "";
+    $("#preview-note").innerHTML = "";
+    $("#talk").hidden = true;
+    return;
+  }
   const tab = (id, label, count) =>
     `<a class="tab" href="#/${id}" ${r === id ? 'aria-current="page"' : ""}>${label}${count ? `<span class="count" aria-label="${count} waiting">${count}</span>` : ""}</a>`;
   $("#top").innerHTML = `
@@ -157,31 +205,42 @@ function renderShell() {
         ${tab("today", "Home")}${tab("details", "Details")}${tab("notes", "Notes", notesWaiting())}${tab("review", "Review", waitingCount())}${tab("sources", "Sources")}
       </nav>
       <div class="top-right">
-        <label class="sr" for="biz">Business</label>
-        <select id="biz" class="biz" data-change="biz">
-          ${SANDBOXES.map((s) => `<option value="${s.id}" ${s.id === app.bizId ? "selected" : ""}>${esc(s.label)}</option>`).join("")}
-        </select>
-        <button class="icon-btn" data-action="drive" title="Drive mode: listen to your brief">${icon.car}<span class="sr">Drive mode</span></button>
+        ${statusDots()}
         <a class="icon-btn" href="#/settings" title="Settings">${icon.gear}<span class="sr">Settings</span></a>
       </div>
     </div>`;
   const nav = (id, label, ic, count) =>
     `<a href="#/${id}" ${r === id ? 'aria-current="page"' : ""}>${ic}${label}${count ? `<span class="count">${count}</span>` : ""}</a>`;
   $("#bottom").innerHTML =
-    nav("today", "Home", icon.ask) + nav("details", "Details", icon.chart) + nav("notes", "Notes", icon.note, notesWaiting()) +
-    nav("review", "Review", icon.inbox, waitingCount()) + nav("sources", "Sources", icon.plug);
+    nav("today", "Home", icon.ask) + nav("details", "Details", icon.chart) +
+    `<span class="nav-slot" aria-hidden="true"></span>` +
+    nav("notes", "Notes", icon.note, notesWaiting() + waitingCount()) + nav("sources", "Sources", icon.plug);
+  $("#talk").hidden = false;
   $("#preview-note").innerHTML = app.ctx.business.synthetic
-    ? `Preview with a fictional business<span class="wide-only">, ${esc(app.ctx.business.name.replace(/\.$/, ""))}. Today is set to ${dayDate(app.ctx.business.asOf)}</span>.`
+    ? app.account?.sample
+      ? `Sample business with fictional data<span class="wide-only">. Today is set to ${dayDate(app.ctx.business.asOf)}</span>.`
+      : `Preview: your connections are simulated, so Neri shows a sample ${esc(app.ctx.profile.displayName.toLowerCase())} business<span class="wide-only">. Today is set to ${dayDate(app.ctx.business.asOf)}</span>.`
     : "";
 }
 
+// Connection health as dots: green connected, yellow waiting (file or setup), red needs attention.
+function connections() {
+  if (app.account?.connections?.length) return app.account.connections;
+  return app.ctx.business.sources.map((src) => ({ id: src.id, name: src.label, state: src.state === "ok" ? "ok" : src.state === "error" ? "error" : "waiting", syncedAt: src.syncedAt }));
+}
+function statusDots() {
+  const list = connections();
+  const label = list.map((c) => `${c.name}: ${c.state === "ok" ? "connected" : c.state === "error" ? "needs attention" : "waiting for a file"}`).join(", ");
+  return `<a class="dots" href="#/sources" title="${esc(label)}" aria-label="Connections. ${esc(label)}">${list.slice(0, 8).map((c) => `<i class="d ${c.state === "ok" ? "" : c.state === "error" ? "red" : "amber"}"></i>`).join("")}${list.length > 8 ? `<small>+${list.length - 8}</small>` : ""}</a>`;
+}
+
 function render() {
-  if (!app.ctx) return;
-  renderShell();
   const r = route();
-  const views = { today: viewToday, details: viewDetails, notes: viewNotes, review: viewReview, sources: viewSources, settings: viewSettings };
+  if (!app.ctx && r !== "welcome" && r !== "setup") return;
+  renderShell();
+  const views = { today: viewToday, details: viewDetails, notes: viewNotes, review: viewReview, sources: viewSources, settings: viewSettings, welcome: viewWelcome, setup: viewSetup };
   $("#view").innerHTML = masked(views[r]());
-  document.title = `${{ today: "Home", details: "Details", notes: "Notes", review: "Review", sources: "Sources", settings: "Settings" }[r]} · Neri Cash`;
+  document.title = `${{ today: "Home", details: "Details", notes: "Notes", review: "Review", sources: "Sources", settings: "Settings", welcome: "Sign up", setup: "Set up" }[r]} · Neri Cash`;
   if (app.drive) renderDrive();
 }
 
@@ -196,11 +255,13 @@ function viewToday() {
   return `
   <div class="home">
     <section class="home-top">
-      <p class="hello">${greeting(new Date().getHours())}, ${esc(app.ctx.business.owner)}</p>
+      <p class="hello">${greeting(new Date().getHours())}, ${esc(ownerName())}</p>
       <h1 class="headline">${esc(s.headline)}</h1>
       <p class="subhead">${esc(s.sub)}</p>
+      ${s.take ? `<p class="take"><span class="sunmark" aria-hidden="true"></span>${esc(s.take)}</p>` : ""}
       <div class="home-links">
         ${canSpeak ? `<button class="listen" data-action="listen" aria-pressed="${app.stopSpeak ? "true" : "false"}"><span class="disc">${app.stopSpeak ? icon.stop : icon.play}</span>${app.stopSpeak ? "Stop" : "Play brief"} <small>${spokenLength()} sec</small></button>` : ""}
+        <button class="btn quiet" data-action="drive">${icon.car}Drive mode</button>
         <a class="btn quiet" href="#/details">See the numbers</a>
       </div>
     </section>
@@ -515,7 +576,8 @@ const LOGO_COLORS = ["#4a5fd9", "#2f7d5b", "#b25a1f", "#7a4fd0", "#1f7a99", "#a8
 function logoTile(c) {
   let h = 0;
   for (const ch of c.id) h = (h * 31 + ch.charCodeAt(0)) | 0;
-  const initials = c.name.replace(/[^A-Za-z0-9 ]/g, "").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const words = c.name.replace(/[^A-Za-z ]/g, " ").split(" ").filter((w) => w && !/^(and|the|of)$/i.test(w));
+  const initials = (c.mark ?? (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2))).toUpperCase();
   return `<span class="logo" style="background:${LOGO_COLORS[Math.abs(h) % LOGO_COLORS.length]}" aria-hidden="true">${initials}</span>`;
 }
 
@@ -584,6 +646,10 @@ function viewSettings() {
   <div class="settings">
     <div class="setting"><h3>Your line</h3><p>The least cash you want to keep. Neri warns you before you go under it.</p>
       <form class="control" data-submit="safety" style="display:flex;gap:8px"><label class="money-input"><span>$</span><input name="amt" inputmode="numeric" value="${Math.round(app.brief.run.safetyLine / 100)}" aria-label="Your line in dollars" /></label><button class="btn small" type="submit">Save</button></form></div>
+    <div class="setting"><h3>Account</h3><p>${app.account?.sample ? "You're looking at a sample business." : `${esc(app.account?.email ?? "")}${app.account?.businessName ? `, ${esc(app.account.businessName)}` : ""}`}</p>
+      <div class="control" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${app.account?.sample ? `<button class="btn small primary" data-action="signout">Create your account</button>` : `<button class="btn small" data-action="signout">Sign out</button>`}</div></div>
+    <div class="setting"><h3>Sample data</h3><p>Switch between the fictional businesses this preview runs on.</p>
+      <select class="biz control" data-change="biz" aria-label="Sample business">${SANDBOXES.map((x) => `<option value="${x.id}" ${x.id === app.bizId ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>
     <div class="setting"><h3>Hide names</h3><p>Show customers and suppliers as Customer A, Supplier B. For demos and screen sharing.</p>
       <button class="switch control" role="switch" aria-checked="${app.mask}" data-action="mask" aria-label="Hide names"></button></div>
     <div class="setting"><h3>Appearance</h3><p>Light, dark, or follow your device.</p>
@@ -591,6 +657,100 @@ function viewSettings() {
     <h2 class="section-title" style="margin-top:32px">Rules from your notes</h2>
     <p class="section-note">Things you told Neri about how people pay and get paid. They shape every forecast.</p>
     ${app.ctx.rules.filter((r) => r.state !== "dismissed").length ? app.ctx.rules.filter((r) => r.state !== "dismissed").map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q><div>${esc(app.ctx.parties.find((p) => p.id === r.scope.partyId)?.name ?? "Everyone")}: ${r.kind === "flexibility" ? `can move payments up to ${r.params.extraDays} days` : r.kind === "lag_offset" ? `pays about ${r.params.offsetDays} days late` : r.kind}${r.state === "confirmed" ? "" : " (waiting for your OK)"}</div></div>`).join("") : `<p>No rules yet.</p>`}
+  </div>`;
+}
+
+// ---------------------------------------------------------------- Sign up (business email + code)
+function viewWelcome() {
+  const su = app.signup;
+  const err = su.error ? `<p class="form-error" role="alert">${esc(su.error)}</p>` : "";
+  if (su.step === "code") {
+    return `
+    <div class="portal-wrap">
+      <h1 class="portal-title">Check your email</h1>
+      <p class="portal-sub">We sent a 6-digit code to <b>${esc(su.email)}</b>.</p>
+      <form class="portal-form" data-submit="verify" novalidate>
+        <label for="code">Code</label>
+        <input id="code" name="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required />
+        <label for="bizname">Business name</label>
+        <input id="bizname" name="biz" value="${esc(su.name)}" placeholder="Your business" autocomplete="organization" required />
+        ${err}
+        <button class="btn primary big" type="submit">Create account</button>
+      </form>
+      <p class="portal-fine">${api.mode === "preview" ? "Preview: any 6 digits work." : ""} <button class="linklike" data-action="signup-back">Use a different email</button></p>
+    </div>`;
+  }
+  return `
+  <div class="portal-wrap">
+    <h1 class="portal-title">Your CFO, in your pocket.</h1>
+    <p class="portal-sub">Neri reads your books, bank and messages, and every morning tells you where cash is headed and what to do about it.</p>
+    <form class="portal-form" data-submit="signup" novalidate>
+      <label for="email">Work email</label>
+      <input id="email" name="email" type="email" autocomplete="email" placeholder="you@yourbusiness.com" value="${esc(su.email)}" required />
+      ${err}
+      <button class="btn primary big" type="submit">Continue</button>
+    </form>
+    <p class="portal-fine">One account for your business. Invite your team later.</p>
+    <p class="portal-fine"><button class="linklike" data-action="sample">Look around with a sample business first</button></p>
+  </div>`;
+}
+
+// ---------------------------------------------------------------- Set up (one page)
+const KINDS = [
+  { id: "trading", label: "Trading and import" },
+  { id: "restaurant", label: "Restaurant and retail" },
+  { id: "services", label: "Services" },
+  { id: "other", label: "Something else" },
+];
+const SUGGESTED = {
+  trading: ["zoho_books", "quickbooks", "bank_feed", "zoho_crm", "m365", "whatsapp"],
+  restaurant: ["quickbooks", "bank_feed", "square", "toast", "gusto", "google"],
+  services: ["quickbooks", "xero", "bank_feed", "hubspot", "gusto", "google"],
+  other: ["quickbooks", "bank_feed", "google"],
+};
+function viewSetup() {
+  const st = app.setup;
+  const name = app.signup.name || "your business";
+  const suggested = SUGGESTED[st.kind].map((id) => CONNECTORS.find((c) => c.id === id)).filter(Boolean);
+  const more = CATEGORIES.flatMap((cat) => CONNECTORS.filter((c) => c.category === cat.id && !SUGGESTED[st.kind].includes(c.id)));
+  let tz = "";
+  try {
+    tz = new Intl.DateTimeFormat("en-US", { timeZoneName: "longGeneric" }).formatToParts(new Date()).find((x) => x.type === "timeZoneName")?.value ?? "";
+  } catch {}
+  const n = st.picked.size;
+  const viaFile = [...st.picked].filter((id) => CONNECTORS.find((c) => c.id === id)?.availability !== "live").length;
+  const tile = (c) => {
+    const on = st.picked.has(c.id);
+    const state = st.connecting && on ? (c.availability === "live" ? "ok" : "waiting") : "";
+    return `<button class="app-tile ${on ? "on" : ""}" data-action="pick" data-id="${esc(c.id)}" aria-pressed="${on}" title="${esc(c.reads)}">
+      ${logoTile(c)}<span class="app-name">${esc(c.name)}</span>
+      <span class="tick" aria-hidden="true">${state ? `<i class="d ${state === "ok" ? "" : "amber"}"></i>` : icon.check}</span>
+    </button>`;
+  };
+  return `
+  <div class="setup">
+    <h1 class="portal-title">Set up ${esc(name)}</h1>
+    <p class="portal-sub">Tick the apps you use, then connect them all at once. Neri only reads.</p>
+    <div class="kind-row" role="radiogroup" aria-label="Type of business">
+      ${KINDS.map((k) => `<button class="kind-pill" role="radio" aria-checked="${st.kind === k.id}" data-action="kind" data-k="${k.id}">${k.label}</button>`).join("")}
+    </div>
+    <section class="rail" aria-label="Suggested apps">
+      <h2>Suggested for ${esc(KINDS.find((k) => k.id === st.kind).label.toLowerCase())}</h2>
+      <div class="rail-track">${suggested.map(tile).join("")}</div>
+    </section>
+    <section class="rail" aria-label="More apps">
+      <h2>More apps</h2>
+      <div class="rail-track">${more.map(tile).join("")}</div>
+    </section>
+    <div class="reserve-row">
+      <label for="reserve">Keep at least</label>
+      <span class="money-input"><span>$</span><input id="reserve" inputmode="numeric" placeholder="35,000" value="${esc(st.reserve)}" data-change="reserve" /></span>
+      <span class="reserve-note">in the bank. Neri warns you before you go under it.${tz ? ` Times in ${esc(tz)}.` : ""}</span>
+    </div>
+    <div class="connect-bar">
+      <span class="bar-note" id="bar-note">${viaFile ? `${viaFile} of these connect by file upload until their connector is ready.` : `<label class="linklike">${icon.upload}No app? Upload a file<input type="file" accept=".csv,.xlsx,.xls,.pdf" data-change="upload" hidden /></label>`}</span>
+      <button class="btn primary big" data-action="connect-all" ${st.connecting ? "disabled" : ""}>${st.connecting ? "Connecting…" : n ? `Connect ${n} ${n === 1 ? "app" : "apps"}` : "Skip for now"}</button>
+    </div>
   </div>`;
 }
 
@@ -775,6 +935,54 @@ function renderDrive() {
     <div class="drive-caption" id="drive-caption">${canListen ? (app.stopListen ? "Listening…" : "Tap the mic to park a thought. Neri will ask you to confirm when you're parked.") : ""}</div>`);
 }
 
+// ---------------------------------------------------------------- Talk to Neri (the big mic)
+function openTalk() {
+  app.stopSpeak?.();
+  app.stopSpeak = null;
+  let el = document.querySelector(".voice");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "voice";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-label", "Talk to Neri");
+    document.body.append(el);
+  }
+  const paint = (heard, status) => {
+    el.innerHTML = `
+      <div class="voice-card">
+        <div class="orb ${app.stopListen ? "live" : ""}" aria-hidden="true">${icon.mic}</div>
+        <p class="voice-heard" aria-live="polite">${heard ? esc(heard) : "Ask about cash, or tell me what's on your mind."}</p>
+        <p class="voice-status">${esc(status)}</p>
+        ${canListen ? "" : `<form class="askbar" data-submit="talk-typed"><input name="q" placeholder="Type it instead" aria-label="Type your question" /><button class="send" type="submit">${icon.send}<span class="sr">Ask</span></button></form>`}
+        <div class="voice-actions">${app.stopListen ? `<button class="btn primary" data-action="talk-stop">I'm done</button>` : ""}<button class="btn" data-action="talk-close">Close</button></div>
+      </div>`;
+  };
+  if (!canListen) {
+    paint("", "Voice needs Chrome or Safari, with microphone access allowed.");
+    el.querySelector("input")?.focus();
+    return;
+  }
+  app.stopListen = listen({
+    onText: (t) => paint(t, "Listening…"),
+    onError: (msg) => {
+      app.stopListen = null;
+      paint("", msg);
+    },
+    onEnd: async (text) => {
+      app.stopListen = null;
+      if (!text) return paint("", "Didn't catch that. Tap the mic and try again.");
+      closeTalk();
+      await doAsk(text, "voice");
+    },
+  });
+  paint("", "Listening…");
+}
+function closeTalk() {
+  app.stopListen?.();
+  app.stopListen = null;
+  document.querySelector(".voice")?.remove();
+}
+
 // ---------------------------------------------------------------- voice capture
 function startCapture(target) {
   if (app.stopListen) {
@@ -846,8 +1054,10 @@ async function doAsk(q, via = "typed") {
     const n = await api.parkNote(q, via);
     app.notes = await api.notes();
     turn.note = n.id;
+    if (via === "voice") speak([`Got it. ${readingSentence(n)} It's in your notes, and nothing changes until you add it.`]);
   } else {
     turn.a = await api.ask(q);
+    if (via === "voice") speak([speakable(turn.a.text)]);
   }
   turn.pending = false;
   render();
@@ -869,6 +1079,58 @@ document.addEventListener("click", async (ev) => {
       app.selectedWeek = null;
       if (route() === "details") render();
     }
+    return;
+  }
+  if (a === "talk") return openTalk();
+  if (a === "talk-stop") return app.stopListen?.();
+  if (a === "talk-close") return closeTalk();
+  if (a === "signup-back") {
+    app.signup = { step: "email", email: app.signup.email, name: "", error: "" };
+    return render();
+  }
+  if (a === "sample") {
+    await api.useSample(SANDBOXES[0].id);
+    history.replaceState(null, "", "#/today");
+    return load();
+  }
+  if (a === "signout") {
+    await api.signOut();
+    app.signup = { step: "email", email: "", name: "", error: "" };
+    app.setup = { kind: "trading", picked: new Set(), reserve: "", connecting: false };
+    app.askLog = [];
+    location.hash = "#/welcome";
+    return load();
+  }
+  if (a === "kind") {
+    app.setup.kind = el.dataset.k;
+    return render();
+  }
+  if (a === "pick") {
+    const p = app.setup.picked;
+    p.has(id) ? p.delete(id) : p.add(id);
+    el.classList.toggle("on", p.has(id));
+    el.setAttribute("aria-pressed", String(p.has(id)));
+    const btn = document.querySelector('[data-action="connect-all"]');
+    if (btn) btn.textContent = p.size ? `Connect ${p.size} ${p.size === 1 ? "app" : "apps"}` : "Skip for now";
+    const viaFile = [...p].filter((x) => CONNECTORS.find((c) => c.id === x)?.availability !== "live").length;
+    const note = document.getElementById("bar-note");
+    if (note && viaFile) note.textContent = `${viaFile} of these connect by file upload until their connector is ready.`;
+    return;
+  }
+  if (a === "connect-all") {
+    const st = app.setup;
+    st.connecting = true;
+    render();
+    const dollars = Number(String(st.reserve).replace(/[^\d.]/g, ""));
+    // Preview: connectors marked Ready sign in on the Neri server; here they show as connected. Others wait for a file.
+    await new Promise((r) => setTimeout(r, st.picked.size ? 1100 : 0));
+    await api.completeSetup({ email: app.signup.email, businessName: app.signup.name, kind: st.kind, reserve: dollars ? Math.round(dollars * 100) : null, connect: [...st.picked] });
+    st.connecting = false;
+    history.replaceState(null, "", "#/today");
+    await load();
+    const c = app.account.connections;
+    const ok = c.filter((x) => x.state === "ok").length;
+    toast("All set", c.length ? `${ok} connected${c.length - ok ? `, ${c.length - ok} waiting for a file` : ""}. Here's today.` : "Upload a file or connect an app whenever you're ready.");
     return;
   }
   if (a === "done") {
@@ -1006,6 +1268,39 @@ document.addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const kind = f.dataset.submit;
   if (kind === "ask") return doAsk(new FormData(f).get("q") ?? "");
+  if (kind === "talk-typed") {
+    const q = String(new FormData(f).get("q") ?? "");
+    closeTalk();
+    return doAsk(q);
+  }
+  if (kind === "signup") {
+    const email = String(new FormData(f).get("email") ?? "").trim();
+    try {
+      const r = await api.startSignup(email);
+      app.signup = { step: "code", email, name: r.suggestedName ?? suggestBusinessName(email), error: "" };
+    } catch (e) {
+      app.signup.error = e.message;
+      app.signup.email = email;
+    }
+    render();
+    $("#code")?.focus();
+    return;
+  }
+  if (kind === "verify") {
+    const fd = new FormData(f);
+    const name = String(fd.get("biz") ?? "").trim();
+    try {
+      if (!name) throw new Error("Add your business name.");
+      await api.verifyCode(app.signup.email, String(fd.get("code") ?? ""));
+      app.signup = { ...app.signup, name, step: "done", error: "" };
+      location.hash = "#/setup";
+    } catch (e) {
+      app.signup.error = e.message;
+      app.signup.name = name;
+      render();
+    }
+    return;
+  }
   if (kind === "park") {
     const text = (new FormData(f).get("text") ?? "").toString().trim();
     if (!text) return;
@@ -1026,9 +1321,17 @@ document.addEventListener("submit", async (ev) => {
 
 document.addEventListener("change", async (ev) => {
   const el = ev.target;
+  if (el.dataset.change === "reserve") {
+    app.setup.reserve = el.value;
+    return;
+  }
   if (el.dataset.change === "biz") {
     app.bizId = el.value;
-    try { localStorage.setItem("neri.biz", app.bizId); } catch {}
+    if (app.account?.sample) app.account = await api.useSample(el.value);
+    else if (app.account) {
+      app.account = { ...app.account, sandbox: el.value };
+      try { localStorage.setItem("neri.account", JSON.stringify(app.account)); } catch {}
+    }
     app.askLog = [];
     app.whatIf = null;
     app.brief = null;

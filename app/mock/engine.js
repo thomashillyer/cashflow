@@ -162,6 +162,14 @@ export function createEngine(fixture) {
     };
   }
 
+  // Timing problem (cash recovers above the line by the end of the horizon) vs margin problem (it doesn't).
+  function diagnosis(run = forecast()) {
+    const end = run.weeks[run.weeks.length - 1].closing;
+    if (!run.firstBelowSafety) return { kind: "healthy", sentence: "" };
+    if (end >= state.safetyLine) return { kind: "timing", sentence: "It's a timing problem, not a profit problem: cash recovers once the late money lands, so today's list is how we close it." };
+    return { kind: "margin", sentence: `This one isn't only timing: you end the 13 weeks at ${money(end)}, still under your line, so more is going out than coming in. Timing moves buy weeks; the real fix is margin or spend.` };
+  }
+
   function simulate(levers, base = forecast()) {
     const run = forecast({ levers });
     return { run, lowPointDelta: run.lowPoint.amount - base.lowPoint.amount };
@@ -424,34 +432,27 @@ export function createEngine(fixture) {
     const base = forecast();
     const amount = parseAmount(question);
 
-    const whatIf = q.match(/what if (.+?) pays? (\d+) days? late/);
-    if (whatIf) {
-      const pt = findParty(whatIf[1]);
-      if (!pt) return { text: `I couldn't match “${whatIf[1]}” to anyone in your books.`, citations: [], missingData: "party" };
-      const days = Number(whatIf[2]);
-      const levers = allCommitments().filter((c) => c.partyId === pt.id && c.settlement === "open").map((c) => ({ kind: "shift", commitmentId: c.id, days }));
-      const sim = simulate(levers, base);
-      return {
-        text: `If ${pt.name} pays ${days} more days late on everything open, your low point moves from ${money(base.lowPoint.amount)} (${shortDate(base.lowPoint.date)}) to ${money(sim.run.lowPoint.amount)} (${shortDate(sim.run.lowPoint.date)}). The chart now shows that case.`,
-        citations: levers.map((l) => l.commitmentId),
-        scenario: { label: `${pt.name} +${days} days`, run: sim.run },
-      };
-    }
+    // CFO voice: verdict first, then the one reason, then the move. Every figure comes from simulate().
+    const chaseLevers = () => brief().three.filter((x) => x.state === "open" && x.lever).map((x) => x.lever);
 
     if (/payroll/.test(q)) {
       const payrolls = base.events.filter((e) => party(commitmentById(e.commitmentId)?.partyId)?.kind === "employee" && e.direction === "out");
-      const risky = payrolls.filter((e) => (base.days.find((d) => d.date === e.date)?.closing ?? 0) < 0);
+      const closeOn = (run, d) => run.days.find((x) => x.date === d)?.closing ?? 0;
+      const risky = payrolls.filter((e) => closeOn(base, e.date) < 0);
       if (!risky.length) {
-        const tight = payrolls.filter((e) => (base.days.find((d) => d.date === e.date)?.closing ?? 0) < state.safetyLine);
+        const tight = payrolls.filter((e) => closeOn(base, e.date) < state.safetyLine);
         return {
-          text: `Yes. Every payroll in the next 13 weeks clears${tight.length ? `, but on ${tight.map((e) => shortDate(e.date)).join(" and ")} you'll be under your ${money(state.safetyLine)} line afterwards` : " with room to spare"}.`,
+          text: tight.length
+            ? `Yes, but it gets tight. Every payroll clears, though after the ${shortDate(tight[0].date)} run you're at ${money(closeOn(base, tight[0].date))}, under your ${money(state.safetyLine)} line. I'd work today's list now so that week has room.`
+            : `Yes, comfortably. Every payroll in the next 13 weeks clears with room above your line.`,
           citations: payrolls.map((e) => e.commitmentId),
         };
       }
       const e = risky[0];
-      const close = base.days.find((d) => d.date === e.date).closing;
+      const fix = chaseLevers();
+      const after = fix.length ? simulate(fix, base).run : null;
       return {
-        text: `Not as things stand. The ${shortDate(e.date)} payroll (${money(e.amountBase)}) leaves you at ${money(close)} that day. The three things on your Today list close most of that gap.`,
+        text: `Not as it stands. The ${shortDate(e.date)} payroll (${money(e.amountBase)}) leaves you at ${money(closeOn(base, e.date))} that day.${after ? ` The fix is on today's list: do ${["", "that one", "those two", "those three"][fix.length]} and you're at ${money(closeOn(after, e.date))} after that payroll.` : ""}`,
         citations: [e.commitmentId],
       };
     }
@@ -459,39 +460,72 @@ export function createEngine(fixture) {
     if (/\b(who|call|chase|owes?)\b/.test(q)) {
       const b = brief();
       const chase = [...b.three, ...b.rest].filter((i) => i.lever?.kind === "chase");
-      if (!chase.length) return { text: "No one needs a call right now. Every open invoice is expected on or before its due date.", citations: [] };
+      if (!chase.length) return { text: "Nobody right now. Every open invoice is expected on or before its due date, so calls wouldn't move your cash.", citations: [] };
+      const [first, ...others] = chase;
       return {
-        text: `Start with ${chase.map((i) => `${partyName(i.partyId)} (${commitmentById(i.lever.commitmentId).sourceRef.record}, lifts your low point ${money(i.cashEffect)})`).join(", then ")}.`,
+        text: `${partyName(first.partyId)} first. Their ${commitmentById(first.lever.commitmentId).sourceRef.record} is the biggest swing: paid on its due date, your low point rises ${money(first.cashEffect)}.${others.length ? ` Then ${others.map((i) => partyName(i.partyId)).join(" and ")}.` : ""} Ask for a firm date, not a promise.`,
         citations: chase.map((i) => i.lever.commitmentId),
       };
     }
 
-    if (amount && /(afford|hire|buy|spend|plan|deposit|purchase|order)/.test(q)) {
+    if (amount && /(afford|hire|buy|spend|plan|deposit|purchase|order|invest)/.test(q)) {
       const date = parseWhen(q, asOf);
-      const ev = {
-        id: `evt-plan-preview-0`, commitmentId: "plan-preview", legIndex: 0, date, amount, currency: "USD", amountBase: amount,
-        direction: "out", status: "likely", confidence: 0.9, basis: `your plan, typed in Ask Neri: “${question}”`,
+      const mk = (d) => ({
+        id: `evt-plan-preview-0`, commitmentId: "plan-preview", legIndex: 0, date: d, amount, currency: fixture.profile.baseCurrency, amountBase: amount,
+        direction: "out", status: "likely", confidence: 0.9, basis: `your plan: “${question}”`,
         sourceRef: { system: "owner", record: "Ask Neri" }, overriddenBy: [],
-      };
-      const sim = simulate([{ kind: "add", event: ev }], base);
+      });
+      const sim = simulate([{ kind: "add", event: mk(date) }], base);
       const ok = sim.run.lowPoint.amount >= state.safetyLine;
+      // If it doesn't fit, find the first week it would.
+      let better = null;
+      if (!ok) {
+        for (const w of base.weeks) {
+          if (w.start <= date) continue;
+          const s2 = simulate([{ kind: "add", event: mk(w.start) }], base);
+          if (s2.run.lowPoint.amount >= Math.min(state.safetyLine, base.lowPoint.amount)) { better = { date: w.start, low: s2.run.lowPoint }; break; }
+        }
+      }
+      const text = ok
+        ? `Yes. ${money(amount)} on ${shortDate(date)} takes your low point to ${money(sim.run.lowPoint.amount)} on ${shortDate(sim.run.lowPoint.date)}, still above your line.`
+        : `Not on ${shortDate(date)}. It takes your low point to ${money(sim.run.lowPoint.amount)} on ${shortDate(sim.run.lowPoint.date)}, ${money(state.safetyLine - sim.run.lowPoint.amount)} under your line.${better ? ` Move it to ${shortDate(better.date)} and it costs you nothing extra: your low point stays at ${money(better.low.amount)}.` : " I'd hold it until the gap is closed."}`;
       return {
-        text: `A ${money(amount)} payment on ${shortDate(date)} moves your low point from ${money(base.lowPoint.amount)} to ${money(sim.run.lowPoint.amount)} on ${shortDate(sim.run.lowPoint.date)}. ${ok ? "You stay above your line." : `That's ${money(state.safetyLine - sim.run.lowPoint.amount)} under your ${money(state.safetyLine)} line.`}`,
+        text,
         citations: [],
         scenario: { label: `${money(amount)} on ${shortDate(date)}`, run: sim.run },
         proposal: { kind: "plan", amount, date, note: question },
       };
     }
 
-    if (/\b(low|lowest|short|gap|worst|tightest)\b/.test(q)) {
+    const whatIf2 = q.match(/what if (.+?) pays? (\d+) days? late/);
+    if (whatIf2) {
+      const pt = findParty(whatIf2[1]);
+      if (!pt) return { text: `I don't see “${whatIf2[1]}” in your books, so I can't price that.`, citations: [], missingData: "party" };
+      const days = Number(whatIf2[2]);
+      const levers = allCommitments().filter((c) => c.partyId === pt.id && c.settlement === "open").map((c) => ({ kind: "shift", commitmentId: c.id, days }));
+      const sim = simulate(levers, base);
+      const hurt = sim.run.lowPoint.amount < base.lowPoint.amount;
       return {
-        text: `Your lowest point is ${money(base.lowPoint.amount)} on ${shortDate(base.lowPoint.date)}${base.firstBelowSafety ? `. You first drop under your ${money(state.safetyLine)} line on ${shortDate(base.firstBelowSafety)}` : ", above your line the whole way"}.`,
+        text: hurt
+          ? `That would hurt. Your low point drops from ${money(base.lowPoint.amount)} to ${money(sim.run.lowPoint.amount)} on ${shortDate(sim.run.lowPoint.date)}. ${pt.name} is worth a call this week to pin down a date.`
+          : `You'd absorb it. Your low point stays at ${money(base.lowPoint.amount)} on ${shortDate(base.lowPoint.date)}, because their money lands after your tightest week anyway.`,
+        citations: levers.map((l) => l.commitmentId),
+        scenario: { label: `${pt.name} +${days} days`, run: sim.run },
+      };
+    }
+
+    if (/\b(low|lowest|short|gap|worst|tightest|how am i|how are we|how's cash|cash look)\b/.test(q)) {
+      const below = base.firstBelowSafety;
+      return {
+        text: below
+          ? `${shortDate(below)} is when it bites: you drop under your ${money(state.safetyLine)} line, bottoming at ${money(base.lowPoint.amount)} on ${shortDate(base.lowPoint.date)}. ${diagnosis(base).sentence}`
+          : `You're fine. Your lowest point is ${money(base.lowPoint.amount)} on ${shortDate(base.lowPoint.date)}, above your line the whole way.`,
         citations: base.days.find((d) => d.date === base.lowPoint.date).eventIds.map((id) => id.replace(/^evt-/, "").replace(/-\d+$/, "")),
       };
     }
 
     return {
-      text: "In this preview I can answer questions about payroll, who to call, your lowest point, “what if a customer pays 10 days late”, and plans like “a $40K supplier deposit in December”. The full version answers anything from your books through Claude.",
+      text: "I don't have that one in this preview. Try payroll, who to call, your lowest point, a what-if like “what if a customer pays 10 days late”, or a plan like “a $40K supplier deposit in December”. The full version answers from your books through Claude.",
       citations: [],
       missingData: "preview",
     };
@@ -645,6 +679,7 @@ export function createEngine(fixture) {
   }
 
   return {
+    diagnosis,
     business: fixture.business,
     profile: fixture.profile,
     parties: fixture.parties,

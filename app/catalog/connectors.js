@@ -23,9 +23,9 @@ export const CATEGORIES = [
 export const CONNECTORS = [
   // Accounting
   { id: "zoho_books", name: "Zoho Books", category: "accounting", availability: "live", reads: "Invoices, bills, POs, payments, contacts" },
-  { id: "quickbooks", name: "QuickBooks Online", category: "accounting", availability: "next", reads: "Invoices, bills, payments, customers, vendors" },
+  { id: "quickbooks", name: "QuickBooks Online", mark: "QB", category: "accounting", availability: "next", reads: "Invoices, bills, payments, customers, vendors" },
   { id: "xero", name: "Xero", category: "accounting", availability: "next", reads: "Invoices, bills, payments, contacts" },
-  { id: "sage_intacct", name: "Sage Intacct", category: "accounting", availability: "planned", reads: "AR, AP, payments" },
+  { id: "sage_intacct", name: "Sage Intacct", mark: "SI", category: "accounting", availability: "planned", reads: "AR, AP, payments" },
   { id: "freshbooks", name: "FreshBooks", category: "accounting", availability: "planned", reads: "Invoices, expenses, payments" },
   { id: "tally", name: "Tally", category: "accounting", availability: "planned", reads: "Ledgers, outstanding receivables and payables" },
 
@@ -33,12 +33,12 @@ export const CONNECTORS = [
   { id: "bank_feed", name: "Bank feeds", category: "bank", availability: "next", reads: "Balances and transactions from most US banks" },
   { id: "bank_csv", name: "Bank statement", category: "bank", availability: "live", reads: "Upload a CSV or PDF statement" },
   { id: "mercury", name: "Mercury", category: "bank", availability: "planned", reads: "Balances, transactions" },
-  { id: "amex", name: "American Express", category: "bank", availability: "planned", reads: "Card balance and statement date" },
+  { id: "amex", name: "American Express", mark: "AX", category: "bank", availability: "planned", reads: "Card balance and statement date" },
 
   // ERP and inventory
   { id: "netsuite", name: "NetSuite", category: "erp", availability: "planned", reads: "POs, sales orders, AR, AP" },
-  { id: "business_central", name: "Dynamics 365 Business Central", category: "erp", availability: "planned", reads: "POs, sales orders, AR, AP" },
-  { id: "sap_b1", name: "SAP Business One", category: "erp", availability: "planned", reads: "POs, sales orders, AR, AP" },
+  { id: "business_central", name: "Dynamics 365 Business Central", mark: "BC", category: "erp", availability: "planned", reads: "POs, sales orders, AR, AP" },
+  { id: "sap_b1", name: "SAP Business One", mark: "SAP", category: "erp", availability: "planned", reads: "POs, sales orders, AR, AP" },
   { id: "odoo", name: "Odoo", category: "erp", availability: "planned", reads: "Purchases, sales, invoices" },
   { id: "acumatica", name: "Acumatica", category: "erp", availability: "planned", reads: "POs, sales orders, AR, AP" },
   { id: "katana", name: "Katana", category: "erp", availability: "planned", reads: "Manufacturing and purchase orders" },
@@ -64,17 +64,17 @@ export const CONNECTORS = [
   { id: "paychex", name: "Paychex", category: "payroll", availability: "planned", reads: "Pay schedule and run totals" },
 
   // Bills and spend
-  { id: "bill_com", name: "BILL", category: "spend", availability: "planned", reads: "Approved bills and scheduled payments" },
+  { id: "bill_com", name: "BILL", mark: "B", category: "spend", availability: "planned", reads: "Approved bills and scheduled payments" },
   { id: "ramp", name: "Ramp", category: "spend", availability: "planned", reads: "Card spend, bills, statement dates" },
 
   // Comms
-  { id: "m365", name: "Microsoft 365", category: "comms", availability: "live", reads: "Outlook mail, Teams chats, calendar" },
-  { id: "whatsapp", name: "WhatsApp Business", category: "comms", availability: "live", reads: "Customer and supplier messages" },
-  { id: "google", name: "Gmail and Google Calendar", category: "comms", availability: "next", reads: "Mail and calendar" },
+  { id: "m365", name: "Microsoft 365", mark: "MS", category: "comms", availability: "live", reads: "Outlook mail, Teams chats, calendar" },
+  { id: "whatsapp", name: "WhatsApp Business", mark: "WA", category: "comms", availability: "live", reads: "Customer and supplier messages" },
+  { id: "google", name: "Gmail and Google Calendar", mark: "G", category: "comms", availability: "next", reads: "Mail and calendar" },
   { id: "slack", name: "Slack", category: "comms", availability: "planned", reads: "Channel and DM messages you choose" },
 
   // Documents
-  { id: "sharepoint", name: "OneDrive and SharePoint", category: "docs", availability: "live", reads: "Quotes, POs, contracts" },
+  { id: "sharepoint", name: "OneDrive and SharePoint", mark: "OD", category: "docs", availability: "live", reads: "Quotes, POs, contracts" },
   { id: "gdrive", name: "Google Drive", category: "docs", availability: "next", reads: "Quotes, POs, contracts" },
   { id: "dropbox", name: "Dropbox", category: "docs", availability: "planned", reads: "Quotes, POs, contracts" },
 
