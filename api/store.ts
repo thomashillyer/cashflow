@@ -90,6 +90,8 @@ export interface Store {
   load(id: string): Promise<{ records: Records; storeRevision: number }>;
   // Idempotent upserts of whole records, then a revision bump. Returns the new revision.
   upsertRecords(id: string, records: Partial<Records>): Promise<number>;
+  // Remove cash events by id (a corrected re-import replaces the events of the earlier read of the same file). Bumps the revision.
+  deleteEvents(id: string, eventIds: string[]): Promise<number>;
   // "Code computes, the DB commits": the route computes the change, then this writes the records, the
   // proposal states and the stored response in one atomic step, only while the revision is still
   // `expectedRevision`, and bumps the revision. The idempotency key is checked first, so a replay
@@ -201,6 +203,12 @@ export class MemoryStore implements Store {
   async upsertRecords(id: string, records: Partial<Records>): Promise<number> {
     const b = this.need(id);
     this.writeRecords(b, records);
+    return ++b.storeRevision;
+  }
+  async deleteEvents(id: string, eventIds: string[]): Promise<number> {
+    const b = this.need(id);
+    const drop = new Set(eventIds);
+    b.records.events = b.records.events.filter((e) => !drop.has(e.id));
     return ++b.storeRevision;
   }
   private writeRecords(b: MemBiz, records: Partial<Records>): void {
