@@ -14,6 +14,7 @@ import { fmtDate } from "../../ai/brief";
 import { fmtMoney } from "../../ai/money";
 import { enrichEvidence, prepareFileImport, type PreparedImport } from "../../adapters/prepare";
 import type { Deps } from "../app";
+import { attachOriginals } from "../originals";
 import { inferWhatsAppDateOrder, normalizeChat } from "../../adapters/whatsapp/export";
 import { businessIdentity, loadForRun, runInputs, savedScenario } from "../engine";
 import { businessOf, HttpError, isIsoDate } from "../http";
@@ -232,7 +233,9 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       records, storeRevision, business: businessIdentity(b), mode: deps.aiMode, now: nowIso(),
       ...(b.profile.account?.timezone ? { timeZone: b.profile.account.timezone } : {}),
     });
-    const result = { ...ingested, evidence: enrichEvidence(ingested.evidence, prep.prepared?.fileEvidence) };
+    // Keep the original behind each source (api/originals.ts); a failure to store never fails the import.
+    const result = await attachOriginals({ blobs: deps.blobs, businessId: b.id, body: req.body, input },
+      { ...ingested, evidence: enrichEvidence(ingested.evidence, prep.prepared?.fileEvidence) });
     // Same input gives the same ids: never reopen a decided proposal, never reset a decided signal.
     const existing = new Map((await deps.store.listProposals(b.id)).map((p) => [p.id, p]));
     const proposals = result.proposals.filter((p) => existing.get(p.id)?.state !== "confirmed" && existing.get(p.id)?.state !== "dismissed");
