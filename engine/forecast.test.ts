@@ -666,3 +666,84 @@ describe("recurring items, pattern fallback, daily-sales coverage (#62 #75 #66 #
     expect(w).not.toMatch(/unknown payment pattern|no due date/);
   });
 });
+
+describe("overdue outflows: what rolls to asOf and what does not", () => {
+  const asOf = "2026-11-16";
+
+  it("a deal's past-dated virtual linked costs stay out of the balance, warned", () => {
+    const p: Profile = {
+      ...profile,
+      paymentPatterns: [
+        { id: "supplier_cost", appliesTo: "purchase_order", legs: [{ share: 1, anchor: "order", offsetDays: 0, direction: "out" }] },
+        { id: "deal", appliesTo: "sales_deal", isDefault: true, legs: [{ share: 0.3, anchor: "order", offsetDays: 0, direction: "in" }, { share: 0.7, anchor: "due", offsetDays: 0, direction: "in" }], linkedCosts: [{ patternId: "supplier_cost", share: 0.55 }] },
+      ],
+    };
+    const r = { ...empty(), balances: [bal($(100000), asOf)], commitments: [com("deal1", { type: "sales_deal", amount: $(100000), anchors: { order: "2026-10-01", due: "2027-03-01" } })] };
+    const run = forecast(r, p, base, asOf, {});
+    const cost = run.events.filter((e) => e.commitmentId?.startsWith("deal1~"));
+    expect(cost.length).toBeGreaterThan(0);
+    for (const e of cost) expect(e.date < asOf).toBe(true);
+    expect(closing(run, asOf)).toBe($(100000));
+    expect(run.warnings.join(" ")).toMatch(/past-dated linked\/estimated cost, not counted/);
+  });
+
+  it("a past-dated leg from an estimated anchor is not rolled", () => {
+    const p: Profile = {
+      ...profile,
+      leadTimes: { productionDays: 10 },
+      paymentPatterns: [{ id: "po", appliesTo: "purchase_order", isDefault: true, legs: [{ share: 1, anchor: "ship", offsetDays: 0, direction: "out" }] }],
+    };
+    const r = { ...empty(), balances: [bal($(100000), asOf)], commitments: [com("po1", { type: "purchase_order", amount: $(1000), anchors: { order: "2026-10-01" } })] };
+    const run = forecast(r, p, base, asOf, {});
+    expect(run.events.find((e) => e.commitmentId === "po1")?.date).toBe("2026-10-11");
+    expect(closing(run, asOf)).toBe($(100000));
+  });
+
+  it("a bank actual tagged to an unpaid overdue bill is not counted twice", () => {
+    const r = empty();
+    r.balances = [bal($(100000), "2026-11-10")];
+    r.commitments = [com("bill-x", { type: "bill", amount: $(5000), anchors: { due: "2026-11-01" } })];
+    r.events = [{ id: "bank-1", commitmentId: "bill-x", date: "2026-11-12", amount: $(5000), currency: "USD", direction: "out", basis: "bank", sourceRef: src } as CashEvent];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(run.openingBalance).toBe($(95000));
+    expect(closing(run, asOf)).toBe($(95000));
+    expect(run.warnings.join(" ")).toMatch(/possibly paid already \(bank line bank-1\), needs reconciliation/);
+  });
+
+  it("partial bank cover rolls only the uncovered remainder", () => {
+    const r = empty();
+    r.balances = [bal($(100000), "2026-11-10")];
+    r.commitments = [com("bill-x", { type: "bill", amount: $(5000), anchors: { due: "2026-11-01" } })];
+    r.events = [{ id: "bank-1", commitmentId: "bill-x", date: "2026-11-12", amount: $(2000), currency: "USD", direction: "out", basis: "bank", sourceRef: src } as CashEvent];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(closing(run, asOf)).toBe($(95000));
+    expect(run.events.find((e) => e.commitmentId === "bill-x" && e.status !== "actual")?.amount).toBe($(3000));
+  });
+
+  it("a bank actual the books already count as paid does not hide the rest", () => {
+    const r = empty();
+    r.balances = [bal($(100000), "2026-11-10")];
+    r.commitments = [com("bill-x", { type: "bill", amount: $(5000), outstanding: $(3000), anchors: { due: "2026-11-01" } })];
+    r.events = [{ id: "bank-1", commitmentId: "bill-x", date: "2026-11-12", amount: $(2000), currency: "USD", direction: "out", basis: "bank", sourceRef: src } as CashEvent];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(closing(run, asOf)).toBe($(95000));
+  });
+
+  it("a shiftDays override on an overdue bill counts from asOf; a date override is kept as given", () => {
+    const r = { ...empty(), balances: [bal($(100000), asOf)], commitments: [com("bill-old", { type: "bill", amount: $(1000), anchors: { due: "2026-11-01" } })] };
+    const shifted = forecast(r, profile, { id: "s1", kind: "base", overrides: [{ id: "o1", target: { commitmentId: "bill-old" }, change: { shiftDays: 3 }, origin: "owner" }] }, asOf, {});
+    expect(shifted.events.find((e) => e.commitmentId === "bill-old")?.date).toBe("2026-11-19");
+    const dated = forecast(r, profile, { id: "s2", kind: "base", overrides: [{ id: "o2", target: { commitmentId: "bill-old" }, change: { date: "2026-11-25" }, origin: "owner" }] }, asOf, {});
+    expect(dated.events.find((e) => e.commitmentId === "bill-old")?.date).toBe("2026-11-25");
+  });
+
+  it("a date_change signal without a leg moves only the overdue first leg", () => {
+    const p: Profile = { ...profile, paymentPatterns: [{ id: "two", appliesTo: "bill", isDefault: true, legs: [{ share: 0.5, anchor: "order", offsetDays: 0, direction: "out" }, { share: 0.5, anchor: "due", offsetDays: 0, direction: "out" }] }] };
+    const r = empty();
+    r.balances = [bal($(100000), asOf)];
+    r.commitments = [com("bill2", { type: "bill", amount: $(1000), anchors: { order: "2026-10-01", due: "2026-12-01" } })];
+    r.signals = [{ id: "sig-d", channel: "owner", receivedAt: "2026-11-15T00:00:00Z", commitmentId: "bill2", claim: { kind: "date_change", newDate: "2026-11-20" }, confidence: 1, state: "applied", sourceRef: src }];
+    const run = forecast(r, p, base, asOf, {});
+    expect(run.events.filter((e) => e.commitmentId === "bill2").map((e) => e.date).sort()).toEqual(["2026-11-20", "2026-12-01"]);
+  });
+});

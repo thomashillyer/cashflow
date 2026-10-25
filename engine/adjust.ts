@@ -52,7 +52,10 @@ function applyOverride(events: CashEvent[], o: Override, ctx: Ctx): CashEvent[] 
       notes.push(`date -> ${o.change.date}`);
     }
     if (o.change.shiftDays) {
-      out = { ...out, date: addDays(out.date, o.change.shiftDays) };
+      // An overdue payment is assumed payable now, so a shift on it counts from asOf, not from the old due date.
+      // (A plain `date` override is the owner's explicit choice and is kept as given.)
+      const from = out.direction === "out" && out.date < ctx.asOf ? ctx.asOf : out.date;
+      out = { ...out, date: addDays(from, o.change.shiftDays) };
       notes.push(`shifted ${o.change.shiftDays > 0 ? "+" : ""}${o.change.shiftDays} days`);
     }
     if (newAmounts.has(e.id)) {
@@ -99,9 +102,7 @@ function leverOverrides(l: Lever, events: CashEvent[], ctx: Ctx): Override[] {
       }
       const e = targetLeg(l, "out", events);
       if (!e) return noTarget("remaining payment");
-      // An overdue payment is assumed payable now, so deferring it counts the days from asOf, not from the old due date.
-      const change = e.date < ctx.asOf ? { date: addDays(ctx.asOf, l.days) } : { shiftDays: l.days };
-      return [{ id, target: { commitmentId: l.commitmentId, legIndex: e.legIndex }, change, origin: "lever" }];
+      return [{ id, target: { commitmentId: l.commitmentId, legIndex: e.legIndex }, change: { shiftDays: l.days }, origin: "lever" }];
     }
     case "pay_early": {
       const c = ctx.commitments.find((x) => x.id === l.commitmentId);
@@ -156,8 +157,13 @@ export function adjust(events: CashEvent[], scenario: Scenario, ctx: Ctx): CashE
       } else {
         // No leg named: move the whole schedule by the first leg's shift so later legs keep their spacing.
         const first = [...legs].sort((a, b) => (a.date < b.date ? -1 : 1))[0]!;
-        const delta = diffDays(c.newDate, first.date);
-        out = applyOverride(out, { id: s.id, target: { commitmentId: s.commitmentId }, change: { shiftDays: delta }, origin: "signal" }, ctx);
+        if (first.date < ctx.asOf) {
+          // The new date answers the overdue leg; later legs keep their own dates.
+          out = applyOverride(out, { id: s.id, target: { commitmentId: s.commitmentId, legIndex: first.legIndex }, change: { date: c.newDate }, origin: "signal" }, ctx);
+        } else {
+          const delta = diffDays(c.newDate, first.date);
+          out = applyOverride(out, { id: s.id, target: { commitmentId: s.commitmentId }, change: { shiftDays: delta }, origin: "signal" }, ctx);
+        }
       }
     }
   }

@@ -2,7 +2,7 @@
 // Docs: docs/design/05-forecast-engine.md. No I/O, no clock (asOf is an input), no randomness.
 
 import { createHash } from "node:crypto";
-import type { CashEvent, Records, Scenario } from "../schema/records";
+import type { CashEvent, Commitment, Records, Scenario } from "../schema/records";
 import type { Profile } from "../schema/profile";
 import type { ForecastRun } from "../schema/forecast";
 import { addDays, dateRange, diffDays, mondayOf } from "./dates";
@@ -121,6 +121,59 @@ function normalize(r: Records): Records {
   };
 }
 
+// Overdue unpaid payments are still owed, so they count on asOf instead of falling out of the balance.
+// Overdue receipts keep their date and stay out of the balance (TECHNICAL_PLAN section 6), warned in forecast().
+// Not rolled, kept past-dated with a warning:
+//   - virtual linked costs (`deal~pattern`) and legs dated from an estimated anchor: no source document says they are due;
+//   - legs already covered by bank actuals tagged to the commitment that the books do not reflect yet (possibly paid).
+function rollOverdueOutflows(
+  events: CashEvent[],
+  records: Records,
+  commitments: Commitment[],
+  profile: Profile,
+  asOf: string,
+  fx: Record<string, number>,
+  warnings: string[],
+): CashEvent[] {
+  const label = (e: CashEvent) => `${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} payment dated ${e.date}`;
+  // Bank-side cover per commitment: tagged outflow actuals on/before asOf beyond what the books already count as paid.
+  const cover = new Map<string, { left: number; ids: string[] }>();
+  for (const c of commitments) {
+    const actuals = records.events.filter((x) => x.commitmentId === c.id && x.direction === "out" && x.date <= asOf);
+    if (actuals.length === 0) continue;
+    const bank = actuals.reduce((a, x) => a + (toBase(x.amount, x.currency, profile, fx) ?? 0), 0);
+    const booksPaid = toBase(c.amount - (c.outstanding ?? c.amount), c.currency, profile, fx) ?? 0;
+    const left = bank - booksPaid;
+    if (left > 0) cover.set(c.id, { left, ids: actuals.map((x) => x.id) });
+  }
+  const overdue = (e: CashEvent) => e.date < asOf && e.direction === "out" && e.status !== "actual" && e.status !== "possible";
+  const order = [...events].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.legIndex - b.legIndex));
+  const out = new Map<CashEvent, CashEvent | undefined>();
+  for (const e of order) {
+    if (!overdue(e)) continue;
+    if (e.commitmentId?.includes("~") || /estimated/.test(e.basis.split(";")[0]!)) {
+      warnings.push(`Overdue: ${label(e)} is before ${asOf}; past-dated linked/estimated cost, not counted (needs review).`);
+      continue;
+    }
+    const cv = e.commitmentId ? cover.get(e.commitmentId) : undefined;
+    let rest = e;
+    if (cv && cv.left > 0) {
+      const take = Math.min(cv.left, e.amountBase);
+      cv.left -= take;
+      warnings.push(`Overdue: ${label(e)} is possibly paid already (bank line ${cv.ids.join(", ")}), needs reconciliation.`);
+      if (take >= e.amountBase) {
+        out.set(e, undefined); // keep it out: stays past-dated
+        continue;
+      }
+      const restBase = e.amountBase - take;
+      rest = { ...e, amountBase: restBase, amount: Math.round((e.amount * restBase) / e.amountBase), basis: `${e.basis}; ${money(take, profile.baseCurrency)} possibly paid already per bank` };
+    }
+    warnings.push(`Overdue: ${label(e)} is before ${asOf}; assumed payable now and counted on ${asOf} (needs review).`);
+    out.set(e, { ...rest, date: asOf, basis: `${rest.basis}; overdue since ${e.date}, assumed payable now` });
+  }
+  return events.map((e) => (out.has(e) ? (out.get(e) ?? e) : e));
+}
+
 export function forecast(input: Records, profile: Profile, scenario: Scenario, asOf: string, fxRates: Record<string, number>): ForecastRun {
   const records = normalize(input);
   const end = horizonEnd(profile, asOf);
@@ -146,18 +199,12 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     commitments: expanded.commitments,
     warnings,
   });
-  // Overdue unpaid payments are still owed: count them on asOf instead of letting them fall out of the balance.
-  // Overdue receipts keep their date and stay out of the balance (TECHNICAL_PLAN section 6); both are warned below.
-  const rolled = all.map((e) => {
-    if (!(e.date < asOf && e.direction === "out" && e.status !== "actual" && e.status !== "possible")) return e;
-    warnings.push(`Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} payment dated ${e.date} is before ${asOf}; assumed payable now and counted on ${asOf} (needs review).`);
-    return { ...e, date: asOf, basis: `${e.basis}; overdue since ${e.date}, assumed payable now` };
-  });
+  const rolled = rollOverdueOutflows(all, records, expanded.commitments, profile, asOf, fx, warnings);
   const events = [...rolled].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1));
 
   for (const e of events) {
-    if (e.date < asOf && e.status !== "actual" && e.status !== "possible") {
-      warnings.push(`Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} ${e.direction === "in" ? "receipt" : "payment"} dated ${e.date} is before ${asOf}; kept at its date, not moved to today (needs review).`);
+    if (e.date < asOf && e.direction === "in" && e.status !== "actual" && e.status !== "possible") {
+      warnings.push(`Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} receipt dated ${e.date} is before ${asOf}; kept at its date, not moved to today (needs review).`);
     }
   }
 

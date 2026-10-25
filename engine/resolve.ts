@@ -11,7 +11,7 @@
 import type { CashEvent, Commitment, Records } from "../schema/records";
 import type { Profile } from "../schema/profile";
 import { addDays } from "./dates";
-import { SALES_HISTORY_DAYS } from "./expand";
+import { DAILY_SALES_ID, SALES_HISTORY_DAYS } from "./expand";
 
 export type RecurringItem = Profile["recurring"][number];
 
@@ -23,7 +23,7 @@ export type EventSource =
   | { kind: "actual"; event: CashEvent; commitment?: Commitment }
   | { kind: "unresolved" };
 
-export const DAILY_SALES_ID = "daily-sales";
+export { DAILY_SALES_ID };
 
 function findCommitment(id: string, records: Records): Commitment | undefined {
   const stored = records.commitments.find((c) => c.id === id);
