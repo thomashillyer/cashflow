@@ -2,8 +2,9 @@
 // mutates its input. Persons 3/5 call this inside the store's atomic confirm transaction
 // (docs/TECHNICAL_PLAN.md section 4); revision and idempotency-key checks live there.
 //
-// Never touches Commitment.settlement. A confirmed link adds evidence only, never cash. A PO <-> invoice
-// link only records linkedCommitmentIds; linked coverage is computed once, by the engine (expand).
+// Commitment.settlement changes in exactly one place: createSettlement, because a confirmed settlement is identified
+// payment evidence. Documents and links never change it. A confirmed link adds evidence only, never cash. A PO <->
+// invoice link only records linkedCommitmentIds; linked coverage is computed once, by the engine (expand).
 
 import type { ChangeProposal, CommitmentFieldChange, ProposalOp } from "../../schema/intake";
 import type { Commitment, Party, Records, SourceRef } from "../../schema/records";
@@ -153,14 +154,29 @@ export function applyProposal(records: Records, proposal: ChangeProposal, _opts:
       }
       case "createSettlement": {
         const s = op.settlement;
-        commitment(s.commitmentId);
+        const target = commitment(s.commitmentId);
         const dup = next.settlements.find((x) =>
           x.commitmentId === s.commitmentId && x.date === s.date && x.amount === s.amount && x.sourceRef.record === s.sourceRef.record);
         if (dup) return;
         const id = uniqueId(`stl-${s.commitmentId}-${s.date}`, new Set(next.settlements.map((x) => x.id)));
         next.settlements.push({ ...structuredClone(s), id });
         affected.add(id);
-        warnings.push(`Payment recorded for ${s.commitmentId}; outstanding and settlement state are derived from settlements.`);
+        if (target.outstanding === undefined) {
+          // The engine derives the remainder from amount minus settlements; setting it here would count it twice.
+          warnings.push(`Payment recorded for ${s.commitmentId}; the remaining amount is derived from settlements.`);
+        } else if (s.currency !== target.currency) {
+          warnings.push(`Payment in ${s.currency} recorded for ${s.commitmentId}, which is in ${target.currency}; outstanding left unchanged (needs review).`);
+        } else {
+          // Outstanding is authoritative in the engine, so keep it consistent with the payment. Idempotent: a repeat
+          // of the same settlement returned above. A confirmed settlement is identified payment evidence, so this is
+          // the one place settlement state moves.
+          target.outstanding = Math.max(0, target.outstanding - s.amount);
+          if (target.settlement !== "cancelled" && target.settlement !== "credited") {
+            target.settlement = target.outstanding === 0 ? "paid" : "partial";
+          }
+          affected.add(target.id);
+          warnings.push(`Payment recorded for ${s.commitmentId}; outstanding is now ${target.outstanding}.`);
+        }
         return;
       }
     }

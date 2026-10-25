@@ -274,7 +274,8 @@ describe("purchase orders", () => {
       type: "purchase_order", direction: "in", status: e.status, amount: e.amount, reference: "HH-PO-552",
     });
     const after = confirmAll(before, result);
-    expect(after.commitments.find((c) => c.type === "purchase_order")).toMatchObject({ status: "likely", amount: 1000000, outstanding: 1000000 });
+    expect(after.commitments.find((c) => c.type === "purchase_order")).toMatchObject({ status: "likely", amount: 1000000 });
+    expect(after.commitments.find((c) => c.type === "purchase_order")!.outstanding).toBeUndefined();
   });
 
   it("po-partial-invoice: the PO's remainder plus the invoice is 1,000,000 of inflow, never 1,400,000", async () => {
@@ -294,11 +295,12 @@ describe("purchase orders", () => {
     r = confirmAll(r, invResult);
 
     const invoice = r.commitments.find((c) => c.reference === "INV-1203")!;
-    expect(invoice).toMatchObject({ type: "invoice", amount: e.invoice.amount, outstanding: e.invoice.amount });
+    expect(invoice).toMatchObject({ type: "invoice", amount: e.invoice.amount });
+    expect(invoice.outstanding).toBeUndefined();
     expect(poRemaining(r, po.id)).toBe(e.poRemaining);
     // Applying the link records it only; the PO's own amount and outstanding stay whole, because the
     // engine (expand: coveredByLinked) is the one place linked coverage is subtracted.
-    expect(byId(r, po.id)).toMatchObject({ amount: 1000000, outstanding: 1000000, linkedCommitmentIds: [invoice.id] });
+    expect(byId(r, po.id)).toMatchObject({ amount: 1000000, linkedCommitmentIds: [invoice.id] });
 
     const newInflow = forecastableInflow(r) - forecastableInflow(before);
     expect(newInflow).toBe(e.totalForecastIn);

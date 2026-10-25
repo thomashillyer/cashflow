@@ -189,10 +189,13 @@ function buildDraft(
   const draft: CommitmentDraft = {
     type, direction, partyId, amount, currency, anchors,
     status: type === "purchase_order" ? "likely" : "committed",
-    outstanding: found(f.outstanding) ?? amount,
     settlement: "open",
     evidenceIds: [...c.evidenceIds],
   };
+  // Only a balance due the document itself states is authoritative. Otherwise leave outstanding unset so the
+  // engine derives the remainder from amount minus Settlements (a set value would be counted on top of them).
+  const stated = found(f.outstanding);
+  if (stated !== undefined) draft.outstanding = stated;
   const reference = found(f.reference);
   if (reference) draft.reference = reference;
   const invoiceUrl = found(f.invoiceUrl);
