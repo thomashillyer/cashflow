@@ -84,12 +84,24 @@ Node 22, TypeScript strict, vitest. `dev` and `demo` are added when the api/app 
 npm install
 npm test           # all tests, including golden tests over every fixture
 npm run typecheck  # tsc --noEmit
+npm run setup:supabase # validate Supabase vars in .env + read-only connectivity check
 npx supabase start     # local Postgres + API (Docker); `npx supabase status` for keys
 npx supabase db reset  # apply supabase/migrations/ locally
 npx supabase db push   # apply migrations to the linked shared project
 npm run dev        # api + app (not yet)
 npm run demo       # demo profile + cached Claude responses (not yet)
 ```
+
+## Supabase setup (agents: do this for your human)
+
+- **Human step (once):** copy `.env.example` to `.env` and paste the `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` values the team lead shared in the team chat. Do not paste them into the Claude Code chat; edit `.env` yourself.
+- **Agent step:** run `npm run setup:supabase`. It checks `.env` is gitignored, that the three variables are set and look like the right keys for the right project (prints names and lengths only, never values), and runs a read-only connectivity check. Add `-- --require-service-role` for server/importer work.
+- **Optional:** someone already logged in to the Supabase org (`! npx -y supabase@2 login`) can run `npm run setup:supabase -- --from-cli [--with-service-role]` to fetch the keys into `.env` instead of pasting.
+- **Rules:**
+  - The hosted project ("Cashflow") holds synthetic data only.
+  - Never commit `.env` or paste keys into PRs, issues, or chat.
+  - The anon key is read-only (SELECT on synthetic businesses, plus the `confirm_change_proposal` RPC); other writes go through server code with the service role.
+  - Schema changes are a new migration file (timestamp after `20261025120000`) in a PR, never dashboard edits.
 
 ## Definition of done (for any change)
 

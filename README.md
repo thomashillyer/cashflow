@@ -37,7 +37,7 @@ Public demos and committed fixtures must be synthetic. Real exports live in `dat
 
 ## Database (Supabase)
 
-The schema lives in `supabase/migrations/` and mirrors `schema/records.ts`; `db/` has the typed client (`getSupabase`, `loadRecords`, `upsert*`). Copy `.env.example` to `.env` for keys.
+The schema lives in `supabase/migrations/` and mirrors `schema/records.ts`; `db/` has the typed client (`getSupabase`, `loadRecords`, `upsert*`). Copy `.env.example` to `.env`, paste the Supabase values the team lead shared, then run `npm run setup:supabase` to validate them and check connectivity (`-- --from-cli` fetches keys instead, if you are logged in to the Supabase org).
 
 - **Local:** `npx supabase start` (needs Docker), then `npx supabase db reset` to apply migrations. `npx supabase status` prints the local URL and keys.
 - **Shared hosted project:** `npx supabase link --project-ref <ref>`, then `npx supabase db push` to apply new migrations. Get the URL and anon key from Project Settings → API.
