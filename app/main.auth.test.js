@@ -7,6 +7,7 @@ let auth;
 let account;
 let location;
 let handlers;
+let demoAllowed;
 const session = { user: { email: "owner@example.com" } };
 
 beforeEach(() => {
@@ -33,6 +34,7 @@ beforeEach(() => {
   vi.stubGlobal("addEventListener", vi.fn());
   vi.stubGlobal("requestAnimationFrame", vi.fn());
   account = null;
+  demoAllowed = false;
   const run = JSON.parse(readFileSync(new URL("../fixtures/cascade_trade/forecast_run.json", import.meta.url), "utf8"));
   const context = { business: { name: "Owner Co", synthetic: false, sources: [] }, profile: { displayName: "Trading" }, parties: [], rules: [] };
   api = {
@@ -47,7 +49,7 @@ beforeEach(() => {
     review: vi.fn().mockResolvedValue([]), notes: vi.fn().mockResolvedValue([]),
   };
   auth = { consumeEmailLink: vi.fn().mockResolvedValue(null), currentSession: vi.fn().mockResolvedValue(null) };
-  vi.doMock("./api.js", () => ({ api, SANDBOXES: [{ id: "cascade_trade" }], suggestBusinessName: () => "", authLive: true }));
+  vi.doMock("./api.js", () => ({ api, SANDBOXES: [{ id: "cascade_trade" }], suggestBusinessName: () => "", authLive: true, get demoAllowed() { return demoAllowed; } }));
   vi.doMock("./ui/auth.js", () => auth);
 });
 
@@ -177,7 +179,19 @@ describe("email-link startup", () => {
     expect(api.context).not.toHaveBeenCalled();
   });
 
-  it("keeps a selected sample available even when a team session exists", async () => {
+  it("recovers a stale sample into the signed-in owner's business in production", async () => {
+    account = { sample: true, sandbox: "cascade_trade" };
+    auth.currentSession.mockResolvedValue(session);
+    api.restoreAccount.mockImplementation(async () => (account = { businessId: "private", email: session.user.email, businessName: "Owner Co" }));
+    const html = await start();
+    expect(api.restoreAccount).toHaveBeenCalledWith(session);
+    expect(html).toContain('class="home"');
+    expect(location.hash).toBe("#/today");
+    expect(html).not.toContain('data-action="sample"');
+  });
+
+  it("keeps a selected sample available in explicit demo mode", async () => {
+    demoAllowed = true;
     account = { sample: true, sandbox: "cascade_trade" };
     auth.currentSession.mockResolvedValue(session);
     const html = await start();

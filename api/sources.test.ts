@@ -101,7 +101,7 @@ describe("POST /sources/:source/pull", () => {
     expect((await app.inject({ method: "POST", url: "/sources/zoho_books/pull" })).statusCode).toBe(401);
     expect((await pull("zoho_books", { ...OTHER, "x-neri-business": bizId } as never)).statusCode).toBe(404);
     const sample = await pull("zoho_books", { ...OWNER, "x-neri-business": "cascade_trade" } as never);
-    expect([sample.statusCode, sample.json().error.code]).toEqual([403, "SAMPLE_BUSINESS"]);
+    expect([sample.statusCode, sample.json().error.code]).toEqual([404, "NOT_FOUND"]);
     expect((await pull("dropbox")).statusCode).toBe(404);
   });
 

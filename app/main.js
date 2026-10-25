@@ -1,6 +1,6 @@
-import { api, SANDBOXES, suggestBusinessName, authLive } from "./api.js";
+import { api, SANDBOXES, suggestBusinessName, authLive, demoAllowed } from "./api.js";
 import { consumeEmailLink, currentSession } from "./ui/auth.js";
-import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
+import { CATEGORIES, CONNECTORS } from "./catalog/connectors.js";
 import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
 import { isQuestion } from "./ui/question.js";
@@ -18,6 +18,8 @@ const app = {
   ctx: null,
   brief: null,
   review: [],
+  reviewDocs: { proposals: [], storeRevision: null },
+  decidingProposal: false,
   notes: [],
   scenario: "base",
   stressRun: null,
@@ -32,6 +34,8 @@ const app = {
   stopListen: null,
   drive: false,
   interest: new Set(),
+  connections: [],
+  syncing: null,
 };
 
 try {
@@ -48,9 +52,14 @@ async function load() {
     if (!["welcome", "setup"].includes(rawRoute())) history.replaceState(null, "", "#/welcome");
     return render();
   }
-  app.bizId = app.account.sandbox ?? SANDBOXES[0].id;
+  app.bizId = app.account.businessId ?? (demoAllowed ? app.account.sandbox ?? SANDBOXES[0].id : null);
   await api.open(app.bizId);
   app.ctx = await api.context();
+  if (!demoAllowed && app.ctx.business.synthetic) {
+    app.ctx = null;
+    app.brief = null;
+    throw new Error("Sample data is not available on this server. Sign in to your business.");
+  }
   if (app.account.reserve && !app.account.reserveApplied) {
     await api.setSafetyLine(app.account.reserve);
     app.account = { ...app.account, reserveApplied: true };
@@ -63,6 +72,10 @@ async function refresh() {
   const prevThree = new Set((app.brief?.three ?? []).map((i) => i.id + i.cashEffect));
   // Context too, so names for commitments added by Review, notes or plans (live partyByCommitment) stay current.
   [app.brief, app.review, app.notes, app.ctx] = await Promise.all([api.brief(), api.review(), api.notes(), api.context()]);
+  [app.connections, app.reviewDocs] = await Promise.all([
+    api.mode === "live" && api.connections ? api.connections().catch(() => []) : [],
+    api.mode === "live" && api.reviewProposals ? api.reviewProposals() : { proposals: [], storeRevision: null },
+  ]);
   app.ctx.safetyLine = app.brief.run.safetyLine;
   if (app.scenario === "stress") app.stressRun = await api.forecast("stress");
   if (prevThree.size) {
@@ -121,8 +134,50 @@ function forecastReviewPanel(run = app.brief.run) {
   </section>`;
 }
 
+function forecastEmpty(run = app.brief.run) {
+  return api.mode === "live" && !app.ctx?.business.synthetic && (run.review?.reasons ?? []).some((r) => ["no_opening_balance", "no_data"].includes(r.code));
+}
+
+function bankBalanceForm() {
+  const missing = (app.brief.run.review?.reasons ?? []).some((r) => r.code === "no_opening_balance");
+  const accounts = app.ctx.balanceAccounts ?? [];
+  if (!missing && !accounts.length) return ""; // Older servers cannot safely identify the account to correct.
+  const currency = app.ctx.profile.baseCurrency ?? "USD";
+  const editable = accounts.filter((a) => a.currency === currency);
+  if (accounts.length && !editable.length) return `<section class="panel" style="max-width:760px;margin-block:24px"><h2>Update your bank balance</h2><p>Upload a new statement to update your foreign-currency bank accounts.</p></section>`;
+  return `<form class="panel bank-balance" data-submit="bank-balance" style="max-width:760px;margin-block:24px">
+    <h2>${accounts.length ? "Update your bank balance" : "Add your current bank balance"}</h2>
+    ${editable.length ? `<label for="bank-account">Bank account</label><select id="bank-account" name="account" required>${editable.length > 1 ? `<option value="">Choose the account to update</option>` : ""}${editable.map((a) => `<option value="${esc(a.account)}">${esc(a.account)} (${esc(a.currency)})</option>`).join("")}</select>` : `<input type="hidden" name="account" value="main" />`}
+    <label for="bank-amount">Current bank balance (${esc(currency)})</label>
+    <input id="bank-amount" name="amount" inputmode="decimal" placeholder="Enter your actual balance" required />
+    <label for="bank-date">Balance date</label>
+    <input id="bank-date" name="asOf" type="date" value="${esc(app.ctx.business.asOf)}" max="${esc(app.ctx.business.asOf)}" required />
+    <button class="btn primary" type="submit">Save bank balance</button>
+    <p class="fineprint">Saved as a user-entered bank balance. Use the balance shown by your bank for this date; a negative balance is allowed.</p>
+  </form>`;
+}
+
+function parseBalance(value) {
+  const text = String(value).trim();
+  if (!/^-?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d{1,2})?$/.test(text)) throw new Error("Enter the bank balance as an amount, with up to two decimal places.");
+  const [whole, cents = ""] = text.replace(/^-/, "").replaceAll(",", "").split(".");
+  const amount = (Number(whole) * 100 + Number(cents.padEnd(2, "0"))) * (text.startsWith("-") ? -1 : 1);
+  if (!Number.isSafeInteger(amount)) throw new Error("That balance is too large. Check the amount and try again.");
+  return amount;
+}
+
+function viewEmptyForecast(title = "Add your business data") {
+  return `<div class="page-head"><div><h1>${esc(title)}</h1><p>Your forecast starts with your bank balance, open invoices and bills.</p></div></div>
+    <section class="panel" style="max-width:760px"><h2>No forecast yet</h2>
+      <p>Upload your bank statement and books export, paste a message, or sync an available source. Review anything that needs your OK.</p>
+      <a class="btn primary" href="#/sources">Add your first source</a>
+      ${waitingCount() ? `<a class="btn" href="#/review">Review imported items</a>` : ""}
+    </section>${bankBalanceForm()}`;
+}
+
 function summary() {
   const b = app.brief;
+  if (forecastEmpty()) return { headline: "Add your business data to build a forecast.", sub: "Start with your bank balance, open invoices and bills.", take: "No forecast is ready yet. Add a source to continue.", tone: "review" };
   const run = b.run;
   const review = forecastReview(run);
   const safety = run.safetyLine;
@@ -189,7 +244,7 @@ function commitmentParty(cid) {
 function spokenBrief() {
   const s = summary();
   const b = app.brief;
-  const open = b.three.filter((i) => i.state !== "done");
+  const open = forecastEmpty() ? [] : b.three.filter((i) => i.state !== "done");
   const parts = [`${greeting(new Date().getHours())}, ${ownerName()}. ${speakable(s.headline)} ${speakable(s.take ?? s.sub)}`];
   if (open.length) {
     parts.push(open.length === 1 ? "One thing today." : `${["", "One", "Two", "Three"][open.length]} things today.`);
@@ -197,7 +252,7 @@ function spokenBrief() {
   } else {
     parts.push(forecastReview() ? (b.run.review ? "Check the forecast items when you're parked." : "Verify the forecast with your source records before acting.") : "Nothing needs you today.");
   }
-  const waiting = app.review.length + app.notes.filter((n) => n.state === "new").length;
+  const waiting = waitingCount() + app.notes.filter((n) => n.state === "new").length;
   if (waiting) parts.push(`${waiting === 1 ? "One item is" : `${waiting} items are`} waiting for your OK when you're parked.`);
   return parts;
 }
@@ -221,7 +276,9 @@ window.addEventListener("hashchange", () => {
 });
 
 function waitingCount() {
-  return app.review.length;
+  const priced = new Set(app.review.map((i) => i.signal.id));
+  const unpriced = (app.reviewDocs.signals ?? []).filter((i) => !priced.has(i.signal.id)).length;
+  return app.review.length + app.reviewDocs.proposals.length + unpriced;
 }
 function notesWaiting() {
   return app.notes.filter((n) => n.state === "new").length;
@@ -298,10 +355,11 @@ function render() {
 
 // ---------------------------------------------------------------- Today
 function viewToday() {
+  if (forecastEmpty()) return viewEmptyForecast();
   const b = app.brief;
   const s = summary();
   const n = b.three.length;
-  const waitingRev = app.review.length;
+  const waitingRev = waitingCount();
   const waitingNotes = notesWaiting();
   const waiting = [waitingRev ? `${waitingRev} ${waitingRev === 1 ? "message" : "messages"}` : "", waitingNotes ? `${waitingNotes} ${waitingNotes === 1 ? "note" : "notes"}` : ""].filter(Boolean).join(" and ");
   return `
@@ -415,7 +473,7 @@ function refLabel(id) {
 }
 
 function sampleCard(pa) {
-  if (!pa) return "";
+  if (!pa || (api.mode === "live" && !demoAllowed)) return "";
   return `<div class="sample-card"><span class="tag">Sample</span><div>${esc(pa.label)}<small>${esc(pa.disclosure)}</small></div></div>`;
 }
 
@@ -472,6 +530,7 @@ function chartWidth() {
 }
 
 function viewDetails() {
+  if (forecastEmpty()) return viewEmptyForecast("Your forecast needs source data");
   const b = app.brief;
   const run = b.run;
   const figures = `
@@ -615,6 +674,7 @@ function noteRow(n) {
 }
 
 function noteImpact(n) {
+  if (forecastEmpty()) return "Add your bank balance and source records to see the cash effect.";
   const r = n.reading;
   const e = n.effect;
   if (r.missing.length) return `Add the ${r.missing.join(" and ")} to see what it does to your cash.`;
@@ -632,12 +692,36 @@ function noteImpact(n) {
 }
 
 // ---------------------------------------------------------------- Review
+function proposalCard(item) {
+  const p = item.proposal;
+  const fields = item.candidate?.fields ?? {};
+  const found = (field) => fields[field]?.state === "found" ? fields[field].value : null;
+  const labels = { create: "Add record", link: "Link source", update: "Update record" };
+  const canConfirm = Boolean(labels[p.action] && p.ops.length && !p.conflicts.length);
+  const reference = found("reference") ?? item.target?.reference ?? item.evidence[0]?.sourceRef?.record ?? "Imported document";
+  const amount = found("amount");
+  const due = found("dueDate");
+  return `<article class="panel" style="margin-bottom:20px">
+    <h2>${esc(reference)}</h2>
+    ${amount != null ? `<p>${money(amount, { currency: found("currency") ?? app.ctx.profile.baseCurrency })}${due ? `, due ${dayDate(due)}` : ""}</p>` : ""}
+    <p>${esc(found("sellerName") ?? found("buyerName") ?? "Check the source before confirming.")}</p>
+    <ul>${[...p.reasons, ...(item.notes ?? [])].map((text) => `<li>${esc(text)}</li>`).join("")}</ul>
+    ${canConfirm ? `<button class="btn primary" data-action="proposal" data-id="${esc(p.id)}" data-d="confirm" ${app.decidingProposal ? "disabled" : ""}>${labels[p.action]}</button>` : `<p>This item needs more information before it can change your forecast. Upload a clearer source or ask your team to resolve the missing fields.</p>`}
+    <button class="btn" data-action="proposal" data-id="${esc(p.id)}" data-d="dismiss" ${app.decidingProposal ? "disabled" : ""}>Dismiss</button>
+  </article>`;
+}
+
 function viewReview() {
   const items = app.review;
+  const documents = app.reviewDocs.proposals;
+  const pricedIds = new Set(items.map((i) => i.signal.id));
+  const unresolvedSignals = (app.reviewDocs.signals ?? []).filter((i) => !pricedIds.has(i.signal.id));
   return `
   <div class="page-head"><div><h1>Review</h1><p>Messages and uploads that could change your forecast. Nothing changes until you apply it.</p></div></div>
   <div style="max-width:760px">
-  ${items.length ? items.map(reviewCard).join("") : `<section class="panel"><p style="margin:0">Nothing to review. When an email, WhatsApp message or upload could move your cash, it waits here for your OK.</p></section>`}
+  ${documents.map(proposalCard).join("")}
+  ${unresolvedSignals.map(({ signal, notes }) => `<article class="panel" style="margin-bottom:20px"><h2>Imported message needs a match</h2><p>${esc(signal.sourceRef?.excerpt?.text ?? "This message could affect a record, but Neri couldn't match it safely.")}</p>${(notes ?? []).map((n) => `<p>${esc(n)}</p>`).join("")}<p>Ask your team to match the message to the right invoice before applying it.</p><button class="btn" data-action="signal" data-d="dismiss" data-id="${esc(signal.id)}">Dismiss</button></article>`).join("")}
+  ${items.length ? items.map(reviewCard).join("") : documents.length || unresolvedSignals.length ? "" : `<section class="panel"><p style="margin:0">Nothing to review. When an email, WhatsApp message or upload could move your cash, it waits here for your OK.</p></section>`}
   </div>`;
 }
 
@@ -651,7 +735,7 @@ function reviewCard(rv) {
     ${m ? `<div class="message">${body}</div>` : ""}
     <div class="change">
       <div><small>${esc(rv.commitment.sourceRef.record)}, ${money(rv.commitment.amount, { currency: rv.commitment.currency })}, expected</small><b>${shortDate(rv.from)}</b><span class="arrow">→</span><b>${shortDate(rv.to)}</b></div>
-      <div><small>Your low point</small><b class="${rv.before.amount < 0 ? "below" : ""}">${money(rv.before.amount)}</b><span class="arrow">→</span><b class="${rv.after.amount < 0 ? "below" : ""}">${money(rv.after.amount)}</b></div>
+      ${forecastEmpty() ? `<div><small>Cash effect</small><p>Add your bank balance before Neri can price this change.</p></div>` : `<div><small>Your low point</small><b class="${rv.before.amount < 0 ? "below" : ""}">${money(rv.before.amount)}</b><span class="arrow">→</span><b class="${rv.after.amount < 0 ? "below" : ""}">${money(rv.after.amount)}</b></div>`}
     </div>
     <footer>
       <button class="btn primary" data-action="signal" data-d="apply" data-id="${esc(s.id)}">Apply change</button>
@@ -672,39 +756,43 @@ function logoTile(c) {
   return `<span class="logo" style="background:${LOGO_COLORS[Math.abs(h) % LOGO_COLORS.length]}" aria-hidden="true">${initials}</span>`;
 }
 
+const connectorId = (id) => id === "m365" ? "outlook" : id;
+
 function viewSources() {
-  const connected = new Map(app.ctx.business.sources.map((s) => [s.id, s]));
-  const live = CONNECTORS.filter((c) => c.availability === "live").length;
+  const imported = new Map(app.ctx.business.sources.map((src) => [src.id, src]));
+  const capabilities = new Map(app.connections.map((c) => [c.id, c]));
   return `
-  <div class="page-head"><div><h1>Sources</h1><p>Connect the systems your business already runs on. Neri only reads. It never writes back, sends or pays.</p></div></div>
+  <div class="page-head"><div><h1>Sources</h1><p>Add the records your business already has. Neri only reads; it never writes back, sends or pays.</p></div></div>
   <div class="upload-band">
-    <p><b>No connector? Use a file.</b> Upload a CSV, Excel or PDF export, or paste an email or WhatsApp message. Every source works this way, today.</p>
-    <label class="btn">${icon.upload}Upload a file<input type="file" accept=".csv,.xlsx,.xls,.pdf,.eml,.txt" data-change="upload" hidden /></label>
-    <a class="btn quiet" href="#/review">Paste a message</a>
+    <p><b>Start with a file.</b> Upload a bank statement, invoices, bills or a books export.</p>
+    <label class="btn">${icon.upload}Upload a file<input type="file" accept=".csv,.xlsx,.pdf,.eml,.txt,.zip" data-change="upload" hidden /></label>
   </div>
+  ${app.ctx.business.sources.length ? `<section class="panel" style="max-width:760px;margin-block:24px"><h2>Your source records</h2>${app.ctx.business.sources.map((src) => `<p><b>${esc(src.id === "owner" ? "Owner-entered records" : src.label)}</b> — ${esc(src.state === "ok" ? src.detail || "Records imported" : "Waiting for data")}</p>`).join("")}</section>` : ""}
+  ${api.mode === "live" ? bankBalanceForm() : ""}
+  <form class="panel source-paste" data-submit="source-paste" style="max-width:760px;margin-block:24px">
+    <label for="source-text">Paste an invoice, email or WhatsApp message</label>
+    <textarea id="source-text" name="text" rows="4" maxlength="100000" required placeholder="Paste the source text here"></textarea>
+    <button class="btn primary" type="submit">Read pasted text</button>
+    <p class="fineprint">Proposed changes wait for your review. Pasting a payment promise never marks an invoice paid.</p>
+  </form>
   ${CATEGORIES.map((cat) => {
     const list = CONNECTORS.filter((c) => c.category === cat.id);
     return `<section class="cat"><h2>${cat.label}</h2><p>${cat.why}</p><div class="conn-grid">
       ${list.map((c) => {
-        const on = connected.get(c.id);
-        return `<div class="conn ${on ? "is-on" : ""}">${logoTile(c)}<b>${esc(c.name)}</b>
-          <div class="state ${on ? "on" : ""}">${on ? connState(c, on) : `<button class="btn" data-action="connect" data-id="${esc(c.id)}">${c.availability === "live" ? "Connect" : app.interest.has(c.id) ? "Requested" : c.availability === "next" ? "Coming next" : "Request"}</button>`}</div>
-          <p class="reads">${on ? `${esc(on.detail)}${on.syncedAt ? `<span class="synced"> · Read ${esc(syncTime(on.syncedAt))}</span>` : ""}` : esc(c.reads)}</p></div>`;
+        const source = imported.get(c.id) ?? imported.get(connectorId(c.id));
+        const connection = capabilities.get(connectorId(c.id));
+        const hasRecords = source?.state === "ok";
+        const needsAttention = connection?.state === "error" || source?.state === "error";
+        const syncing = app.syncing === connection?.id;
+        return `<div class="conn">${logoTile(c)}<b>${esc(c.name)}</b>
+          <div class="state ${hasRecords ? "on" : ""}">${needsAttention ? `<span class="conn-status"><i class="dot bad"></i>Needs attention</span>` : hasRecords ? `<span class="conn-status"><i class="dot"></i>Records imported</span>` : `<span>${source ? "Waiting for data" : "No data yet"}</span>`}</div>
+          <p class="reads">${esc(connection?.state === "error" ? connection.message : source?.detail || connection?.message || c.reads)}</p>
+          ${connection?.available === true ? `<button class="btn" data-action="connection-sync" data-id="${esc(connection.id)}" ${app.syncing ? "disabled" : ""}>${syncing ? "Syncing…" : "Sync now"}</button>` : `<button class="btn" data-action="connect" data-id="${esc(c.id)}">Import options</button>`}
+        </div>`;
       }).join("")}
     </div></section>`;
   }).join("")}
-  <p class="fineprint" style="margin-top:28px">${live} sources are ready now, ${CONNECTORS.length - live} more are on the way. Each one is read-only and can be turned off at any time.</p>`;
-}
-
-// A connected source: its status dot and a Reconnect that reads it again. Apps Neri can read pull fresh data;
-// file-based sources (bank statement, sales export) reconnect by uploading the newer file.
-function connState(c, on) {
-  const status = on.state === "ok" ? ["", "Connected"] : on.state === "error" ? ["bad", "Needs attention"] : ["warn", "Waiting"];
-  const label = `${icon.refresh}<span>Reconnect</span>`;
-  const btn = PULLABLE.has(c.id)
-    ? `<button class="btn reconnect ${on.state === "error" ? "primary" : ""}" data-action="reconnect" data-id="${esc(c.id)}" title="Read ${esc(c.name)} again">${label}</button>`
-    : `<label class="btn reconnect ${on.state === "error" ? "primary" : ""}" title="Upload a newer file">${label}<input type="file" accept=".csv,.xlsx,.xls,.pdf" data-change="upload" hidden /></label>`;
-  return `<span class="conn-status"><i class="dot ${status[0]}"></i>${status[1]}</span>${btn}`;
+  <p class="fineprint" style="margin-top:28px">Sync is available only for sources configured for your business on this server. Other sources use file upload or pasted text.</p>`;
 }
 
 // ---------------------------------------------------------------- Ask
@@ -759,10 +847,10 @@ function viewSettings() {
     <div class="setting"><h3>Sign-in</h3><p>${authLive ? "Use your email and password. No email verification is needed." : "Preview sign-up stays in this browser. Real accounts use email and password on your Neri server."}</p>
       ${authLive && !app.account?.sample ? `<button class="btn small control" data-action="signout-all">Sign out everywhere</button>` : ""}</div>
     <div class="setting"><h3>Who can see your numbers</h3><p>Only members of ${esc(app.account?.businessName || "your business")}. You're the owner from sign-up; inviting teammates is coming.</p></div>
-    <div class="setting"><h3>Your connected apps</h3><p>Read-only. Neri never writes back, sends or pays.</p></div>
+    <div class="setting"><h3>Your sources</h3><p>Read-only. Neri never writes back, sends or pays.</p></div>
     <div class="setting"><h3>Screen lock</h3><p>${LOCK_MS ? `Numbers hide after ${Math.round(LOCK_MS / 60000)} minutes away.` : "Off."}</p></div>
-    <div class="setting"><h3>Sample data</h3><p>Switch between the fictional businesses this preview runs on.</p>
-      <select class="biz control" data-change="biz" aria-label="Sample business">${SANDBOXES.map((x) => `<option value="${x.id}" ${x.id === app.bizId ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>
+    ${demoAllowed ? `<div class="setting"><h3>Sample data</h3><p>Switch between fictional businesses in this demo.</p>
+      <select class="biz control" data-change="biz" aria-label="Sample business">${SANDBOXES.map((x) => `<option value="${x.id}" ${x.id === app.bizId ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>` : ""}
     <div class="setting"><h3>Hide names</h3><p>Show customers and suppliers as Customer A, Supplier B. For demos and screen sharing.</p>
       <button class="switch control" role="switch" aria-checked="${app.mask}" data-action="mask" aria-label="Hide names"></button></div>
     <div class="setting"><h3>Appearance</h3><p>Light, dark, or follow your device.</p>
@@ -775,6 +863,7 @@ function viewSettings() {
 
 // ---------------------------------------------------------------- Sign up (password accounts; browser-only preview)
 function viewWelcome() {
+  if (api.mode === "live" && !authLive) return `<div class="portal-wrap"><h1 class="portal-title">Sign-in isn't configured</h1><p class="portal-sub">This server needs its sign-in settings before you can open your business. Contact the Neri team and reload once it's ready.</p></div>`;
   const su = app.signup;
   const err = su.error ? `<p class="form-error" role="alert">${esc(su.error)}</p>` : "";
   if (su.step === "name") {
@@ -802,7 +891,7 @@ function viewWelcome() {
       ${su.retry ? `<p class="portal-fine"><button class="btn" data-action="retry-signin" ${su.busy ? "disabled" : ""}>Try loading your business again</button></p>` : ""}
       <p class="portal-fine"><button class="linklike" data-action="auth-mode" data-mode="${signingIn ? "signup" : "signin"}" ${su.busy ? "disabled" : ""}>${signingIn ? "New to Neri? Create an account" : "Already have an account? Sign in"}</button></p>
       ${signingIn ? `<p class="portal-fine">Previously used an email link and haven't set a password? Ask the Neri team for help accessing your existing account.</p>` : ""}
-      <p class="portal-fine"><button class="linklike" data-action="sample" ${su.busy ? "disabled" : ""}>Look around with a sample business first</button></p>
+      ${demoAllowed ? `<p class="portal-fine"><button class="linklike" data-action="sample" ${su.busy ? "disabled" : ""}>Look around with a sample business first</button></p>` : ""}
     </div>`;
   }
   if (su.step === "code") {
@@ -824,7 +913,7 @@ function viewWelcome() {
       ${authLive ? `</details>` : ""}
       <p class="portal-fine">${authLive ? "The link or code works once and expires soon. You can also explore a sample business without signing in." : "Preview: any 6 digits work."}</p>
       <p class="portal-fine"><button class="linklike" data-action="resend" ${resendWait() ? "disabled" : ""}>${resendWait() ? `Send a new email in ${resendWait()}s` : "Send a new email"}</button> <span aria-hidden="true">&nbsp;</span> <button class="linklike" data-action="signup-back">Use a different email</button></p>
-      <p class="portal-fine"><button class="linklike" data-action="sample">Explore a sample business</button></p>
+      ${demoAllowed ? `<p class="portal-fine"><button class="linklike" data-action="sample">Explore a sample business</button></p>` : ""}
     </div>`;
   }
   return `
@@ -839,7 +928,7 @@ function viewWelcome() {
       <button class="btn primary big" type="submit">Continue</button>
     </form>
     <p class="portal-fine">${authLive ? "No password to remember or leak: we email you a one-time sign-in link or code." : "No password to remember or leak: preview sign-up uses any 6-digit code."}</p>
-    <p class="portal-fine"><button class="linklike" data-action="sample">Look around with a sample business first</button></p>
+    ${demoAllowed ? `<p class="portal-fine"><button class="linklike" data-action="sample">Look around with a sample business first</button></p>` : ""}
   </div>`;
 }
 
@@ -929,11 +1018,9 @@ function viewSetup() {
   try {
     tz = new Intl.DateTimeFormat("en-US", { timeZoneName: "longGeneric" }).formatToParts(new Date()).find((x) => x.type === "timeZoneName")?.value ?? "";
   } catch {}
-  const n = st.picked.size;
-  const viaFile = [...st.picked].filter((id) => CONNECTORS.find((c) => c.id === id)?.availability !== "live").length;
   const tile = (c) => {
     const on = st.picked.has(c.id);
-    const state = st.connecting && on ? (c.availability === "live" ? "ok" : "waiting") : "";
+    const state = st.connecting && on ? "waiting" : "";
     return `<button class="app-tile ${on ? "on" : ""}" data-action="pick" data-id="${esc(c.id)}" aria-pressed="${on}" title="${esc(c.reads)}">
       ${logoTile(c)}<span class="app-name">${esc(c.name)}</span>
       <span class="tick" aria-hidden="true">${state ? `<i class="d ${state === "ok" ? "" : "amber"}"></i>` : icon.check}</span>
@@ -942,7 +1029,7 @@ function viewSetup() {
   return `
   <div class="setup">
     <h1 class="portal-title">Set up ${esc(name)}</h1>
-    <p class="portal-sub">Tick the apps you use, then connect them all at once. Neri only reads.</p>
+    <p class="portal-sub">Choose the tools you use. After setup, upload their exports or sync a source available on your server.</p>
     <div class="kind-row" role="radiogroup" aria-label="Type of business">
       ${KINDS.map((k) => `<button class="kind-pill" role="radio" aria-checked="${st.kind === k.id}" data-action="kind" data-k="${k.id}">${k.label}</button>`).join("")}
     </div>
@@ -960,8 +1047,8 @@ function viewSetup() {
       <span class="reserve-note">in the bank. Neri warns you before you go under it.${tz ? ` Times in ${esc(tz)}.` : ""}</span>
     </div>
     <div class="connect-bar">
-      <span class="bar-note" id="bar-note">${viaFile ? `${viaFile} of these connect by file upload until their connector is ready.` : `<label class="linklike">${icon.upload}No app? Upload a file<input type="file" accept=".csv,.xlsx,.xls,.pdf" data-change="upload" hidden /></label>`}</span>
-      <button class="btn primary big" data-action="connect-all" ${st.connecting ? "disabled" : ""}>${st.connecting ? "Connecting…" : n ? `Connect ${n} ${n === 1 ? "app" : "apps"}` : "Skip for now"}</button>
+      <span class="bar-note" id="bar-note">Your choices are preferences. No account is connected until a source sync succeeds.</span>
+      <button class="btn primary big" data-action="connect-all" ${st.connecting ? "disabled" : ""}>${st.connecting ? "Creating business…" : "Create business"}</button>
     </div>
   </div>`;
 }
@@ -1048,50 +1135,17 @@ async function showDraft(itemId) {
 }
 
 // Apps Neri can read for real today (Sources > Connect). Everything else connects by file until its connector is ready.
-const PULLABLE = new Set(["zoho_books", "zoho_crm", "m365"]);
-
-async function pullApps(ids, onStep) {
-  const out = [];
-  for (const id of ids.filter((x) => PULLABLE.has(x))) {
-    const name = CONNECTORS.find((c) => c.id === id)?.name ?? id;
-    onStep?.(name);
-    try {
-      out.push({ id, name, ok: true, res: await api.pullSource(id) });
-    } catch (e) {
-      out.push({ id, name, ok: false, error: e.message });
-    }
-  }
-  return out;
-}
-
-// One plain sentence per app: what was read, or why not and what to do instead.
-function pullSummary(results) {
-  if (!results.length) return "Nothing to read yet. Upload a file or connect an app whenever you're ready.";
-  return results.map((r) => {
-    if (!r.ok) return `${r.name}: ${r.error}`;
-    const s = r.res?.summary ?? {};
-    const warn = r.res?.diagnostics?.warnings?.[0];
-    const what = r.res?.kind === "messages"
-      ? `${s.messages ?? 0} message${s.messages === 1 ? "" : "s"} to review`
-      : `${r.res?.diagnostics?.rowsRead ?? 0} item${r.res?.diagnostics?.rowsRead === 1 ? "" : "s"} read`;
-    return `${r.name}: ${what}.${warn ? ` ${warn}` : ""}`;
-  }).join(" ");
-}
-
 function showConnect(id) {
   const c = CONNECTORS.find((x) => x.id === id);
-  const cat = CATEGORIES.find((x) => x.id === c.category);
-  const isLive = c.availability === "live";
+  if (!c) return;
+  const connection = app.connections.find((x) => x.id === connectorId(id));
   openSheet(`
-    ${sheetHead(`${esc(c.name)}`, esc(cat.label))}
-    <dl class="kv"><dt>Neri reads</dt><dd>${esc(c.reads)}</dd><dt>Access</dt><dd>Read-only. Turn it off any time.</dd><dt>Status</dt><dd>${AVAILABILITY_LABEL[c.availability]}</dd></dl>
-    ${isLive
-      ? `<p>You'll sign in with ${esc(c.name)} and pick which company to share. The first import takes a couple of minutes, then Neri keeps it fresh.</p>
-         <button class="btn primary" data-action="connect-go" data-id="${esc(c.id)}">Connect ${esc(c.name)}</button>
-         <p class="fineprint">${api.mode === "preview" ? "This preview uses a fictional business, so sign-in opens on your Neri server, not here." : ""}</p>`
-      : `<p>${c.availability === "next" ? "This connector is being built next." : "This connector is on the list."} You don't have to wait: export from ${esc(c.name)} and upload the file. Neri reads it the same way.</p>
-         <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn primary">${icon.upload}Upload an export<input type="file" accept=".csv,.xlsx,.xls,.pdf" data-change="upload" hidden /></label>
-         <button class="btn" data-action="interest" data-id="${esc(c.id)}">${app.interest.has(c.id) ? "We'll tell you" : "Tell me when it's ready"}</button></div>`}`);
+    ${sheetHead(esc(c.name), "Read-only source records")}
+    <p>${esc(c.reads)}.</p>
+    ${connection?.available === true
+      ? `<p>This server can read this source for your business.</p><button class="btn primary" data-action="connection-sync" data-id="${esc(connection.id)}">Sync now</button>`
+      : `<p>Automatic sync isn't configured for your business. Export a file from ${esc(c.name)} and upload it, or paste a message on Sources.</p>
+         <label class="btn primary">${icon.upload}Upload an export<input type="file" accept=".csv,.xlsx,.pdf,.eml,.txt,.zip" data-change="upload" hidden /></label>`}`);
 }
 
 // ---------------------------------------------------------------- toast
@@ -1162,7 +1216,7 @@ function renderDrive() {
     document.body.append(el);
   }
   const s = summary();
-  const open = app.brief.three.filter((i) => i.state !== "done");
+  const open = forecastEmpty() ? [] : app.brief.three.filter((i) => i.state !== "done");
   // parts: [0]=headline, [1]=count, [2..]=items
   const itemSpeaking = (n) => app.speakingIndex === n + 2;
   el.innerHTML = masked(`
@@ -1313,7 +1367,7 @@ async function sendFiles(files) {
     }
   }
   if (sent) {
-    app.review = await api.review().catch(() => app.review);
+    await refresh();
     toast(sent === files.length ? `${label} read` : `${sent} of ${files.length} files read`, "Anything that could move your cash is waiting in Review.", "Open Review", () => (location.hash = "#/review"));
     render();
   }
@@ -1435,6 +1489,7 @@ async function onClick(ev) {
     return render();
   }
   if (a === "sample") {
+    if (!demoAllowed) return;
     await api.useSample(SANDBOXES[0].id);
     history.replaceState(null, "", "#/today");
     return load();
@@ -1456,11 +1511,7 @@ async function onClick(ev) {
     p.has(id) ? p.delete(id) : p.add(id);
     el.classList.toggle("on", p.has(id));
     el.setAttribute("aria-pressed", String(p.has(id)));
-    const btn = document.querySelector('[data-action="connect-all"]');
-    if (btn) btn.textContent = p.size ? `Connect ${p.size} ${p.size === 1 ? "app" : "apps"}` : "Skip for now";
-    const viaFile = [...p].filter((x) => CONNECTORS.find((c) => c.id === x)?.availability !== "live").length;
-    const note = document.getElementById("bar-note");
-    if (note && viaFile) note.textContent = `${viaFile} of these connect by file upload until their connector is ready.`;
+    render();
     return;
   }
   if (a === "connect-all") {
@@ -1468,9 +1519,7 @@ async function onClick(ev) {
     st.connecting = true;
     render();
     const dollars = Number(String(st.reserve).replace(/[^\d.]/g, ""));
-    // Preview: connectors marked Ready sign in on the Neri server; here they show as connected. Others wait for a file.
     try {
-      if (api.mode === "preview") await new Promise((r) => setTimeout(r, st.picked.size ? 1100 : 0));
       await api.completeSetup({ email: app.signup.email, businessName: app.signup.name, kind: st.kind, reserve: dollars ? Math.round(dollars * 100) : null, connect: [...st.picked] });
     } catch (e) {
       st.connecting = false;
@@ -1478,19 +1527,10 @@ async function onClick(ev) {
       toast("Couldn't finish setup", `${e.message} Try again, or upload a file instead.`);
       return;
     }
-    // Live: read each ticked app now, so Home opens with the real numbers. A failure is shown in words and the
-    // owner can upload a file instead; one app failing never stops the others.
-    const results = api.mode === "preview" ? [] : await pullApps([...st.picked], (name) => {
-      const btn = document.querySelector('[data-action="connect-all"]');
-      if (btn) btn.textContent = `Reading ${name}…`;
-    });
     st.connecting = false;
     history.replaceState(null, "", "#/today");
     await load();
-    if (results.length) return toast("All set", pullSummary(results));
-    const c = app.account.connections;
-    const ok = c.filter((x) => x.state === "ok").length;
-    toast("All set", c.length ? `${ok} connected${c.length - ok ? `, ${c.length - ok} waiting for a file` : ""}. Here's today.` : "Upload a file or connect an app whenever you're ready.");
+    toast("Your business is ready", "Add a bank statement and your books on Sources to build your forecast.", "Add a source", () => (location.hash = "#/sources"));
     return;
   }
   if (a === "done") {
@@ -1546,13 +1586,27 @@ async function onClick(ev) {
     toast("Added to your forecast", `${money(t.a.proposal.amount)} on ${shortDate(t.a.proposal.date)}. Today's list is updated.`);
     return;
   }
+  if (a === "proposal") {
+    if (app.decidingProposal) return;
+    app.decidingProposal = true;
+    render();
+    try {
+      await api.decideProposal(id, el.dataset.d, app.reviewDocs.storeRevision);
+      await refresh();
+      toast(el.dataset.d === "confirm" ? "Imported item confirmed" : "Imported item dismissed", "Your records and forecast are updated.");
+    } finally {
+      app.decidingProposal = false;
+      render();
+    }
+    return;
+  }
   if (a === "signal") {
     const res = await api.decideSignal(id, el.dataset.d);
     await refresh();
     if (el.dataset.d === "apply") {
       location.hash = "#/today";
       const low = app.brief.run.lowPoint;
-      toast(res?.alert?.title ?? "Change applied", res?.alert?.detail ? `${res.alert.detail} Today's list is re-ranked.` : `Your low point is now ${money(low.amount)} on ${shortDate(low.date)}. Today's list is re-ranked.`, "Details", () => (location.hash = "#/details"));
+      toast(res?.alert?.title ?? "Change applied", forecastEmpty() ? "Add your bank balance and source records to see the cash effect." : res?.alert?.detail ? `${res.alert.detail} Today's list is re-ranked.` : `Your low point is now ${money(low.amount)} on ${shortDate(low.date)}. Today's list is re-ranked.`, "Details", () => (location.hash = "#/details"));
     } else {
       toast("Dismissed", "The forecast stays as it was.");
     }
@@ -1578,27 +1632,27 @@ async function onClick(ev) {
     return;
   }
   if (a === "connect") return showConnect(id);
-  if (a === "reconnect") {
-    if (api.mode === "preview") {
-      toast("Reconnect runs on your Neri server", "This preview runs a fictional business with sample data, so there's nothing to read again.");
-      return;
-    }
-    el.disabled = true;
-    const results = await pullApps([id], (name) => { el.querySelector("span").textContent = `Reading ${name}…`; });
-    await load();
-    toast(results[0]?.ok ? "Up to date" : "Couldn't reconnect", pullSummary(results));
-    return;
-  }
-  if (a === "connect-go") {
-    if (api.mode === "preview" || !PULLABLE.has(id)) {
-      toast("Sign-in opens on your Neri server", "This preview runs a fictional business with sample data.");
-      return;
-    }
-    el.disabled = true;
-    const results = await pullApps([id], (name) => { el.textContent = `Reading ${name}…`; });
+  if (a === "connection-sync") {
+    const connection = app.connections.find((c) => c.id === id);
+    if (api.mode !== "live" || connection?.available !== true || app.syncing) return;
+    app.syncing = id;
     closeSheet();
-    await load();
-    toast(results[0]?.ok ? "Connected" : "Couldn't connect", pullSummary(results));
+    render();
+    try {
+      const result = await api.syncConnection(id);
+      await refresh();
+      const pending = (result.counts?.proposals ?? 0) + (result.counts?.signals ?? 0);
+      const incomplete = result.connection?.state === "error" || (result.counts?.failed ?? 0) > 0 || (result.counts?.rejected ?? 0) > 0;
+      const hasData = pending > 0 || (result.counts?.commitments ?? 0) > 0 || (result.counts?.settlements ?? 0) > 0;
+      const title = incomplete ? (hasData ? "Some source records need attention" : "Source sync needs attention") : "Source sync completed";
+      const detail = incomplete
+        ? `${pending ? `${pending} imported ${pending === 1 ? "item is" : "items are"} waiting for review. ` : ""}${result.connection?.message || "Some source records could not be read. Check the source and try again."}`
+        : pending ? `${pending} imported ${pending === 1 ? "item is" : "items are"} waiting for your review.` : result.summary?.written === false ? "No new or changed records were found." : "Open Review to check anything that needs your OK.";
+      toast(title, detail, "Open Review", () => (location.hash = "#/review"));
+    } finally {
+      app.syncing = null;
+      render();
+    }
     return;
   }
   if (a === "interest") {
@@ -1730,6 +1784,29 @@ async function onSubmit(ev) {
     location.hash = "#/setup";
     return;
   }
+  if (kind === "bank-balance") {
+    const fd = new FormData(f);
+    const amount = parseBalance(fd.get("amount") ?? "");
+    const asOf = String(fd.get("asOf") ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) throw new Error("Choose the date shown on your bank balance.");
+    if (api.mode !== "live") return toast("Balance not saved", "Open your Neri server to add your real bank balance.");
+    const accounts = app.ctx.balanceAccounts ?? [];
+    const account = String(fd.get("account") ?? (accounts.length ? "" : "main"));
+    if (accounts.length && !accounts.some((a) => a.account === account && a.currency === (app.ctx.profile.baseCurrency ?? "USD"))) throw new Error("Choose one of your bank accounts to update.");
+    await api.setBalance(amount, asOf, account);
+    await refresh();
+    toast("Bank balance saved", "Your user-entered balance is now part of your source records.");
+    return;
+  }
+  if (kind === "source-paste") {
+    const text = String(new FormData(f).get("text") ?? "").trim();
+    if (!text) return toast("Paste the source text first");
+    if (api.mode !== "live") return toast("Text not read", "This preview uses sample data. Open your Neri server to import your records.");
+    await api.importText(text);
+    await refresh();
+    toast("Text received", "Open Review to check anything Neri found.", "Open Review", () => (location.hash = "#/review"));
+    return;
+  }
   if (kind === "park") {
     const text = (new FormData(f).get("text") ?? "").toString().trim();
     if (!text) return;
@@ -1756,6 +1833,7 @@ async function onChange(ev) {
     return;
   }
   if (el.dataset.change === "biz") {
+    if (!demoAllowed) return;
     app.bizId = el.value;
     if (app.account?.sample) app.account = await api.useSample(el.value);
     else if (app.account) {
@@ -1830,6 +1908,7 @@ async function resumeSignin(session, name = "") {
 }
 
 async function start() {
+  if (!demoAllowed && app.account && (app.account.sample || !app.account.businessId)) app.account = null;
   if (authLive) {
     let session;
     let fromLink;

@@ -54,9 +54,9 @@ describe("forecast checks in the owner brief", () => {
     expect(run.firstBelowSafety).toBeUndefined();
     const output = render(run);
     expect(output.summary.tone).toBe("review");
-    expect(output.html).toContain("No commitments or actuals loaded");
+    expect(output.html).toContain("No forecast yet");
     expect(output.html).toContain('href="#/sources"');
-    expect(output.html).toContain("No cash actions are ranked yet");
+    expect(output.html).toContain("Add your first source");
     for (const text of [output.html, output.spoken.join(" "), output.drive]) {
       expect(text).not.toMatch(/good shape|Nothing needs you today|above your line for all/);
       expect(text).toContain("forecast");

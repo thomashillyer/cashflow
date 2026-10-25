@@ -124,7 +124,7 @@ describe("masking through the API", () => {
     expect((await put(OWNER, { maskNames: true, maskAliases: { "Evergreen Home": "Acme Retail", "x": "y" } })).statusCode).toBe(400);
     expect((await put(OTHER, { maskNames: true })).statusCode).toBe(404);
     const sample = await app.inject({ method: "PUT", url: "/profile/masking", headers: { ...OWNER, "x-neri-business": "cascade_trade" }, payload: { maskNames: true } });
-    expect([sample.statusCode, sample.json().error.code]).toEqual([403, "SAMPLE_BUSINESS"]);
+    expect([sample.statusCode, sample.json().error.code]).toEqual([404, "NOT_FOUND"]);
     expect((await put(OWNER, { maskNames: true, maskAliases: { "Evergreen Home": "Acme Retail" } })).statusCode).toBe(200);
     const r = await ctx({});
     expect(r.headers["x-neri-masked"]).toBe("1");

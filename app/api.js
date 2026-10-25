@@ -21,6 +21,9 @@ const API_BASE =
   window.NERI_API_BASE === "same-origin" ? location.origin
   : window.NERI_API_BASE || (fromQuery && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(fromQuery) ? fromQuery : "");
 
+// A live API serves real owner data unless its server explicitly enables the demo.
+export const demoAllowed = !API_BASE || window.NERI_DEMO_MODE === true;
+
 let engine = null;
 
 async function loadPreview(id) {
@@ -67,12 +70,10 @@ const preview = {
   },
   async startSignup(email) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Enter your work email, like you@yourbusiness.com.");
-    if (auth.authConfigured) await auth.sendCode(email);
-    return { suggestedName: suggestBusinessName(email), personal: FREE_MAIL.test(email.split("@")[1] ?? ""), realCode: auth.authConfigured };
+    return { suggestedName: suggestBusinessName(email), personal: FREE_MAIL.test(email.split("@")[1] ?? ""), realCode: false };
   },
   async verifyCode(email, code) {
     if (!/^\d{6}$/.test(code.trim())) throw new Error("Enter the 6-digit code from the email.");
-    if (auth.authConfigured) await auth.verifyCode(email, code);
     return { ok: true };
   },
   async restoreAccount() {
@@ -90,7 +91,7 @@ const preview = {
       reserve,
       connections: connect.map((id) => {
         const c = CONNECTORS.find((x) => x.id === id);
-        return { id, name: c?.name ?? id, state: c?.availability === "live" ? "ok" : "waiting" };
+        return { id, name: c?.name ?? id, state: "waiting" };
       }),
       createdAt: new Date().toISOString(),
     };
@@ -180,7 +181,7 @@ function maskHeader() {
 
 function businessHeader() {
   const acc = readAccount() ?? memAccount;
-  return openedBiz && (!acc || acc.sample) ? { "X-Neri-Business": openedBiz } : {};
+  return demoAllowed && openedBiz && (!acc || acc.sample) ? { "X-Neri-Business": openedBiz } : {};
 }
 
 // A random id per browser (kept in localStorage when allowed). The demo API gives each visitor a private
@@ -202,7 +203,7 @@ function visitor() {
 
 async function http(path, init) {
   const token = await auth.accessToken().catch(() => null);
-  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader(), ...maskHeader(), "X-Neri-Visitor": visitor() };
+  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader(), ...maskHeader(), ...(demoAllowed ? { "X-Neri-Visitor": visitor() } : {}), ...init?.headers };
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (res.status === 401) {
     await auth.signOut().catch(() => {});
@@ -232,7 +233,13 @@ const live = {
     return auth.signIn(email, password);
   },
   account() {
-    return readAccount() ?? memAccount;
+    const acc = readAccount() ?? memAccount;
+    // Older browser previews have no businessId. Never reuse them on the owner's live server.
+    if (!demoAllowed && acc && (acc.sample || !acc.businessId)) {
+      writeAccount(null);
+      return null;
+    }
+    return acc;
   },
   // Sign-in goes straight to Supabase Auth. The API only ever sees the session token.
   async startSignup(email) {
@@ -256,7 +263,10 @@ const live = {
       if (e.status === 404) return null; // No business yet outside demo mode.
       throw e;
     }
-    if (context.business.synthetic) return null; // A new user gets the default sample in demo mode.
+    if (context.business.synthetic) {
+      if (demoAllowed) return null;
+      throw new Error("The server returned sample data. Reload or contact the Neri team before continuing.");
+    }
     const acc = {
       businessId: context.business.id,
       email: session.user.email,
@@ -275,6 +285,7 @@ const live = {
     return acc;
   },
   async useSample(sandbox) {
+    if (!demoAllowed) throw new Error("Sample businesses are not available on this server. Sign in to your business.");
     const acc = { sample: true, sandbox, connections: null };
     writeAccount(acc);
     return acc;
@@ -284,11 +295,25 @@ const live = {
     writeAccount(null);
   },
   async open(id) {
-    openedBiz = id ?? null;
+    openedBiz = demoAllowed ? id ?? null : null;
+  },
+  async connections() {
+    const result = await http("/connections");
+    return result.connections ?? [];
+  },
+  async syncConnection(id) {
+    return http(`/connections/${encodeURIComponent(id)}/sync`, { method: "POST" });
+  },
+  async importText(text) {
+    return http("/import/paste", { method: "POST", body: JSON.stringify({ text }) });
+  },
+  async setBalance(amount, asOf, account = "main") {
+    return http("/balance", { method: "PUT", body: JSON.stringify({ amount, asOf, account }) });
   },
   // partyByCommitment (commitment id -> party id) becomes the same partyOf() the preview context offers.
   async context() {
     const c = await http("/context");
+    if (!demoAllowed && c.business.synthetic) throw new Error("The server returned sample data. Sign in to your business before continuing.");
     return { ...c, partyOf: (cid) => c.partyByCommitment?.[cid] };
   },
   // Expected: { three: WorkItem[], rest: WorkItem[], watch: WorkItem[], combined?, shortfall?, run: ForecastRun }
@@ -300,6 +325,14 @@ const live = {
   },
   async review() {
     return http("/review");
+  },
+  async reviewProposals() {
+    return http("/review/proposals");
+  },
+  async decideProposal(id, decision, expectedRevision) {
+    return http(`/review/${encodeURIComponent(id)}/${decision === "confirm" ? "confirm" : "dismiss"}`, {
+      method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ expectedRevision }),
+    });
   },
   async decideSignal(id, decision) {
     return http(`/signals/${encodeURIComponent(id)}/${decision === "apply" ? "apply" : "dismiss"}`, { method: "POST" });

@@ -7,18 +7,17 @@ One Fastify service (docs/TECHNICAL_PLAN.md §9) that answers the routes `app/ap
 ```
 npm install
 cp .env.example .env          # paste the Supabase values (see CLAUDE.md "Supabase setup")
-npm run seed:demo             # once per Supabase project: the synthetic samples (cascade_trade, pike_noodle)
 npm run dev                   # http://localhost:8787 (API + app), reloads on change
 npm start                     # same, without watch (production)
 ```
 
-No database? `NERI_STORE=memory DEMO_MODE=1 npm run dev` runs on the fixtures in memory (lost on restart), no sign-in needed. Good for a laptop demo.
+No database? `NODE_ENV=development NERI_STORE=memory DEMO_MODE=1 npm run dev` runs on the fixtures in memory (lost on restart), no sign-in needed. Good for a laptop demo.
 
 Tests: `npx vitest run api` (Fastify `inject()`, in-memory store, no network, no key).
 
-## Live demo hosting (Fly.io)
+## Production hosting (Fly.io)
 
-**https://neri-cash.fly.dev**: this API plus the app on one origin, in `DEMO_MODE` against the shared Supabase project. `Dockerfile` builds it and switches the image's `app/config.js` to `same-origin` (the committed file stays empty for the local preview). `fly.toml` sets the region (`sjc`), keeps one machine warm, and health-checks `/health`. `.github/workflows/fly-deploy.yml` deploys every push to `main` (repo secret `FLY_API_TOKEN`). Runtime secrets live in Fly: `fly secrets set -a neri-cash SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... [ANTHROPIC_API_KEY=...]`. Manual deploy: `fly deploy --remote-only`. Logs: `fly logs -a neri-cash`.
+**https://neri-cash.fly.dev**: this API plus the app on one origin, with `DEMO_MODE=0`, `NERI_STORE=supabase`, and private signed-in businesses. Production rejects memory storage and demo mode at startup; missing Supabase configuration fails startup. `Dockerfile` builds it and switches the image's `app/config.js` to `same-origin` (the committed file stays empty for the local preview). `fly.toml` sets the region (`sjc`), keeps one machine warm, and health-checks `/health`. `.github/workflows/fly-deploy.yml` deploys every push to `main` (repo secret `FLY_API_TOKEN`). Runtime secrets live in Fly: `fly secrets set -a neri-cash SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... [ANTHROPIC_API_KEY=...]`. Manual deploy: `fly deploy --remote-only`. Logs: `fly logs -a neri-cash`.
 
 ## Environment
 
@@ -32,9 +31,8 @@ Tests: `npx vitest run api` (Fastify `inject()`, in-memory store, no network, no
 | `ANTHROPIC_WORKSPACE_ID` | Only for a user-level key (`sk-ant-usr-...`), which isn't scoped to a workspace: the workspace id (`wrkspc_...`) sent as `anthropic-workspace-id` on every Claude call. Not needed for a workspace key (`sk-ant-api03-...`). |
 | `NERI_AI_MODE` | `live` or `cache_only`. Default: live when a key is set, except in `DEMO_MODE`, where it is `cache_only` unless set to `live`. |
 | `DEMO_MODE=1` | Requests without a token may open the synthetic samples (public preview, judges); uploads (`/import`) still need sign-in, because the samples are shared. Private businesses still need a member's token. Visitors get a private sandbox copy of each sample (see Demo sandbox). |
-| `NERI_DEFAULT_BUSINESS` | Sample opened when the caller has no business of their own (default `cascade_trade`). |
-| `NERI_STORE=memory` | In-memory store seeded from the fixtures, instead of Supabase. |
-| `NERI_SOURCE_EMAIL=<email>` / `NERI_SOURCE_BUSINESS=<business id>` | Lets the signed-in user whose VERIFIED email is `NERI_SOURCE_EMAIL` (from the session token, never the request body), or the one business named by `NERI_SOURCE_BUSINESS`, pull with the server's own `ZOHO_*` and `MICROSOFT_*` app credentials (`ZOHO_API_DOMAIN`, `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, optional `ZOHO_ORG_ID`; `MICROSOFT_TENANT_ID`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_MAILBOX_UPN`). Everyone else gets "not connected" until the per-owner Connect flow lands (#128). Shared samples never. Unset = off. |
+| `NERI_DEFAULT_BUSINESS` | Local demo sample only (default `cascade_trade`); ignored as a production fallback. |
+| `NERI_STORE=memory` | Local in-memory store; fixtures are seeded only when `DEMO_MODE=1`. Rejected in production. |
 | `NERI_ALLOW_RESET=1` | Let `POST /demo/reset` without a visitor id reseed the shared samples (admin use, tests). Off by default, also in demo mode. |
 | `NERI_STATIC_DIR` | Directory served at `/` (default `app/`). |
 | `PORT`, `HOST` | Default `8787`, `127.0.0.1`. Set `HOST=0.0.0.0` in a container. |
@@ -44,12 +42,24 @@ Tests: `npx vitest run api` (Fastify `inject()`, in-memory store, no network, no
 The hosted app creates accounts and signs in with email and password directly through Supabase. Email confirmations are disabled for the hackathon, so neither action sends mail. Passwords never pass through this API. Private-business access still checks the verified session's user ID and membership, not its unverified email address.
 
 - **Email-link callback:** set the hosted Supabase Authentication Site URL to `https://neri-cash.fly.dev` (for local development, use the app's local origin). The frontend uses that default destination without a redirect override or wildcard allowlist. The default email template works unchanged: open the link in the browser/device where sign-in started so the stored PKCE verifier is available. Existing businesses are restored through `GET /context`; signing in does not call `POST /setup` again. Six-digit OTP templates remain supported.
-- **Email delivery:** without custom SMTP, the built-in sender is limited to team addresses and currently two emails/hour. A configured provider such as SendGrid supports its own recipient and rate-limit policy; the frontend also accepts its six-digit-code templates. Keep anonymous samples available for judges. No sender credentials or auth-confirmation settings are changed by this frontend flow. Configure hosted Auth separately from app deployment; do not push the local `supabase/config.toml` wholesale. [Supabase SMTP limits](https://supabase.com/docs/guides/auth/auth-smtp).
+- **Email delivery:** without custom SMTP, the built-in sender is limited to team addresses and currently two emails/hour. A configured provider such as SendGrid supports its own recipient and rate-limit policy; the frontend also accepts its six-digit-code templates. Email delivery is not required for the current password sign-in. No sender credentials or auth-confirmation settings are changed by this frontend flow. Configure hosted Auth separately from app deployment; do not push the local `supabase/config.toml` wholesale. [Supabase SMTP limits](https://supabase.com/docs/guides/auth/auth-smtp).
 - Every route except `GET /health` and `GET /ready` reads `Authorization: Bearer <supabase access token>` and verifies it with `supabase.auth.getUser` (anon-key client). A bad or expired token is `401` (the app then returns to sign-in). No token is `401` unless `DEMO_MODE=1`.
-- **Which business:** the `X-Neri-Business` header (or `?business=`) if sent; else the caller's own business; else the default sample. The app does not send one yet, so a signed-in owner sees their own business and everyone else sees the sample.
-- **Membership:** synthetic businesses are open to any verified caller (and to anonymous callers in demo mode). A private business needs membership: a row in `memberships` (tenant-access migration, branch `p3/tenant-access`) or, until that migration is applied, the owner recorded at `POST /setup` (`profile.account.ownerUserId`). Anything else is `404`, the same answer as an unknown id.
+- **Which business:** the `X-Neri-Business` header (or `?business=`) if sent; else the caller's own business. A signed-in user without a business receives `404 NO_BUSINESS` and goes to setup. The default sample is used only with explicit local `DEMO_MODE=1`.
+- **Membership:** synthetic businesses are rejected in production, including explicit IDs; they are accessible only in demo mode. A private business needs membership: a row in `memberships` (tenant-access migration, branch `p3/tenant-access`) or, until that migration is applied, the owner recorded at `POST /setup` (`profile.account.ownerUserId`). Anything else is `404`, the same answer as an unknown id.
 - Reads and writes then use the service-role client, scoped by that business id.
 - Synthetic samples are shared and read-only for anonymous visitors in demo mode; see Demo sandbox below.
+
+The legacy `/sources/:source/pull` route is not configured by the production entry point; use the tenant-bound `/connections` service below.
+
+## Real source connections
+
+Production Sources discovers capabilities through `GET /connections`; selecting a provider in setup does not connect it. Configure `NERI_CONNECTOR_BUSINESS_ID` with exactly one private business ID plus the provider credentials as server secrets. Other businesses cannot discover or use that server-managed account.
+
+- Outlook: `MICROSOFT_TENANT_ID` (tenant UUID), `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_MAILBOX_UPN`. `POST /connections/outlook/sync` reads at most ten recent relevant messages from the last thirty days with the existing application's mailbox permissions. It saves evidence and pending proposals/signals; it never sends mail or applies proposed changes. Live extraction requires `NERI_AI_MODE=live` and `ANTHROPIC_API_KEY`. Partial failures remain visible and retryable.
+- Zoho Books: `ZOHO_API_DOMAIN`, `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, optional `ZOHO_ORGANIZATION_ID`. `POST /connections/zoho_books/sync` imports normalized accounting records from the bound company. Tokens must be valid; unavailable providers offer upload/paste instead.
+- `PUT /balance` takes `{ amount, asOf, account? }`: signed integer cents, a nonfuture `YYYY-MM-DD`, and optional account name. Currency is the business base currency. Re-entering the same account/date corrects its snapshot. Enter only an actual bank balance; email imports do not invent one.
+
+New businesses start with no recurring commitments, no opening bank balance, and a zero reserve until the owner sets one. Missing cash/books stay visible; no sample totals are presented as actual data.
 
 ## Demo sandbox
 

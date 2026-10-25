@@ -26,7 +26,7 @@ function sources(b: Business, records: Records) {
     id, label: SOURCE_LABELS[id] ?? id, state: "ok", syncedAt: acc.syncedAt ?? acc.createdAt ?? null, detail: `${n} record${n === 1 ? "" : "s"}`,
   }));
   // A connection's data shows up under the system name its records carry (CRM deals are "crm", Outlook mail is "email").
-  const SYSTEM_OF: Record<string, string> = { zoho_crm: "crm", m365: "email" };
+  const SYSTEM_OF: Record<string, string> = { zoho_crm: "crm", m365: "email", outlook: "email" };
   const present = new Set([...counts.keys(), ...records.evidence.map((e) => e.sourceRef.system)]);
   for (const c of acc.connections ?? []) {
     const system = SYSTEM_OF[c.id] ?? c.id;
@@ -64,6 +64,8 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       rules: records.rules,
       safetyLine: profile.safetyLine.kind === "fixed" ? profile.safetyLine.amount : undefined,
       partyByCommitment,
+      // Expose account identities for correcting an existing snapshot without adding another account.
+      balanceAccounts: [...new Map([...records.balances].sort((a, b) => a.asOf.localeCompare(b.asOf)).map((b) => [b.account, { account: b.account, asOf: b.asOf, currency: b.currency }])).values()],
       storeRevision,
     };
   });

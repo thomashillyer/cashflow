@@ -2,11 +2,12 @@
 // PATCH /notes/:id, POST /notes/:id/add|keep|remove) and POST /plans. Notes and plans are the owner
 // channel of the signals pipeline: they reach the forecast only as an owner Signal, after the owner's OK.
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Profile } from "../../schema/profile";
+import type { BalanceSnapshot } from "../../schema/records";
 import type { Deps } from "../app";
 import { loadForRun, runInputs } from "../engine";
 import { storeFor, businessOf, HttpError, isIsoDate, minorUnits, userOf } from "../http";
@@ -59,7 +60,8 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const profile: StoredProfile = {
       ...starter,
       recurring: [],
-      ...(reserve !== undefined ? { safetyLine: { kind: "fixed", amount: reserve } } : {}),
+      // A template's example reserve is not the owner's preference. No reserve is assumed until set.
+      safetyLine: { kind: "fixed", amount: reserve ?? 0 },
       account: { owner: ownerNameFrom(email), email, kind, connections, ownerUserId: user.id, createdAt },
     };
     // One business per owner for now: setting up again updates it (notes and import notes are kept).
@@ -88,11 +90,41 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (typeof body.timezone === "string" && /^[A-Za-z_]+(\/[A-Za-z_+-]+)*$/.test(body.timezone)) next.account = { ...next.account, timezone: body.timezone };
     await storeFor(req).saveProfile(b.id, next);
     const storeRevision = await storeFor(req).bumpRevision(b.id);
+    const latest = await storeFor(req).load(b.id);
+    await refreshPending(storeFor(req), b.id, latest.records, latest.storeRevision, nowIso());
     const { account: _a, ...profile } = next;
     return { profile, storeRevision };
   };
   app.patch("/profile", updateProfile);
   app.put("/profile", updateProfile);
+
+  // Owner-confirmed opening cash. This records a snapshot; it never touches a bank or books a payment.
+  app.put("/balance", async (req) => {
+    if (!userOf(req)) throw new HttpError(401, "UNAUTHENTICATED", "Sign in before entering your bank balance.");
+    const b = businessOf(req);
+    const body = req.body as Record<string, unknown> | null;
+    if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some((k) => !["amount", "asOf", "account"].includes(k)))
+      throw new HttpError(400, "INVALID_ARGUMENT", "Enter an amount, balance date, and optional account name. The currency comes from your business.");
+    if (typeof body.amount !== "number" || !Number.isSafeInteger(body.amount))
+      throw new HttpError(400, "INVALID_ARGUMENT", "Enter the balance as a whole number of cents; an overdraft can be negative.", { fieldIssues: [{ field: "amount", issue: "signed integer cents required" }] });
+    const asOf = body.asOf;
+    if (!isIsoDate(asOf) || new Date(`${asOf}T00:00:00Z`).toISOString().slice(0, 10) !== asOf || asOf > runInputs(b, deps.now).asOf)
+      throw new HttpError(400, "INVALID_ARGUMENT", "Choose a valid balance date on or before today.", { fieldIssues: [{ field: "asOf", issue: "valid date, not in the future" }] });
+    const account = body.account === undefined ? "main" : typeof body.account === "string" ? body.account.trim() : "";
+    if (!account || account.length > 64 || (typeof body.account === "string" && /[\u0000-\u001f\u007f]/.test(body.account)))
+      throw new HttpError(400, "INVALID_ARGUMENT", "Use an account name of 1 to 64 characters, without line breaks.", { fieldIssues: [{ field: "account", issue: "1 to 64 printable characters" }] });
+    const key = createHash("sha256").update(`${account}\0${asOf}`).digest("hex").slice(0, 24);
+    const { records } = await storeFor(req).load(b.id);
+    if (records.balances.some((balance) => balance.account === account && balance.currency !== b.profile.baseCurrency))
+      throw new HttpError(422, "INVALID_ARGUMENT", "That account uses another currency. Choose an account in your business currency.", { fieldIssues: [{ field: "account", issue: "account currency must match the business" }] });
+    // Correct an imported snapshot in place so equal-date balances cannot compete in the forecast.
+    const id = records.balances.find((balance) => balance.account === account && balance.asOf === asOf && balance.currency === b.profile.baseCurrency)?.id ?? `balance-owner-${key}`;
+    const balance: BalanceSnapshot = { id, account, amount: body.amount, currency: b.profile.baseCurrency, asOf, sourceRef: { system: "owner", record: id } };
+    const storeRevision = await storeFor(req).upsertRecords(b.id, { balances: [balance] });
+    const latest = await storeFor(req).load(b.id);
+    await refreshPending(storeFor(req), b.id, latest.records, latest.storeRevision, nowIso());
+    return { balance, storeRevision };
+  });
 
   // ---- owner notes -----------------------------------------------------------------------
   const view = async (req: FastifyRequest, b: Business, thoughts: Thought[]) => {
