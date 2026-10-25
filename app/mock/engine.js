@@ -660,8 +660,10 @@ export function createEngine(fixture) {
     return fixture.parties.find((p) => p.name.toLowerCase().includes(t) || t.includes(p.name.toLowerCase().split(" ")[0]));
   }
 
-  function record(id) {
-    const c = commitmentById(id);
+  // A commitment id, or an event id (week-sheet links).
+  function record(ref) {
+    const id = commitmentById(ref) ? ref : forecast().events.find((e) => e.id === ref)?.commitmentId;
+    const c = id ? commitmentById(id) : undefined;
     if (!c) return null;
     const ev = forecast().events.filter((e) => e.commitmentId === id);
     return {

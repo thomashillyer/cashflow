@@ -157,6 +157,42 @@ describe("routes return what app/api.js expects", () => {
     expect((await app.inject({ method: "GET", url: "/records/nope", headers: OTHER })).statusCode).toBe(404);
   });
 
+  it("GET /records/:id resolves event ids, profile recurring items, daily sales and bank lines (Ask cites, week sheet)", async () => {
+    const get = async (id: string, business = "cascade_trade") =>
+      (await app.inject({ method: "GET", url: `/records/${encodeURIComponent(id)}`, headers: { ...OTHER, "x-neri-business": business } })).json();
+    const evt = await get("evt-inv-INV-1187-0");
+    expect(evt).toMatchObject({ source: "commitment", eventId: "evt-inv-INV-1187-0", commitment: { id: "inv-INV-1187" } });
+    expect(evt.party).toBeTruthy();
+    expect(evt.events.map((e: { id: string }) => e.id)).toContain("evt-inv-INV-1187-0");
+
+    const payroll = (await get("rec-payroll"));
+    expect(payroll).toMatchObject({ source: "profile_recurring", eventId: null, commitment: { id: "rec-payroll", type: "recurring", sourceRef: { system: "profile" } } });
+    expect(payroll.events.length).toBeGreaterThan(0);
+    const leg = payroll.events[0].id;
+    expect(await get(leg)).toMatchObject({ source: "profile_recurring", eventId: leg, commitment: { id: "rec-payroll" } });
+
+    const run = (await app.inject({ method: "GET", url: "/forecast", headers: { ...OTHER, "x-neri-business": "pike_noodle" } })).json();
+    const sale = run.events.find((e: { commitmentId?: string }) => e.commitmentId === "daily-sales");
+    const ds = await get(sale.id, "pike_noodle");
+    expect(ds).toMatchObject({ source: "daily_sales", eventId: sale.id, events: [{ id: sale.id }] });
+    expect(ds.basedOn.length).toBeGreaterThan(0);
+    expect(await get("bank-sales-2026-10-19", "pike_noodle")).toMatchObject({ source: "actual", commitment: { status: "actual", sourceRef: { system: "bank_csv" } } });
+    expect((await app.inject({ method: "GET", url: "/records/evt-nope-0", headers: OTHER })).statusCode).toBe(404);
+  });
+
+  it("owner-facing dates read like 'Dec 25', not ISO", async () => {
+    const iso = /\d{4}-\d{2}-\d{2}/;
+    for (const business of ["cascade_trade", "pike_noodle"]) {
+      const brief = (await app.inject({ method: "GET", url: "/brief", headers: { ...OTHER, "x-neri-business": business } })).json();
+      if (brief.shortfall) expect(brief.shortfall.title).not.toMatch(iso);
+    }
+    const [item] = (await app.inject({ method: "GET", url: "/review", headers: OTHER })).json();
+    expect(item.message.from).not.toMatch(/\.txt$/);
+    const { alert } = (await app.inject({ method: "POST", url: `/signals/${item.signal.id}/apply`, headers: OTHER })).json();
+    expect(alert.title).not.toMatch(iso);
+    expect(alert.detail).not.toMatch(iso);
+  });
+
   it("PUT /profile with a partial body updates the safety line only", async () => {
     const res = await app.inject({ method: "PUT", url: "/profile", headers: OTHER, payload: { safetyLine: { kind: "fixed", amount: 5000000 } } });
     expect(res.statusCode).toBe(200);
