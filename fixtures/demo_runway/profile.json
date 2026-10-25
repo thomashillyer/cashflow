@@ -1,0 +1,44 @@
+{
+  "id": "demo_runway",
+  "displayName": "Demo runway (hand-calculated)",
+  "baseCurrency": "USD",
+  "horizonWeeks": 13,
+  "freeCashLookaheadWeeks": 6,
+  "defaultLagDays": 0,
+  "lagShrinkageK": 3,
+  "safetyLine": {
+    "kind": "fixed",
+    "amount": 500000
+  },
+  "paymentPatterns": [],
+  "revenueModel": {
+    "kind": "deals"
+  },
+  "recurring": [
+    {
+      "id": "rec-payroll",
+      "name": "Payroll",
+      "amount": 1800000,
+      "cadence": "monthly",
+      "anchor": "2026-11-01",
+      "endDate": "2026-11-01",
+      "category": "payroll",
+      "nonDeferrable": true
+    }
+  ],
+  "thresholds": {
+    "signalAutoApplyConfidence": 0.85,
+    "rankFloor": 0.1,
+    "relationshipPenalty": {},
+    "staleAfterHours": 72,
+    "stressDelayDays": 7
+  },
+  "actionLeadDays": {
+    "chase": 3,
+    "defer": 3
+  },
+  "signalSources": [
+    "owner"
+  ],
+  "vocabulary": {}
+}

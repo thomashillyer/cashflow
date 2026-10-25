@@ -1,0 +1,78 @@
+{
+  "key": "538bd086e7a0d094b6ae8a990cfbddc73cffd75a80b0367c2232ddd71ab632cc",
+  "promptVersion": "extract_document@1",
+  "model": "claude-opus-5-5",
+  "source": "live",
+  "output": {
+    "kind": "bill",
+    "businessRole": "buyer",
+    "fields": {
+      "sellerName": {
+        "value": "NINGBO PACK CO., LTD.",
+        "quote": "NINGBO PACK CO., LTD."
+      },
+      "buyerName": {
+        "value": "Cascade Trade Co.",
+        "quote": "Buyer: Cascade Trade Co., Kent, WA, USA"
+      },
+      "reference": {
+        "value": "0042",
+        "quote": "COMMERCIAL INVOICE No. 0042"
+      },
+      "poReference": {
+        "value": null,
+        "quote": null
+      },
+      "amount": {
+        "value": "6,200.00",
+        "quote": "TOTAL (USD) 6,200.00"
+      },
+      "outstanding": {
+        "value": null,
+        "quote": null
+      },
+      "currency": {
+        "value": "USD",
+        "quote": "TOTAL (USD) 6,200.00"
+      },
+      "issueDate": {
+        "value": "November 18, 2026",
+        "quote": "Date: November 18, 2026"
+      },
+      "dueDate": {
+        "value": "December 18, 2026",
+        "quote": "Payment due: December 18, 2026 (100% before shipment)"
+      },
+      "terms": {
+        "value": "100% before shipment",
+        "quote": "Payment due: December 18, 2026 (100% before shipment)"
+      },
+      "invoiceUrl": {
+        "value": null,
+        "quote": null
+      },
+      "paymentUrl": {
+        "value": null,
+        "quote": null
+      },
+      "statedStatus": {
+        "value": null,
+        "quote": null
+      },
+      "paidAmount": {
+        "value": null,
+        "quote": null
+      },
+      "paidDate": {
+        "value": null,
+        "quote": null
+      }
+    },
+    "coversReferences": [],
+    "containsInstructions": false,
+    "confidence": 0.95,
+    "notes": [
+      "Supplier invoice from Ningbo Pack Co., Ltd. billed to Cascade Trade Co.; payment is required in full before shipment."
+    ]
+  }
+}

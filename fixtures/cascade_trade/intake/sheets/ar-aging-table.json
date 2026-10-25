@@ -1,0 +1,16 @@
+{
+  "evidenceId": "ev-xlsx-ar-aging",
+  "sheet": "AR Aging",
+  "rows": [
+    ["Cascade Trade Co. - AR aging", null, null, null, null, null, null],
+    ["As of 2026-10-25", null, null, null, null, null, null],
+    [null, null, null, null, null, null, null],
+    ["Invoice #", "Customer", "Invoice Date", "Due Date", "Currency", "Amount", "Balance Due"],
+    ["INV-1187", "Evergreen Home", "2026-11-10", "2026-12-10", "USD", "28,000.00", 28000],
+    ["INV-104", "Puget Market", "2026-09-30", "2026-10-30", "USD", 12000, 12000],
+    ["INV-1203", "Harbor and Hearth", "2026-10-12", "2026-11-11", "USD", 4000, 4000],
+    ["INV-1190", "Puget Market", "2026-10-05", "2026-11-04", "USD", 6200.5, 6200.5],
+    [null, null, null, null, null, null, null],
+    ["Total", null, null, null, null, 50200.5, 50200.5]
+  ]
+}

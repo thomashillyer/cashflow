@@ -1,0 +1,21 @@
+{
+  "evidenceId": "ev-xlsx-single-invoice",
+  "sheet": "Invoice",
+  "rows": [
+    ["INVOICE", null, null, null, null],
+    ["Cascade Trade Co.", null, null, null, null],
+    [null, null, null, null, null],
+    ["Invoice #", "INV-1204", null, "Invoice date", "2026-10-20"],
+    ["Bill to", "Harbor and Hearth", null, "Due date", "2026-11-19"],
+    ["PO #", "HH-PO-552", null, "Terms", "Net 30"],
+    [null, null, null, null, null],
+    ["Description", "Qty", "Unit price", "Amount", null],
+    ["Hand-glazed mug set", 400, 30, 12000, null],
+    ["Linen napkins", 300, 30, 9000, null],
+    ["Candle holders", 290, 30, 8700, null],
+    [null, null, null, null, null],
+    [null, null, "Subtotal", 29700, null],
+    [null, null, "Freight", 1500, null],
+    [null, null, "Total due", "USD 31,200.00", null]
+  ]
+}

@@ -61,11 +61,11 @@ The engine-and-warnings lane is split so five people each own one area:
 
 | Person | Lane | Owns |
 |---|---|---|
-| 1 | Data and adapters | `adapters/`, Evidence storage, masking, `fixtures/*/records.json` |
-| 2 | Engine | `engine/expand`, `lag`, `forecast`, `simulate` + golden tests |
-| 3 | App | `app/`, `api/` routes, Review screen, onboarding/profile editor |
-| 4 | AI (Claude) | `ai/`: signal/document extraction, reconciliation proposals, brief text, Ask Neri, drafts |
-| 5 | Warnings, integration, demo | `engine/warnings`, `rank`, end-to-end wiring, deploy, demo script, submission |
+| Niru (1) | Data and adapters | `adapters/`, Evidence storage, masking, `fixtures/*/records.json` |
+| Thomas (2) | Engine | `engine/expand`, `lag`, `forecast`, `simulate` + golden tests |
+| SilverBeck (3) | App | `app/`, `api/` routes, Review screen, onboarding/profile editor |
+| Andras (4) | AI (Claude) | `ai/`: signal/document extraction, reconciliation proposals, brief text, Ask Neri, drafts |
+| Kiana (5) | Warnings, integration, demo | `engine/warnings`, `rank`, end-to-end wiring, deploy, demo script, submission |
 
 The task lists in `tasks/` came from the earlier plan; their checklists still apply where they match these lanes.
 

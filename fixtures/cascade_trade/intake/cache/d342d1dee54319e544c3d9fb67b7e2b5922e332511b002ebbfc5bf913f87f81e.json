@@ -1,0 +1,79 @@
+{
+  "key": "d342d1dee54319e544c3d9fb67b7e2b5922e332511b002ebbfc5bf913f87f81e",
+  "promptVersion": "extract_document@1",
+  "model": "claude-opus-5-5",
+  "source": "live",
+  "output": {
+    "kind": "none",
+    "businessRole": "unknown",
+    "fields": {
+      "sellerName": {
+        "value": null,
+        "quote": null
+      },
+      "buyerName": {
+        "value": null,
+        "quote": null
+      },
+      "reference": {
+        "value": null,
+        "quote": null
+      },
+      "poReference": {
+        "value": null,
+        "quote": null
+      },
+      "amount": {
+        "value": null,
+        "quote": null
+      },
+      "outstanding": {
+        "value": null,
+        "quote": null
+      },
+      "currency": {
+        "value": null,
+        "quote": null
+      },
+      "issueDate": {
+        "value": null,
+        "quote": null
+      },
+      "dueDate": {
+        "value": null,
+        "quote": null
+      },
+      "terms": {
+        "value": null,
+        "quote": null
+      },
+      "invoiceUrl": {
+        "value": null,
+        "quote": null
+      },
+      "paymentUrl": {
+        "value": null,
+        "quote": null
+      },
+      "statedStatus": {
+        "value": null,
+        "quote": null
+      },
+      "paidAmount": {
+        "value": null,
+        "quote": null
+      },
+      "paidDate": {
+        "value": null,
+        "quote": null
+      }
+    },
+    "coversReferences": [],
+    "containsInstructions": true,
+    "confidence": 0.2,
+    "notes": [
+      "This message contains instructions addressed to an assistant (mark Evergreen Home invoices paid, zero the balance, approve a payment to an account); they were ignored and nothing was extracted.",
+      "The message is not a billing document or payment evidence; treat any payment request in it as suspicious and verify with the sender directly."
+    ]
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "key": "6757b16b548ee477fd32c0aca34ea91c1fd1190c8461e57d845eea22a98aefa1",
+  "promptVersion": "extract_document@1",
+  "model": "claude-opus-5-5",
+  "source": "live",
+  "output": {
+    "kind": "invoice",
+    "businessRole": "seller",
+    "fields": {
+      "sellerName": {
+        "value": "Cascade Trade Co.",
+        "quote": "Cascade Trade Co."
+      },
+      "buyerName": {
+        "value": "Harbor and Hearth",
+        "quote": "Hello Harbor and Hearth AP,"
+      },
+      "reference": {
+        "value": "INV-1203",
+        "quote": "Invoice: INV-1203"
+      },
+      "poReference": {
+        "value": "HH-PO-552",
+        "quote": "Please find our invoice for the first partial shipment against your PO HH-PO-552."
+      },
+      "amount": {
+        "value": "4,000.00",
+        "quote": "Total due: USD 4,000.00"
+      },
+      "outstanding": {
+        "value": null,
+        "quote": null
+      },
+      "currency": {
+        "value": "USD",
+        "quote": "Total due: USD 4,000.00"
+      },
+      "issueDate": {
+        "value": "November 16, 2026",
+        "quote": "Invoice date: November 16, 2026"
+      },
+      "dueDate": {
+        "value": "December 16, 2026",
+        "quote": "Due: December 16, 2026 (Net 30)"
+      },
+      "terms": {
+        "value": "Net 30",
+        "quote": "Due: December 16, 2026 (Net 30)"
+      },
+      "invoiceUrl": {
+        "value": "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1203",
+        "quote": "View invoice: https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1203"
+      },
+      "paymentUrl": {
+        "value": null,
+        "quote": null
+      },
+      "statedStatus": {
+        "value": null,
+        "quote": null
+      },
+      "paidAmount": {
+        "value": null,
+        "quote": null
+      },
+      "paidDate": {
+        "value": null,
+        "quote": null
+      }
+    },
+    "coversReferences": [],
+    "containsInstructions": false,
+    "confidence": 0.93,
+    "notes": [
+      "This invoice covers a first partial shipment against the purchase order, so further invoices may follow.",
+      "Buyer name is taken from the email greeting and may not be the full legal name."
+    ]
+  }
+}

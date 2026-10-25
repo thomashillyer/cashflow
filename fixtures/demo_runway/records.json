@@ -1,0 +1,93 @@
+{
+  "parties": [
+    {
+      "id": "party-supplier",
+      "name": "Demo Supplier",
+      "kind": "supplier",
+      "tags": [],
+      "notes": []
+    },
+    {
+      "id": "party-customer",
+      "name": "Demo Customer",
+      "kind": "customer",
+      "tags": [],
+      "notes": []
+    }
+  ],
+  "commitments": [
+    {
+      "id": "bill-supplier",
+      "type": "bill",
+      "direction": "out",
+      "reference": "BILL-1",
+      "partyId": "party-supplier",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-10-29"
+      },
+      "status": "committed",
+      "outstanding": 2000000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "BILL-1"
+      }
+    },
+    {
+      "id": "inv-INV-104",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "INV-104",
+      "partyId": "party-customer",
+      "amount": 1200000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-10-30"
+      },
+      "status": "committed",
+      "outstanding": 1200000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-104"
+      }
+    },
+    {
+      "id": "loan",
+      "type": "plan",
+      "direction": "in",
+      "category": "funding",
+      "funding": true,
+      "amount": 4000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-10-30"
+      },
+      "status": "likely",
+      "sourceRef": {
+        "system": "owner",
+        "record": "loan-note"
+      }
+    }
+  ],
+  "events": [],
+  "signals": [],
+  "rules": [],
+  "settlements": [],
+  "balances": [
+    {
+      "id": "bal-demo",
+      "account": "operating",
+      "amount": 1500000,
+      "currency": "USD",
+      "asOf": "2026-10-25",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "bal-demo"
+      }
+    }
+  ],
+  "evidence": []
+}

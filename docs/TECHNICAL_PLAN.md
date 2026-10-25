@@ -40,12 +40,12 @@ Follow the existing [repo/lane contract](design/09-api-repo-lanes.md). Do not in
 | Area | Implementation decision |
 |---|---|
 | Language and contracts | Strict TypeScript. `schema/records.ts` implements the six core records and supporting types from [03](design/03-data-model.md). Add Zod runtime schemas alongside it; every lane imports them. |
-| Application | One Node application serving `api/` and `app/`. Reuse the working Node/Supabase/HTML prototype only if the owner confirms event eligibility and availability. Fresh-build default: a small Fastify API serving a static HTML/CSS/TypeScript app, with Vite only for browser bundling. |
-| Store | One `Store` interface. Fresh-build default: SQLite through `better-sqlite3`, prepared SQL, migrations, foreign keys, WAL, bounded busy timeout. If reusing a working Supabase store, implement that interface there instead; never maintain both stores during the sprint. |
+| Application | One Node application serving `api/` and `app/`. Node/Supabase/HTML stack, matching the existing Neri prototype. Default: a small Fastify API serving a static HTML/CSS/TypeScript app, with Vite only for browser bundling. |
+| Store | One `Store` interface, implemented on Supabase (Postgres) through the typed client in `db/`. The schema lives in `supabase/migrations/` and mirrors `schema/records.ts`; use foreign keys, constraints, and new migration files for every change (never edit an applied migration). Local development uses `npx supabase start`; the shared hosted project is the demo store. Do not maintain a second store. |
 | Parsing | `csv-parse` for CSV, ExcelJS for XLSX, PDF.js for embedded PDF text. Preserve row/sheet/page locations. Thin PDF/XLSX intake is required; long-tail formats and generic layout learning beyond pilot examples are stretch. |
 | AI | Official Anthropic TypeScript SDK with schema-constrained outputs for record candidates. Current accessible model IDs live in server configuration. Validate responses in application code too. |
 | Verification | Vitest for pure engine/golden and store tests; one Playwright end-to-end flow once the app exists. |
-| Deployment | One long-running Node service. A SQLite deployment needs writable persistent disk and one service instance. A reused Supabase deployment uses its existing database. |
+| Deployment | One long-running Node service backed by the shared Supabase project. Apply migrations (`npx supabase db push`) before the service reports ready. No local disk state is required. |
 
 Pin compatible versions and one lockfile at kickoff. None of these packages are installed by this document. Verify production build, database writes, a representative parse, and model access before building against untested SDK assumptions. The prototype/hosting decisions are concrete kickoff dependencies, not claims that code or accounts were inspected.
 
@@ -61,7 +61,7 @@ fixtures/       cascade_trade/, pike_noodle/, expected/
 data/private/   private local sources; never committed
 ```
 
-Reference implementations/docs: [better-sqlite3](https://github.com/WiseLibs/better-sqlite3), [CSV Parse](https://csv.js.org/parse/), [ExcelJS](https://github.com/exceljs/exceljs), [PDF.js Node example](https://github.com/mozilla/pdf.js/blob/master/examples/node/getinfo.mjs), and [Claude structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs). Framework/store choice must preserve the shared contracts below.
+Reference implementations/docs: [Supabase docs](https://supabase.com/docs), [CSV Parse](https://csv.js.org/parse/), [ExcelJS](https://github.com/exceljs/exceljs), [PDF.js Node example](https://github.com/mozilla/pdf.js/blob/master/examples/node/getinfo.mjs), and [Claude structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs). Framework/store choice must preserve the shared contracts below.
 
 ## 3. Shared contracts and invariants
 
@@ -110,7 +110,7 @@ One table/collection per accepted core record type, plus the operational state b
 | `work_item_state` / `reminders` | Stable subject/check/lever identity, state, next follow-up, scheduled reminder, latest computed impact. |
 | `mutations` / `audit_log` | Idempotency key/request digest/result, before/after fields, evidence, actor/session and time. |
 
-`Store` must expose snapshot reads and an atomic confirmation operation. SQLite uses one short transaction; a Supabase implementation needs an equivalent database transaction/RPC rather than multiple independent HTTP writes. Network/model calls occur outside transactions.
+`Store` must expose snapshot reads and an atomic confirmation operation. Supabase confirmation runs as one Postgres transaction through an RPC function, never as multiple independent HTTP writes. Network/model calls occur outside transactions.
 
 Confirmation algorithm:
 
@@ -216,9 +216,9 @@ Person 3 owns API route implementation and app integration; person 5 coordinates
 
 Public preview/video/repo use synthetic datasets. A per-session signed random cookie isolates synthetic business state; every route enforces that scope. Public intake accepts registered synthetic fixture IDs and bounded simulated changes, not private file/URL/mailbox inputs or live pilot credentials. Real pilot adapters run in a separate loopback-only environment. Masking names alone does not make private financial amounts safe to publish.
 
-Keep server configuration in `.env`: mode, data directory or existing Supabase configuration, session secret, accessible model IDs/API key, and verified connector settings. Check in placeholders only. No new credentials are created by this plan. Private data sent to a model/provider requires the owner's authorization; public synthetic fixtures avoid that dependency.
+Keep server configuration in `.env`: mode, Supabase URL and keys (service-role key server-side only), session secret, accessible model IDs/API key, and verified connector settings. Check in placeholders only. No new credentials are created by this plan. Private data sent to a model/provider requires the owner's authorization; public synthetic fixtures avoid that dependency.
 
-With SQLite, use one service instance and persistent disk. Apply migrations before readiness; keep DB locks short and make consistent backups/reset snapshots. Do not copy a live SQLite file without its WAL state. Hosted pilot authentication, distributed workers, and horizontal scaling are post-hackathon work.
+Apply migrations before readiness; keep transactions short, and use `npx supabase db reset` locally and a documented snapshot or reset for the hosted demo project. Hosted pilot authentication, distributed workers, and horizontal scaling are post-hackathon work.
 
 Trace request ID, adapter, input hash/revision, counts, rule version, latency and error code; keep raw messages, files, tokens and real figures out of logs. Expose stale/incomplete source state to the owner. Probe the actual host's build/native dependencies, persistence and timeout limits before relying on it for the demo.
 
@@ -245,11 +245,11 @@ Proposed CI after scaffolding: locked install → TypeScript check → unit/stor
 
 | Person | Owns | First artifact and integration handoff |
 |---|---|---|
-| [1](../tasks/01-data-and-source-adapters.md) | `adapters/`, Evidence capture, masking, fixture records | Sample source bundle, mapped records/candidates and payment history; hand to AI/reconciliation and engine |
-| [2](../tasks/02-cashflow-engine.md) | `engine/expand`, `lag`, `forecast`, `simulate` | Profile + Records → ForecastRun/impact on both fixtures; hand to warnings, AI tools and App |
-| [3](../tasks/03-product-ui-and-onboarding.md) | `app/`, `api/` routes, Review/profile editor | Fixture-backed endpoints/screens, atomic confirm wiring and projection bundle consumption |
-| [4](../tasks/04-document-understanding-and-reconciliation.md) | `ai/`, candidate extraction/match proposals, brief, Ask Neri, drafts | Candidate/Signal/Rule proposals with evidence; validated explanations from tools only |
-| [5](../tasks/05-actions-integration-and-demo.md) | `engine/warnings`, `rank`, store/integration coordination, deployment/demo | Stable WorkItems, run revision/transaction infrastructure, deployed end-to-end loop |
+| [Niru (1)](../tasks/01-data-and-source-adapters.md) | `adapters/`, Evidence capture, masking, fixture records | Sample source bundle, mapped records/candidates and payment history; hand to AI/reconciliation and engine |
+| [Thomas (2)](../tasks/02-cashflow-engine.md) | `engine/expand`, `lag`, `forecast`, `simulate` | Profile + Records → ForecastRun/impact on both fixtures; hand to warnings, AI tools and App |
+| [SilverBeck (3)](../tasks/03-product-ui-and-onboarding.md) | `app/`, `api/` routes, Review/profile editor | Fixture-backed endpoints/screens, atomic confirm wiring and projection bundle consumption |
+| [Andras (4)](../tasks/04-document-understanding-and-reconciliation.md) | `ai/`, candidate extraction/match proposals, brief, Ask Neri, drafts | Candidate/Signal/Rule proposals with evidence; validated explanations from tools only |
+| [Kiana (5)](../tasks/05-actions-integration-and-demo.md) | `engine/warnings`, `rank`, store/integration coordination, deployment/demo | Stable WorkItems, run revision/transaction infrastructure, deployed end-to-end loop |
 
 Use [the committed event schedule](design/11-plan-demo-risks.md), not a new seven-hour clock starting when this document is read. Its listed deadline is 5:30 pm Pacific on October 25; external event timing was not independently reverified for this document. Preserve its integration and feature-freeze checkpoints; adjust remaining work with the team if a checkpoint is already past.
 

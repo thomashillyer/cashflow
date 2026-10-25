@@ -1,6 +1,6 @@
 # Person 1: Data and source adapters
 
-Owner: unassigned. Claim this role in [tracking issue #1](https://github.com/thomashillyer/cashflow/issues/1).
+Owner: Niru. Track progress in [tracking issue #1](https://github.com/thomashillyer/cashflow/issues/1).
 
 ## Outcome
 
