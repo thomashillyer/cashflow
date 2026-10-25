@@ -106,7 +106,7 @@ Every number the engine uses that depends on the business reads from the profile
 | `affordabilityStep` | Grid step of the "smallest upfront share" search for a deal | 0.05 |
 | `urgencyScaleDays` | Ranking decay: `score = value / (1 + daysUntilNeeded / urgencyScaleDays) × confidence × relationship` | 7 |
 
-Kept as engine constants (math, not business choices): `actual` confidence 1 and owner-rule lag confidence 1, median and quartiles (0.25/0.75) in the lag model, round-half-up of lag days, the basis-point grid of the affordability search, and the three items of "three things to do today". `restaurant.json` shows `salesHistoryDays` and `dailySalesConfidence` explicitly; the other templates use the defaults.
+Kept as engine constants (math, not business choices): `actual` confidence 1 and owner-rule lag confidence 1, median and quartiles (0.25/0.75) in the lag model, round-half-up of lag days, the basis-point grid of the affordability search, and the three items of "three things to do today". `restaurant.json` shows `salesHistoryDays` and `dailySalesConfidence` explicitly. `agency.json` adds `order` to `lag.laggedAnchors`: both `milestones_50_50` legs are client invoices on net-60 terms (the first billed at order, the second at delivery), so both wait on the client and get the client's lag. `trading.json` and `contractor.json` keep the default list, because their order-day legs are upfront deposits paid before work starts. The other fields use the defaults.
 
 ## Starter templates to ship
 
