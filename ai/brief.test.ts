@@ -597,7 +597,7 @@ describe("wording: tense, needed-by, lowest point, currency (P4.18)", () => {
   it("the committed stand-ins are marked as stand-ins and are cache hits for the current prompts", () => {
     const files = readdirSync(BRIEF_CACHE_DIR);
     expect(files).toHaveLength(6);
-    for (const f of files) expect(JSON.parse(readFileSync(join(BRIEF_CACHE_DIR, f), "utf8")).source).toMatch(/^(stand-in|live)$/);
+    for (const f of files) expect(JSON.parse(readFileSync(join(BRIEF_CACHE_DIR, f), "utf8")).source).toMatch(/^(stand-in|live|live-edited)$/);
     for (const it of fx.items) {
       expect(readCache(BRIEF_CACHE_DIR, briefCacheKey(it, fx))).toBeDefined();
       expect(readCache(BRIEF_CACHE_DIR, draftCacheKey(it, fx))).toBeDefined();
