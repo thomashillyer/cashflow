@@ -8,7 +8,7 @@ import type { Profile } from "../../schema/profile";
 import type { Records } from "../../schema/records";
 import { INTENT_STANDINS } from "../../scripts/intent-standins";
 import { INTENT_CACHE_DIR, readCache, writeCache } from "../cache";
-import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../config";
+import { ASK_LIVE_MODEL, INTENT_MODEL, INTENT_PROMPT_VERSION } from "../config";
 import {
   askDraftId, draftCadence, intentAssumptions, intentCacheKey, intentContent, intentSystemPrompt, readAmountPhrase, readIntent,
   resolveAskDate, resolveAskWindow, resolveIntent, sanitizeRaw, type ReadIntentContext,
@@ -382,13 +382,13 @@ describe("the model call", () => {
     const i = await readIntent(question, { records, profile, asOf, mode: "live", client, cacheDir: dir });
     expect(i.draft?.amount).toBe(4_000_000);
     expect(requests).toHaveLength(1);
-    expect(requests[0].model).toBe(INTENT_MODEL);
+    expect(requests[0].model).toBe(ASK_LIVE_MODEL);
     expect(requests[0].messages[0].content).toBe(`<question>\n${question}\n</question>`);
     expect(requests[0].system[0].text).toBe(intentSystemPrompt());
     expect(requests[0].output_config.format.type).toBe("json_schema");
     expect(requests[0].tools).toBeUndefined();
-    const entry = readCache(dir, intentCacheKey(question));
-    expect(entry).toMatchObject({ source: "live", promptVersion: INTENT_PROMPT_VERSION, model: INTENT_MODEL, output: raw });
+    const entry = readCache(dir, intentCacheKey(question, ASK_LIVE_MODEL));
+    expect(entry).toMatchObject({ source: "live", promptVersion: INTENT_PROMPT_VERSION, model: ASK_LIVE_MODEL, output: raw });
 
     const again = await readIntent(question, { records, profile, asOf, mode: "live", client, cacheDir: dir });
     expect(again).toEqual(i);

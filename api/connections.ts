@@ -22,7 +22,7 @@ export type ConnectionStatus = {
 export type ConnectionList = { connections: ConnectionStatus[] };
 export type ConnectionSyncResult = {
   connection: ConnectionStatus;
-  counts: { parties: number; commitments: number; settlements: number; evidence: number; rejected: number; proposals?: number; signals?: number; messages?: number; duplicates?: number; failed?: number };
+  counts: { parties: number; commitments: number; settlements: number; evidence: number; rejected: number; balances?: number; proposals?: number; signals?: number; messages?: number; duplicates?: number; failed?: number };
   summary?: PersistSummary;
   storeRevision: number;
 };
@@ -112,6 +112,15 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
       }
       const data = result.data;
       const summary = await persistImport(store, b.id, data);
+      // The Books adapter may also return actual bank balances. Keep repeats revision-neutral,
+      // and leave saved opening cash untouched when Banking permission returned no balances.
+      const balances = data.balances.filter((next) => !records.balances.some((old) => old.id === next.id
+        && old.account === next.account && old.amount === next.amount && old.currency === next.currency && old.asOf === next.asOf
+        && old.sourceRef.system === next.sourceRef.system && old.sourceRef.record === next.sourceRef.record));
+      if (balances.length) {
+        summary.storeRevision = await store.upsertRecords(b.id, { balances });
+        summary.written = true;
+      }
       if (summary.written) {
         const latest = await store.load(b.id);
         await refreshPending(store, b.id, latest.records, latest.storeRevision, at);
@@ -129,7 +138,7 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
       errorMessage = undefined;
       return {
         connection: { ...identity, available: true, state: "ok", lastSyncedAt: at },
-        counts: { parties: data.parties.length, commitments: data.commitments.length, settlements: data.settlements.length, evidence: data.evidence.length, rejected: data.diagnostics.rowsRejected },
+        counts: { parties: data.parties.length, commitments: data.commitments.length, settlements: data.settlements.length, evidence: data.evidence.length, rejected: data.diagnostics.rowsRejected, balances: data.balances.length },
         summary, storeRevision: summary.storeRevision,
       };
     } catch (error) {
@@ -227,7 +236,8 @@ export function buildConnectionService(env: NodeJS.ProcessEnv, options: Connecti
           const out = await read(input, { records, storeRevision, business: { name: b.name, aliases: b.profile.account?.aliases }, mode: options.aiMode ?? "cache_only", now: at,
             ...(b.profile.account?.timezone ? { timeZone: b.profile.account.timezone } : {}) });
           const prior = new Map((await store.listProposals(b.id)).map((p) => [p.id, p]));
-          const proposals = out.proposals.filter((p) => !prior.has(p.id)).map((p) => ({ ...p, state: "proposed" as const }));
+          const proposals = out.proposals.filter((p) => prior.get(p.id)?.state !== "confirmed" && prior.get(p.id)?.state !== "dismissed")
+            .map((p) => ({ ...p, state: "proposed" as const }));
           const known = new Set(records.signals.map((s) => s.id));
           const signals = out.signals.filter((s) => !known.has(s.id)).map((s) => ({ ...s, state: "proposed" as const }));
           const incomplete = out.candidates.some((c) => c.extraction !== "ok") || out.evidence.some((e) => e.extraction === "partial" || e.extraction === "unreadable" || e.extraction === "unsupported")

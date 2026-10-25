@@ -72,8 +72,21 @@ describe("production uses the owner's data", () => {
     const parkNote = vi.fn();
     await screen(`render = () => {}; refresh = async () => {}; toast = () => {};
       onSubmit({ target: { closest: () => ({ dataset: { submit: 'bank-balance' }, values: { amount: '-123.45', asOf: '2026-10-25' } }) }, preventDefault() {} })`, { api: { setBalance, parkNote } });
-    expect(setBalance).toHaveBeenCalledWith(-12345, "2026-10-25");
+    expect(setBalance).toHaveBeenCalledWith(-12345, "2026-10-25", "main");
     expect(parkNote).not.toHaveBeenCalled();
+  });
+
+  it("updates existing accounts explicitly without offering a second default main account", async () => {
+    const html = screen(`app.ctx.profile.baseCurrency = 'USD'; app.ctx.balanceAccounts = [{account:'operating',currency:'USD',asOf:'2026-10-24'}, {account:'savings',currency:'USD',asOf:'2026-10-24'}]; viewSources()`);
+    expect(html).toContain("Update your bank balance");
+    expect(html).toContain('name="account" required');
+    expect(html).toContain('value="operating"');
+    expect(html).toContain('value="savings"');
+    expect(html).not.toContain('name="account" value="main"');
+    const setBalance = vi.fn().mockResolvedValue({});
+    await screen(`app.ctx.profile.baseCurrency = 'USD'; app.ctx.balanceAccounts = [{account:'operating',currency:'USD'}]; refresh=async()=>{}; toast=()=>{};
+      onSubmit({target:{closest:()=>({dataset:{submit:'bank-balance'},values:{amount:'99.12',asOf:'2026-10-25',account:'operating'}})},preventDefault(){}})`, {api:{setBalance}});
+    expect(setBalance).toHaveBeenCalledWith(9912, '2026-10-25', 'operating');
   });
 
   it("distinguishes imported records from a waiting setup preference", () => {
@@ -144,6 +157,22 @@ describe("production uses the owner's data", () => {
     expect(reports[0][1]).toContain("1 imported item is waiting for review");
     expect(reports[0][1]).toContain("Two messages could not be interpreted");
     expect(reports[0][0]).not.toBe("Source sync completed");
+  });
+
+  it("shows newly uploaded document proposals in Review without reloading the page", async () => {
+    const pending = { proposal: { id: 'uploaded', action: 'create', ops: [{}], conflicts: [], reasons: [] }, candidate: { fields: { reference: {state:'found',value:'UPLOADED-INV-1'} } }, evidence: [], notes: [] };
+    const api = {
+      uploadFile: vi.fn().mockResolvedValue({}),
+      review: async () => [], notes: async () => [],
+      brief: async () => ({run:baseRun,three:[],rest:[],watch:[]}),
+      context: async () => ({business:{synthetic:false,sources:[]},profile:{baseCurrency:'USD'},parties:[]}),
+      reviewProposals: vi.fn().mockResolvedValue({storeRevision:1,proposals:[pending]}),
+    };
+    const html = await screen(`render=()=>{};toast=()=>{};(async()=>{await sendFiles([{name:'invoice.csv'}]);return viewReview();})()`, {api});
+    expect(api.uploadFile).toHaveBeenCalledTimes(1);
+    expect(api.reviewProposals).toHaveBeenCalledTimes(1);
+    expect(html).toContain('UPLOADED-INV-1');
+    expect(html).toContain('data-id="uploaded" data-d="confirm"');
   });
 
   it("clears sync progress and reports no success when a real sync fails", async () => {

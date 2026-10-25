@@ -37,7 +37,7 @@ export type Account = {
   timezone?: string;
   kind?: string;                       // starter profile the owner picked
   aliases?: string[];                  // other names the business goes by (intake matching)
-  connections?: { id: string; name: string; state: "ok" | "waiting" | "error" }[];
+  connections?: { id: string; name: string; state: "ok" | "waiting" | "error"; message?: string; syncedAt?: string }[];
   ownerUserId?: string;                // Supabase auth user id of the owner (membership fallback)
   asOf?: string;                       // fixed "today" for synthetic samples; real businesses use the clock
   fxRates?: Record<string, number>;
@@ -45,6 +45,8 @@ export type Account = {
   createdAt?: string;
   thoughts?: Thought[];                // owner notes (parked thoughts)
   intakeNotes?: IntakeNote[];          // import notes Review needs (e.g. "owner must confirm the date")
+  maskNames?: boolean;                 // mask party names and contact details in every API response (api/mask.ts)
+  maskAliases?: Record<string, string>; // real name -> stage name; the rest get Customer A, Supplier A, ...
 };
 
 export type StoredProfile = Profile & { account?: Account };

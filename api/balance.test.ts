@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "./app";
 import { MemoryStore } from "./store";
+import { propose } from "../ai/reconcile/match";
+import { candidate, f } from "../ai/reconcile/testkit";
 
 const headers = { authorization: "Bearer owner" };
 const today = "2026-11-16";
@@ -53,6 +55,9 @@ describe("owner-confirmed bank balance", () => {
     expect(saved.records.commitments).toEqual(original.records.commitments);
     expect(saved.records.parties).toEqual(original.records.parties);
     expect((await app.inject({ url: "/forecast", headers })).json().openingBalance).toBe(25000);
+    const context = (await app.inject({ url: "/context", headers })).json();
+    expect(context.balanceAccounts).toEqual([{ account: "Checking", asOf: today, currency: "USD" }]);
+    expect(context.balanceAccounts[0]).not.toHaveProperty("amount");
   });
 
   it("accepts a signed overdraft and takes currency from the business", async () => {
@@ -61,6 +66,15 @@ describe("owner-confirmed bank balance", () => {
     const response = await put({ amount: -250, asOf: today });
     expect(response.statusCode).toBe(200);
     expect(response.json().balance).toMatchObject({ amount: -250, currency: "EUR" });
+  });
+
+  it("corrects an imported snapshot for the same account and date without creating a competing balance", async () => {
+    await store.upsertRecords(businessId, { balances: [{ id: "books-checking", account: "Checking", amount: 10000, currency: "USD", asOf: today, sourceRef: { system: "zoho_books", record: "bank-checking" } }] });
+    const response = await put({ amount: 25000, asOf: today, account: "Checking" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().balance).toMatchObject({ id: "books-checking", amount: 25000, sourceRef: { system: "owner", record: "books-checking" } });
+    expect((await store.load(businessId)).records.balances).toHaveLength(1);
+    expect((await app.inject({ url: "/forecast", headers })).json().openingBalance).toBe(25000);
   });
 
   it.each([
@@ -88,5 +102,27 @@ describe("owner-confirmed bank balance", () => {
     const run = (await app.inject({ url: "/forecast", headers })).json();
     expect(run.openingBalance).toBe(500000);
     expect(run.review).toEqual({ needed: false, reasons: [] });
+  });
+
+  it.each(["balance", "safety line"])("keeps a pending invoice confirmable after the owner updates the %s", async (setting) => {
+    const source = "email-invoice";
+    await store.upsertRecords(businessId, { parties: [{ id: "customer", name: "Customer", kind: "customer", tags: [], notes: [] }] });
+    const invoice = candidate({ id: "pending-invoice", partyId: "customer", evidenceIds: [source], fields: {
+      reference: f("INV-NEW", source), amount: f(10000, source), currency: f("USD", source),
+      buyerName: f("Customer", source), dueDate: f("2026-11-20", source),
+    } });
+    const loaded = await store.load(businessId);
+    const proposal = propose(invoice, loaded.records, { storeRevision: loaded.storeRevision, now: `${today}T17:00:00Z` });
+    expect(proposal.action).toBe("create");
+    await store.saveIntake(businessId, { evidence: [{ id: source, channel: "email", format: "eml", receivedAt: `${today}T17:00:00Z`, extraction: "ok", sourceRef: { system: "email", record: source } }],
+      candidates: [invoice], proposals: [proposal], signals: [] });
+    const response = setting === "balance" ? await put({ amount: 500000, asOf: today })
+      : await app.inject({ method: "PUT", url: "/profile", headers, payload: { safetyLine: { kind: "fixed", amount: 50000 } } });
+    expect(response.statusCode).toBe(200);
+    const current = (await app.inject({ url: "/review/proposals", headers })).json();
+    expect((await store.listProposals(businessId))[0]!.expectedStoreRevision).toBe(current.storeRevision);
+    const confirmed = await app.inject({ method: "POST", url: `/review/${proposal.id}/confirm`, headers, payload: { expectedRevision: current.storeRevision } });
+    expect(confirmed.statusCode).toBe(200);
+    expect((await store.load(businessId)).records.commitments).toHaveLength(1);
   });
 });

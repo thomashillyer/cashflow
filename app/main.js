@@ -139,10 +139,15 @@ function forecastEmpty(run = app.brief.run) {
 }
 
 function bankBalanceForm() {
-  if (!(app.brief.run.review?.reasons ?? []).some((r) => r.code === "no_opening_balance")) return "";
+  const missing = (app.brief.run.review?.reasons ?? []).some((r) => r.code === "no_opening_balance");
+  const accounts = app.ctx.balanceAccounts ?? [];
+  if (!missing && !accounts.length) return ""; // Older servers cannot safely identify the account to correct.
   const currency = app.ctx.profile.baseCurrency ?? "USD";
+  const editable = accounts.filter((a) => a.currency === currency);
+  if (accounts.length && !editable.length) return `<section class="panel" style="max-width:760px;margin-block:24px"><h2>Update your bank balance</h2><p>Upload a new statement to update your foreign-currency bank accounts.</p></section>`;
   return `<form class="panel bank-balance" data-submit="bank-balance" style="max-width:760px;margin-block:24px">
-    <h2>Add your current bank balance</h2>
+    <h2>${accounts.length ? "Update your bank balance" : "Add your current bank balance"}</h2>
+    ${editable.length ? `<label for="bank-account">Bank account</label><select id="bank-account" name="account" required>${editable.length > 1 ? `<option value="">Choose the account to update</option>` : ""}${editable.map((a) => `<option value="${esc(a.account)}">${esc(a.account)} (${esc(a.currency)})</option>`).join("")}</select>` : `<input type="hidden" name="account" value="main" />`}
     <label for="bank-amount">Current bank balance (${esc(currency)})</label>
     <input id="bank-amount" name="amount" inputmode="decimal" placeholder="Enter your actual balance" required />
     <label for="bank-date">Balance date</label>
@@ -1128,6 +1133,7 @@ async function showDraft(itemId) {
     <p class="fineprint">Neri never sends anything for you. You send it, from your own mail.</p>`, { mask: false });
 }
 
+// Apps Neri can read for real today (Sources > Connect). Everything else connects by file until its connector is ready.
 function showConnect(id) {
   const c = CONNECTORS.find((x) => x.id === id);
   if (!c) return;
@@ -1360,7 +1366,7 @@ async function sendFiles(files) {
     }
   }
   if (sent) {
-    app.review = await api.review().catch(() => app.review);
+    await refresh();
     toast(sent === files.length ? `${label} read` : `${sent} of ${files.length} files read`, "Anything that could move your cash is waiting in Review.", "Open Review", () => (location.hash = "#/review"));
     render();
   }
@@ -1783,7 +1789,10 @@ async function onSubmit(ev) {
     const asOf = String(fd.get("asOf") ?? "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) throw new Error("Choose the date shown on your bank balance.");
     if (api.mode !== "live") return toast("Balance not saved", "Open your Neri server to add your real bank balance.");
-    await api.setBalance(amount, asOf);
+    const accounts = app.ctx.balanceAccounts ?? [];
+    const account = String(fd.get("account") ?? (accounts.length ? "" : "main"));
+    if (accounts.length && !accounts.some((a) => a.account === account && a.currency === (app.ctx.profile.baseCurrency ?? "USD"))) throw new Error("Choose one of your bank accounts to update.");
+    await api.setBalance(amount, asOf, account);
     await refresh();
     toast("Bank balance saved", "Your user-entered balance is now part of your source records.");
     return;

@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabase } from "../db/client";
 import { buildApp, type Verifier } from "./app";
 import { loadSamples } from "./demo";
+import { MemoryBlobs, SupabaseBlobs, type Blobs } from "./blobs";
 import { MemoryStore, type Store } from "./store";
 import { SupabaseStore } from "./supabase-store";
 import { isBehind, supabaseSchemaStatus } from "./schema-status";
@@ -33,6 +34,7 @@ async function memoryStore(): Promise<Store> {
 
 const sb = useMemory ? null : getSupabase({ serviceRole: true });
 const store: Store = useMemory ? await memoryStore() : new SupabaseStore(sb!);
+const blobs: Blobs = sb ? new SupabaseBlobs(sb) : new MemoryBlobs();
 // The Dockerfile copies the whole repo, so supabase/migrations is in the image.
 const schemaStatus = sb ? supabaseSchemaStatus(sb, join(import.meta.dirname, "../supabase/migrations")) : undefined;
 
@@ -49,12 +51,16 @@ const verify: Verifier = env.SUPABASE_URL && env.SUPABASE_ANON_KEY
 const aiMode = env.ANTHROPIC_API_KEY && (env.NERI_AI_MODE === "live" || (!demoMode && env.NERI_AI_MODE !== "cache_only")) ? "live" : "cache_only";
 const app = await buildApp({
   store,
+  blobs,
   verify,
   demoMode,
   defaultBusiness: env.NERI_DEFAULT_BUSINESS ?? "cascade_trade",
   // Live Claude only with a key, and never by default on the public demo (anonymous callers could spend it).
   aiMode,
   connections: buildConnectionService(env, { aiMode }),
+  ...(env.ANTHROPIC_API_KEY && env.NERI_ASK_MODE === "live" ? { askMode: "live" as const } : {}),
+  ...(env.NERI_ASK_MODEL?.trim() ? { askModel: env.NERI_ASK_MODEL.trim() } : {}),
+  askLive: { maxPerHour: Number(env.NERI_ASK_LIVE_MAX_PER_HOUR) > 0 ? Number(env.NERI_ASK_LIVE_MAX_PER_HOUR) : 200 },
   staticDir: env.NERI_STATIC_DIR ?? join(import.meta.dirname, "../app"),
   appConfig: { supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY },
   allowReset: demoMode && !production && env.NERI_ALLOW_RESET === "1",

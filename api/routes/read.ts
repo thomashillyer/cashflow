@@ -25,8 +25,18 @@ function sources(b: Business, records: Records) {
   const out = [...counts].map(([id, n]) => ({
     id, label: SOURCE_LABELS[id] ?? id, state: "ok", syncedAt: acc.syncedAt ?? acc.createdAt ?? null, detail: `${n} record${n === 1 ? "" : "s"}`,
   }));
+  // A connection's data shows up under the system name its records carry (CRM deals are "crm", Outlook mail is "email").
+  const SYSTEM_OF: Record<string, string> = { zoho_crm: "crm", m365: "email", outlook: "email" };
+  const present = new Set([...counts.keys(), ...records.evidence.map((e) => e.sourceRef.system)]);
   for (const c of acc.connections ?? []) {
-    if (!counts.has(c.id)) out.push({ id: c.id, label: c.name, state: c.state === "ok" ? "waiting" : c.state, syncedAt: null, detail: "Waiting for the first file or sync" });
+    const system = SYSTEM_OF[c.id] ?? c.id;
+    if (c.state === "error") {
+      out.push({ id: c.id, label: c.name, state: "error", syncedAt: null, detail: c.message ?? "Neri couldn't read this app. Upload a file instead." });
+    } else if (!present.has(system)) {
+      out.push({ id: c.id, label: c.name, state: c.state === "ok" ? "waiting" : c.state, syncedAt: null, detail: "Waiting for the first file or sync" });
+    } else if (system !== c.id && !out.some((o) => o.id === system)) {
+      out.push({ id: system, label: c.name, state: "ok", syncedAt: c.syncedAt ?? acc.syncedAt ?? null, detail: "Connected" });
+    }
   }
   return out;
 }
@@ -54,6 +64,8 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       rules: records.rules,
       safetyLine: profile.safetyLine.kind === "fixed" ? profile.safetyLine.amount : undefined,
       partyByCommitment,
+      // Expose account identities for correcting an existing snapshot without adding another account.
+      balanceAccounts: [...new Map([...records.balances].sort((a, b) => a.asOf.localeCompare(b.asOf)).map((b) => [b.account, { account: b.account, asOf: b.asOf, currency: b.currency }])).values()],
       storeRevision,
     };
   });

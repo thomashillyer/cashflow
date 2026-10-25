@@ -10,7 +10,7 @@ cd app
 python3 -m http.server 4300     # or: npx serve -l 4300
 ```
 
-Open http://localhost:4300. It starts in **preview mode** with two fictional businesses (switch in the header):
+Open http://localhost:4300. It starts in **preview mode** with two fictional businesses (switch in Settings):
 Cascade Trade Co. (trading, from `docs/design/10-testing-and-fixtures.md`) and Pike Street Noodle Bar (restaurant).
 
 ## Hosting
@@ -22,7 +22,7 @@ The app is served together with the API from one Node service on Fly.io at **htt
 
 Set `window.NERI_API_BASE` in `app/config.js`, or open `http://localhost:4300/?api=http://localhost:8787`.
 Every call goes through `app/api.js`; the `live` object there lists the routes the app expects. They follow
-`docs/design/09-api-repo-lanes.md`, plus four the app needs that aren't in that table yet:
+`docs/design/09-api-repo-lanes.md`, plus the app routes below that are not in the older lane table:
 
 | Route | Why the app needs it |
 |---|---|
@@ -30,6 +30,9 @@ Every call goes through `app/api.js`; the `live` object there lists the routes t
 | `GET /review` | Proposed signals with the message excerpt and the priced effect (before/after low point) |
 | `GET/POST /notes`, `PATCH /notes/:id`, `POST /notes/:id/(add\|keep\|remove)` | Parked thoughts (owner channel of the signals pipeline) |
 | `POST /plans` | Owner confirms a plan proposed in Ask Neri |
+| `GET /connections`, `POST /connections/:id/sync` | Tenant-bound source availability and an actual read-only sync |
+| `GET /review/proposals`, `POST /review/:id/confirm\|dismiss` | Imported document fields, evidence and revision-checked owner decisions |
+| `PUT /balance` | Owner-entered bank balance snapshot; existing accounts come from `context.balanceAccounts` |
 
 `GET /brief` should return `{ three, rest, watch, combined, shortfall, run }`: the ranked `WorkItem`s split into
 today's three, the rest, and watch items, plus the `ForecastRun` they came from, so the list and the chart always
@@ -43,7 +46,7 @@ show the same revision.
 | `ui/chart.js` | 13-week cash chart (daily closings, your line, low point, pipeline, what-if) |
 | `ui/speech.js` | Play brief (speech synthesis) and voice capture for notes, both built into the browser |
 | `catalog/connectors.js` | Every source the Sources screen lists, with honest availability |
-| `mock/` | **Preview only.** A small generic engine plus two fixtures so the app runs before `engine/`, `ai/` and `api/` exist. Delete when the API is wired. |
+| `mock/` | **Preview only.** Browser-only engine and fictional fixtures selected when no API is configured; production never selects them. |
 
 ## Product rules the UI keeps
 
@@ -53,7 +56,7 @@ show the same revision.
 - Notes: anything typed or spoken is read as money in or out, amount, date, party and certainty. It reaches the forecast only after **Add to forecast**.
 - Every number has a source chip that opens its record: the invoice, its payment history, the message behind a moved date.
 - Nothing sends, pays or writes back. Drafts are copied or opened in the owner's own mail app.
-- Partner cards are labeled as samples, with the referral disclosure on the card.
+- Partner cards appear only in explicit demo mode, labeled as samples with their referral disclosure.
 - Hide names (Settings) masks customers and suppliers for demos and screen sharing.
 
 ## Security
@@ -61,7 +64,7 @@ show the same revision.
 - **Sign-in:** real accounts use email and password with Supabase Auth (`app/ui/auth.js`). New passwords need at least eight characters. Disable **Confirm email** in the hosted project's Authentication settings (`mailer_autoconfirm: true` through the Management API); local `auth.email.enable_confirmations` is already false. Sign-up returns a session immediately and the owner continues to business setup. Returning owners choose **Sign in**, which restores their business through `/context` without rerunning `/setup`. Passwords go straight to Supabase and are never saved in Neri's account data or local storage. The service-role key never goes in the browser.
 - **Email verification:** sign-up and password sign-in send no email and need no SMTP provider. Email addresses are unverified in this hackathon flow; access to private businesses depends on the authenticated user ID and membership, never on a claimed email address. Password reset delivery still needs a mail provider. Previously issued PKCE email links remain supported and their callback credentials are removed from the URL; legacy passwordless users do not automatically gain a password by re-registering.
 - **API calls** carry the user's session token (`Authorization: Bearer …`). A 401 sends the owner back to sign-in.
-- **Tenant isolation** (separate PR, `supabase/migrations/*_tenant_access.sql`): with a user's token, the database returns only businesses that user is a member of, plus the synthetic sample businesses. Reads the server makes with the service-role key bypass this, so the API must check the token (or pass it through) before real data goes in. Invites are a follow-up.
+- **Tenant isolation** (separate PR, `supabase/migrations/*_tenant_access.sql`): with a user's token, the database returns only businesses that user is a member of. The API exposes synthetic sample businesses only in explicit demo mode. Reads the server makes with the service-role key bypass this, so the API must check the token (or pass it through) before real data goes in. Invites are a follow-up.
 - **Screen lock:** numbers blur after `NERI_LOCK_MINUTES` (default 15) without activity or in the background; with real sign-in, unlocking checks the session is still valid.
 - **Sign out everywhere** (Settings) revokes every refresh token; other devices are signed out once their current access token expires (about an hour by default).
 
@@ -74,3 +77,5 @@ Source choices during setup are preferences, not connections. `GET /connections`
 File uploads call `POST /import/upload`; pasted source text calls `POST /import/paste`. Review loads `GET /review/proposals` alongside matched signals, shows extracted fields and reasons, and confirms resolved proposals through revision-checked `POST /review/:id/confirm` with an idempotency key. Unresolved items remain visible and cannot be applied until their missing information is resolved; they can be dismissed. Failed syncs and imports report an error instead of showing a success state.
 
 Missing opening cash can be supplied through **Add your current bank balance** on Home or Sources. The owner types the actual signed amount and balance date; `PUT /balance` stores it as an owner-entered balance snapshot in the profile currency. Blank, malformed or over-precision amounts are rejected before any request. The balance is not turned into a note or a forecast commitment.
+
+Existing bank balances can be corrected by selecting an existing account from `context.balanceAccounts`; the UI does not invent an additional account. Foreign-currency balances are updated by statement import because manual entry uses the business base currency.

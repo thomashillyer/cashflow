@@ -90,6 +90,8 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (typeof body.timezone === "string" && /^[A-Za-z_]+(\/[A-Za-z_+-]+)*$/.test(body.timezone)) next.account = { ...next.account, timezone: body.timezone };
     await storeFor(req).saveProfile(b.id, next);
     const storeRevision = await storeFor(req).bumpRevision(b.id);
+    const latest = await storeFor(req).load(b.id);
+    await refreshPending(storeFor(req), b.id, latest.records, latest.storeRevision, nowIso());
     const { account: _a, ...profile } = next;
     return { profile, storeRevision };
   };
@@ -112,9 +114,13 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (!account || account.length > 64 || (typeof body.account === "string" && /[\u0000-\u001f\u007f]/.test(body.account)))
       throw new HttpError(400, "INVALID_ARGUMENT", "Use an account name of 1 to 64 characters, without line breaks.", { fieldIssues: [{ field: "account", issue: "1 to 64 printable characters" }] });
     const key = createHash("sha256").update(`${account}\0${asOf}`).digest("hex").slice(0, 24);
-    const id = `balance-owner-${key}`;
+    const { records } = await storeFor(req).load(b.id);
+    // Correct an imported snapshot in place so equal-date balances cannot compete in the forecast.
+    const id = records.balances.find((balance) => balance.account === account && balance.asOf === asOf)?.id ?? `balance-owner-${key}`;
     const balance: BalanceSnapshot = { id, account, amount: body.amount, currency: b.profile.baseCurrency, asOf, sourceRef: { system: "owner", record: id } };
     const storeRevision = await storeFor(req).upsertRecords(b.id, { balances: [balance] });
+    const latest = await storeFor(req).load(b.id);
+    await refreshPending(storeFor(req), b.id, latest.records, latest.storeRevision, nowIso());
     return { balance, storeRevision };
   });
 

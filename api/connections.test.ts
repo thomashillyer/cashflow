@@ -6,6 +6,7 @@ import type { IntakeInput, IntakeContext, IntakeResult } from "../ai/intake";
 import { reviewCandidate } from "../ai/extract/document";
 import { propose } from "../ai/reconcile/match";
 import type { ZohoPullInput } from "../adapters/zoho_books";
+import type { BalanceSnapshot } from "../schema/records";
 import { buildConnectionService } from "./connections";
 import { sendError, type NeriRequest } from "./http";
 import { connectionRoutes } from "./routes/connections";
@@ -18,12 +19,12 @@ const env = {
   ZOHO_ORGANIZATION_ID: "test-org",
 };
 const now = () => new Date("2026-10-25T22:00:00Z");
-const output = (at: string) => buildAccounting({
+const output = (at: string) => ({ ...buildAccounting({
   system: "zoho_books", now: at, payments: [], docs: [{
     kind: "invoice", providerId: "source-1", number: "INV-1", partyId: "customer-1", partyName: "Example Customer",
     currency: "USD", total: 100, balance: 100, issued: "2026-10-20", due: "2026-11-20", status: "open", raw: { revision: 1 }, sheet: "invoices", row: 1,
   }],
-});
+}), balances: [] as BalanceSnapshot[] });
 
 const microsoft = { ...env, MICROSOFT_TENANT_ID: "00000000-0000-0000-0000-000000000001", MICROSOFT_CLIENT_ID: "fake-ms-client", MICROSOFT_CLIENT_SECRET: "fake-ms-secret", MICROSOFT_MAILBOX_UPN: "owner@example.com" };
 const email = (id: string): Extract<IntakeInput, { kind: "email" }> => ({ kind: "email", raw: `From: supplier@example.com\nTo: owner@example.com\nSubject: Invoice update\nMessage-ID: <${id}>\n\nPlease review the invoice.`, source: { evidenceId: `email-${id}`, sourceRef: { system: "email", record: id } } });
@@ -112,6 +113,36 @@ describe("tenant-bound Outlook review intake", () => {
     await service.sync(business, store, now, "outlook");
     expect(ingest).toHaveBeenCalledTimes(2);
     expect(await store.listProposals(business.id)).toHaveLength(1);
+  });
+
+  it.each(["proposed", "confirmed", "dismissed"] as const)("refreshes a recovered proposal while preserving a %s decision", async (state) => {
+    const { store, business } = await setup();
+    let recovered = false;
+    const service = buildConnectionService(microsoft, {
+      outlookPull: async () => ({ ok: true, data: { inputs: [email("recovered")], diagnostics: output(now().toISOString()).diagnostics } }),
+      ingest: async (input, ctx) => {
+        const result = await readEmail(input, ctx);
+        if (!recovered) return { ...result, candidates: result.candidates.map((c) => ({ ...c, extraction: "partial" as const })) };
+        return { ...result, proposals: result.proposals.map((p) => ({ ...p, action: "link" as const,
+          ops: [{ op: "linkEvidence" as const, commitmentId: "existing-invoice", evidenceIds: p.evidenceIds }], reasons: ["Source recovered and matched"] })) };
+      },
+    });
+    await service.sync(business, store, now, "outlook");
+    const initial = (await store.listProposals(business.id))[0]!;
+    expect(initial.ops).toEqual([]);
+    await store.saveProposals(business.id, [{ ...initial, state }]);
+    recovered = true;
+    const result = await service.sync(business, store, now, "outlook");
+    expect(result.connection.state).toBe("ok");
+    const current = (await store.listProposals(business.id))[0]!;
+    expect(current.state).toBe(state);
+    if (state === "proposed") {
+      expect(current.action).toBe("link");
+      expect(current.ops).toHaveLength(1);
+      expect(current.reasons).toEqual(["Source recovered and matched"]);
+    } else expect(current).toEqual({ ...initial, state });
+    await service.sync(business, store, now, "outlook");
+    expect((await store.listProposals(business.id))[0]).toEqual(current);
   });
 });
 async function setup() {
@@ -229,6 +260,20 @@ describe("tenant-bound Zoho Books connection", () => {
     expect(pull).toHaveBeenCalledTimes(1);
     expect(results.map((r) => r.storeRevision)).toEqual([1, 1]);
     expect((await store.load(business.id)).records.commitments).toHaveLength(1);
+  });
+
+  it("persists actual Books bank balances idempotently and retains them when no balance is returned", async () => {
+    const { store, business } = await setup();
+    let includeBalance = true;
+    const balance: BalanceSnapshot = { id: "bank-source", account: "Bank", amount: 12345, currency: "USD", asOf: "2026-10-25", sourceRef: { system: "zoho_books", record: "bankaccount:source" } };
+    const service = buildConnectionService(env, { pull: async (input) => ({ ok: true, data: { ...output(input.now), balances: includeBalance ? [balance] : [] } }) });
+    const first = await service.sync(business, store, now);
+    expect(first.counts.balances).toBe(1);
+    expect((await store.load(business.id)).records.balances).toEqual([balance]);
+    expect((await service.sync(business, store, now)).storeRevision).toBe(first.storeRevision);
+    includeBalance = false;
+    expect((await service.sync(business, store, now)).storeRevision).toBe(first.storeRevision);
+    expect((await store.load(business.id)).records.balances).toEqual([balance]);
   });
 });
 

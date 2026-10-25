@@ -17,7 +17,7 @@ import type { CfoAnswer, CfoVoice, Decision, NumberFact } from "../../schema/ask
 import type { Profile } from "../../schema/profile";
 import { callStructured, factsBlock, fmtDate, prompt, sha, type Turn } from "../brief";
 import { ASK_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
-import { CFO_VOICE_MODEL, CFO_VOICE_PROMPT_VERSION } from "../config";
+import { ASK_LIVE_MODEL, CFO_VOICE_MODEL, CFO_VOICE_PROMPT_VERSION } from "../config";
 import { fmtMoney } from "../money";
 import { amountMatches, checkText, extractAmounts, extractDates } from "../number_check";
 
@@ -29,7 +29,8 @@ export type VoiceContext = {
   // Read and write directory. Default: reads LIVE_CACHE_DIR (gitignored) then the committed demo cache
   // (ASK_CACHE_DIR); live results are written to LIVE_CACHE_DIR, never to the fixtures.
   cacheDir?: string;
-  model?: string;
+  model?: string;         // the recorded model the cache lookup is keyed on (default CFO_VOICE_MODEL)
+  liveModel?: string;     // the model a live call on a miss uses (default ASK_LIVE_MODEL); its answer is stored under its own key
   // Id of the persisted proposed Signal or Rule (verdict "proposed"); the caller persists the proposal, then
   // passes its id. Default: a PLACEHOLDER id derived from the proposal (not a persisted record): always pass the real id.
   proposalId?: string;
@@ -449,8 +450,8 @@ const cacheDirs = (ctx: VoiceContext) => ({
 });
 
 // Cached voices that fail the checks are skipped, so a stale or hand-edited entry never reaches the owner.
-function cachedVoice(ctx: VoiceContext, key: string, d: Decision): CfoVoice | undefined {
-  for (const dir of cacheDirs(ctx).readDirs) {
+function cachedVoice(ctx: VoiceContext, keys: string[], d: Decision): CfoVoice | undefined {
+  for (const key of keys) for (const dir of cacheDirs(ctx).readDirs) {
     const hit = readCache(dir, key);
     const parsed = hit ? VoiceOutput.safeParse(hit.output) : undefined;
     if (parsed?.success && checkVoice(fromOutput(parsed.data), d).length === 0) return fromOutput(parsed.data);
@@ -475,18 +476,19 @@ function storeVoice(ctx: VoiceContext, key: string, model: string, output: Voice
 export async function voice(decision: Decision, ctx: VoiceContext): Promise<CfoAnswer> {
   if (CODE_BUILT.has(decision.verdict)) return assemble(decision, clean(fallbackVoice(decision)), true, ctx);
 
-  const model = ctx.model ?? CFO_VOICE_MODEL;
-  const key = voiceCacheKey(decision, ctx);
-  const hit = cachedVoice(ctx, key, decision);
+  const liveModel = ctx.liveModel ?? ASK_LIVE_MODEL;
+  const key = voiceCacheKey(decision, ctx);                              // the recorded model: the committed entries
+  const liveKey = voiceCacheKey(decision, { ...ctx, model: liveModel }); // where a live answer is stored
+  const hit = cachedVoice(ctx, [...new Set([key, liveKey])], decision);
   if (hit) return assemble(decision, clean(hit), false, ctx);
 
   if (ctx.mode === "live") {
     const turns: Turn[] = [{ role: "user", content: factsBlock(facts(decision, ctx.business.name, ctx.profile.vocabulary)) }];
     for (let attempt = 1; attempt <= 2; attempt++) {
-      const res = await callStructured(ctx.client, model, prompt("cfo_voice.md"), turns, VoiceOutput, "low");
+      const res = await callStructured(ctx.client, liveModel, prompt("cfo_voice.md"), turns, VoiceOutput, "low");
       const problems = "problem" in res ? [res.problem] : checkVoice(fromOutput(res.output), decision);
       if (!("problem" in res) && problems.length === 0) {
-        storeVoice(ctx, key, model, res.output);
+        storeVoice(ctx, liveKey, liveModel, res.output);
         return assemble(decision, clean(fromOutput(res.output)), false, ctx);
       }
       if ("problem" in res) break; // the call itself failed (timeout, refusal, outage): no second paid attempt
