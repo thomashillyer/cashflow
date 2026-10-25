@@ -78,7 +78,8 @@ function openingBalance(records: Records, profile: Profile, asOf: string, fx: Re
   for (const e of records.events) {
     if (e.date >= snapDate && e.date < asOf) {
       const base = toBase(e.amount, e.currency, profile, fx);
-      if (base !== undefined) total += e.direction === "in" ? base : -base;
+      if (base === undefined) warnings.push(`Actual ${e.id} is in ${e.currency} with no FX rate; left out of opening cash, which is understated or overstated by that amount (needs review).`);
+      else total += e.direction === "in" ? base : -base;
     }
   }
   return total;
