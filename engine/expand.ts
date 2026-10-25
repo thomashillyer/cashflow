@@ -113,32 +113,60 @@ function coveredByLinked(c: Commitment, byId: Map<string, Commitment>, warnings:
   return out.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
 
-// Total and still-to-move amount of a commitment. When `outstanding` is unset it is derived from recorded Settlements
-// in the commitment's currency, so a Settlement plus its bank line never count the money twice (TECHNICAL_PLAN 6
-// opening-cash boundary). An applied amount_change signal states the new total; what was already paid stays paid.
-function remaining(c: Commitment, records: Records, amountSignal: Signal | undefined, warnings: string[]): { total: number; target: number } {
+// What of a commitment is already paid, and the total it is paid out of.
+// - `outstanding` unset: paid = the commitment's Settlements in its own currency. Settlements dated before the latest
+//   balance snapshot are inside opening cash; ones on/after it count only when a bank actual for the commitment is in
+//   records.events, otherwise the money stays expected and we warn (a Settlement and its bank line are one payment,
+//   TECHNICAL_PLAN 6 opening-cash boundary).
+// - `outstanding` set: amount - outstanding may already include linked invoices (an importer or older reconcile run
+//   lowered it), so the part not explained by settlements is treated as linked coverage already applied, and only the
+//   rest of the linked coverage is subtracted again later. paid = amount - outstanding - that pre-applied coverage.
+// An applied amount_change signal states the new total; what was already paid stays paid.
+function paidSoFar(
+  c: Commitment,
+  records: Records,
+  amountSignal: Signal | undefined,
+  covered: number,
+  snapDate: string,
+  warnings: string[],
+): { total: number; paid: number; counted: Set<string> } {
   const label = c.reference ?? c.id;
-  let settled = 0;
-  for (const s of records.settlements) {
-    if (s.commitmentId !== c.id) continue;
-    if (s.currency !== c.currency) {
-      warnings.push(`${label}: settlement ${s.id} is in ${s.currency}, not ${c.currency}; not deducted from what is outstanding (needs review)`);
-      continue;
+  const counted = new Set<string>();
+  const mine = records.settlements.filter((s) => s.commitmentId === c.id);
+  let paid: number;
+  let outstanding: number;
+  if (c.outstanding === undefined) {
+    const banked = records.events.some((e) => e.commitmentId === c.id);
+    let settled = 0;
+    for (const s of mine) {
+      if (s.currency !== c.currency) {
+        warnings.push(`${label}: settlement ${s.id} is in ${s.currency}, not ${c.currency}; not deducted from what is outstanding (needs review)`);
+        continue;
+      }
+      if (s.date >= snapDate && !banked) {
+        warnings.push(`${label}: payment of ${money(s.amount, s.currency)} recorded on ${s.date} but not seen in the bank; still forecast as expected (needs reconciliation)`);
+        continue;
+      }
+      settled += s.amount;
+      counted.add(s.id);
     }
-    settled += s.amount;
+    paid = Math.min(c.amount, settled);
+    outstanding = c.amount - paid;
+  } else {
+    outstanding = c.outstanding;
+    const settled = mine.filter((s) => s.currency === c.currency).reduce((a, s) => a + s.amount, 0);
+    for (const s of mine) if (s.currency === c.currency) counted.add(s.id);
+    const reduced = Math.max(0, c.amount - outstanding);
+    if (settled > reduced) warnings.push(`${label}: settlements (${money(settled, c.currency)}) exceed what outstanding reflects (${money(reduced, c.currency)}); possible double count (needs reconciliation)`);
+    const preCovered = Math.min(covered, Math.max(0, reduced - settled));
+    paid = reduced - preCovered;
   }
-  const outstanding = c.outstanding ?? Math.max(0, c.amount - settled);
   if (c.settlement === "partial" && outstanding >= c.amount)
     warnings.push(`${label}: marked partially paid but nothing is recorded as paid; forecasting the full ${money(c.amount, c.currency)} (needs review)`);
-  if (c.settlement === "paid" && c.outstanding !== undefined && c.outstanding > 0)
-    warnings.push(`${label}: marked paid but ${money(c.outstanding, c.currency)} is still outstanding; nothing forecast (needs review)`);
-  if (c.settlement === "open" && outstanding < c.amount)
-    warnings.push(`${label}: marked open but ${money(c.amount - outstanding, c.currency)} is already paid; forecasting only ${money(outstanding, c.currency)} (needs review)`);
-  if (amountSignal?.claim.kind === "amount_change") {
-    const total = amountSignal.claim.newAmount;
-    return { total, target: Math.max(0, total - (c.amount - outstanding)) };
-  }
-  return { total: c.amount, target: outstanding };
+  if (c.settlement === "open" && paid > 0)
+    warnings.push(`${label}: marked open but ${money(paid, c.currency)} is already paid; forecasting only what remains (needs review)`);
+  const total = amountSignal?.claim.kind === "amount_change" ? amountSignal.claim.newAmount : c.amount;
+  return { total, paid: Math.min(total, paid), counted };
 }
 
 function expandCommitment(
@@ -148,13 +176,16 @@ function expandCommitment(
   fx: Record<string, number>,
   byId: Map<string, Commitment>,
   amountSignal: Signal | undefined,
+  snapDate: string,
   warnings: string[],
 ): CashEvent[] {
-  if (c.settlement === "cancelled" || c.settlement === "credited") return [];
-  if (c.type === "recurring" && !c.anchors.due) return []; // profile.recurring owns aggregate recurrences
-  const { total, target } = remaining(c, records, amountSignal, warnings);
-  if (c.settlement === "paid") return [];
   const label = c.reference ?? c.id;
+  if (c.settlement === "paid" && c.outstanding !== undefined && c.outstanding > 0)
+    warnings.push(`${label}: marked paid but ${money(c.outstanding, c.currency)} is still outstanding; nothing forecast (needs review)`);
+  if (c.settlement === "paid" || c.settlement === "cancelled" || c.settlement === "credited") return [];
+  if (c.type === "recurring" && !c.anchors.due) return []; // profile.recurring owns aggregate recurrences
+  const covers = coveredByLinked(c, byId, warnings);
+  const { total, paid, counted } = paidSoFar(c, records, amountSignal, covers.reduce((a, x) => a + x.amount, 0), snapDate, warnings);
   const pattern = pickPattern(c, profile);
   const dir0 = defaultDirection(c);
   const legs: Leg[] = pattern?.legs ?? [{ share: 1, anchor: "due", offsetDays: 0, direction: dir0 }];
@@ -166,28 +197,29 @@ function expandCommitment(
     legAmounts[i]! -= t;
     return t;
   };
-  // 1. Settled money consumes pattern legs: explicit Settlement.legIndex first, then legs in order.
-  let consume = total - target;
+  // 1. Paid money consumes pattern legs: explicit Settlement.legIndex first, then legs in order.
+  let consume = paid;
   for (const s of records.settlements) {
-    if (s.commitmentId !== c.id || s.currency !== c.currency || s.legIndex === undefined || legAmounts[s.legIndex] === undefined) continue;
+    if (!counted.has(s.id) || s.legIndex === undefined || legAmounts[s.legIndex] === undefined) continue;
     consume -= take(s.legIndex, Math.min(s.amount, consume));
   }
   for (let i = 0; i < legAmounts.length && consume > 0; i++) consume -= take(i, consume);
 
   // 2. Linked invoices/bills replace the legs they invoiced. Rule: each linked invoice (earliest first) first consumes
   // the legs whose anchor date is on or before the invoice's due date (else its invoice date), since those are what it
-  // billed; any remainder then consumes the other legs in order. Legs with no resolvable anchor date are only reached
-  // by the remainder; an undated invoice consumes legs in order.
+  // billed; any remainder then consumes the other legs. Legs with no resolvable anchor date are only reached by the
+  // remainder; an undated invoice is all remainder.
   // Among the billed legs the order is ambiguous (a 70% balance bill dated at shipment is "on or after" both the
   // deposit and the shipment leg), so we pick the conservative side: money out consumes the latest billed leg first
   // (the earlier payment stays in the forecast), money in consumes the earliest billed leg first (the receipt stays late).
+  // The remainder pass uses the same direction-aware order.
   const legDates = legs.map((leg) => resolveAnchor(leg.anchor, c, profile).date);
   const order = legs.map((_, i) => i);
   const billedOrder = dir0 === "out" ? [...order].reverse() : order;
-  for (const cover of coveredByLinked(c, byId, warnings)) {
+  for (const cover of covers) {
     let left = cover.amount;
     if (cover.cutoff) for (const i of billedOrder) if (left > 0 && legDates[i] !== undefined && legDates[i]! <= cover.cutoff) left -= take(i, left);
-    for (const i of order) if (left > 0) left -= take(i, left);
+    for (const i of billedOrder) if (left > 0) left -= take(i, left);
   }
 
   const events: CashEvent[] = [];
@@ -415,14 +447,13 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
 // outflow commitment already covers it: its pattern (explicit patternId, else the profile default for its type) is the
 // cost's pattern. Matching on type alone is allowed only when the deal pattern has exactly one linked cost, since
 // several costs (e.g. goods and freight) can share a type. Linked invoices never suppress a cost.
-// Virtual costs scale by the deal's remaining share (outstanding / amount, after settlements and amount signals), so a
-// half-paid deal carries half its supplier costs; every cost leg is scaled, none is assumed already paid.
-function linkedCostCommitments(deal: Commitment, records: Records, profile: Profile, byId: Map<string, Commitment>, amountSignal: Signal | undefined): Commitment[] {
+// Virtual costs scale by the deal's total (after an amount_change signal), not by what the customer still owes: a
+// customer deposit does not pay the supplier.
+function linkedCostCommitments(deal: Commitment, profile: Profile, byId: Map<string, Commitment>, amount: number): Commitment[] {
   if (deal.settlement === "paid" || deal.settlement === "cancelled" || deal.settlement === "credited") return [];
   const linked = (deal.linkedCommitmentIds ?? []).map((id) => byId.get(id)).filter((l): l is Commitment => !!l && defaultDirection(l) === "out");
   const pattern = pickPattern(deal, profile);
   const costs = pattern?.linkedCosts ?? [];
-  const { target } = remaining(deal, records, amountSignal, []); // warnings come from the deal's own expansion
   const out: Commitment[] = [];
   for (const lc of costs) {
     const costPattern = profile.paymentPatterns.find((p) => p.id === lc.patternId);
@@ -433,7 +464,7 @@ function linkedCostCommitments(deal: Commitment, records: Records, profile: Prof
       id: `${deal.id}~${lc.patternId}`,
       type: costPattern.appliesTo,
       direction: "out",
-      amount: Math.round(target * lc.share),
+      amount: Math.round(amount * lc.share),
       currency: deal.currency,
       anchors: deal.anchors,
       patternId: lc.patternId,
@@ -454,8 +485,15 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
   const all: Commitment[] = [];
   for (const c of commitments) {
     all.push(c);
-    for (const virt of linkedCostCommitments(c, records, profile, byId, amountSignals.get(c.id))) all.push(virt);
+    const sig = amountSignals.get(c.id)?.claim;
+    const dealAmount = sig?.kind === "amount_change" ? sig.newAmount : c.amount;
+    for (const virt of linkedCostCommitments(c, profile, byId, dealAmount)) all.push(virt);
   }
+  // Settlements dated before the latest start-of-day snapshot are already inside opening cash (same boundary as
+  // forecast.ts openingBalance); without a snapshot, as-of is the boundary.
+  let snapDate = "";
+  for (const b of records.balances) if (b.asOf <= asOf && b.asOf > snapDate) snapDate = b.asOf;
+  if (!snapDate) snapDate = asOf;
   const recurringIds = new Set(profile.recurring.map((r) => r.id));
   for (const c of all) {
     if (recurringIds.has(c.id)) continue; // overrides the profile recurring item of the same id (expandRecurring)
@@ -466,7 +504,7 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
     }
     if (open && c.type === "recurring" && !c.anchors.due)
       warnings.push(`${c.reference ?? c.id}: recurring commitment has no due date and matches no profile recurring item; not scheduled (needs review)`);
-    events.push(...expandCommitment(c, records, profile, fx, byId, amountSignals.get(c.id), warnings));
+    events.push(...expandCommitment(c, records, profile, fx, byId, amountSignals.get(c.id), snapDate, warnings));
   }
   events.push(...expandRecurring(commitments, amountSignals, profile, fx, asOf, horizonEnd, warnings));
   events.push(...expandDailySales(records, profile, asOf, horizonEnd, warnings));
