@@ -1,9 +1,10 @@
 // GET /context, GET /brief, GET /forecast, POST /simulate, GET /records/:id.
 
 import type { FastifyInstance } from "fastify";
-import type { Lever, Records } from "../../schema/records";
+import type { CashEvent, Commitment, Lever, Records } from "../../schema/records";
 import { forecast } from "../../engine/forecast";
 import { simulate } from "../../engine/simulate";
+import { findCommitment, resolveEventSource, type EventSource } from "../../engine/resolve";
 import type { Deps } from "../app";
 import { briefFor, loadForRun, runInputs, savedScenario } from "../engine";
 import { businessOf, HttpError } from "../http";
@@ -29,6 +30,10 @@ function sources(b: Business, records: Records) {
   }
   return out;
 }
+
+// What GET /records/:id returns as `commitment`: a stored commitment, or one built from a profile entry or a bank
+// line (no `type` when nothing fits, e.g. an unmatched bank line).
+type RecordCommitment = Omit<Commitment, "type"> & { type?: Commitment["type"] };
 
 const SCENARIOS = new Set(["base", "stress"]);
 
@@ -83,27 +88,86 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   });
 
   // A record and everything behind it: the commitment, its party, its dated events, signals, rules, and the message.
+  // `id` may be a commitment id, an event id (a bank line, or a forecast event such as "evt-inv-INV-1187-0",
+  // "evt-rec-payroll-3", "evt-daily-sales-2027-01-15"), or the id a forecast event points at (a profile recurring
+  // item, "daily-sales", a linked cost). engine/resolve.ts decides what each event traces to; profile items and
+  // unmatched bank lines come back in the same commitment shape, built from the profile entry or the bank line.
+  // `source` names what was found and `eventId` the event that was asked for (null when a commitment was).
   app.get("/records/:id", async (req) => {
     const b = businessOf(req);
     const { id } = req.params as { id: string };
     const { records, overrides } = await loadForRun(deps.store, b.id);
-    const c = records.commitments.find((x) => x.id === id);
-    if (!c) throw new HttpError(404, "NOT_FOUND", "That record isn't in your books any more.");
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
     const run = forecast(records, profile, savedScenario(overrides), asOf, fxRates);
-    const signals = records.signals.filter((s) => s.commitmentId === id);
-    const msgSignal = signals.find((s) => s.sourceRef.excerpt?.text);
-    const ev = msgSignal ? records.evidence.find((e) => e.id === msgSignal.sourceRef.record || e.sourceRef.record === msgSignal.sourceRef.record) : undefined;
-    return {
-      commitment: c,
-      party: records.parties.find((p) => p.id === c.partyId) ?? null,
-      events: run.events.filter((e) => e.commitmentId === id),
-      signals,
-      rules: records.rules.filter((r) => "partyId" in r.scope && r.scope.partyId === c.partyId),
-      evidence: records.evidence.filter((e) => c.evidenceIds?.includes(e.id)),
-      message: msgSignal
-        ? { id: msgSignal.sourceRef.record, channel: msgSignal.channel, receivedAt: msgSignal.receivedAt, body: ev?.text ?? msgSignal.sourceRef.excerpt!.text!, excerpt: msgSignal.sourceRef.excerpt!.text! }
-        : null,
+    const notFound = () => new HttpError(404, "NOT_FOUND", "That record isn't in your books any more.");
+
+    const view = (c: RecordCommitment, events: CashEvent[], source: EventSource["kind"], eventId: string | null) => {
+      const signals = records.signals.filter((s) => s.commitmentId === c.id);
+      const msgSignal = signals.find((s) => s.sourceRef.excerpt?.text);
+      const ev = msgSignal ? records.evidence.find((e) => e.id === msgSignal.sourceRef.record || e.sourceRef.record === msgSignal.sourceRef.record) : undefined;
+      return {
+        commitment: c,
+        party: records.parties.find((p) => p.id === c.partyId) ?? null,
+        events,
+        signals,
+        rules: c.partyId ? records.rules.filter((r) => "partyId" in r.scope && r.scope.partyId === c.partyId) : [],
+        evidence: records.evidence.filter((e) => c.evidenceIds?.includes(e.id)),
+        message: msgSignal
+          ? { id: msgSignal.sourceRef.record, channel: msgSignal.channel, receivedAt: msgSignal.receivedAt, body: ev?.text ?? msgSignal.sourceRef.excerpt!.text!, excerpt: msgSignal.sourceRef.excerpt!.text! }
+          : null,
+        source,
+        eventId,
+      };
     };
+    const eventsOf = (cid: string) => run.events.filter((e) => e.commitmentId === cid);
+
+    const direct = findCommitment(id, records);
+    if (direct) return view(direct, eventsOf(direct.id), "commitment", null);
+
+    // An event id, or else the first forecast event that points at this id (profile recurring, daily sales, linked cost).
+    const asked = run.events.find((e) => e.id === id) ?? records.events.find((e) => e.id === id && e.status === "actual");
+    const event = asked ?? run.events.find((e) => e.commitmentId === id);
+    if (!event) throw notFound();
+    const eventId = asked ? asked.id : null;
+    const src = resolveEventSource(event, records, profile, asOf);
+    switch (src.kind) {
+      case "commitment":
+        return view(src.commitment, eventsOf(src.commitment.id), src.kind, eventId);
+      case "actual": {
+        if (src.commitment) return view(src.commitment, eventsOf(src.commitment.id), src.kind, eventId);
+        // An unmatched bank line (card sales, fees) is its own source.
+        const line = run.events.find((e) => e.id === src.event.id) ?? src.event;
+        return view({
+          id: line.id, direction: line.direction, ...(line.category ? { category: line.category } : {}),
+          amount: line.amount, currency: line.currency, anchors: {}, status: "actual", sourceRef: line.sourceRef,
+        }, [line], src.kind, eventId);
+      }
+      case "linked_cost": {
+        const parent = src.parentCommitment;
+        return view(parent, [...eventsOf(parent.id), ...eventsOf(event.commitmentId!)].sort((x, y) => x.date.localeCompare(y.date)), src.kind, eventId);
+      }
+      case "profile_recurring": {
+        const item = src.item;
+        return view({
+          id: item.id, type: "recurring", direction: item.direction ?? "out", category: item.category,
+          amount: event.amount, currency: event.currency, anchors: {}, status: event.status,
+          sourceRef: { system: "profile", record: item.name },
+        }, eventsOf(item.id), src.kind, eventId);
+      }
+      case "daily_sales": {
+        // The forecast has one event per sale day; show the one asked for, or the next week of them.
+        const days = asked ? [event] : eventsOf(event.commitmentId!).slice(0, 7);
+        return {
+          ...view({
+            id: event.commitmentId!, direction: "in", category: "sales",
+            amount: event.amount, currency: event.currency, anchors: {}, status: event.status,
+            sourceRef: { system: "profile", record: "Daily sales" },
+          }, days, src.kind, eventId),
+          basedOn: src.historyEventIds, // the actual sales receipts the average came from
+        };
+      }
+      default:
+        throw notFound();
+    }
   });
 };

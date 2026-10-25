@@ -7,7 +7,7 @@ import type { Override, Records, Scenario, WorkItem } from "../schema/records";
 import { buildBrief } from "../engine/brief";
 import type { Brief } from "../engine/rank";
 import { simulate } from "../engine/simulate";
-import { writeBrief, type BriefContext } from "../ai/brief";
+import { fmtDate, writeBrief, type BriefContext } from "../ai/brief";
 import { fmtMoney } from "../ai/money";
 import type { Business, Store } from "./store";
 
@@ -104,7 +104,7 @@ export async function briefFor(store: Store, b: Business, mode: AiMode, now: () 
   const shortfall: BriefResult["shortfall"] = residual > 0
     ? {
         amount: residual,
-        title: `Even with these, you'd be ${fmtMoney(residual, currency)} under your line around ${run.lowPoint.date}`,
+        title: `Even with these, you'd be ${fmtMoney(residual, currency)} under your line around ${fmtDate(run.lowPoint.date, inputs.asOf)}`,
         why: "If chasing and timing can't close the rest, you could look at short-term working capital. Whether to borrow is your call; Neri only shows the gap and the dates.",
         partnerAction: { label: "See sample working-capital options", sample: true, disclosure: PARTNER_DISCLOSURE },
       }

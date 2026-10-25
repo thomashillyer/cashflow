@@ -248,8 +248,9 @@ const live = {
   async confirmPlan(proposal) {
     return http("/plans", { method: "POST", body: JSON.stringify(proposal) });
   },
+  // null for an id the books don't have, so the "Not found" sheet shows.
   async record(id) {
-    return http(`/records/${encodeURIComponent(id)}`);
+    return http(`/records/${encodeURIComponent(id)}`).catch((e) => (e.status === 404 ? null : Promise.reject(e)));
   },
   async setSafetyLine(cents) {
     return http("/profile", { method: "PUT", body: JSON.stringify({ safetyLine: { kind: "fixed", amount: cents } }) });

@@ -613,7 +613,7 @@ function reviewCard(rv) {
   const body = m ? esc(m.body).replace(esc(m.excerpt), `<mark>${esc(m.excerpt)}</mark>`) : "";
   return `
   <article class="review-card">
-    <header><span class="ico">${s.channel === "whatsapp" ? icon.chat : icon.mail}</span><div><b>${esc(rv.party?.name ?? "Unknown sender")} about ${esc(rv.commitment.sourceRef.record)}</b><span>${s.channel === "email" ? "Email" : esc(s.channel)} from ${esc(m?.from ?? "")}, ${dayOf(s.receivedAt)} at ${clock(s.receivedAt)}</span></div></header>
+    <header><span class="ico">${s.channel === "whatsapp" ? icon.chat : icon.mail}</span><div><b>${esc(rv.party?.name ?? "Unknown sender")} about ${esc(rv.commitment.sourceRef.record)}</b><span>${esc(sourceName(s.channel))}${m?.from ? ` from ${esc(m.from)}` : ""}, ${dayOf(s.receivedAt)} at ${clock(s.receivedAt)}</span></div></header>
     ${m ? `<div class="message">${body}</div>` : ""}
     <div class="change">
       <div><small>${esc(rv.commitment.sourceRef.record)}, ${money(rv.commitment.amount, { currency: rv.commitment.currency })}, expected</small><b>${shortDate(rv.from)}</b><span class="arrow">→</span><b>${shortDate(rv.to)}</b></div>
@@ -664,11 +664,15 @@ function viewSources() {
 
 // ---------------------------------------------------------------- Ask
 // Source chips: readable labels ("INV-1187", "Payroll Dec 24"), at most four, then a count.
+// A cite may be an event id ("evt-inv-INV-1187-0", "evt-rec-payroll-3", "evt-daily-sales-2027-01-15"): label what it points at.
 function citeLabel(cid) {
-  const ref = refLabel(cid);
-  if (ref !== "Source") return ref;
-  const name = app.ctx.parties.find((p) => p.id === app.ctx.partyOf?.(cid))?.name ?? "Record";
   const d = cid.match(/(\d{4}-\d{2}-\d{2})$/);
+  const base = cid.startsWith("evt-") ? (d ? cid.slice(4, -11) : cid.slice(4).replace(/-\d+$/, "")) : cid;
+  const ref = refLabel(base);
+  if (ref !== "Source") return ref;
+  const name = app.ctx.profile?.recurring?.find((r) => r.id === base)?.name
+    ?? (base === "daily-sales" ? "Daily sales" : null)
+    ?? app.ctx.parties.find((p) => p.id === app.ctx.partyOf?.(base))?.name ?? "Record";
   return d ? `${name} ${shortDate(d[1])}` : name;
 }
 function citeChips(cites) {
@@ -931,7 +935,7 @@ async function showRecord(id) {
 }
 
 function sourceName(sys) {
-  return { zoho_books: "Zoho Books", bank_csv: "Bank statement", email: "Email", whatsapp: "WhatsApp", crm: "Zoho CRM", owner: "Your note", generic_file: "Uploaded file" }[sys] ?? sys;
+  return { zoho_books: "Zoho Books", bank_csv: "Bank statement", email: "Email", whatsapp: "WhatsApp", crm: "Zoho CRM", owner: "Your note", generic_file: "Uploaded file", profile: "Your setup" }[sys] ?? sys;
 }
 
 function showWeek(start) {
@@ -942,7 +946,7 @@ function showWeek(start) {
   const evs = run.events.filter((e) => e.date >= start && e.date <= addDays(start, 6) && e.status !== "possible");
   openSheet(`
     ${sheetHead(`Week of ${weekLabel(start)}`, `Ends at ${money(w.closing)}. Lowest day ${money(w.minClosing)}.`)}
-    ${evs.length ? evs.map((e) => `<div class="event"><b>${esc(partyNameFor(e))}<span class="status">${dayDate(e.date)}</span></b><span class="amt ${e.direction === "in" ? "in" : "out"}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p><button class="src" data-action="record" data-id="${esc(e.commitmentId)}">${esc(e.sourceRef.record)}</button></div>`).join("") : `<p>No money moves this week.</p>`}`);
+    ${evs.length ? evs.map((e) => `<div class="event"><b>${esc(partyNameFor(e))}<span class="status">${dayDate(e.date)}</span></b><span class="amt ${e.direction === "in" ? "in" : "out"}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p><button class="src" data-action="record" data-id="${esc(e.id)}">${esc(e.sourceRef.record)}</button></div>`).join("") : `<p>No money moves this week.</p>`}`);
 }
 function partyNameFor(e) {
   const pid = commitmentParty(e.commitmentId);

@@ -9,6 +9,7 @@ import { forecast } from "../../engine/forecast";
 import { ingest, type IntakeInput, type IntakeNote } from "../../ai/intake";
 import { ApplyError, applyProposal, type ApplyErrorCode } from "../../ai/reconcile/apply";
 import { propose } from "../../ai/reconcile/match";
+import { fmtDate } from "../../ai/brief";
 import { fmtMoney } from "../../ai/money";
 import type { Deps } from "../app";
 import { businessIdentity, loadForRun, runInputs, savedScenario } from "../engine";
@@ -44,6 +45,12 @@ export async function refreshPending(store: Store, businessId: string, records: 
   if (next.length) await store.saveProposals(businessId, next);
 }
 
+// Evidence has no sender field; its record id is a sender only when it is an address or a phone number
+// (not a file name or message id). Otherwise "" and the app leaves "from" out.
+function senderOf(record: string | undefined): string {
+  return record && /^[^\s@]+@[^\s@]+$|^\+?\d[\d\s().-]{6,}$/.test(record) ? record : "";
+}
+
 function signalItem(b: Business, records: Records, overrides: Override[], s: Signal, deps: Deps) {
   const c = records.commitments.find((x) => x.id === s.commitmentId);
   if (!c) return null;
@@ -59,7 +66,7 @@ function signalItem(b: Business, records: Records, overrides: Override[], s: Sig
   return {
     signal: { ...s, effect: { lowPointDelta: after.lowPoint.amount - before.lowPoint.amount, week: after.lowPoint.week } },
     // Message text is data: shown as text, never interpreted.
-    message: { id: s.sourceRef.record, channel: s.channel, from: ev?.sourceRef.record ?? "", receivedAt: s.receivedAt, body: ev?.text ?? excerpt, excerpt },
+    message: { id: s.sourceRef.record, channel: s.channel, from: senderOf(ev?.sourceRef.record), receivedAt: s.receivedAt, body: ev?.text ?? excerpt, excerpt },
     commitment: c,
     party: records.parties.find((p) => p.id === (s.partyId ?? c.partyId)) ?? null,
     from,
@@ -276,8 +283,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     return {
       signal: next, storeRevision: revision, lowPoint: after,
       alert: {
-        title: `${who}: ${c?.reference ?? c?.sourceRef.record ?? "the change"}${next.claim.kind === "date_change" ? ` moves to ${next.claim.newDate}` : " updated"}`,
-        detail: `Your low point is now ${money(after.amount)} on ${after.date}${after.amount < before.amount ? `, down ${money(before.amount - after.amount)}` : ""}.`,
+        title: `${who}: ${c?.reference ?? c?.sourceRef.record ?? "the change"}${next.claim.kind === "date_change" ? ` moves to ${fmtDate(next.claim.newDate, asOf)}` : " updated"}`,
+        detail: `Your low point is now ${money(after.amount)} on ${fmtDate(after.date, asOf)}${after.amount < before.amount ? `, down ${money(before.amount - after.amount)}` : ""}.`,
       },
     };
   });

@@ -26,7 +26,8 @@ export type EventSource =
 
 export { DAILY_SALES_ID };
 
-function findCommitment(id: string, records: Records): Commitment | undefined {
+// A stored commitment, or one created by an applied new_commitment/plan signal ("sig-<signalId>").
+export function findCommitment(id: string, records: Records): Commitment | undefined {
   const stored = records.commitments.find((c) => c.id === id);
   if (stored) return stored;
   if (!id.startsWith("sig-")) return undefined;
