@@ -22,8 +22,11 @@ import type { Profile } from "../schema/profile";
 import type { Commitment, Lever, Party, Records, WorkItem } from "../schema/records";
 import { BRIEF_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "./cache";
 import { BRIEF_MODEL, BRIEF_PROMPT_VERSION, DRAFT_MODEL, DRAFT_PROMPT_VERSION } from "./config";
-import { minorUnitDigits } from "./normalize";
-import { allowedFromToolResults, checkText, type Allowed, type CheckOpts } from "./number_check";
+import { toBase } from "../engine/expand";
+import { fmtMoney, fmtWithBase } from "./money";
+import { allowedFromToolResults, checkText, extractDates, type Allowed, type CheckOpts } from "./number_check";
+
+export { fmtMoney } from "./money";
 
 export const MAX_BRIEF_ITEMS = 3;
 const MAX_TITLE_WORDS = 8;
@@ -65,20 +68,37 @@ export type Facts = {
   lever?: LeverFacts;
   cashEffect: number;
   cashEffectMeans: "rise in the lowest cash point" | "dollars saved";
-  neededBy: string;
-  asOf: string;
+  neededBy: string;                       // when to ask or act, never a settlement date
+  neededByStatus: "upcoming" | "today" | "passed";
+  asOf: string;                           // every tense in the text is relative to this date
   baseCurrency: string;
   commitment?: {
     id: string; reference?: string; type: string; direction?: string; amount: number; outstanding?: number;
     currency: string; due?: string; status: string; category?: string; discount?: { pct: number; byDate: string };
+    // Computed by code from `due` and asOf; absent without a due date or once the document is settled.
+    dueStatus?: "not yet due" | "due today" | `overdue by ${number} day${"" | "s"}`;
+    daysOverdue?: number;
+    // The owed figure (outstanding, else amount) as text in the commitment currency; when that is not the
+    // base currency, followed by the converted base figure: "₹1,000,000 (about $12,000 at today's rate)".
+    display: string;
+    // Only when the commitment currency is not the base currency: the run's rate and the converted figure.
+    converted?: { amountBase: number; rate: number };
   };
   party?: { name: string; kind: string; tags: string[]; medianDaysLate?: number; ownerNotes: string[] };
-  expected: { date: string; basis: string; amountBase: number }[];
+  expected: {
+    date: string; basis: string; amount: number; currency: string; amountBase: number; display: string;
+    converted: boolean;                   // true when `amountBase` was converted from `currency`
+    againstLowPoint: "after" | "before" | "same day";  // this date against lowPoint.date
+  }[];
   lowPoint: { week: string; date: string; amount: number };
   safetyLine: number;
   amountAfterLever?: number;  // lowest point if this item is done: base low point + cashEffect; absent for dollars saved and for items with no lever
   vocabulary: Record<string, string>;
 };
+
+// Whole days from `from` to `to` (UTC calendar dates).
+const daysBetween = (from: string, to: string) =>
+  Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
 // Notes are the owner's words: bounded, single-line, and never a source of allowed figures.
 const cleanNote = (n: string) => n.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, MAX_NOTE_CHARS);
@@ -106,10 +126,19 @@ export function buildFacts(item: WorkItem, ctx: Pick<BriefContext, "run" | "reco
     ...(l.kind === "split" ? { parts: l.shares.length } : {}),
   };
   const saved = l?.kind === "pay_early";
-  const expected = c
+  const base = profile.baseCurrency;
+  const expected: Facts["expected"] = c
     ? run.events.filter((e) => e.commitmentId === c.id && e.date >= run.asOf).slice(0, MAX_EXPECTED)
-      .map((e) => ({ date: e.date, basis: cleanBasis(e.basis), amountBase: e.amountBase }))
+      .map((e) => ({
+        date: e.date, basis: cleanBasis(e.basis), amount: e.amount, currency: e.currency, amountBase: e.amountBase,
+        display: fmtWithBase(e.amount, e.currency, base, e.amountBase), converted: e.currency !== base,
+        againstLowPoint: e.date > run.lowPoint.date ? "after" : e.date < run.lowPoint.date ? "before" : "same day",
+      }))
     : [];
+  const owed = c ? c.outstanding ?? c.amount : 0;
+  const owedBase = c && c.currency !== base ? toBase(owed, c.currency, profile, run.fxRates) : undefined;
+  const open = !c?.settlement || c.settlement === "open" || c.settlement === "partial";
+  const sinceDue = c?.anchors.due && open ? daysBetween(c.anchors.due, run.asOf) : undefined;
   return {
     itemId: item.id,
     warning: item.warning,
@@ -117,14 +146,20 @@ export function buildFacts(item: WorkItem, ctx: Pick<BriefContext, "run" | "reco
     cashEffect: item.cashEffect,
     cashEffectMeans: saved ? "dollars saved" : "rise in the lowest cash point",
     neededBy: item.neededBy,
+    neededByStatus: item.neededBy > run.asOf ? "upcoming" : item.neededBy === run.asOf ? "today" : "passed",
     asOf: run.asOf,
-    baseCurrency: profile.baseCurrency,
+    baseCurrency: base,
     ...(c ? {
       commitment: {
         id: c.id, ...(c.reference ? { reference: c.reference } : {}), type: c.type, ...(c.direction ? { direction: c.direction } : {}),
         amount: c.amount, ...(c.outstanding !== undefined ? { outstanding: c.outstanding } : {}), currency: c.currency,
         ...(c.anchors.due ? { due: c.anchors.due } : {}), status: c.status, ...(c.category ? { category: c.category } : {}),
         ...(c.discount ? { discount: c.discount } : {}),
+        ...(sinceDue === undefined ? {} : sinceDue <= 0
+          ? { dueStatus: sinceDue === 0 ? "due today" as const : "not yet due" as const }
+          : { dueStatus: `overdue by ${sinceDue} day${sinceDue === 1 ? "" : "s"}` as const, daysOverdue: sinceDue }),
+        display: fmtWithBase(owed, c.currency, base, owedBase),
+        ...(owedBase !== undefined ? { converted: { amountBase: owedBase, rate: run.fxRates[c.currency]! } } : {}),
       },
     } : {}),
     ...(party ? {
@@ -151,9 +186,42 @@ export function allowedFromFacts(facts: { party?: Facts["party"] } & Record<stri
 }
 
 // What a draft to a counterparty may draw on: the document and its dates, not the owner's cash position.
-export function draftFacts(f: Facts): Omit<Facts, "lowPoint" | "safetyLine" | "amountAfterLever" | "cashEffect" | "cashEffectMeans"> {
-  const { lowPoint: _l, safetyLine: _s, amountAfterLever: _a, cashEffect: _c, cashEffectMeans: _m, ...rest } = f;
-  return rest;
+// A chase asks for payment by `payBy` and carries no other date the counterparty could read as a grace
+// period: not the engine's assumed date, not our expected-payment dates, not the owner's needed-by.
+//   - not yet due (or due today): payBy is the due date, or an earlier assumed date;
+//   - overdue: payBy is the assumed date, when there is one.
+export type DraftFacts = Omit<Facts, "lowPoint" | "safetyLine" | "amountAfterLever" | "cashEffect" | "cashEffectMeans" | "neededBy" | "neededByStatus" | "lever" | "commitment" | "expected"> & {
+  lever?: Omit<LeverFacts, "assumeDate"> & { assumeDate?: string };
+  neededBy?: string;
+  neededByStatus?: Facts["neededByStatus"];
+  commitment?: Omit<NonNullable<Facts["commitment"]>, "converted">;
+  expected: Omit<Facts["expected"][number], "amountBase" | "converted" | "againstLowPoint">[];
+  payBy?: string;
+};
+
+export function payByFor(f: Facts): string | undefined {
+  const cm = f.commitment;
+  const assume = f.lever?.assumeDate;
+  const notYetDue = cm?.dueStatus === "not yet due" || cm?.dueStatus === "due today";
+  if (!notYetDue) return assume && assume >= f.asOf ? assume : undefined;
+  return assume && cm?.due && assume < cm.due ? assume : cm?.due;
+}
+
+// To the counterparty the figures are the document's own: no converted base-currency figure, and no
+// comparison with the owner's lowest point.
+export function draftFacts(f: Facts): DraftFacts {
+  const { lowPoint: _l, safetyLine: _s, amountAfterLever: _a, cashEffect: _c, cashEffectMeans: _m, commitment, ...rest } = f;
+  const own = commitment ? (() => {
+    const { converted: _v, ...c } = commitment;
+    return { ...c, display: fmtMoney(c.outstanding ?? c.amount, c.currency) };
+  })() : undefined;
+  const expected = f.expected.map(({ amountBase: _b, converted: _v, againstLowPoint: _g, ...e }) => ({ ...e, display: fmtMoney(e.amount, e.currency) }));
+  const out = { ...rest, ...(own ? { commitment: own } : {}), expected };
+  if (f.lever?.kind !== "chase") return out;
+  const { neededBy: _n, neededByStatus: _ns, lever, ...others } = out;
+  const { assumeDate: _d, ...leverRest } = lever!;
+  const payBy = payByFor(f);
+  return { ...others, lever: leverRest, expected: [], ...(payBy ? { payBy } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -168,60 +236,84 @@ export function fmtDate(iso: string, asOf: string): string {
   return iso.slice(0, 4) === asOf.slice(0, 4) ? base : `${base}, ${y}`;
 }
 
-// Minor units to text: "$28,000", "-$5,500" (U+2212 minus), "INR 1,000,000". Integer math on the digits.
-export function fmtMoney(minor: number, currency: string, base: string): string {
-  const digits = minorUnitDigits(currency);
-  const abs = BigInt(Math.abs(minor));
-  const scale = 10n ** BigInt(digits);
-  const whole = (abs / scale).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  const frac = (abs % scale).toString().padStart(digits, "0");
-  const num = digits > 0 && frac !== "0".repeat(digits) ? `${whole}.${frac}` : whole;
-  const text = currency === base && base === "USD" ? `$${num}` : `${currency} ${num}`;
-  return minor < 0 ? `−${text}` : text;
-}
-
 // ---------------------------------------------------------------------------
 // Deterministic fallbacks (code only; no model)
+//
+// Wording rules, shared with the prompts: tense follows the document's `dueStatus` against asOf (an invoice
+// not yet due "is due Dec 10", never "was due"); the expected payment sits "after your lowest point", not
+// "after your lowest week"; `neededBy` is when to ask or act ("Ask by Dec 12"), never a settlement date;
+// a foreign-currency figure is stated in its own currency with the converted figure marked as converted.
 
 const partyName = (f: Facts, fallback: string) => f.party?.name ?? fallback;
 const docRef = (f: Facts) => f.commitment?.reference ?? "the open document";
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+const AGAINST_LOW_POINT = { after: "after your lowest point", before: "before your lowest point", "same day": "on the day of your lowest point" };
+
+// "INV-1187 for $28,000 is due Dec 10." / "... is due today." / "... is overdue by 5 days (due Dec 10)."
+function docLine(f: Facts): string {
+  const cm = f.commitment;
+  if (!cm) return "";
+  const ref = cap(docRef(f));
+  const what = cm.reference ? `${ref} for ${cm.display}` : `${ref} (${cm.display})`;
+  switch (cm.dueStatus) {
+    case undefined: return `${what}.`;
+    case "due today": return `${what} is due today.`;
+    case "not yet due": return `${what} is due ${fmtDate(cm.due!, f.asOf)}.`;
+    default: return `${what} is ${cm.dueStatus} (due ${fmtDate(cm.due!, f.asOf)}).`;
+  }
+}
+
+// "Payment is expected Dec 26, after your lowest point."
+function expectedLine(f: Facts): string {
+  const e = f.expected[0];
+  if (!e) return "";
+  return `Payment is expected ${e.date === f.asOf ? "today" : fmtDate(e.date, f.asOf)}, ${AGAINST_LOW_POINT[e.againstLowPoint]}.`;
+}
+
+// neededBy is when to ask or act. Returns a sentence; "Ask by Dec 12." / "Ask today."
+function actBy(f: Facts, verb: "Ask" | "Act"): string {
+  if (f.neededByStatus === "today") return `${verb} today.`;
+  if (f.neededByStatus === "passed") return `${verb} now; this was needed by ${fmtDate(f.neededBy, f.asOf)}.`;
+  return `${verb} by ${fmtDate(f.neededBy, f.asOf)}.`;
+}
 
 export function fallbackBrief(f: Facts): { title: string; why: string } {
-  const money = (n: number) => fmtMoney(n, f.baseCurrency, f.baseCurrency);
+  const money = (n: number) => fmtMoney(n, f.baseCurrency);
   const date = (d: string) => fmtDate(d, f.asOf);
   const cm = f.commitment;
-  const cur = cm?.currency ?? f.baseCurrency;
-  const owed = cm ? fmtMoney(cm.outstanding ?? cm.amount, cur, f.baseCurrency) : undefined;
   const lift = f.amountAfterLever === undefined ? "helps your lowest point"
     : `lifts your lowest point from ${money(f.lowPoint.amount)} (week of ${date(f.lowPoint.week)}) to ${money(f.amountAfterLever)}`;
   const kind = f.lever?.kind;
+  const join = (...parts: string[]) => parts.filter(Boolean).join(" ");
   switch (kind) {
-    case "chase":
+    case "chase": {
+      const assume = f.lever?.assumeDate ?? f.neededBy;
       return {
         title: `Chase ${partyName(f, "the customer")} on ${docRef(f)}`,
-        why: owed && f.lever?.assumeDate
-          ? `Collecting ${owed} by ${date(f.lever.assumeDate)} ${lift}.`
-          : `Collecting this payment by ${date(f.neededBy)} ${lift}.`,
+        why: join(docLine(f), expectedLine(f), `Collecting ${cm ? "it" : "this payment"} by ${date(assume)} ${lift}.`,
+          assume === f.neededBy ? "" : actBy(f, "Ask")),
       };
+    }
     case "defer":
       return {
         title: `Ask ${partyName(f, "the supplier")} for ${f.lever?.days} more days`,
-        why: `Moving the ${docRef(f)} payment back ${f.lever?.days} days ${lift}. Ask by ${date(f.neededBy)}.`,
+        why: join(docLine(f), `Moving the ${docRef(f)} payment back ${f.lever?.days} days ${lift}.`, actBy(f, "Ask")),
       };
     case "ask_advance":
       return {
         title: `Ask ${partyName(f, "the customer")} for a ${f.lever?.advancePct}% advance`,
-        why: `Asking for ${f.lever?.advancePct}% up front on ${docRef(f)} ${lift}. Ask by ${date(f.neededBy)}.`,
+        why: join(docLine(f), `Asking for ${f.lever?.advancePct}% up front on ${docRef(f)} ${lift}.`, actBy(f, "Ask")),
       };
     case "split":
       return {
         title: `Split the ${docRef(f)} payment`,
-        why: `Paying ${docRef(f)} in ${f.lever?.parts} parts ${lift}. Decide by ${date(f.neededBy)}.`,
+        why: join(docLine(f), `Paying ${docRef(f)} in ${f.lever?.parts} parts ${lift}.`, actBy(f, "Act")),
       };
     case "pay_early":
       return {
         title: `Pay ${docRef(f)} early for the discount`,
-        why: `Paying ${partyName(f, "this supplier")} early by ${date(f.neededBy)} saves ${money(f.cashEffect)}.`,
+        why: join(`Paying ${partyName(f, "this supplier")} early saves ${money(f.cashEffect)}.`, actBy(f, "Act")),
       };
     default:
       return {
@@ -232,24 +324,30 @@ export function fallbackBrief(f: Facts): { title: string; why: string } {
 }
 
 export function fallbackDraft(f: Facts, business: string): { subject?: string; body: string } {
-  const date = (d: string) => fmtDate(d, f.asOf);
+  const date = (d: string) => (d === f.asOf ? "today" : fmtDate(d, f.asOf));
   const cm = f.commitment;
   const name = f.party?.name;
   const hello = name ? `Hello ${name},` : "Hello,";
   const ref = cm?.reference ?? "the open item";
-  const amt = cm ? fmtMoney(cm.outstanding ?? cm.amount, cm.currency, f.baseCurrency) : undefined;
+  // To the counterparty, the amount is the document's own: no converted figure.
+  const amt = cm ? fmtMoney(cm.outstanding ?? cm.amount, cm.currency) : undefined;
   const sign = `Thank you,\n${business}`;
   const lines: string[] = [hello, ""];
   let subject: string;
   switch (f.lever?.kind) {
-    case "chase":
+    case "chase": {
       subject = cm?.reference ? (amt ? `Invoice ${ref}: ${amt}` : `Invoice ${ref}`) : "Open invoice";
+      const due = cm?.due && cm.dueStatus
+        ? `, which ${cm.dueStatus === "due today" ? "is due today" : cm.dueStatus === "not yet due" ? `is due ${date(cm.due)}` : `was due ${date(cm.due)}`}`
+        : cm?.due ? `, due ${date(cm.due)}` : "";
+      const payBy = payByFor(f);
       lines.push(
-        `I'm following up on ${cm?.reference ? `invoice ${ref}` : "an open invoice"}${amt ? ` for ${amt}` : ""}${cm?.due ? `, due ${date(cm.due)}` : ""}.` +
+        `I'm following up on ${cm?.reference ? `invoice ${ref}` : "an open invoice"}${amt ? ` for ${amt}` : ""}${due}.` +
         ` Could you let me know when we can expect payment?` +
-        (f.lever.assumeDate ? ` Receiving it by ${date(f.lever.assumeDate)} would help us a great deal.` : ""),
+        (payBy ? ` Payment ${payBy === f.asOf ? "today" : `by ${date(payBy)}`} would help us a great deal.` : ""),
         "", "If anything is holding it up, please tell me and I will help sort it out.");
       break;
+    }
     case "defer":
       subject = `Payment timing for ${ref}`;
       lines.push(
@@ -382,7 +480,8 @@ function countProblems(text: string, f: Facts): string[] {
   const nums = (s: string) => [...s.matchAll(/\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
   const basis = f.expected.flatMap((e) => nums(e.basis));
   const allowed: Record<"day" | "pct" | "week", Set<number>> = {
-    day: new Set([...(f.lever?.days !== undefined ? [f.lever.days] : []), ...(f.party?.medianDaysLate !== undefined ? [Math.abs(f.party.medianDaysLate)] : []), ...basis]),
+    day: new Set([...(f.lever?.days !== undefined ? [f.lever.days] : []), ...(f.party?.medianDaysLate !== undefined ? [Math.abs(f.party.medianDaysLate)] : []),
+      ...(f.commitment?.daysOverdue !== undefined ? [f.commitment.daysOverdue] : []), ...basis]),
     pct: new Set([...(f.lever?.advancePct !== undefined ? [f.lever.advancePct] : []), ...(f.commitment?.discount ? [f.commitment.discount.pct] : [])]),
     week: new Set(),
   };
@@ -393,6 +492,21 @@ function countProblems(text: string, f: Facts): string[] {
     if (!allowed[kind].has(Number(m[1]))) out.push(`"${m[0]}" is not in the facts`);
   }
   return out;
+}
+
+// Tense and phrasing rules (P4.18). Tense is relative to asOf, through the code-computed dueStatus: nothing
+// that is not yet due "was due", nothing that is overdue "is due". neededBy is when to ask or act, not a
+// settlement date. The expected date sits "after your lowest point"; a week is not a point in time.
+const PAST_DUE_RE = /\b(?:was|were)\s+due\b|\boverdue\b|\bpast\s+due\b/i;
+const FUTURE_DUE_RE = /\bnot\s+yet\s+due\b|\b(?:is|are)\s+due\b/i;
+const SETTLED_BY_RE = /\bsettle[ds]?\s+by\b|\bsettlement\s+by\b/i;
+const LOWEST_WEEK_RE = /\b(?:after|before)\s+(?:your|the)\s+lowest\s+week\b/i;
+
+function tenseProblem(text: string, f: Facts): string | undefined {
+  const overdue = f.commitment?.daysOverdue !== undefined;
+  if (!overdue && PAST_DUE_RE.test(text)) return `says something was due or overdue, but as of ${f.asOf} nothing is (use "is due" for a date that has not passed)`;
+  if (overdue && FUTURE_DUE_RE.test(text)) return `says the document is due, but it is ${f.commitment!.dueStatus} as of ${f.asOf}`;
+  return undefined;
 }
 
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
@@ -410,12 +524,24 @@ export function checkBriefText(title: string, why: string, item: WorkItem, f: Fa
   const parts = [
     ...r.unmatched.map((u) => `${u.kind} "${u.raw}" is not in the facts`),
     ...r.problems, ...countProblems(text, f),
+    ...[tenseProblem(text, f)].filter((x): x is string => !!x),
+    ...(SETTLED_BY_RE.test(text) ? ['"settled by" is wrong: neededBy is when to ask or act (write "ask by" or "act by")'] : []),
+    ...(LOWEST_WEEK_RE.test(text) ? ['write "after your lowest point", not "after your lowest week"'] : []),
   ];
   return parts.length ? parts.join("; ") : undefined;
 }
 
 // Phrases that claim something was sent or paid. Drafts are text for the owner to send; they never say it was.
 const CLAIM_RE = /\bsent\b|\b(?:we|i)(?:'ve| have)?\s+(?:already\s+|just\s+)?(?:paid|wired|transferred)\b|\b(?:have|has|had|already|just|am|are|was|were)\s+(?:been\s+)?(?:paid|wired|transferred|submitted|processed)\b|\bi(?:'ve| have)\s+paid\b|\bon its way\b|\bpayment\s+(?:is|was)\s+(?:made|processed|complete)/i;
+
+// A chase for an invoice that is not yet due asks for payment by the due date or earlier. A later date
+// would read as a grace period.
+function chaseDateProblem(text: string, f: Facts): string | undefined {
+  const due = f.commitment?.due;
+  if (f.lever?.kind !== "chase" || !due || (f.commitment?.dueStatus !== "not yet due" && f.commitment?.dueStatus !== "due today")) return undefined;
+  const late = extractDates(text, { asOf: f.asOf }).find((d) => d.date > due);
+  return late ? `"${late.raw}" is after the due date; an invoice that is not yet due is chased for the due date or earlier` : undefined;
+}
 
 export function checkDraftText(subject: string | undefined, body: string, item: WorkItem, f: Facts): string | undefined {
   if (!body.trim()) return "empty body";
@@ -426,13 +552,15 @@ export function checkDraftText(subject: string | undefined, body: string, item: 
   // A message to a counterparty may state only what is on the document: never our own cash position
   // (low point, safety line) or the lever's effect on it.
   const r = checkText(all, citationsFor(item, f), allowedFromFacts(draftFacts(f)), checkOpts(f));
-  const parts = [...r.unmatched.map((u) => `${u.kind} "${u.raw}" is not in the facts`), ...r.problems, ...countProblems(all, f)];
+  const parts = [...r.unmatched.map((u) => `${u.kind} "${u.raw}" is not in the facts`), ...r.problems, ...countProblems(all, f),
+    ...[tenseProblem(all, f), chaseDateProblem(all, f)].filter((x): x is string => !!x)];
   return parts.length ? parts.join("; ") : undefined;
 }
 
 const feedback = (problems: string[]) =>
   `Your previous answer failed validation:\n${problems.map((p) => `- ${p}`).join("\n")}\n` +
   "Use only the amounts and dates in the facts, keep titles to 8 words, include no links, and claim nothing was sent or paid. " +
+  "Keep tenses relative to asOf, write neededBy as \"ask by\" or \"act by\", and name the currency as the facts do. " +
   "If a figure is not in the facts, leave it out. Return the corrected answer in the same format.";
 
 // ---------------------------------------------------------------------------
