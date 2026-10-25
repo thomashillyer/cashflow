@@ -65,10 +65,16 @@ function applyOverride(events: CashEvent[], o: Override, ctx: Ctx): CashEvent[] 
 
 // The leg a chase/defer acts on: the named one, else the earliest remaining event in the lever's direction.
 // Moving one leg keeps the others where they were (a deposit and a balance never collapse onto one date).
-function targetLeg(l: { commitmentId: string; legIndex?: number }, dir: "in" | "out", events: CashEvent[]): CashEvent | undefined {
+function targetLeg(l: { commitmentId: string; legIndex?: number }, dir: "in" | "out", events: CashEvent[], pred: (e: CashEvent) => boolean = () => true): CashEvent | undefined {
   const mine = events.filter((e) => e.commitmentId === l.commitmentId && e.direction === dir);
-  if (l.legIndex !== undefined) return mine.find((e) => e.legIndex === l.legIndex);
-  return [...mine].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.legIndex - b.legIndex))[0];
+  if (l.legIndex !== undefined) return mine.find((e) => e.legIndex === l.legIndex && pred(e));
+  return [...mine].filter(pred).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.legIndex - b.legIndex))[0];
+}
+
+// Profile rule: a recurring item flagged nonDeferrable (payroll, taxes), matched by id or by category so the same
+// obligation imported from a bank file under another id is covered too. Shared by every lane that proposes a defer.
+export function isNonDeferrable(profile: Profile, commitmentId: string, category?: string): boolean {
+  return profile.recurring.some((r) => r.nonDeferrable === true && (r.id === commitmentId || (!!category && r.category === category)));
 }
 
 function leverOverrides(l: Lever, events: CashEvent[], ctx: Ctx): Override[] {
@@ -79,13 +85,15 @@ function leverOverrides(l: Lever, events: CashEvent[], ctx: Ctx): Override[] {
   };
   switch (l.kind) {
     case "chase": {
-      const e = targetLeg(l, "in", events);
-      if (!e) return noTarget("remaining receipt");
+      // A chase pulls a receipt earlier; never move one that is already at or before the assumed date.
+      const e = targetLeg(l, "in", events, (x) => x.date > l.assumeDate);
+      if (!e) return noTarget(`remaining receipt later than ${l.assumeDate}`);
       return [{ id, target: { commitmentId: l.commitmentId, legIndex: e.legIndex }, change: { date: l.assumeDate }, origin: "lever" }];
     }
     case "defer": {
       // Payroll, taxes and other fixed obligations are never deferred, even when asked.
-      if (ctx.profile.recurring.some((r) => r.id === l.commitmentId && r.nonDeferrable)) {
+      const cat = ctx.commitments.find((c) => c.id === l.commitmentId)?.category ?? events.find((e) => e.commitmentId === l.commitmentId)?.category;
+      if (isNonDeferrable(ctx.profile, l.commitmentId, cat)) {
         ctx.warnings.push(`lever defer on ${l.commitmentId} skipped: marked nonDeferrable in the profile`);
         return [];
       }

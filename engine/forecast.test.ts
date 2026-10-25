@@ -389,6 +389,34 @@ describe("levers act on one leg, in the right direction", () => {
     expect(run.warnings.join(" ")).toMatch(/lever chase on po: no remaining receipt/);
   });
 
+  it("chase never pulls a receipt later, so it skips legs already before the assumed date", () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [com("deal", { type: "sales_deal", amount: $(1000), anchors: { order: "2026-10-28", delivery: "2026-11-20" } })];
+    const { run } = sim(r, [{ kind: "chase", commitmentId: "deal", assumeDate: "2026-11-05" }]);
+    expect(dates(run, "deal")).toEqual(["0:2026-10-28", "1:2026-11-05"]);
+    const none = sim(r, [{ kind: "chase", commitmentId: "deal", assumeDate: "2026-12-01" }]);
+    expect(dates(none.run, "deal")).toEqual(["0:2026-10-28", "1:2026-11-20"]);
+    expect(none.lowPointDelta).toBe(0);
+    expect(none.run.warnings.join(" ")).toMatch(/no remaining receipt later than 2026-12-01/);
+  });
+
+  it("a legIndex that matches nothing warns and changes nothing", () => {
+    const s = sim(po(), [{ kind: "defer", commitmentId: "po", days: 5, legIndex: 9 }]);
+    expect(dates(s.run, "po")).toEqual(["0:2026-10-28", "1:2026-11-10"]);
+    expect(s.lowPointDelta).toBe(0);
+    expect(s.run.warnings.join(" ")).toMatch(/no remaining payment/);
+  });
+
+  it("nonDeferrable also covers the same category under a different id (e.g. payroll found in the bank file)", () => {
+    const r = empty();
+    r.balances = [bal($(100000))];
+    r.commitments = [com("payroll-bank", { type: "bill", category: "payroll", amount: $(500), anchors: { due: "2026-10-30" } })];
+    const s = sim(r, [{ kind: "defer", commitmentId: "payroll-bank", days: 7 }]);
+    expect(s.run.events.find((e) => e.commitmentId === "payroll-bank")?.date).toBe("2026-10-30");
+    expect(s.run.warnings.join(" ")).toMatch(/nonDeferrable/);
+  });
+
   it("defer on a recurring item moves the next occurrence only", () => {
     const { run } = sim(empty(), [{ kind: "defer", commitmentId: "rec-sub", days: 3 }]);
     const sub = run.events.filter((e) => e.commitmentId === "rec-sub").map((e) => e.date);
