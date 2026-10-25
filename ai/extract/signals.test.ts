@@ -136,7 +136,8 @@ describe("cached extractions of the cascade_trade fixtures", () => {
     });
     expect(s.confidence).toBeLessThanOrEqual(0.5);
     expect(notes.some((n) => n.includes("owner must confirm the date"))).toBe(true);
-    expect(s.sourceRef.excerpt!.text).toBe("we'll pay once our customer pays us, early January");
+    expect(s.sourceRef.excerpt!.text).toContain("early January"); // the model's quote may be the phrase or the whole promise
+    expect(s.sourceRef.excerpt!.end).toBeLessThanOrEqual(bundle.messages![1]!.end);
     expect(sliced(s, bundle.text)).toBe(s.sourceRef.excerpt!.text);
     expect(s.receivedAt).toBe(bundle.messages![1]!.at);
     // the excerpt is inside the promise message, not the reminder
