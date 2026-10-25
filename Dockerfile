@@ -14,5 +14,8 @@ COPY . .
 # The server serves app/config.js live (same-origin API + public Supabase values from env); see api/app.ts.
 ENV HOST=0.0.0.0 PORT=8080
 EXPOSE 8080
+# Live Claude responses are cached in data/private/ai-cache (ai/cache.ts LIVE_CACHE_DIR). The app runs as node,
+# which can't create directories under /srv, so create it here; otherwise every page load calls Claude again.
+RUN mkdir -p data/private/ai-cache && chown -R node:node data
 USER node
 CMD ["npx", "tsx", "api/server.ts"]
