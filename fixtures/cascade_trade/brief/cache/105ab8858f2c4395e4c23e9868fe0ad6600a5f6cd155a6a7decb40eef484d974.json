@@ -2,9 +2,9 @@
   "key": "105ab8858f2c4395e4c23e9868fe0ad6600a5f6cd155a6a7decb40eef484d974",
   "promptVersion": "draft_message@1",
   "model": "claude-opus-5-5",
-  "source": "hand-authored stand-in; replace with a live run (scripts/refresh-brief-cache.ts)",
+  "source": "live",
   "output": {
-    "subject": "Advance on PO HH-PO-552",
-    "body": "Hello Harbor and Hearth team,\n\nThank you for PO HH-PO-552 for $10,000. To help us fund the order, we would like to ask whether you could pay 40% in advance. Please let me know whether that works for you, or what you would suggest instead.\n\nThank you,\nCascade Trade Co."
+    "subject": "PO HH-PO-552: advance request",
+    "body": "Hello Harbor and Hearth team,\n\nThank you for your PO HH-PO-552 for $10,000. We are writing to ask whether you would be able to pay a 40% advance on this order. If that works for you, could you let us know whether the advance could reach us by Nov 23?\n\nIf an advance is not possible or you have any questions, please tell us and we will gladly talk it through.\n\nThank you,\nCascade Trade Co."
   }
 }
