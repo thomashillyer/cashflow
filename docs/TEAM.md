@@ -37,6 +37,6 @@ Add entries under your own name to avoid merge conflicts. Each owner keeps their
 - Took the integration lane (person 5) and wrote the warning checks and ranking that turn a forecast into "three things to do today": cash gap (chase / defer), early-pay discount, idle cash, AR concentration, payment slip, each with a dollar effect from the engine's `simulate()` (#35).
 - Wired the loop end to end in `engine/brief.ts` (forecast → warnings → rank) and added the `work_items` store helpers, so an owner's ticked-off items stay done across reruns (#70).
 - Spotted that saved work items couldn't tell which forecast they came from, proposed an `inputs_hash` column, and agreed it with Andras before writing the migration; Andras followed up with the atomic save RPC (#91, #109).
-- Aligned warnings with Thomas's engine changes: one lever per payment leg, and `deal_affordability` ("ask for 50% upfront and you stay above your safety line") for deal-level cash before signing (#98).
+- Aligned warnings with Thomas's engine changes: one lever per payment leg, and `deal_affordability` ("ask for 50% upfront and you stay above your safety line") for deal-level cash before signing (#98, #113).
 - Ran a local subagent review before every push and fixed what it found; flagged cross-lane follow-ups in the PRs instead of patching other lanes' code (engine `ask_advance` semantics and overdue chase for Thomas, per-leg drafts for Andras).
 
