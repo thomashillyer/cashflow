@@ -995,9 +995,50 @@ describe("split lever (#39)", () => {
     expect(legs(second.run, "po").map((x) => [x[1], x[2]])).toEqual([["2026-10-28", $(5000)], ["2026-11-10", $(2500)], ["2026-11-24", $(2500)]]);
   });
 
-  it("an overdue leg starts on asOf and the rest follow every interval from asOf", () => {
-    const { run } = sim(bill("2026-10-10", $(3000)), [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }]);
-    expect(legs(run, "bill").map((x) => [x[1], x[2]])).toEqual([[asOf, $(1500)], ["2026-11-08", $(1500)]]);
-    expect(closing(run, asOf)).toBe($(13500));
+  it("an overdue payment is not split (base applies bank-cover checks to it)", () => {
+    const s = sim(bill("2026-10-10", $(3000)), [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }]);
+    expect(legs(s.run, "bill")).toEqual(legs(s.base, "bill"));
+    expect(s.lowPointDelta).toBe(0);
+    expect(s.run.warnings.join(" ")).toMatch(/overdue payment; split skipped — check whether it is already paid/);
+  });
+
+  const deal = () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [com("deal", { type: "sales_deal", amount: $(10000), anchors: { order: "2026-10-10", delivery: "2026-11-20" } })];
+    return r;
+  };
+  const dp: Profile = {
+    ...p,
+    recurring: [],
+    paymentPatterns: [...p.paymentPatterns, { id: "deal", appliesTo: "sales_deal", isDefault: true, legs: [{ share: 0.3, anchor: "order", offsetDays: 0, direction: "in" }, { share: 0.7, anchor: "delivery", offsetDays: 0, direction: "in" }] }],
+  };
+
+  it("with no legIndex, an overdue receipt is skipped and the earliest future receipt is split", () => {
+    const { run } = sim(deal(), [{ kind: "split", commitmentId: "deal", shares: [0.5, 0.5] }], dp);
+    expect(legs(run, "deal").map((x) => [x[1], x[2]])).toEqual([["2026-10-10", $(3000)], ["2026-11-20", $(3500)], ["2026-12-04", $(3500)]]);
+  });
+
+  it("a named overdue receipt starts one interval after asOf, never as instant cash", () => {
+    const s = sim(deal(), [{ kind: "split", commitmentId: "deal", shares: [0.5, 0.5], legIndex: 0 }], dp);
+    expect(legs(s.run, "deal").map((x) => [x[1], x[2]])).toEqual([["2026-11-08", $(1500)], ["2026-11-20", $(7000)], ["2026-11-22", $(1500)]]);
+    expect(closing(s.run, asOf)).toBe(0);
+  });
+
+  it("a later lever acts on one installment: [split, pay_early] keeps the discount on every part, ids unique", () => {
+    const r = bill("2026-11-20", $(10000));
+    r.commitments = [{ ...r.commitments[0]!, discount: { pct: 2, byDate: "2026-11-30" } }];
+    const { run } = sim(r, [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }, { kind: "pay_early", commitmentId: "bill" }], { ...p, recurring: [] });
+    const out = run.events.filter((e) => e.commitmentId === "bill");
+    expect(out.map((e) => [e.date, e.amount])).toEqual([[asOf, $(4900)], [asOf, $(4900)]]);
+    expect(out.reduce((a, e) => a + e.amount, 0)).toBe($(9800));
+    expect(new Set(run.events.map((e) => e.id)).size).toBe(run.events.length);
+    const payIds = out.map((e) => e.overriddenBy!.find((x) => x.startsWith("lever-pay_early"))!);
+    expect(new Set(payIds).size).toBe(2);
+  });
+
+  it("[split, defer 10] defers only the first installment by default", () => {
+    const { run } = sim(bill("2026-11-02", $(10000)), [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }, { kind: "defer", commitmentId: "bill", days: 10 }]);
+    expect(legs(run, "bill").map((x) => [x[1], x[2]])).toEqual([["2026-11-12", $(5000)], ["2026-11-16", $(5000)]]);
   });
 });
