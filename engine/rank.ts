@@ -8,8 +8,9 @@
 
 import type { Candidate, ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
-import type { Commitment, Lever, Records, WorkItem } from "../schema/records";
+import type { CashEvent, Commitment, Lever, Records, WorkItem } from "../schema/records";
 import { diffDays } from "./dates";
+import { STATUS_CONFIDENCE } from "./expand";
 import { pendingEventsByCommitment, receivableShares, sumBase } from "./warnings";
 
 // The orchestrator binds the engine's simulate(records, profile, baseOverrides, levers, asOf, fxRates)
@@ -50,10 +51,11 @@ function relationship(partyId: string | undefined, records: Records, profile: Pr
 
 function describe(
   c: Candidate, value: number, commitment: Commitment | undefined, run: ForecastRun, records: Records,
-  money: (minor: number) => string,
+  money: (minor: number) => string, leg?: CashEvent,
 ): { title: string; why: string } {
   const partyOf = (id?: string) => records.parties.find((p) => p.id === id)?.name ?? "this party";
-  const ref = commitment?.reference ?? commitment?.id ?? "";
+  // A lever on one leg of a multi-leg commitment names that leg, so two legs never read the same.
+  const ref = (commitment?.reference ?? commitment?.id ?? "") + (leg ? ` (${money(leg.amountBase)} due ${leg.date})` : "");
   const named = records.parties.find((p) => p.id === commitment?.partyId)?.name;
   const lever = c.lever;
 
@@ -136,8 +138,10 @@ export function rank(
     }
     if (c.lever && value <= 0) continue;
 
-    // A possible deal has no main-line events; its probability is the confidence.
-    const confidence = commitment?.status === "possible" ? commitment.probability ?? 1
+    // A deal's confidence is its status's, as the engine assigns it: a possible deal has no main-line events,
+    // and a likely deal's lag-shrunk later legs would understate a decision taken before signing.
+    const confidence = c.upfront && commitment
+      ? (commitment.status === "possible" ? commitment.probability ?? STATUS_CONFIDENCE.possible : STATUS_CONFIDENCE[commitment.status])
       : events.length ? Math.min(...events.map((e) => e.confidence)) : 1;
     const rel = c.lever ? relationship(commitment?.partyId, records, profile) : 1;
     const d = Math.max(0, diffDays(c.neededBy, run.asOf));
@@ -148,7 +152,7 @@ export function rank(
     const item: WorkItem = {
       id,
       warning: c.warning,
-      ...describe(c, value, commitment, run, records, money),
+      ...describe(c, value, commitment, run, records, money, legIndex !== undefined ? events[0] : undefined),
       ...(c.lever ? { lever: c.lever } : {}),
       cashEffect: value,
       neededBy: c.neededBy,

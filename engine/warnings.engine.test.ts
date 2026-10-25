@@ -64,7 +64,16 @@ describe("per-leg defer on a two-leg purchase order", () => {
       lever: { kind: "defer", commitmentId: "po-1", days: 10, legIndex: 1 },
       cashEffect: $(14000),
     });
+    expect(defers[0]!.title).toBe("Move PO-1 ($14,000 due 2026-11-12) by 10 days");
     expect(defers[0]!.why).toBe("If it can wait, your low point rises by $14,000.");
+  });
+
+  it("keeps the leg suffix once the deposit is paid, so a dismissed item stays dismissed", () => {
+    const paid = { ...input, records: { ...input.records,
+      settlements: [{ id: "s1", commitmentId: "po-1", amount: $(6000), currency: "USD", date: "2026-11-01", legIndex: 0, sourceRef: src }],
+      commitments: input.records.commitments.map((c) => (c.id === "po-1" ? { ...c, outstanding: $(14000), settlement: "partial" as const } : c)) } };
+    const ids = buildBrief(paid).brief.all.filter((w) => w.lever?.kind === "defer").map((w) => w.id);
+    expect(ids.every((id) => id.startsWith("wi-projected_cash_gap-defer-po-1-"))).toBe(true);
   });
 });
 
@@ -76,16 +85,14 @@ describe("deal_affordability", () => {
       anchors: { order: "2026-11-09", delivery: "2026-12-07" }, ...o });
 
   it("asks for the smallest upfront share that keeps cash above the line", () => {
-    const { run, brief } = buildBrief({ records: records($(10000), [deal()]), profile, asOf, fxRates: {} });
+    const { brief } = buildBrief({ records: records($(10000), [deal()]), profile, asOf, fxRates: {} });
     const item = brief.all.find((w) => w.warning === "deal_affordability")!;
     expect(item).toMatchObject({
       lever: { kind: "ask_advance", commitmentId: "deal", share: 0.5 },
       cashEffect: $(15000),           // low point -$10,000 at 20% -> $5,000 at 50%
       neededBy: "2026-11-09",
+      confidence: 0.7,                // the engine's confidence for a likely commitment
     });
-    // A likely deal's confidence is the engine's, from its own legs.
-    const legs = run.events.filter((e) => e.commitmentId === "deal");
-    expect(item.confidence).toBe(Math.min(...legs.map((e) => e.confidence)));
     expect(item.title).toBe("Ask the customer for 50% upfront on DEAL");
     expect(item.why).toBe("At 20% upfront this order takes cash below your safety line; 50% keeps it above and raises your low point by $15,000.");
     expect(brief.today.map((w) => w.id)).toContain("wi-deal_affordability-ask_advance-deal");
@@ -95,6 +102,14 @@ describe("deal_affordability", () => {
     const { brief } = buildBrief({ records: records($(10000), [deal({ status: "possible", probability: 0.5 })]),
       profile, asOf, fxRates: {} });
     expect(brief.all.find((w) => w.warning === "deal_affordability")).toMatchObject({ confidence: 0.5, cashEffect: $(15000) });
+    const noProbability = buildBrief({ records: records($(10000), [deal({ status: "possible" })]), profile, asOf, fxRates: {} });
+    expect(noProbability.brief.all.find((w) => w.warning === "deal_affordability")?.confidence).toBe(0.3);
+  });
+
+  it("skips a deal whose order date has passed", () => {
+    const { brief } = buildBrief({ records: records($(10000), [deal({ anchors: { order: "2026-10-30", delivery: "2026-12-07" } })]),
+      profile, asOf, fxRates: {} });
+    expect(brief.all.some((w) => w.warning === "deal_affordability")).toBe(false);
   });
 
   it("explains, without a lever, when even 100% upfront is not enough", () => {

@@ -57,11 +57,21 @@ function flexibilityRule(c: Commitment, records: Records) {
     ?? confirmed.find((r) => "all" in r.scope);
 }
 
-// The legs a lever acts on, one lever per leg. legIndex is set only when the commitment has more than one
-// remaining leg in that direction, so single-leg ids stay stable (`wi-...-chase-inv-104`).
-function legLevers(events: CashEvent[], dir: Direction): { leg: CashEvent; legIndex?: number }[] {
-  const mine = events.filter((e) => e.direction === dir);
-  return mine.map((leg) => (mine.length > 1 ? { leg, legIndex: leg.legIndex } : { leg }));
+// Whether a commitment is paid in more than one leg in a direction, by its terms rather than by what is still
+// pending, so a WorkItem id doesn't change when an earlier leg is paid. Recurring items always have several.
+function isMultiLeg(c: Commitment, profile: Profile, dir: Direction): boolean {
+  if (c.type === "recurring") return true;
+  const pattern = c.patternId
+    ? profile.paymentPatterns.find((p) => p.id === c.patternId)
+    : profile.paymentPatterns.find((p) => p.appliesTo === c.type && p.isDefault);
+  return (pattern?.legs.filter((l) => l.direction === dir).length ?? 1) > 1;
+}
+
+// The legs a lever acts on, one lever per leg. legIndex is set only for multi-leg commitments, so single-leg
+// ids stay stable (`wi-...-chase-inv-104`).
+function legLevers(c: Commitment, events: CashEvent[], dir: Direction, profile: Profile): { leg: CashEvent; legIndex?: number }[] {
+  const multi = isMultiLeg(c, profile, dir);
+  return events.filter((e) => e.direction === dir).map((leg) => (multi ? { leg, legIndex: leg.legIndex } : { leg }));
 }
 
 // A daily closing balance falls below the safety line: chase receivable legs that are overdue or land
@@ -81,7 +91,7 @@ export const projectedCashGap: Check = (run, records, profile) => {
 
     if (isReceivable(c)) {
       const reach = addDays(run.asOf, lead.chase ?? 0);
-      for (const { leg, legIndex } of legLevers(events, "in")) {
+      for (const { leg, legIndex } of legLevers(c, events, "in", profile)) {
         const overdue = leg.date < run.asOf;
         // Overdue: collect as soon as the owner can reach them. Otherwise no earlier than the due date.
         let assumeDate: string;
@@ -101,7 +111,7 @@ export const projectedCashGap: Check = (run, records, profile) => {
     if (commitmentDirection(c) === "out" && !isNonDeferrable(profile, c.id, c.category ?? events[0]?.category)) {
       const rule = flexibilityRule(c, records);
       const days = (rule?.params.extraDays as number | undefined) ?? DEFAULT_DEFER_DAYS;
-      for (const { leg, legIndex } of legLevers(events, "out")) {
+      for (const { leg, legIndex } of legLevers(c, events, "out", profile)) {
         if (leg.date < run.asOf || leg.date > deferUntil) continue;
         // The base run already applied this flexibility; deferring again would double-count it.
         if (rule && leg.overriddenBy?.includes(rule.id)) continue;
@@ -213,6 +223,8 @@ export function dealAffordability(run: ForecastRun, records: Records, profile: P
   const out: Candidate[] = [];
   for (const c of records.commitments) {
     if (c.type !== "sales_deal" || !isOpen(c) || (c.status !== "likely" && c.status !== "possible")) continue;
+    // Terms are set once the order is placed; this advice is for before signing.
+    if (c.anchors.order && c.anchors.order < run.asOf) continue;
     const r = smallestUpfrontShare(records, profile, baseOverrides, c.id, run.asOf, run.fxRates);
     if (r.kind !== "ok" && r.kind !== "not_achievable") continue;
     const neededBy = addDays(c.anchors.order ?? run.asOf, -(lead.ask_advance ?? 0));
@@ -221,14 +233,17 @@ export function dealAffordability(run: ForecastRun, records: Records, profile: P
         upfront: { share: 1, currentShare: r.currentShare } });
       continue;
     }
-    const atCurrent = runAtUpfrontShare(records, profile, baseOverrides, c.id, run.asOf, run.fxRates, r.currentShare);
+    // A likely deal is already on the main line, so the brief's base run is the run at the current share.
+    const currentLow = c.status === "likely" ? run.lowPoint.amount
+      : runAtUpfrontShare(records, profile, baseOverrides, c.id, run.asOf, run.fxRates, r.currentShare).lowPoint.amount;
     out.push({
       warning: "deal_affordability",
-      // The lever records the ask for drafting; its dollar effect is the affordability search's, not simulate()'s.
+      // The lever records the ask for drafting. Its dollar effect is the affordability search's ("upfront legs
+      // total `share`"); the engine's ask_advance advances `share` of every leg to asOf, so don't re-simulate it.
       lever: { kind: "ask_advance", commitmentId: c.id, share: r.share },
       evidenceRefs: [c.id],
       neededBy,
-      cashEffect: r.lowPoint - atCurrent.lowPoint.amount,
+      cashEffect: r.lowPoint - currentLow,
       upfront: { share: r.share, currentShare: r.currentShare },
     });
   }
