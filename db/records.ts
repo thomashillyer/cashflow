@@ -109,22 +109,29 @@ export async function loadWorkItems(db: SupabaseClient, businessId: string): Pro
   return (data as Row[]).map((r) => fromRow<WorkItem>(r, "work_items"));
 }
 
-// Service-role only: save a fresh ranking. Open items the new ranking no longer produces are
-// removed; done and dismissed items are kept, so a later rerun still knows their state.
+// Service-role only: save a fresh ranking. `state` is never written here: new rows take the column
+// default ('open') and existing rows keep theirs, so a recompute can't undo an owner's tick-off.
+// Open items the new ranking no longer produces are removed; done and dismissed items are kept.
 export async function saveWorkItems(db: SupabaseClient, businessId: string, items: WorkItem[]): Promise<void> {
-  await upsert(db, "work_items", businessId, items);
+  await upsert(db, "work_items", businessId, items.map(({ state: _state, ...rest }) => rest));
   let stale = db.from("work_items").delete().eq("business_id", businessId).eq("state", "open");
-  if (items.length) stale = stale.not("id", "in", `(${items.map((i) => `"${i.id}"`).join(",")})`);
+  if (items.length) {
+    const quoted = items.map((i) => `"${i.id.replace(/[\\"]/g, "\\$&")}"`);
+    stale = stale.not("id", "in", `(${quoted.join(",")})`);
+  }
   const { error } = await stale;
   if (error) throw toStoreError(`prune work items ${businessId}`, error);
 }
 
-// Owner ticks an item off, or dismisses it. Changes work-item state only; never sends or pays.
+// Service-role only: the owner ticks an item off or dismisses it. Changes work-item state only;
+// never sends or pays. Throws NOT_FOUND when no row was updated (wrong id, or RLS blocked it).
 export async function setWorkItemState(
   db: SupabaseClient, businessId: string, id: string, state: WorkItem["state"],
 ): Promise<void> {
-  const { error } = await db.from("work_items").update({ state }).eq("business_id", businessId).eq("id", id);
+  const { data, error } = await db.from("work_items").update({ state })
+    .eq("business_id", businessId).eq("id", id).select("id");
   if (error) throw toStoreError(`set work item ${id}`, error);
+  if (!data?.length) throw new StoreError("NOT_FOUND", 404, `set work item ${id}: no such work item`);
 }
 
 // Atomic confirm through the confirm_change_proposal RPC (one transaction). Throws StoreError
