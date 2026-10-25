@@ -103,3 +103,21 @@ npm run demo       # loads demo profile + cached Claude responses
 - Building a connector without its file/paste fallback.
 - Specific investment or loan recommendations. Idle-cash views explain amount and duration plus general options only. Partner cards are clearly labeled samples.
 - Committing real customer names, amounts, or exports.
+
+## Branches, PRs, and review
+
+- Never push to `main`. Branch per issue (`p<person>/<topic>`, e.g. `p4/reconcile`), open a PR with `Closes #<issue>`, and say if it is stacked on another PR.
+- Keep PRs small: one issue each. Run `npm run typecheck && npm test` before pushing.
+- Before merging, run a **local subagent review** (below). Fix must-fix findings, then merge. Don't merge someone else's PR without them.
+
+### Local PR review (Claude Code)
+
+Ask Claude Code: "review PR #N with a subagent". It should spawn one general-purpose subagent with this brief (fill in N and the branch):
+
+> Read-only review of PR #N (branch `<branch>`, base `main`) in this repo. Do not push, commit, comment on GitHub, or edit files. Read `CLAUDE.md` and the design doc for the area touched (`docs/design/`). Use `git diff main...<branch>` and `git show <branch>:<path>`; to run tests, use a temporary worktree (`git worktree add /tmp/review-N <branch>`, then remove it).
+>
+> Report only findings that matter: bugs, wrong money/date math, contract mismatches with `schema/` or the design docs, broken tests, security problems (secrets, prompt injection, anything that could send/pay/move money), and things that will block another lane. **Do not nitpick**: no style, naming, formatting, or "consider adding" suggestions unless they cause a real problem. If the PR is fine, say so in one line.
+>
+> Format: a short ranked list, each with `file:line`, what is wrong, a concrete failure scenario, and the fix. Split into "must fix before merge" and "worth fixing soon". Keep it under ~15 items.
+
+Then the author applies the fixes, re-runs tests, and merges (squash) once must-fix items are resolved.
