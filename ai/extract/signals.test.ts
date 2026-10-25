@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Commitment, Records, Signal } from "../../schema/records";
 import { loadSignalBundle, OWNER_INV104_RECEIVED_AT } from "../../scripts/signal-standins";
 import { baseRecords } from "../reconcile/testkit";
-import { parseEmail, parsePaste } from "./message";
+import { parseEmail, parsePaste, type MessageBundle } from "./message";
 import {
   extractSignals, passesTriage, resolveDatePhrase, SignalExtraction, toSignal, type ToSignalContext,
 } from "./signals";
@@ -153,7 +153,7 @@ describe("cached extractions of the cascade_trade fixtures", () => {
 
 describe("toSignal", () => {
   const records = baseRecords();
-  const ctxFor = (bundle: ReturnType<typeof parsePaste>, over: Partial<ToSignalContext> = {}): ToSignalContext => ({
+  const ctxFor = (bundle: MessageBundle, over: Partial<ToSignalContext> = {}): ToSignalContext => ({
     records, receivedAt: bundle.parent.receivedAt, channel: "owner", evidenceId: bundle.parent.id, signalId: "sig-1", timeZone: TZ, ...over,
   });
   const paste = (text: string, receivedAt = "2026-11-25T20:00:00Z") => parsePaste(text, { evidenceId: "ev-note", receivedAt });
@@ -206,6 +206,51 @@ describe("toSignal", () => {
     expect(lone.signal!.matchCandidates).toEqual([{ commitmentId: "inv-INV-1187", reasons: [expect.stringMatching(/only open commitment/)] }]);
     const far = toSignal(extraction({ amountMentioned: q("$31,000", "$28,400"), newDatePhrase: q("next Friday") }), bundle, ctxFor(bundle, { channel: "email" }));
     expect(far.notes.join(" ")).toMatch(/Ignored the amount/); // value not in its quote
+  });
+
+  it("a restated original due date in a chat reminder is never a date change", () => {
+    const bundle = loadSignalBundle("whatsapp-evergreen.txt");
+    const reminder = bundle.messages![0]!;
+    const r = toSignal(extraction({
+      reference: q("INV-1187", "INV-1187 for $28,000"), newDatePhrase: q("Dec 10", "is due Dec 10"), confidence: 0.8,
+    }), bundle, { ...ctxFor(bundle), receivedAt: reminder.at, channel: "whatsapp", message: reminder });
+    expect(r.signal).toBeUndefined();
+    expect(r.notes.join(" ")).toMatch(/already the due date/);
+  });
+
+  it("the promise comes from Dana's own message even when the reference is quoted from the reminder", () => {
+    const bundle = loadSignalBundle("whatsapp-evergreen.txt");
+    const promise = bundle.messages![1]!;
+    const { signal } = toSignal(extraction({
+      reference: q("INV-1187", "INV-1187 for $28,000"), newDatePhrase: q("early January", "early January"),
+    }), bundle, { ...ctxFor(bundle), receivedAt: promise.at, channel: "whatsapp", message: promise });
+    expect(signal!.claim).toEqual({ kind: "date_change", newDate: "2027-01-05" });
+    expect(signal!.commitmentId).toBe("inv-INV-1187");
+    // a date quoted only from another message of the chat is not accepted
+    const other = toSignal(extraction({
+      reference: q("INV-1187", "INV-1187 for $28,000"), newDatePhrase: q("Dec 10", "is due Dec 10"),
+    }), bundle, { ...ctxFor(bundle), receivedAt: promise.at, channel: "whatsapp", message: promise });
+    expect(other.signal).toBeUndefined();
+  });
+
+  it("a reference taken from a URL path (2-INV-1187) is ignored; the invoice number written in the text wins", () => {
+    const url = "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187";
+    const mail = (body: string) => parseEmail(
+      `From: Dana <accounts@evergreenhome.example>\nSubject: timing\nDate: Wed, 25 Nov 2026 08:00:00 -0800\n\n${body}`, { evidenceId: "ev-mail" });
+    const withText = mail(`We will pay INV-1187 next Friday.\nView invoice: ${url}`);
+    const a = toSignal(extraction({ reference: q("2-INV-1187", url), newDatePhrase: q("next Friday", "pay INV-1187 next Friday") }), withText, ctxFor(withText, { channel: "email" }));
+    expect(a.signal!.commitmentId).toBe("inv-INV-1187");
+    expect(a.notes.join(" ")).toMatch(/comes from a link/);
+
+    // only the URL carries the number: no match by reference, same-party candidate only
+    const urlOnly = mail(`We will pay next Friday.\nView invoice: ${url}`);
+    const b = toSignal(extraction({ reference: q("2-INV-1187", url), newDatePhrase: q("next Friday", "pay next Friday") }), urlOnly, ctxFor(urlOnly, { channel: "email" }));
+    expect(b.signal!.commitmentId).toBeUndefined();
+    expect(b.signal!.matchCandidates).toEqual([{ commitmentId: "inv-INV-1187", reasons: [expect.stringMatching(/only open commitment/)] }]);
+
+    // the model returned nothing for the reference, but the text names the invoice
+    const c = toSignal(extraction({ newDatePhrase: q("next Friday", "pay INV-1187 next Friday") }), withText, ctxFor(withText, { channel: "email" }));
+    expect(c.signal!.commitmentId).toBe("inv-INV-1187");
   });
 
   it("owner messages (no sender): a reference shared by two open commitments is ambiguous", () => {

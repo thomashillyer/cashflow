@@ -282,6 +282,9 @@ const clamp01 = (n: number) => (Number.isFinite(n) ? Math.min(1, Math.max(0, n))
 const squash = (s: string) => s.replace(/\s+/g, " ").trim().toLowerCase();
 const normRef = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 const isOpen = (c: Commitment) => c.settlement === undefined || c.settlement === "open" || c.settlement === "partial";
+// `ref` written out as a whole token (not inside a longer id like "2-INV-1187").
+const mentions = (text: string, ref: string): boolean =>
+  new RegExp(`(?<![A-Za-z0-9-])${ref.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![A-Za-z0-9])`, "i").test(text);
 const PHONE_RE = /^\+?[\d\s().-]{7,}$/;
 
 // The value must be supported by its own quote, or a real quote could vouch for a different value.
@@ -322,7 +325,14 @@ export function toSignal(
     }
     return q;
   };
-  const reference = usable(extraction.reference, "reference");
+  // A reference read out of a URL ("2-INV-1187" in a portal path) is not an invoice number the sender wrote.
+  const inLink = (span: { start: number; end: number }) => bundle.links.some((l) => span.start < l.end && span.end > l.start);
+  let reference = usable(extraction.reference, "reference");
+  const refSpan = reference ? locate(reference) : undefined;
+  if (reference && refSpan && inLink(refSpan)) {
+    notes.push(`Ignored the reference "${reference.value}": it comes from a link, not the message text.`);
+    reference = undefined;
+  }
   const amountMentioned = usable(extraction.amountMentioned, "amount");
   const newDate = usable(extraction.newDatePhrase, "date", true);
   const newAmount = usable(extraction.newAmount, "new amount", true);
@@ -341,11 +351,19 @@ export function toSignal(
   // ---- match a commitment, in code
   const open = ctx.records.commitments.filter(isOpen);
   const pool = partyId ? open.filter((c) => c.partyId === partyId) : open;
+  // The message text with link spans blanked out, so only words the sender wrote are searched.
+  const blanked = [...bundle.links].reduce((t, l) => t.slice(0, l.start) + " ".repeat(l.end - l.start) + t.slice(l.end), bundle.text);
+  const visibleText = msg ? blanked.slice(msg.start, msg.end) : blanked;
   const basis = (c: Commitment) => c.outstanding ?? c.amount;
   let commitmentId: string | undefined;
   let candidates: { commitmentId: string; reasons: string[] }[] = [];
 
-  const exact = reference ? pool.filter((c) => c.reference !== undefined && normRef(c.reference) === normRef(reference.value)) : [];
+  let exact = reference ? pool.filter((c) => c.reference !== undefined && normRef(c.reference) === normRef(reference!.value)) : [];
+  if (!exact.length) {
+    // No usable reference from the model: an invoice number written out in the message text itself still counts.
+    const mentioned = pool.filter((c) => c.reference !== undefined && normRef(c.reference).length >= 3 && mentions(visibleText, c.reference));
+    if (mentioned.length === 1) exact = mentioned;
+  }
   if (exact.length === 1) {
     commitmentId = exact[0]!.id;
   } else if (exact.length > 1) {
@@ -382,6 +400,10 @@ export function toSignal(
     if (r.vague) {
       notes.push("owner must confirm the date");
       confidence = Math.min(confidence, 0.5);
+    }
+    // Restating the date the books already have (a reminder's "due Dec 10") is not a change.
+    if (matched && !r.vague && matched.anchors.due === r.date) {
+      return { notes: [...notes, `The date ${r.date} is already the due date of ${matched.reference ?? matched.id}; it is not a change.`] };
     }
     claim = { kind: "date_change", newDate: r.date };
     primary = newDate;
