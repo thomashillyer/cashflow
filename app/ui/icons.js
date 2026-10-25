@@ -3,6 +3,7 @@ const s = (d, extra = "") => `<svg viewBox="0 0 24 24" fill="none" stroke="curre
 
 export const icon = {
   check: s('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  plus: s('<path d="M12 5v14M5 12h14"/>'),
   play: s('<path d="M8 5.5v13l11-6.5z" fill="currentColor" stroke="none"/>'),
   pause: s('<path d="M8 5v14M16 5v14" stroke-width="3"/>'),
   stop: s('<rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="currentColor" stroke="none"/>'),

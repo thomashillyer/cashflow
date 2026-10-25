@@ -23,6 +23,7 @@ const app = {
   stressRun: null,
   whatIf: null,
   askLog: [],
+  attach: [], // files the owner added in the Ask bar, waiting to be sent
   mask: false,
   fresh: new Set(),
   noteFilter: "all",
@@ -448,9 +449,12 @@ function spokenLength() {
 }
 
 function askBar(placeholder, hints = [], branded = false) {
-  return `
+  const files = branded && app.attach.length
+    ? `<ul class="attach-list" aria-label="Files to send">${app.attach.map((f, k) => `<li class="attach-chip"><span>${esc(f.name)}</span><button type="button" data-action="unattach" data-k="${k}" aria-label="Remove ${esc(f.name)}">×</button></li>`).join("")}</ul>`
+    : "";
+  return `${files}
   <form class="askbar ${branded ? "branded" : ""}" data-submit="ask">
-    ${branded ? `<span class="ask-mark" aria-hidden="true">${logo}</span>` : ""}
+    ${branded ? `<label class="attach-btn" title="Add photos or files"><span class="sr">Add photos or files</span>${icon.plus}<input type="file" multiple accept="image/*,.pdf,.csv,.xlsx,.xls,.doc,.docx,.eml,.txt" data-change="attach" hidden /></label>` : ""}
     <label class="sr" for="askq">Ask Neri</label>
     <input id="askq" name="q" placeholder="${esc(placeholder)}" autocomplete="off" />
     ${canListen ? `<button type="button" class="mic" data-action="mic-ask" aria-pressed="${app.stopListen ? "true" : "false"}" title="Speak">${icon.mic}<span class="sr">Speak</span></button>` : ""}
@@ -1373,6 +1377,10 @@ async function onClick(ev) {
   if (a === "listen") return toggleListen();
   if (a === "drive") return openDrive();
   if (a === "drive-close") return closeDrive();
+  if (a === "unattach") {
+    app.attach.splice(Number(el.dataset.k), 1);
+    return render();
+  }
   if (a === "mic-ask") return startCapture("ask");
   if (a === "mic-note") return startCapture("note");
   if (a === "mic-drive") return startCapture("drive");
@@ -1495,7 +1503,17 @@ async function onSubmit(ev) {
   if (!f) return;
   ev.preventDefault();
   const kind = f.dataset.submit;
-  if (kind === "ask") return doAsk(new FormData(f).get("q") ?? "");
+  if (kind === "ask") {
+    const q = new FormData(f).get("q") ?? "";
+    if (app.attach.length) {
+      const n = app.attach.length;
+      const names = n === 1 ? app.attach[0].name : `${n} files`;
+      app.attach = [];
+      toast(`${names} received`, api.mode === "preview" ? "This preview uses sample data, so files aren't read. On your Neri server they go to Review first." : "Reading now. Anything that could move your cash waits in Review.");
+      if (!String(q).trim()) return render();
+    }
+    return doAsk(q);
+  }
   if (kind === "talk-typed") {
     const q = String(new FormData(f).get("q") ?? "");
     closeTalk();
@@ -1567,6 +1585,13 @@ async function onChange(ev) {
     app.brief = null;
     app.scenario = "base";
     await load();
+    return;
+  }
+  if (el.dataset.change === "attach") {
+    app.attach.push(...Array.from(el.files ?? []).map((f) => ({ name: f.name, type: f.type || "" })));
+    el.value = "";
+    render();
+    $("#askq")?.focus();
     return;
   }
   if (el.dataset.change === "upload") {
