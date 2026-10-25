@@ -4,7 +4,7 @@
 import type { CashEvent, Commitment, Lever, Override, Records, Scenario } from "../schema/records";
 import type { Profile } from "../schema/profile";
 import { addDays, diffDays } from "./dates";
-import { money, toBase } from "./expand";
+import { DAILY_SALES_ID, money, toBase } from "./expand";
 
 export const DEFAULT_STRESS_DELAY_DAYS = 7;
 
@@ -52,7 +52,10 @@ function applyOverride(events: CashEvent[], o: Override, ctx: Ctx): CashEvent[] 
       notes.push(`date -> ${o.change.date}`);
     }
     if (o.change.shiftDays) {
-      out = { ...out, date: addDays(out.date, o.change.shiftDays) };
+      // An overdue payment is assumed payable now, so a shift on it counts from asOf, not from the old due date.
+      // (A plain `date` override is the owner's explicit choice and is kept as given.)
+      const from = out.direction === "out" && out.date < ctx.asOf ? ctx.asOf : out.date;
+      out = { ...out, date: addDays(from, o.change.shiftDays) };
       notes.push(`shifted ${o.change.shiftDays > 0 ? "+" : ""}${o.change.shiftDays} days`);
     }
     if (newAmounts.has(e.id)) {
@@ -154,8 +157,13 @@ export function adjust(events: CashEvent[], scenario: Scenario, ctx: Ctx): CashE
       } else {
         // No leg named: move the whole schedule by the first leg's shift so later legs keep their spacing.
         const first = [...legs].sort((a, b) => (a.date < b.date ? -1 : 1))[0]!;
-        const delta = diffDays(c.newDate, first.date);
-        out = applyOverride(out, { id: s.id, target: { commitmentId: s.commitmentId }, change: { shiftDays: delta }, origin: "signal" }, ctx);
+        if (first.date < ctx.asOf) {
+          // The new date answers the overdue leg; later legs keep their own dates.
+          out = applyOverride(out, { id: s.id, target: { commitmentId: s.commitmentId, legIndex: first.legIndex }, change: { date: c.newDate }, origin: "signal" }, ctx);
+        } else {
+          const delta = diffDays(c.newDate, first.date);
+          out = applyOverride(out, { id: s.id, target: { commitmentId: s.commitmentId }, change: { shiftDays: delta }, origin: "signal" }, ctx);
+        }
       }
     }
   }
@@ -173,13 +181,18 @@ export function adjust(events: CashEvent[], scenario: Scenario, ctx: Ctx): CashE
   if (scenario.kind === "stress") {
     const delay = ctx.profile.thresholds.stressDelayDays ?? DEFAULT_STRESS_DELAY_DAYS;
     const funding = new Set(ctx.commitments.filter((c) => c.funding).map((c) => c.id));
+    // Only unsettled customer receipts still ahead of asOf are delayed. Overdue receipts stay overdue (shifting them
+    // could pull them back into the horizon and make stress look better than base), and card/POS daily sales are
+    // settlements, not customer credit risk.
+    const delayed = (e: CashEvent) =>
+      e.direction === "in" &&
+      e.status !== "actual" &&
+      e.date >= ctx.asOf &&
+      e.commitmentId !== DAILY_SALES_ID &&
+      !(e.commitmentId && funding.has(e.commitmentId));
     out = out
       .filter((e) => !(e.commitmentId && funding.has(e.commitmentId) && e.status === "likely"))
-      .map((e) =>
-        e.direction === "in" && e.status !== "actual" && !(e.commitmentId && funding.has(e.commitmentId))
-          ? tag({ ...e, date: addDays(e.date, delay) }, "stress", `stress: receipt delayed ${delay} days`)
-          : e,
-      );
+      .map((e) => (delayed(e) ? tag({ ...e, date: addDays(e.date, delay) }, "stress", `stress: receipt delayed ${delay} days`) : e));
   }
   return out;
 }

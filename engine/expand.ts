@@ -315,6 +315,8 @@ function expandRecurring(
 }
 
 export const SALES_HISTORY_DAYS = 28;
+// commitmentId of the events emitted by the daily-sales revenue model.
+export const DAILY_SALES_ID = "daily-sales";
 
 // Daily-sales revenue model: average daily sales from the last 28 days of actual "sales" receipts, shaped by the
 // profile's weekday weights (index 0 = Monday). Dates that already have actual sales are not forecast again.
@@ -348,7 +350,7 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
     const amount = Math.round((avg * w) / meanW);
     out.push({
       id: `evt-daily-sales-${date}`,
-      commitmentId: "daily-sales",
+      commitmentId: DAILY_SALES_ID,
       legIndex: i,
       date,
       amount,
