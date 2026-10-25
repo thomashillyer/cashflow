@@ -9,7 +9,7 @@ Warnings are named, plain-code checks over a `ForecastRun`. Each one generates c
 | `projected_cash_gap(amount, horizon)` | A daily closing balance falls below the safety line within the horizon (weekly view shows its containing week) | Chase receivables due before the gap; defer payables a supplier will flex on; split or delay a purchase order; optional financing partner card |
 | `idle_balance_over(threshold, weeks)` | Free cash stays above the threshold for at least that many weeks | Explain how much and for how long, with general options; optional treasury partner card |
 | `ar_concentration_risk(pct)` | One party holds more than pct of open receivables | Ask for a deposit or tighter terms on the next order |
-| `deal_affordability(deal)` | Taking a likely or possible deal pushes the low point below the safety line | The smallest upfront share that keeps cash above the line (search helper in `05-forecast-engine.md`), e.g. "ask for 40% instead of 30%" |
+| `deal_affordability(deal)` | Taking a likely or possible deal pushes the low point below the safety line | The smallest upfront share that keeps cash above the line (search helper in `05-forecast-engine.md`), e.g. "ask for 40% instead of 30%". Likely deals get an ask with its dollar effect; possible deals are explain-only (no lever, no dollar figure), because the base run excludes them |
 | `early_pay_discount(bill)` | A bill offers an early-payment discount and free cash covers it through the discount date | Pay early and keep the discount |
 | `payment_slip(signal)` | An applied signal moved a receivable later | Re-rank everything; raise a change alert |
 

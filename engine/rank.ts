@@ -81,6 +81,12 @@ function describe(
   }
 
   if (c.warning === "deal_affordability") {
+    // Explain-only: a possible deal (no dollar figure, see warnings.ts) or one no upfront share can fix.
+    if (c.upfront && c.upfront.share < 1) {
+      return { title: `If you take ${ref}, ask ${named ?? "the customer"} for ${pct(c.upfront.share)} upfront`,
+        why: `At ${pct(c.upfront.currentShare)} upfront this quote would take cash below your safety line; `
+          + `${pct(c.upfront.share)} keeps it above.` };
+    }
     return { title: `${ref} would take cash below your safety line`,
       why: "Even paid fully upfront, cash stays below the line. Review the supplier terms before signing." };
   }

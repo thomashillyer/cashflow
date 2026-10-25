@@ -7,7 +7,7 @@ import type { Candidate, Check, ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
 import type { CashEvent, Commitment, Direction, Override, Records } from "../schema/records";
 import { isNonDeferrable } from "./adjust";
-import { runAtUpfrontShare, smallestUpfrontShare } from "./affordability";
+import { smallestUpfrontShare } from "./affordability";
 import { addDays } from "./dates";
 import { ENGINE_DEFAULTS, engineSettings } from "./settings";
 
@@ -233,9 +233,15 @@ export function dealAffordability(run: ForecastRun, records: Records, profile: P
         upfront: { share: 1, currentShare: r.currentShare } });
       continue;
     }
+    // A possible deal is off the main line, so a dollar effect measured with the deal taken can't be read
+    // against the brief's low point (the AI layer computes low point + cashEffect). Explain only, no number.
+    if (c.status === "possible") {
+      out.push({ warning: "deal_affordability", evidenceRefs: [c.id], neededBy,
+        upfront: { share: r.share, currentShare: r.currentShare } });
+      continue;
+    }
     // A likely deal is already on the main line, so the brief's base run is the run at the current share.
-    const currentLow = c.status === "likely" ? run.lowPoint.amount
-      : runAtUpfrontShare(records, profile, baseOverrides, c.id, run.asOf, run.fxRates, r.currentShare).lowPoint.amount;
+    const currentLow = run.lowPoint.amount;
     out.push({
       warning: "deal_affordability",
       // The lever records the ask for drafting. Its dollar effect is the affordability search's ("upfront legs
