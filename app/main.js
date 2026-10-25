@@ -134,6 +134,27 @@ function forecastReviewPanel(run = app.brief.run) {
   </section>`;
 }
 
+// One short line for the brief: how many items need a check, never the items themselves.
+function reviewLine(review) {
+  const n = review.reasons.length;
+  return n ? `${n === 1 ? "One item needs" : `${n} items need`} a check before you rely on these numbers.` : review.message;
+}
+
+// Home keeps the checks out of the way: one quiet line under today's things that opens the full list.
+function forecastChecksCompact(run = app.brief.run) {
+  const review = forecastReview(run);
+  if (!review) return "";
+  const n = review.reasons.length;
+  return `<details class="checks">
+    <summary><span class="sunmark" aria-hidden="true"></span><span>${n ? `${n} ${n === 1 ? "item needs" : "items need"} a check` : esc(review.title.replace(/\.$/, ""))}</span><span class="checks-more">Show</span></summary>
+    <div class="checks-body">
+      <p>${esc(review.message)}</p>
+      ${n ? `<ul>${review.reasons.map((r) => `<li>${esc(r.message)}</li>`).join("")}</ul>` : ""}
+      <div class="forecast-review-actions">${review.messages ? `<a class="btn small" href="#/review">Review messages</a>` : ""}${review.sources ? `<a class="btn small" href="#/sources">Check your sources</a>` : ""}<a class="btn small quiet" href="#/details">See the numbers</a></div>
+    </div>
+  </details>`;
+}
+
 function forecastEmpty(run = app.brief.run) {
   return api.mode === "live" && !app.ctx?.business.synthetic && (run.review?.reasons ?? []).some((r) => ["no_opening_balance", "no_data"].includes(r.code));
 }
@@ -200,14 +221,14 @@ function summary() {
         ? `Cash is ${money(short)} below your line right now.`
         : `Cash holds until ${shortDate(holdsUntil)}, then drops ${money(short)} below your line.`,
       sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}${causes.length ? `, when ${causes.join(" and ")} go out` : ""}.`,
-      take: review ? `${review.message}${review.reasons[0] ? ` ${review.reasons[0].message}` : ""}` : cfoTake(),
+      take: review ? reviewLine(review) : cfoTake(),
       tone: "short",
     };
   }
   if (review) return {
     headline: review.title,
     sub: `The current forecast shows a low point of ${money(low.amount)} on ${dayDate(low.date)}.`,
-    take: `${review.message}${review.reasons[0] ? ` ${review.reasons[0].message}` : ""}`,
+    take: reviewLine(review),
     tone: "review",
   };
   const idle = b.watch.find((w) => w.warning === "idle_balance_over");
@@ -376,15 +397,15 @@ function viewToday() {
       </div>
     </section>
 
-    ${forecastReviewPanel()}
     <section class="today-list" aria-labelledby="today-h">
       <div class="deck-head">
         <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
         ${n > 1 ? `<div class="deck-nav"><button class="deck-arrow" data-action="deck" data-dir="-1" aria-label="Previous">${arrow("left")}</button><button class="deck-arrow" data-action="deck" data-dir="1" aria-label="Next">${arrow("right")}</button></div>` : ""}
       </div>
       ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}</ol>
-        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the forecast items above first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
+        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the flagged items below first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
+      ${forecastChecksCompact()}
     </section>
 
     <section class="convo" aria-label="Conversation with Neri">${app.askLog.map(turnHtml).join("")}</section>
