@@ -31,7 +31,7 @@ export class OutlookClient {
     try {
       res = await this.fetchImpl(url, {
         method: "GET",
-        headers: { Authorization: `Bearer ${await this.token("outlook")}`, Accept: "application/json", Prefer: 'outlook.body-content-type="text"' },
+        headers: { Authorization: `Bearer ${await this.token("outlook")}`, Accept: "application/json", Prefer: 'outlook.body-content-type="text", IdType="ImmutableId"' },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (err) {
@@ -59,8 +59,15 @@ export class OutlookClient {
     return { records, truncated: url !== undefined };
   }
 
+  // Metadata only: names and sizes decide what is worth downloading.
   async attachments(messageId: string): Promise<GraphRecord[]> {
-    const body = await this.get(`${GRAPH_BASE}/me/messages/${encodeURIComponent(messageId)}/attachments?$top=20`);
+    const q = new URLSearchParams({ $top: "20", $select: "id,name,size,isInline,contentType" });
+    const body = await this.get(`${GRAPH_BASE}/me/messages/${encodeURIComponent(messageId)}/attachments?${q}`);
     return Array.isArray(body.value) ? (body.value as GraphRecord[]) : [];
+  }
+
+  // One attachment with its content (base64).
+  async attachment(messageId: string, attachmentId: string): Promise<GraphRecord> {
+    return this.get(`${GRAPH_BASE}/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`);
   }
 }

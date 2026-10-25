@@ -8,7 +8,7 @@ export type Status = "actual" | "committed" | "likely" | "possible";
 export type Direction = "in" | "out";
 
 export type SourceRef = {
-  system: string;            // "zoho_books" | "bank_csv" | "email" | "whatsapp" | "crm" | "owner" | "generic_file"
+  system: string;            // "zoho_books" | "quickbooks" | "xero" | "bank_csv" | "email" | "whatsapp" | "crm" | "owner" | "generic_file"
   record: string;            // id in that system: invoice number, bank line hash, message id
   url?: string;              // deep link when the system has one
   excerpt?: { start: number; end: number; text?: string };  // span in a message, for signals; keep the words

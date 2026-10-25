@@ -22,6 +22,8 @@ export type ZohoPull = AccountingImport;
 export { toMinor };
 
 
+const MAX_PAYMENT_DETAILS = 150;
+
 const SPEC = {
   invoice: { path: "invoices", key: "invoices", idKey: "invoice_id", numKey: "invoice_number", partyIdKey: "customer_id", partyNameKey: "customer_name", label: "invoice" },
   bill: { path: "bills", key: "bills", idKey: "bill_id", numKey: "bill_number", partyIdKey: "vendor_id", partyNameKey: "vendor_name", label: "bill" },
@@ -73,6 +75,10 @@ async function pull(input: ZohoPullInput): Promise<ZohoPull> {
   }
 
   const payments: AccountingPayment[] = [];
+  let detailCalls = 0;
+  // Balances already give what is outstanding; payments only add lag history. A rate limit or an
+  // unreadable payment must not throw away the invoices and bills already read.
+  try {
   for (const kind of ["invoice", "bill"] as const) {
     const isIn = kind === "invoice";
     const path = isIn ? "customerpayments" : "vendorpayments";
@@ -82,6 +88,7 @@ async function pull(input: ZohoPullInput): Promise<ZohoPull> {
       const providerId = str(pay.payment_id);
       const date = isoDate(pay.date);
       if (!providerId || !date) continue;
+      if (++detailCalls > MAX_PAYMENT_DETAILS) { warnings.push(`Only the first ${MAX_PAYMENT_DETAILS} payments were read for payment history.`); break; }
       // The list names invoices; the detail says how much went to each.
       const detail = await client.detail(path, providerId, "payment");
       const applied = Array.isArray(detail?.[appliedKey]) ? (detail![appliedKey] as ZohoRecord[]) : [];
@@ -94,6 +101,10 @@ async function pull(input: ZohoPullInput): Promise<ZohoPull> {
         })),
       });
     }
+  }
+  } catch (err) {
+    if (!(err instanceof ConnectorFailure) || err.error.kind === "auth") throw err;
+    warnings.push("Payment history could not be fully read (Zoho Books asked us to slow down). Invoices and bills are complete; import again later for payment history.");
   }
   return buildAccounting({ system: "zoho_books", docs, payments, now: input.now, warnings, ...(input.existingEvidence ? { existingEvidence: input.existingEvidence } : {}) });
 }

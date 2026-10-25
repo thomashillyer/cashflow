@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
 import { parseEmail } from "../../ai/extract/message";
 import type { Fetch } from "../connector";
+import { childEvidenceId, recordEvidenceId } from "../core/ids";
 import { pullOutlook, isMoneyRelated } from "./index";
 
 const NOW = "2026-10-25T18:00:00Z";
@@ -29,8 +30,13 @@ function graph(messages: unknown[], attachments: Record<string, unknown[]> = {},
     urls.push(url); methods.push(init.method); headers.push(init.headers);
     if (extra.status) return { status: extra.status, json: async () => ({}) };
     const u = new URL(url);
+    const one = u.pathname.match(/\/me\/messages\/(.+)\/attachments\/(.+)$/);
+    if (one) {
+      const hit = (attachments[decodeURIComponent(one[1]!)] ?? []).find((x) => (x as { id?: string }).id === decodeURIComponent(one[2]!));
+      return hit ? ok(hit) : { status: 404, json: async () => ({}) };
+    }
     const a = u.pathname.match(/\/me\/messages\/(.+)\/attachments$/);
-    if (a) return ok({ value: attachments[decodeURIComponent(a[1]!)] ?? [] });
+    if (a) return ok({ value: (attachments[decodeURIComponent(a[1]!)] ?? []).map((x) => { const { contentBytes: _c, ...meta } = x as Record<string, unknown>; return meta; }) });
     if (u.pathname === "/v1.0/me/messages") return ok({ value: messages, ...(extra.nextLink ? { "@odata.nextLink": extra.nextLink } : {}) });
     return { status: 404, json: async () => ({}) };
   };
@@ -43,7 +49,7 @@ describe("pullOutlook", () => {
     const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: g.fetch });
     if (!r.ok) throw new Error("expected ok");
     const [input] = r.data.inputs;
-    expect(input).toMatchObject({ kind: "email", source: { evidenceId: "ev-email-AAA", receivedAt: "2026-10-24T15:00:00Z", sourceRef: { system: "email", record: "<AAA@mail.example>" } } });
+    expect(input).toMatchObject({ kind: "email", source: { evidenceId: recordEvidenceId("email", "<AAA@mail.example>"), receivedAt: "2026-10-24T15:00:00Z", sourceRef: { system: "email", record: "<AAA@mail.example>" } } });
     const bundle = parseEmail(input!.raw, { evidenceId: "ev-email-AAA", receivedAt: "2026-10-24T15:00:00Z" });
     expect(bundle.text).toContain("We will pay on Nov 20.");
     expect(bundle.headers?.subject).toBe("Invoice INV-1187");
@@ -64,10 +70,45 @@ describe("pullOutlook", () => {
     const atts = r.data.inputs[0]!.attachments!;
     expect(atts.map((a) => a.fileName)).toEqual(["ar.xlsx", "inv.pdf"]);
     expect(atts[0]!.sheets![0]!.rows[1]).toEqual(["INV-7", "Acme", 100]);
-    expect(atts[0]!.source!.evidenceId).toBe("ev-email-B1-f1");
+    expect(atts[0]!.source!.evidenceId).toBe(childEvidenceId(recordEvidenceId("email", "<B1@mail.example>"), "f1"));
     expect(r.data.inputs[0]!.raw).toContain("X-Attachments: ar.xlsx, inv.pdf");
     expect(r.data.diagnostics.warnings.join(" ")).toMatch(/1 message skipped because it was not about invoices or payments/);
     expect(r.data.diagnostics).toMatchObject({ rowsRead: 1, rowsImported: 1 });
+  });
+
+  it("gives the same evidence ids when a message moves folders and its Graph id changes", async () => {
+    const files = [{ "@odata.type": "#microsoft.graph.fileAttachment", id: "f1", name: "inv.pdf", size: 3, contentBytes: Buffer.from("%PDF").toString("base64") }];
+    const before = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: graph([msg("OLD", { internetMessageId: "<same@mail.example>", hasAttachments: true })], { OLD: files }).fetch });
+    const after = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: graph([msg("NEW", { internetMessageId: "<same@mail.example>", hasAttachments: true })], { NEW: files }).fetch });
+    if (!before.ok || !after.ok) throw new Error("expected ok");
+    expect(after.data.inputs[0]!.source!.evidenceId).toBe(before.data.inputs[0]!.source!.evidenceId);
+    expect(after.data.inputs[0]!.attachments![0]!.source!.evidenceId).toBe(before.data.inputs[0]!.attachments![0]!.source!.evidenceId);
+  });
+
+  it("downloads attachment content only for files it keeps, and never inline images", async () => {
+    const files = [
+      { "@odata.type": "#microsoft.graph.fileAttachment", id: "f1", name: "inv.pdf", size: 3, contentBytes: Buffer.from("%PDF").toString("base64") },
+      { "@odata.type": "#microsoft.graph.fileAttachment", id: "f2", name: "logo.png", size: 3, isInline: true, contentBytes: "AAAA" },
+    ];
+    const g = graph([msg("G1", { hasAttachments: true })], { G1: files });
+    const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: g.fetch });
+    if (!r.ok) throw new Error("expected ok");
+    expect(g.urls.filter((u) => /\/attachments\/[^?]/.test(u)).map((u) => u.split("/attachments/")[1])).toEqual(["f1"]);
+    expect(r.data.inputs[0]!.attachments!.map((a) => a.fileName)).toEqual(["inv.pdf"]);
+  });
+
+  it("one message whose attachments cannot be listed becomes a row error, not a failed pull", async () => {
+    const f: Fetch = async (url) => {
+      const u = new URL(url);
+      if (u.pathname.endsWith("/attachments")) return { status: 404, json: async () => ({}) };
+      return ok({ value: [msg("H1", { hasAttachments: true }), msg("H2")] });
+    };
+    const r = await pullOutlook({ token, now: NOW, since: "2026-10-01T00:00:00Z", fetch: f });
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.inputs).toHaveLength(2);
+    expect(r.data.inputs[0]!.attachments).toEqual([]);
+    expect(r.data.diagnostics.errors[0]).toMatchObject({ code: "unsupported" });
+    expect(r.data.diagnostics.errors[0]!.nextStep).toMatch(/upload/);
   });
 
   it("keeps sender-controlled text out of the headers it builds", async () => {

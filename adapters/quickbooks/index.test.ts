@@ -69,6 +69,14 @@ describe("pullQuickBooks", () => {
     expect(dedupeEvidence(a.data.evidence, c.data.evidence).superseded).toHaveLength(1);
   });
 
+  it("a null balance is unknown, not paid", async () => {
+    const r = await pullQuickBooks({ token, realmId: "1", now: NOW, fetch: fake({ invoices: [{ ...invoices[0]!, Balance: null }] }).fetch });
+    if (!r.ok) throw new Error("expected ok");
+    const c = r.data.commitments.find((x) => x.type === "invoice")!;
+    expect(c.settlement).toBe("open");
+    expect(c.outstanding).toBeUndefined();
+  });
+
   it("uses the default currency only when told to, and says so", async () => {
     const noCur = [{ ...invoices[0]!, CurrencyRef: undefined }];
     const without = await pullQuickBooks({ token, realmId: "1", now: NOW, fetch: fake({ invoices: noCur }).fetch });

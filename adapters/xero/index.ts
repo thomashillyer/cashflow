@@ -74,7 +74,7 @@ async function pull(input: XeroPullInput): Promise<AccountingImport> {
   let truncated = true;
   let seen = 0;
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const body = await get(`https://api.xero.com/api.xro/2.0/Invoices?${new URLSearchParams({ page: String(page) })}`, { "xero-tenant-id": tenantId });
+    const body = await get(`https://api.xero.com/api.xro/2.0/Invoices?${new URLSearchParams({ page: String(page), order: "Date DESC" })}`, { "xero-tenant-id": tenantId });
     const rows = Array.isArray(body.Invoices) ? (body.Invoices as Rec[]) : [];
     for (const r of rows) {
       seen++;

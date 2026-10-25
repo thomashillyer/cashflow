@@ -64,8 +64,10 @@ export const str = (v: unknown): string | undefined => (typeof v === "string" &&
 
 // Decimals in the document currency. Missing or non-numeric is undefined, never 0.
 export function toMinor(v: unknown, currency: string): number | undefined {
-  if (v === null || v === undefined || v === "" || typeof v === "boolean") return undefined;
-  const n = typeof v === "number" ? v : Number(v);
+  let n: number;
+  if (typeof v === "number") n = v;
+  else if (typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v.trim())) n = Number(v.trim());
+  else return undefined;   // blank, array, boolean, hex, exponent: missing, never 0
   if (!Number.isFinite(n)) return undefined;
   return Math.round(n * 10 ** minorUnitDigits(currency));
 }
@@ -79,6 +81,13 @@ function settlementState(status: DocStatus, outstanding: number, amount: number)
   if (status === "partial") return "partial";
   return outstanding <= 0 ? "paid" : outstanding < amount ? "partial" : "open";
 }
+
+// What a change means to cash. Derived display fields in the provider payload ("overdue by 3 days")
+// are left out so an untouched record is not reported as edited on every pull.
+const fingerprint = (d: AccountingDoc) => ({
+  kind: d.kind, number: d.number, party: d.partyId, currency: d.currency, total: d.total, balance: d.balance,
+  status: d.status, issued: d.issued, due: d.due,
+});
 
 export function sortKeys(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(sortKeys);
@@ -95,6 +104,10 @@ export function buildAccounting(input: AccountingBuildInput): AccountingImport {
   const warnings = [...(input.warnings ?? [])];
   const byProviderId = new Map<string, Commitment>();
   let skippedDrafts = 0;
+  // A document number is the issuer's own reference and can repeat (two suppliers both send "1001").
+  // Every document sharing a number gets the provider id in its id, so none overwrites another.
+  const numberUses = new Map<string, number>();
+  for (const d of input.docs) if (d.number) numberUses.set(`${d.kind}:${d.number}`, (numberUses.get(`${d.kind}:${d.number}`) ?? 0) + 1);
 
   for (const d of input.docs) {
     const label = LABEL[d.kind];
@@ -114,8 +127,9 @@ export function buildAccounting(input: AccountingBuildInput): AccountingImport {
       partyId = `party-${system}-${segment(d.partyId)}`;
       if (!parties.has(partyId)) parties.set(partyId, { id: partyId, name: d.partyName, kind: d.kind === "invoice" ? "customer" : "supplier", tags: [], notes: [], sourceRefs: [{ system, record: d.partyId }] });
     }
+    const shared = (numberUses.get(`${d.kind}:${number}`) ?? 0) > 1;
     const commitment: Commitment = {
-      id: `${PREFIX[d.kind]}-${segment(number)}`, type: d.kind, direction: d.kind === "invoice" ? "in" : "out", reference: number,
+      id: `${PREFIX[d.kind]}-${segment(number)}${shared ? `~${sha256Hex(zid).slice(0, 12)}` : ""}`, type: d.kind, direction: d.kind === "invoice" ? "in" : "out", reference: number,
       ...(partyId ? { partyId } : {}),
       amount, currency: d.currency,
       anchors: { ...(d.issued ? { invoice: d.issued } : {}), ...(d.due ? { due: d.due } : {}) },
@@ -128,19 +142,21 @@ export function buildAccounting(input: AccountingBuildInput): AccountingImport {
     const ev: Evidence = {
       id: recordEvidenceId(system, `${d.kind}-${zid}`), channel: system, format: "api", receivedAt: input.now,
       // Canonical payload hash: an unchanged record is a repeat, an edited one supersedes.
-      fileHash: sha256Hex(JSON.stringify(sortKeys(d.raw))), extraction: "ok",
-      sourceRef: { system, record: zid, ...(d.url ? { url: d.url } : {}) },
+      fileHash: sha256Hex(JSON.stringify(sortKeys(fingerprint(d)))), extraction: "ok",
+      sourceRef: { system, record: `${d.kind}:${zid}`, ...(d.url ? { url: d.url } : {}) },
     };
     commitment.evidenceIds = [ev.id];
     commitments.push(commitment);
     evidence.push(ev);
     byProviderId.set(`${d.kind}:${zid}`, commitment);
-    byProviderId.set(`${d.kind}:${number}`, commitment);
+    if (!shared) byProviderId.set(`${d.kind}:${number}`, commitment);
   }
+  const dupes = [...numberUses.values()].filter((n) => n > 1).length;
+  if (dupes) warnings.push(`${dupes} document number${dupes === 1 ? " is" : "s are"} used more than once; each was kept as its own record. Check them on the Review screen.`);
   if (skippedDrafts) warnings.push(`${skippedDrafts} draft document${skippedDrafts === 1 ? "" : "s"} skipped; drafts are not owed yet.`);
 
   const settlements: Settlement[] = [];
-  const paymentHistory: AccountingImport["paymentHistory"] = [];
+  const history = new Map<string, AccountingImport["paymentHistory"][number]>();   // one row per invoice: the date it was fully paid
   for (const p of input.payments) {
     for (const a of p.applied) {
       const target = byProviderId.get(`${a.kind}:${a.docProviderId ?? ""}`) ?? byProviderId.get(`${a.kind}:${a.docNumber ?? ""}`);
@@ -152,11 +168,13 @@ export function buildAccounting(input: AccountingBuildInput): AccountingImport {
         amount: amt, currency: target.currency, date: p.date, sourceRef: { system, record: p.providerId },
       });
       if (a.kind === "invoice" && target.partyId && target.anchors.due && target.settlement === "paid") {
-        paymentHistory.push({ partyId: target.partyId, invoiceId: target.id, due: target.anchors.due, paid: p.date });
+        const prev = history.get(target.id);
+        if (!prev || p.date > prev.paid) history.set(target.id, { partyId: target.partyId, invoiceId: target.id, due: target.anchors.due, paid: p.date });
       }
     }
   }
 
+  const paymentHistory = [...history.values()];
   const key = (e: Evidence) => `${e.sourceRef.system}|${e.sourceRef.record}|${e.fileHash ?? ""}`;
   const existing = new Set((input.existingEvidence ?? []).map(key));
   const rowsDuplicate = evidence.filter((e) => existing.has(key(e))).length;

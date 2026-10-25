@@ -25,9 +25,9 @@ type Rec = Record<string, unknown>;
 const ref = (v: unknown): { value?: string; name?: string } => (typeof v === "object" && v !== null ? (v as { value?: string; name?: string }) : {});
 
 function derive(total: unknown, balance: unknown): DocStatus {
-  const t = typeof total === "number" ? total : Number(total);
-  const b = typeof balance === "number" ? balance : Number(balance);
-  if (!Number.isFinite(t) || !Number.isFinite(b)) return "open";
+  if (typeof total !== "number" || typeof balance !== "number") return "open";   // unknown stays open, never "paid"
+  const t = total;
+  const b = balance;
   if (t === 0) return "void";
   if (b <= 0) return "paid";
   return b < t ? "partial" : "open";
@@ -52,7 +52,8 @@ async function pull(input: QuickBooksPullInput): Promise<AccountingImport> {
   const query = async (entity: "Invoice" | "Bill" | "Payment" | "BillPayment"): Promise<{ records: Rec[]; truncated: boolean }> => {
     const records: Rec[] = [];
     for (let page = 0; page < MAX_PAGES; page++) {
-      const q = `select * from ${entity} startposition ${page * PAGE_SIZE + 1} maxresults ${PAGE_SIZE}`;
+      const order = entity === "Invoice" || entity === "Bill" ? "ORDERBY TxnDate DESC " : "";   // newest first, so a cap drops the oldest
+      const q = `select * from ${entity} ${order}startposition ${page * PAGE_SIZE + 1} maxresults ${PAGE_SIZE}`;
       const body = await getJson({
         fetch: f, provider: "QuickBooks", fallback: "file",
         url: `${base}/v3/company/${input.realmId}/query?${new URLSearchParams({ query: q, minorversion: "70" })}`,

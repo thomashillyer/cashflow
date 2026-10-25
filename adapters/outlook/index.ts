@@ -70,11 +70,19 @@ async function pull(input: OutlookPullInput): Promise<OutlookPull> {
     const subject = oneLine(str(m.subject) ?? "(no subject)");
     const body = str((m.body as { content?: string } | undefined)?.content) ?? "";
     const from = sender(m);
-    const files = m.hasAttachments ? await client.attachments(id) : [];
+    let files: GraphRecord[] = [];
+    if (m.hasAttachments) {
+      try { files = await client.attachments(id); } catch (err) {
+        if (err instanceof ConnectorFailure && (err.error.kind === "auth" || err.error.kind === "rate_limit")) throw err;
+        errors.push({ row, code: "unsupported", message: `The attachments on "${subject}" could not be listed.`, nextStep: "Download them from Outlook and upload them on the import screen." });
+      }
+    }
     const names = files.map((f) => str(f.name) ?? "");
     if (!isMoneyRelated(subject, body, from.address, known, names)) { skipped++; continue; }
 
-    const messageEvidence = recordEvidenceId("email", id);
+    // internetMessageId survives moving the message between folders; the Graph id may not.
+    const messageKey = str(m.internetMessageId) ?? id;
+    const messageEvidence = recordEvidenceId("email", messageKey);
     const receivedAt = str(m.receivedDateTime) ?? input.now;
     const attachments: Attachment[] = [];
     for (const f of files) {
@@ -82,7 +90,14 @@ async function pull(input: OutlookPullInput): Promise<OutlookPull> {
       const kind = f["@odata.type"];
       if (kind !== "#microsoft.graph.fileAttachment" || !SUPPORTED.test(name)) continue;
       const size = typeof f.size === "number" ? f.size : 0;
-      const b64 = str(f.contentBytes);
+      let b64: string | undefined;
+      if (size <= MAX_ATTACHMENT_BYTES && !f.isInline) {
+        const fid = str(f.id);
+        try { b64 = fid ? str((await client.attachment(id, fid)).contentBytes) : undefined; } catch (err) {
+          if (err instanceof ConnectorFailure && (err.error.kind === "auth" || err.error.kind === "rate_limit")) throw err;
+        }
+      }
+      if (f.isInline && !b64) continue;
       if (size > MAX_ATTACHMENT_BYTES || !b64) {
         errors.push({ row, code: "unsupported", message: `"${name}" on "${subject}" was too large or could not be downloaded.`, nextStep: "Download it from Outlook and upload it on the import screen." });
         continue;

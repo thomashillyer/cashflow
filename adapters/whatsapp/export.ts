@@ -16,6 +16,8 @@ import type { Evidence } from "../../schema/records";
 export const MAX_ZIP_ENTRIES = 500;
 export const MAX_ENTRY_BYTES = 10_000_000;
 export const MAX_CHAT_BYTES = 5_000_000;
+export const MAX_ZIP_BYTES = 50_000_000;
+export const MAX_TOTAL_BYTES = 50_000_000;   // everything inflated from one zip
 
 export type WhatsAppExportInput = { fileName: string; bytes: Uint8Array; receivedAt: string; existingEvidence?: Evidence[]; now?: string };
 
@@ -66,25 +68,35 @@ export async function importWhatsAppExport(input: WhatsAppExportInput): Promise<
   const warnings: string[] = [];
   try {
     if (isZip) {
+      if (input.bytes.length > MAX_ZIP_BYTES) return fail("This export is too large to read.", "Export the chat without media, or upload the PDF or spreadsheet on its own.", now, evidenceId);
       const zip = await JSZip.loadAsync(input.bytes);
       const entries = Object.values(zip.files).filter((f) => !f.dir);
       if (entries.length > MAX_ZIP_ENTRIES) return fail("This export has too many files.", "Export the chat without media, or paste the messages.", now, evidenceId);
       const base = (n: string) => n.split("/").pop()!;
+      // The size the zip declares for an entry, read before anything is inflated.
+      const declared = (e: JSZip.JSZipObject) => (e as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
       const chat = entries.find((e) => /(^|\/)_chat\.txt$/i.test(e.name)) ?? entries.find((e) => /\.txt$/i.test(e.name));
       if (!chat) return fail("No chat text was found in this zip.", "Export the chat again from WhatsApp, or paste the messages.", now, evidenceId);
+      const chatSize = declared(chat);
+      if (chatSize === undefined || chatSize > MAX_CHAT_BYTES) return fail("This chat is too large to read in one go.", "Export a shorter period, or paste the messages that matter.", now, evidenceId);
       const chatBytes = await chat.async("uint8array");
       if (chatBytes.length > MAX_CHAT_BYTES) return fail("This chat is too large to read in one go.", "Export a shorter period, or paste the messages that matter.", now, evidenceId);
       chatText = decodeText(chatBytes);
-      for (const e of entries) {
-        if (e === chat || !SUPPORTED.test(e.name)) continue;
-        const size = (e as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
-        if (typeof size === "number" && size > MAX_ENTRY_BYTES) {
-          errors.push({ row: 1, code: "unsupported", message: `"${base(e.name)}" is too large to read.`, nextStep: "Upload that file on the import screen." });
+      // Only files the chat names are opened, within one total budget.
+      let budget = MAX_TOTAL_BYTES - chatBytes.length;
+      for (const name of referencedFiles(chatText)) {
+        if (!SUPPORTED.test(name)) continue;
+        const e = entries.find((x) => base(x.name) === name);
+        if (!e) continue;
+        const size = declared(e);
+        if (size === undefined || size > MAX_ENTRY_BYTES || size > budget) {
+          errors.push({ row: 1, code: "unsupported", message: `"${name}" is too large to read.`, nextStep: "Upload that file on the import screen." });
           continue;
         }
         const bytes = await e.async("uint8array");
-        if (bytes.length > MAX_ENTRY_BYTES) { errors.push({ row: 1, code: "unsupported", message: `"${base(e.name)}" is too large to read.`, nextStep: "Upload that file on the import screen." }); continue; }
-        files.set(base(e.name), bytes);
+        if (bytes.length > MAX_ENTRY_BYTES || bytes.length > budget) { errors.push({ row: 1, code: "unsupported", message: `"${name}" is too large to read.`, nextStep: "Upload that file on the import screen." }); continue; }
+        budget -= bytes.length;
+        files.set(name, bytes);
       }
     } else {
       if (input.bytes.length > MAX_CHAT_BYTES) return fail("This chat is too large to read in one go.", "Export a shorter period, or paste the messages that matter.", now, evidenceId);
@@ -97,6 +109,10 @@ export async function importWhatsAppExport(input: WhatsAppExportInput): Promise<
   const raw = normalizeChat(chatText);
   const messageCount = raw.split("\n").filter((l) => /^\[\d/.test(l)).length;
   if (messageCount === 0) return fail("No WhatsApp messages were found in this file.", "Check that it is a chat exported from WhatsApp, or paste the messages.", now, evidenceId);
+
+  // The parser reads month first. A day-first phone makes dates like 03/04/26 ambiguous: say so.
+  const ambiguous = raw.split("\n").some((l) => { const m = /^\[(\d{1,2})\/(\d{1,2})\//.exec(l); return !!m && Number(m[1]) <= 12 && Number(m[2]) <= 12 && m[1] !== m[2]; });
+  if (ambiguous) warnings.push("Some dates, like 03/04/26, could be read as March 4 or April 3. Neri reads them month first; check any payment date the chat mentions.");
 
   const attachments: Attachment[] = [];
   const referenced = referencedFiles(chatText);

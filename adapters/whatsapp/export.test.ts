@@ -79,6 +79,22 @@ describe("WhatsApp export", () => {
     expect(r.diagnostics.completeness).toBe(0);
   });
 
+  it("refuses an oversized zip and never opens unreferenced files", async () => {
+    const big = await importWhatsAppExport({ fileName: "x.zip", bytes: new Uint8Array(50_000_001), receivedAt: AT });
+    expect(big.diagnostics.errors[0]!.message).toMatch(/too large/);
+    const chat = "[11/28/26, 9:14:02 AM] Dana: <attached: ok.pdf>\n";
+    const z = await zipOf({ "_chat.txt": chat, "ok.pdf": enc("%PDF"), "other.pdf": enc("%PDF-never-opened") });
+    const r = await importWhatsAppExport({ fileName: "c.zip", bytes: z, receivedAt: AT });
+    expect(r.input!.attachments!.map((a) => a.fileName)).toEqual(["ok.pdf"]);
+  });
+
+  it("flags day/month-ambiguous dates so a wrong order is not silent", async () => {
+    const r = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[03/04/26, 9:14:02 AM] Dana: we pay on 10/11\n"), receivedAt: AT });
+    expect(r.diagnostics.warnings.join(" ")).toMatch(/March 4 or April 3/);
+    const clear = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[11/28/26, 9:14:02 AM] Dana: hi\n"), receivedAt: AT });
+    expect(clear.diagnostics.warnings).toEqual([]);
+  });
+
   it("a zip with no chat text is explained", async () => {
     const r = await importWhatsAppExport({ fileName: "x.zip", bytes: await zipOf({ "a.pdf": enc("%PDF") }), receivedAt: AT });
     expect(r.diagnostics.errors[0]!.message).toMatch(/No chat text/);

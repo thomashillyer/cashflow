@@ -118,7 +118,7 @@ describe("pullZoho", () => {
     if (!changed.ok) throw new Error("expected ok");
     const d = dedupeEvidence(first.data.evidence, changed.data.evidence);
     expect(d.superseded).toHaveLength(1);
-    expect(d.superseded[0]!.next.sourceRef.record).toBe("9001");
+    expect(d.superseded[0]!.next.sourceRef.record).toBe("invoice:9001");
   });
 
   it("only ever sends GET, to the fixed Zoho host for the chosen region", async () => {

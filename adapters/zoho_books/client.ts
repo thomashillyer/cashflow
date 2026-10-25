@@ -78,7 +78,8 @@ export class ZohoClient {
     const organization_id = await this.resolveOrganization();
     const records: ZohoRecord[] = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
-      const body = await this.get(path, { organization_id, page, per_page: PAGE_SIZE });
+      const sort: Record<string, string> = path === "invoices" || path === "bills" ? { sort_column: "date", sort_order: "D" } : {};   // newest first
+      const body = await this.get(path, { organization_id, page, per_page: PAGE_SIZE, ...sort });
       const rows = body[key];
       if (Array.isArray(rows)) records.push(...(rows as ZohoRecord[]));
       const ctx = body.page_context as { has_more_page?: boolean } | undefined;
