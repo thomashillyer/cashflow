@@ -71,6 +71,9 @@ export interface Store {
   // Idempotent upserts of whole records, then a revision bump. Returns the new revision.
   upsertRecords(id: string, records: Partial<Records>): Promise<number>;
   bumpRevision(id: string): Promise<number>;
+  // Compare-and-bump: +1 only when the revision is still `expected`. Returns the new revision, or null
+  // when another write got there first.
+  bumpRevisionIf(id: string, expected: number): Promise<number | null>;
   // Import results for Review. Does not bump the revision.
   saveIntake(id: string, write: IntakeWrite): Promise<void>;
   listProposals(id: string): Promise<ChangeProposal[]>;
@@ -163,6 +166,10 @@ export class MemoryStore implements Store {
   }
   async bumpRevision(id: string): Promise<number> {
     return ++this.need(id).storeRevision;
+  }
+  async bumpRevisionIf(id: string, expected: number): Promise<number | null> {
+    const b = this.need(id);
+    return b.storeRevision === expected ? ++b.storeRevision : null;
   }
   async saveIntake(id: string, w: IntakeWrite): Promise<void> {
     const b = this.need(id);

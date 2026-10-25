@@ -79,6 +79,15 @@ export class SupabaseStore implements Store {
     return Number(data);
   }
 
+  // One conditional UPDATE (atomic in Postgres): bumps only while store_revision is still `expected`.
+  async bumpRevisionIf(id: string, expected: number): Promise<number | null> {
+    const { data, error } = await this.db.from("businesses").update({ store_revision: expected + 1 })
+      .eq("id", id).eq("store_revision", expected).select("store_revision");
+    if (error) throw toStoreError(`bump revision ${id}`, error);
+    const row = (data as { store_revision: number | string }[] | null)?.[0];
+    return row ? Number(row.store_revision) : null;
+  }
+
   async saveIntake(id: string, w: IntakeWrite): Promise<void> {
     await upsertEvidence(this.db, id, w.evidence);
     await upsertIntakeCandidates(this.db, id, w.candidates);

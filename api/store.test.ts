@@ -50,3 +50,14 @@ describe("MemoryStore overrides", () => {
     expect(await store.loadOverrides(id)).toEqual([ov("o1", { exclude: true })]);
   });
 });
+
+describe("MemoryStore bumpRevisionIf", () => {
+  it("bumps only from the expected revision", async () => {
+    const store = new MemoryStore();
+    const id = await store.createBusiness({ name: "A", profile: loadSample("cascade_trade")!.profile, isSynthetic: false });
+    const r = (await store.load(id)).storeRevision;
+    expect(await store.bumpRevisionIf(id, r)).toBe(r + 1);
+    expect(await store.bumpRevisionIf(id, r)).toBeNull();
+    expect((await store.load(id)).storeRevision).toBe(r + 1);
+  });
+});
