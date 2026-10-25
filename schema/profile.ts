@@ -25,9 +25,10 @@ export type Profile = {
     amount: number;
     direction?: Direction;            // default "out"
     cadence: "weekly" | "biweekly" | "semimonthly" | "monthly" | "quarterly";
-    anchor: string;                   // first occurrence, YYYY-MM-DD
+    anchor: string;                   // phase, YYYY-MM-DD: any one occurrence; the engine projects backward and forward from it
     secondDay?: number;               // semimonthly: second day of month (first comes from anchor)
-    endDate?: string;
+    startDate?: string;               // first possible occurrence (inclusive); omit when the item is already running
+    endDate?: string;                 // last possible occurrence (inclusive)
     category: string;
     nonDeferrable?: true;             // payroll, taxes: never offered as a defer lever
   }[];
