@@ -11,12 +11,13 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod/v4";
 import type { Direction } from "../../schema/records";
 import type { CandidateFields, DocumentKind, Field, IntakeCandidate } from "../../schema/intake";
-import { cacheKey, DEFAULT_CACHE_DIR, readCache, writeCache } from "../cache";
+import { cacheKey, DEFAULT_CACHE_DIR, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
 import { EXTRACTION_MODEL, PROMPT_VERSION } from "../config";
 import {
   fieldFrom, locateQuote, missing, parseAmount, parseDate, validateCandidate, type SourceSegment,
@@ -85,6 +86,7 @@ export function buildUserContent(segments: SourceSegment[], business: BusinessId
 export function extractionCacheKey(segments: SourceSegment[], business: BusinessIdentity, model = EXTRACTION_MODEL): string {
   return cacheKey({
     promptVersion: PROMPT_VERSION,
+    promptHash: createHash("sha256").update(systemPrompt()).digest("hex"), // editing the prompt invalidates the cache
     model,
     business: { name: business.name, aliases: [...new Set(business.aliases ?? [])].sort() },
     segments: segments.map((s) => ({ evidenceId: s.evidenceId, page: s.page, text: s.text })),
@@ -94,9 +96,10 @@ export function extractionCacheKey(segments: SourceSegment[], business: Business
 // One structured-output call. Returns the parsed output, or a reason the caller should send the
 // document to review. Never throws.
 export async function callModel(
-  client: Anthropic, segments: SourceSegment[], business: BusinessIdentity, model: string,
+  client: Anthropic | undefined, segments: SourceSegment[], business: BusinessIdentity, model: string,
 ): Promise<{ output: ExtractionOutput } | { problem: string }> {
   try {
+    client ??= new Anthropic(); // configured from ANTHROPIC_API_KEY
     // messages.create with a structured-output format rather than messages.parse: parse() throws on
     // a refusal or a cut-off answer before stop_reason can be read, and we want to say which it was.
     const res = await client.messages.create(
@@ -108,7 +111,7 @@ export async function callModel(
         messages: [{ role: "user", content: buildUserContent(segments, business) }],
         output_config: { effort: "low", format: zodOutputFormat(ExtractionOutput) },
       },
-      { timeout: MODEL_TIMEOUT_MS },
+      { timeout: MODEL_TIMEOUT_MS, maxRetries: 1 }, // 2 x 30 s fits the 60 s request budget (TECHNICAL_PLAN section 5)
     );
     if (res.stop_reason === "refusal") return { problem: "the model declined to read this document" };
     if (res.stop_reason === "max_tokens") return { problem: "the model's answer was cut off before it finished" };
@@ -138,6 +141,8 @@ export type ExtractDocumentOptions = {
   evidenceIds: string[];
   mode: "live" | "cache_only";
   client?: Anthropic;      // live mode; defaults to a client configured from ANTHROPIC_API_KEY
+  // Read and write directory. Default: reads LIVE_CACHE_DIR (gitignored) then the committed demo cache
+  // (DEFAULT_CACHE_DIR); live results are written to LIVE_CACHE_DIR, never to the fixtures.
   cacheDir?: string;
   model?: string;
   dayFirst?: boolean;      // numeric dates in these documents are day/month/year
@@ -155,10 +160,14 @@ export async function extractDocument(segments: SourceSegment[], opts: ExtractDo
     return reviewCandidate(base, "partial", [`The document is over ${MAX_SOURCE_CHARS.toLocaleString("en-US")} characters; split it or enter the fields manually.`]);
   }
 
-  const dir = opts.cacheDir ?? DEFAULT_CACHE_DIR;
+  // Live results of real documents go to a gitignored directory. The committed demo entries are read
+  // as a fallback only. An explicit cacheDir is used alone, for both reads and writes.
+  const writeDir = opts.cacheDir ?? LIVE_CACHE_DIR;
+  const readDirs = opts.cacheDir ? [opts.cacheDir] : [LIVE_CACHE_DIR, DEFAULT_CACHE_DIR];
   const key = extractionCacheKey(segments, opts.business, model);
-  const hit = readCache(dir, key);
-  if (hit) {
+  for (const dir of readDirs) {
+    const hit = readCache(dir, key);
+    if (!hit) continue;
     const parsed = ExtractionOutput.safeParse(hit.output);
     if (parsed.success) return toCandidate(parsed.data, segments, base);
     // A cache entry that no longer fits the schema is a miss.
@@ -167,12 +176,12 @@ export async function extractDocument(segments: SourceSegment[], opts: ExtractDo
     return reviewCandidate(base, "partial", ["no cached extraction (demo mode)"]);
   }
 
-  const result = await callModel(opts.client ?? new Anthropic(), segments, opts.business, model);
+  const result = await callModel(opts.client, segments, opts.business, model);
   if ("problem" in result) {
     return reviewCandidate(base, "partial", [`Could not extract fields: ${result.problem}. Review the document manually.`]);
   }
   try {
-    writeCache(dir, { key, promptVersion: PROMPT_VERSION, model, source: "live", output: result.output });
+    writeCache(writeDir, { key, promptVersion: PROMPT_VERSION, model, source: "live", output: result.output });
   } catch {
     // A failed cache write must not lose a good extraction.
   }
@@ -268,8 +277,11 @@ export function toCandidate(
   if (kind === "invoice") direction = "in";
   else if (kind === "bill") direction = "out";
   else if (kind === "purchase_order" || kind === "payment_evidence") direction = byRole;
-  if (role === "unknown" && (kind === "invoice" || kind === "bill" || kind === "purchase_order" || kind === "payment_evidence")) {
-    notes.push("Could not tell which side of this document the business is on; check the direction.");
+  // With no known side, the kind alone must not decide whether cash comes in or goes out.
+  const roleUnknown = role === "unknown" && (kind === "invoice" || kind === "bill" || kind === "purchase_order" || kind === "payment_evidence");
+  if (roleUnknown) {
+    direction = undefined;
+    notes.push("Could not tell which side of this document the business is on; confirm whether money comes in or goes out.");
   }
 
   // ---- fields the model must not have filled in
@@ -364,6 +376,7 @@ export function toCandidate(
   } else {
     extraction = "ok"; // conversational_update becomes a Signal; none has nothing to extract
   }
+  if (roleUnknown && extraction === "ok") extraction = "partial"; // routes to review
   if (extraction === "partial") {
     for (const [name, f] of Object.entries(fields) as [string, Field<unknown>][]) {
       if (f.state === "missing" && f.reason && !/not stated$/.test(f.reason)) notes.push(`${name}: ${f.reason}`);

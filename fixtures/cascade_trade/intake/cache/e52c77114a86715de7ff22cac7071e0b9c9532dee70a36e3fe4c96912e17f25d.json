@@ -1,0 +1,78 @@
+{
+  "key": "e52c77114a86715de7ff22cac7071e0b9c9532dee70a36e3fe4c96912e17f25d",
+  "promptVersion": "extract_document@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in for whatsapp-evergreen.txt; replace with a live run (scripts/refresh-extraction-cache.ts)",
+  "output": {
+    "fields": {
+      "sellerName": {
+        "value": null,
+        "quote": null
+      },
+      "buyerName": {
+        "value": null,
+        "quote": null
+      },
+      "reference": {
+        "value": "INV-1187",
+        "quote": "INV-1187 for $28,000 is due Dec 10"
+      },
+      "poReference": {
+        "value": null,
+        "quote": null
+      },
+      "amount": {
+        "value": "$28,000",
+        "quote": "INV-1187 for $28,000 is due Dec 10"
+      },
+      "outstanding": {
+        "value": null,
+        "quote": null
+      },
+      "currency": {
+        "value": null,
+        "quote": null
+      },
+      "issueDate": {
+        "value": null,
+        "quote": null
+      },
+      "dueDate": {
+        "value": "Dec 10",
+        "quote": "is due Dec 10"
+      },
+      "terms": {
+        "value": null,
+        "quote": null
+      },
+      "invoiceUrl": {
+        "value": null,
+        "quote": null
+      },
+      "paymentUrl": {
+        "value": null,
+        "quote": null
+      },
+      "statedStatus": {
+        "value": null,
+        "quote": null
+      },
+      "paidAmount": {
+        "value": null,
+        "quote": null
+      },
+      "paidDate": {
+        "value": null,
+        "quote": null
+      }
+    },
+    "coversReferences": [],
+    "containsInstructions": false,
+    "notes": [
+      "The customer says they will pay in early January, after their own customer pays them."
+    ],
+    "kind": "conversational_update",
+    "businessRole": "seller",
+    "confidence": 0.85
+  }
+}

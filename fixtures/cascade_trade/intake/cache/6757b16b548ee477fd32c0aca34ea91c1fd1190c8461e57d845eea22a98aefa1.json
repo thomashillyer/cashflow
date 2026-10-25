@@ -1,5 +1,5 @@
 {
-  "key": "364ffe5f8d811e315be1019fa9bca4962657919eec42ac630a6cd62bdeed42bd",
+  "key": "6757b16b548ee477fd32c0aca34ea91c1fd1190c8461e57d845eea22a98aefa1",
   "promptVersion": "extract_document@1",
   "model": "claude-opus-5-5",
   "source": "hand-authored stand-in for email-harbor-inv1203.eml; replace with a live run (scripts/refresh-extraction-cache.ts)",

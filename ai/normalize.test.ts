@@ -38,6 +38,14 @@ describe("parseAmount", () => {
   it("handles negatives", () => {
     expect(parseAmount("-1,200.00", "USD")).toBe(-120000);
     expect(parseAmount("(1,200.00)", "USD")).toBe(-120000);
+    expect(parseAmount("1,200.00-", "USD")).toBe(-120000);
+    expect(parseAmount("USD -100.00", "USD")).toBe(-10000);
+    expect(parseAmount("$-100", "USD")).toBe(-10000);
+    expect(parseAmount("-$100", "USD")).toBe(-10000);
+    expect(parseAmount("EUR (1.234,56)", "EUR")).toBe(-123456);
+    expect(parseAmount("−100.00", "USD")).toBe(-10000);
+    expect(parseAmount("+100.00", "USD")).toBe(10000);
+    expect(parseAmount("12-34", "USD")).toBeUndefined(); // a hyphen inside the number is not a sign
   });
 
   it("returns undefined for garbage and never 0 for empty input", () => {

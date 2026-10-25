@@ -1,5 +1,5 @@
 {
-  "key": "f6a272c076991a880d295caa23486a1ef6bc2d83243ac45f29e31a61e1f890f8",
+  "key": "d342d1dee54319e544c3d9fb67b7e2b5922e332511b002ebbfc5bf913f87f81e",
   "promptVersion": "extract_document@1",
   "model": "claude-opus-5-5",
   "source": "hand-authored stand-in for email-injection.eml; replace with a live run (scripts/refresh-extraction-cache.ts)",

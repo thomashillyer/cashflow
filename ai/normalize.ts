@@ -29,13 +29,18 @@ export function minorUnitDigits(currency: string): number {
 //  - stray text around the number ("28,000.00 (net 30)") or malformed grouping is undefined.
 // Returns undefined rather than guessing. 0 comes only from an explicit zero amount.
 export function parseAmount(raw: string, currency: string): number | undefined {
-  const negative = /^\s*-|\(\s*[^)]*\d[^)]*\)|-\s*$/.test(raw);
-  const body = raw
-    .replace(/\b[A-Z]{3}\b/g, "")                          // ISO code: "USD 6,200.00"
-    .replace(/[\p{Sc}()\-+]/gu, "")                                 // symbols, sign, accounting parentheses
+  // Sign first, on what is left after the ISO code and currency symbol are removed:
+  // "USD -100.00" and "$-100" are negative too.
+  let s = raw.replace(/\b[A-Z]{3}\b/g, "").replace(/\p{Sc}/gu, "").trim();
+  let negative = false;
+  const paren = /^\(([^()]*)\)$/.exec(s);                            // accounting negative: "(1,200.00)"
+  if (paren) { negative = true; s = paren[1]!.trim(); }
+  const lead = /^([-+\u2212])\s*/.exec(s);
+  if (lead) { negative ||= lead[1] !== "+"; s = s.slice(lead[0].length); }
+  if (/[-\u2212]$/.test(s)) { negative = true; s = s.slice(0, -1).trim(); }
+  const body = s
     .replace(/(?<=\d)[\s\x27\u2019\u00a0\u202f](?=\d)/g, "")  // space or apostrophe grouping: "28 000,00"
-    .trim()
-    .replace(/[.,]$/, "");                                          // sentence punctuation: "28,000.00."
+    .replace(/[.,]$/, "");                                           // sentence punctuation: "28,000.00."
   if (!/^[\d.,]*\d[\d.,]*$/.test(body)) return undefined;
 
   const exp = minorUnitDigits(currency);

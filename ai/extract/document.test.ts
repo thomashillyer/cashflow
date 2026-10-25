@@ -6,9 +6,9 @@ import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CASCADE_BUSINESS, loadFixtureSegments } from "../../scripts/cache-fixtures";
+import { CASCADE_BUSINESS, FIXTURE_NAMES, loadFixtureSegments } from "../../scripts/cache-fixtures";
 import { STANDINS } from "../../scripts/cache-standins";
-import { cacheKey, readCache, stableStringify, writeCache } from "../cache";
+import { cacheKey, DEFAULT_CACHE_DIR, LIVE_CACHE_DIR, readCache, stableStringify, writeCache } from "../cache";
 import { EXTRACTION_MODEL, PROMPT_VERSION } from "../config";
 import type { SourceSegment } from "../normalize";
 import {
@@ -106,6 +106,29 @@ describe("cached extractions of the cascade_trade fixtures", () => {
     expect(c.extraction).not.toBe("ok");
   });
 
+  it("the conflicting INV-1187 variants keep their own currency and total", async () => {
+    const cad = await extract("inv1187-cad.pdf");
+    expect(cad.fields.currency).toMatchObject({ state: "found", value: "CAD" });
+    expect(cad.fields.amount).toMatchObject({ state: "found", value: 2800000 });
+    const revised = await extract("inv1187-revised-total.pdf");
+    expect(revised.fields.currency).toMatchObject({ value: "USD" });
+    expect(revised.fields.amount).toMatchObject({ state: "found", value: 2950000 });
+    expect(revised.fields.reference).toMatchObject({ value: "INV-1187" });
+  });
+
+  it("messages: a payment link is kept as a link only, and a bare $ amount stays unread", async () => {
+    const email = await extract("email-inv1187.eml");
+    expect(email.kind).toBe("conversational_update");
+    expect(email.fields.paymentUrl).toMatchObject({ state: "found", value: "https://checkout.stripe.example/c/pay/cs_live_inv1187_cascade" });
+    expect(email.fields.amount.state).toBe("missing");
+    const chat = await extract("whatsapp-evergreen.txt");
+    expect(chat.kind).toBe("conversational_update");
+    expect(chat.fields.reference).toMatchObject({ state: "found", value: "INV-1187" });
+    expect(chat.fields.currency.state).toBe("missing"); // "$" with no code anywhere: not guessed as USD
+    expect(chat.fields.amount.state).toBe("missing");
+    expect(chat.fields.dueDate.state).toBe("missing"); // "Dec 10" has no year
+  });
+
   it("cache_only miss returns a review candidate and never throws", async () => {
     const segments = await loadFixtureSegments("inv1187.pdf");
     const c = await extractDocument(segments, {
@@ -161,6 +184,30 @@ describe("toCandidate", () => {
     const u = toCandidate(empty({ kind: "purchase_order", businessRole: "unknown" }), inv, opts);
     expect(u.direction).toBeUndefined();
     expect(u.notes.join(" ")).toMatch(/which side/);
+  });
+
+  it("an invoice or bill whose side is unknown gets no direction and goes to review", () => {
+    const full = {
+      reference: { value: "A-1", quote: "INVOICE A-1" }, currency: { value: "USD", quote: "(USD)" },
+      amount: { value: "28,000.00", quote: "(USD) 28,000.00" },
+    };
+    for (const kind of ["invoice", "bill"] as const) {
+      const c = toCandidate(withFields(full, { kind, businessRole: "unknown" }), inv, opts);
+      expect(c.kind).toBe(kind);
+      expect(c.direction).toBeUndefined();
+      expect(c.extraction).toBe("partial");
+    }
+  });
+
+  it("a negative amount (credit note) is missing, whichever way the sign is written", () => {
+    for (const written of ["USD -500.00", "$-500", "(500.00)"]) {
+      const s = seg(`CREDIT NOTE C-1\nTotal ${written} USD`);
+      const c = toCandidate(withFields({
+        reference: { value: "C-1", quote: "CREDIT NOTE C-1" }, currency: { value: "USD", quote: "USD" },
+        amount: { value: written, quote: `Total ${written}` },
+      }), s, opts);
+      expect(c.fields.amount.state, written).toBe("missing");
+    }
   });
 
   it("never guesses USD from a bare $", () => {
@@ -308,9 +355,9 @@ describe("response cache", () => {
   });
 
   it("committed entries exist under the current keys, for the current prompt and model", async () => {
-    for (const name of ["inv1187.pdf", "ningbo-bill-0042.pdf", "harbor-po-552.pdf", "email-injection.eml", "email-harbor-inv1203.eml"]) {
+    for (const name of FIXTURE_NAMES) {
       const key = extractionCacheKey(await loadFixtureSegments(name), CASCADE_BUSINESS);
-      const entry = readCache(join(import.meta.dirname, "../../fixtures/cascade_trade/intake/cache"), key);
+      const entry = readCache(DEFAULT_CACHE_DIR, key);
       expect(entry, name).toBeDefined();
       expect(entry).toMatchObject({ promptVersion: PROMPT_VERSION, model: EXTRACTION_MODEL });
     }
@@ -326,6 +373,11 @@ describe("response cache", () => {
     const c = await extractDocument(segments, { business: CASCADE_BUSINESS, candidateId: "c", revision: 1, evidenceIds: [], mode: "cache_only", cacheDir: dir });
     expect(c.notes).toContain("no cached extraction (demo mode)");
     rmSync(dir, { recursive: true });
+  });
+
+  it("live results never default into the tracked fixtures directory", () => {
+    expect(LIVE_CACHE_DIR).toMatch(/data[\\/]private[\\/]/); // gitignored
+    expect(LIVE_CACHE_DIR.startsWith(DEFAULT_CACHE_DIR)).toBe(false);
   });
 
   it("refuses path-like keys", () => {
@@ -381,8 +433,10 @@ describe("live mode against a local server", () => {
 
   it("sends a structured-output request, then caches the answer for cache_only", async () => {
     const dir = tmp();
+    const committed = readdirSync(DEFAULT_CACHE_DIR).length;
     reply = { body: message(JSON.stringify(STANDINS["inv1187.pdf"])) };
     const c = await run(dir);
+    expect(readdirSync(DEFAULT_CACHE_DIR)).toHaveLength(committed); // the tracked fixtures are never written
     expect(c).toMatchObject({ kind: "invoice", direction: "in", extraction: "ok" });
     expect(c.fields.amount).toMatchObject({ value: 2800000 });
 
