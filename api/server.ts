@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabase } from "../db/client";
 import { buildApp, type Verifier } from "./app";
 import { loadSamples } from "./demo";
+import { MemoryBlobs, SupabaseBlobs, type Blobs } from "./blobs";
 import { MemoryStore, type Store } from "./store";
 import { SupabaseStore } from "./supabase-store";
 import { isBehind, supabaseSchemaStatus } from "./schema-status";
@@ -26,6 +27,7 @@ async function memoryStore(): Promise<Store> {
 const useMemory = env.NERI_STORE === "memory";
 const sb = useMemory ? null : getSupabase({ serviceRole: true });
 const store: Store = sb ? new SupabaseStore(sb) : await memoryStore();
+const blobs: Blobs = sb ? new SupabaseBlobs(sb) : new MemoryBlobs();   // originals: private bucket, service role only
 // The Dockerfile copies the whole repo, so supabase/migrations is in the image.
 const schemaStatus = sb ? supabaseSchemaStatus(sb, join(import.meta.dirname, "../supabase/migrations")) : undefined;
 
@@ -41,6 +43,7 @@ const verify: Verifier = env.SUPABASE_URL && env.SUPABASE_ANON_KEY
 
 const app = await buildApp({
   store,
+  blobs,
   verify,
   demoMode,
   defaultBusiness: env.NERI_DEFAULT_BUSINESS ?? "cascade_trade",
