@@ -1,6 +1,6 @@
 # Person 4: Document understanding and reconciliation
 
-Owner: unassigned. Claim this role in [tracking issue #4](https://github.com/thomashillyer/cashflow/issues/4).
+Owner: @palfi-andras. Tracking: [issue #4](https://github.com/thomashillyer/cashflow/issues/4).
 
 ## Outcome
 
