@@ -66,15 +66,32 @@ describe("signalEffect (#73)", () => {
     signals: [{ id: "s1", channel: "email", receivedAt: "2026-10-24T00:00:00Z", commitmentId: "inv", claim: { kind: "date_change", newDate: "2026-11-04" }, confidence: 0.9, state: "proposed", sourceRef: src }],
   });
 
-  it("prices a proposed signal as if applied", () => {
+  const flat = { ...profile, recurring: [] };
+  const inState = (state: "proposed" | "applied" | "dismissed"): Records => {
     const r = records();
-    // Base: +500 on Oct 27, -300 Oct 28 -> low $100 at asOf. Applied: receipt moves to Nov 4 -> -$200 on Oct 28.
-    expect(signalEffect(r, { ...profile, recurring: [] }, [], "s1", asOf, {})).toEqual({ lowPointDelta: -$(300), week: "2026-10-26" });
-    expect(r.signals[0]!.state).toBe("proposed");
+    r.signals[0]!.state = state;
+    return r;
+  };
+
+  it.each(["proposed", "applied", "dismissed"] as const)("prices the signal the same way when it is %s", (state) => {
+    const r = inState(state);
+    // Not applied: +500 on Oct 27, -300 Oct 28 -> low $100 at asOf. Applied: receipt moves to Nov 4 -> -$200 on Oct 28.
+    expect(signalEffect(r, flat, [], "s1", asOf, {})).toEqual({ lowPointDelta: -$(300), week: "2026-10-26" });
+    expect(r.signals[0]!.state).toBe(state);
   });
 
   it("returns undefined for an unknown signal", () => {
-    expect(signalEffect(records(), { ...profile, recurring: [] }, [], "nope", asOf, {})).toBeUndefined();
+    expect(signalEffect(records(), flat, [], "nope", asOf, {})).toBeUndefined();
+  });
+
+  it.each([
+    ["date_change", { kind: "date_change", newDate: "2026-11-04" }],
+    ["amount_change", { kind: "amount_change", newAmount: $(1) }],
+    ["cancel", { kind: "cancel" }],
+  ] as const)("returns undefined for an unmatched %s (ambiguous match)", (_, claim) => {
+    const r = records();
+    r.signals = [{ ...r.signals[0]!, commitmentId: undefined, claim, matchCandidates: [{ commitmentId: "inv", reasons: ["amount"] }] }];
+    expect(signalEffect(r, flat, [], "s1", asOf, {})).toBeUndefined();
   });
 });
 
@@ -93,7 +110,20 @@ describe("resolveEventSource (#79)", () => {
     expect(kind("rec-rent")).toMatchObject({ kind: "profile_recurring", item: { id: "rec-rent" } });
     expect(kind("deal~supplier")).toMatchObject({ kind: "linked_cost", parentCommitment: { id: "deal" }, patternId: "supplier" });
     expect(kind(undefined)).toMatchObject({ kind: "actual", event: { id: "bank-1" } });
-    expect(resolveEventSource({ ...bank, id: "ghost", commitmentId: "ghost", status: "committed" }, r, profile)).toEqual({ kind: "unresolved" });
+    expect(resolveEventSource({ ...bank, id: "ghost", commitmentId: "ghost", status: "committed" }, r, profile, asOf)).toEqual({ kind: "unresolved" });
+  });
+
+  it("a bank line that settles part of an invoice resolves as the bank line, with the invoice linked", () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [com("inv", { type: "invoice", amount: $(50), outstanding: $(30), settlement: "partial", anchors: { due: "2026-10-27" } })];
+    const line: CashEvent = { id: "bank-2", commitmentId: "inv", legIndex: 0, date: "2026-10-26", amount: $(20), currency: "USD", amountBase: $(20), direction: "in", status: "actual", confidence: 1, basis: "bank", sourceRef: { system: "bank_csv", record: "line-9" } };
+    r.events = [line];
+    const run = forecast(r, profile, base, asOf, {});
+    const bankEvt = run.events.find((e) => e.id === "bank-2")!;
+    expect(resolveEventSource(bankEvt, r, profile, asOf)).toMatchObject({ kind: "actual", event: { id: "bank-2", sourceRef: { system: "bank_csv" } }, commitment: { id: "inv" } });
+    const rest = run.events.find((e) => e.commitmentId === "inv" && e.status !== "actual")!;
+    expect(resolveEventSource(rest, r, profile, asOf)).toMatchObject({ kind: "commitment", commitment: { id: "inv" } });
   });
 
   it("daily sales resolve to the actual receipts they were averaged from", () => {
