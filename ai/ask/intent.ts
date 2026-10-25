@@ -311,6 +311,36 @@ const isOpen = (c: Commitment) =>
 const REF_TOKEN = /[A-Za-z]{1,6}[- ]?\d[\w-]*|\d[\w-]*\d/g;
 
 // ---------------------------------------------------------------------------
+// Relative delays ("two weeks later than expected", "a fortnight late", "late by 10 days")
+
+const DELAY_NUMBERS: Record<string, number> = {
+  a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
+  nineteen: 19, twenty: 20,
+};
+const DELAY_UNIT_DAYS: Record<string, number> = { day: 1, week: 7, fortnight: 14, month: 30 };
+const DELAY_QTY = `(\\d+|${Object.keys(DELAY_NUMBERS).join("|")})`;
+const DELAY_UNIT = "(day|week|fortnight|month)s?";
+const LATE_WORDS = "(late|later|delayed|behind|early|earlier|sooner|ahead)";
+const delaySign = (w: string) => (/^(?:early|earlier|sooner|ahead)$/.test(w) ? -1 : 1);
+
+// A relative delay as a signed number of days: + for late, - for early. Returns undefined when the phrase
+// is not a relative delay ("in early January", "in 3 weeks", "December"). Pure; the caller applies the shift.
+export function parseRelativeDelay(phrase: string): number | undefined {
+  const t = squash(phrase).replace(/-/g, " ").replace(/[.,;!?]+$/, "");
+  const qty = (w: string) => (/^\d+$/.test(w) ? Number(w) : DELAY_NUMBERS[w]);
+  // "late by 10 days", "delayed by two weeks", "early by a week"
+  let m = new RegExp(`\\b(late|delayed|early)\\s+by\\s+${DELAY_QTY}\\s+${DELAY_UNIT}\\b`).exec(t);
+  if (m) return delaySign(m[1]!) * qty(m[2]!)! * DELAY_UNIT_DAYS[m[3]!]!;
+  // "two weeks later than expected", "10 days late", "a week early", "a fortnight late"
+  m = new RegExp(`\\b${DELAY_QTY}\\s+${DELAY_UNIT}\\s+${LATE_WORDS}\\b`).exec(t);
+  if (m) return delaySign(m[3]!) * qty(m[1]!)! * DELAY_UNIT_DAYS[m[2]!]!;
+  m = new RegExp(`\\bfortnight\\s+${LATE_WORDS}\\b`).exec(t);
+  if (m) return delaySign(m[1]!) * 14;
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
 // Rules
 
 const parseDayCount = (phrase: string): { days: number; early: boolean } | undefined => {
@@ -422,12 +452,22 @@ export function resolveIntent(question: string, raw: AskIntentRaw, ctx: ResolveI
   // ---- window, then date
   // fix_gap and status read a named period ("December") from either phrase; it is a window, not a date.
   const periodKind = kind === "fix_gap" || kind === "status";
-  const windowSource = raw.windowPhrase ?? (periodKind && raw.datePhrase && resolveAskWindow(raw.datePhrase, rc) ? raw.datePhrase : null);
+  // A what_if that moves payment by a relative delay is a shift, not a date or a window: the model carries the
+  // words in datePhrase (or windowPhrase) and code reads the number of days.
+  let shiftDays: number | undefined;
+  if (kind === "what_if") {
+    for (const p of [raw.datePhrase, raw.windowPhrase]) {
+      const d = p ? parseRelativeDelay(p) : undefined;
+      if (d !== undefined && d !== 0) { shiftDays = d; break; }
+    }
+    if (shiftDays !== undefined) intent.shiftDays = shiftDays;
+  }
+  const windowSource = shiftDays !== undefined ? null : raw.windowPhrase ?? (periodKind && raw.datePhrase && resolveAskWindow(raw.datePhrase, rc) ? raw.datePhrase : null);
   if (windowSource) {
     const horizonEnd = addDays(asOf, profile.horizonWeeks * 7 - 1);
     intent.window = resolveAskWindow(windowSource, rc) ?? { from: asOf, to: horizonEnd }; // "my tightest week": the whole horizon
   }
-  const datePhrase = windowSource === raw.datePhrase ? null : raw.datePhrase;
+  const datePhrase = shiftDays !== undefined || windowSource === raw.datePhrase ? null : raw.datePhrase;
   const startOfPeriod = raw.commitmentType === "recurring";
   const resolved = datePhrase ? resolveAskDate(datePhrase, rc, { startOfPeriod }) : undefined;
   if (resolved) {
@@ -502,11 +542,11 @@ export function resolveIntent(question: string, raw: AskIntentRaw, ctx: ResolveI
     else if (instructed) need("I set aside the instruction in that message. Ask the question again without it.");
   }
   if (kind === "what_if") {
-    if (!commitmentId && !intent.draft && matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? humanizeId(c.id)).join(", ")}?`);
+    if (!commitmentId && !intent.draft && matches.length > 1 && shiftDays === undefined) need(`Which one do you mean: ${matches.map((c) => c.reference ?? humanizeId(c.id)).join(", ")}?`);
     if (!partyId && !commitmentId && !intent.draft && !partyUnknown) {
       need(raw.amountPhrase && !amount ? "How much is it?" : "Which customer, supplier, or order does this apply to?");
     }
-    if (!intent.date) need(raw.datePhrase ? `I couldn't read the date "${raw.datePhrase}". When would it happen?` : "When would this happen?");
+    if (!intent.date && shiftDays === undefined) need(raw.datePhrase ? `I couldn't read the date "${raw.datePhrase}". When would it happen?` : "When would this happen?");
   }
   if (kind === "lookup" && refToken && !commitmentId && matches.length > 1) need(`Which one do you mean: ${matches.map((c) => c.reference ?? humanizeId(c.id)).join(", ")}?`);
   if (kind === "lookup" && !partyId && !commitmentId && !partyUnknown) need("Which customer or supplier?");

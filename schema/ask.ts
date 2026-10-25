@@ -47,6 +47,7 @@ export type AskIntent = {
   commitmentId?: string;
   date?: string;                     // YYYY-MM-DD
   dateVague?: string;                // "early January": the answer must say it assumed a date
+  shiftDays?: number;                // what_if: a relative delay ("two weeks late" = 14, "3 days early" = -3), parsed by code and applied to the target's expected date
   window?: { from: string; to: string };  // "this month", "tightest week" (default: the forecast horizon)
   draft?: CommitmentDraft;           // afford / what_if / tell(plan); the single home for a hypothetical amount
   rule?: Omit<Rule, "id" | "state">; // tell(rule)
