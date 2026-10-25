@@ -13,7 +13,12 @@ export const SANDBOXES = [
 ];
 
 const params = new URLSearchParams(location.search);
-const API_BASE = params.get("api") || window.NERI_API_BASE || "";
+// Live mode only from config.js (a URL, or "same-origin" when the API serves the app). A ?api= override is
+// accepted only for localhost, so a shared link can't point the app at someone else's server.
+const fromQuery = params.get("api");
+const API_BASE =
+  window.NERI_API_BASE === "same-origin" ? location.origin
+  : window.NERI_API_BASE || (fromQuery && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(fromQuery) ? fromQuery : "");
 
 let engine = null;
 

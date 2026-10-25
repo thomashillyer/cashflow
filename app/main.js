@@ -60,6 +60,11 @@ function aliasMap() {
     if (!(p.kind in counters)) continue;
     map.set(p.name, `${labels[p.kind]} ${String.fromCharCode(65 + counters[p.kind]++)}`);
   }
+  // first words too ("Evergreen" in a suggestion), when they belong to exactly one party
+  for (const [name, alias] of [...map]) {
+    const first = name.split(" ")[0];
+    if (first.length > 3 && app.ctx.parties.filter((p) => p.name.startsWith(first + " ") || p.name === first).length === 1) map.set(first, alias);
+  }
   return map;
 }
 function masked(html) {
@@ -226,14 +231,14 @@ function homeRow(i) {
   const draft = i.actions.some((a) => a.kind === "draft_email");
   return `
   <li class="thing home-row ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}">
-    <button class="check" data-action="done" data-id="${i.id}" aria-pressed="${done}" aria-label="${done ? "Done" : "Mark done"}: ${esc(i.title)}">${icon.check}</button>
+    <button class="check" data-action="done" data-id="${esc(i.id)}" aria-pressed="${done}" aria-label="${done ? "Done" : "Mark done"}: ${esc(i.title)}">${icon.check}</button>
     <details>
       <summary><span class="t">${esc(i.title)}</span><span class="e">${money(i.cashEffect, { signed: true })}</span></summary>
       <p>${esc(i.why)}</p>
       <div class="thing-actions">
         <span class="by">Act by <b>${shortDate(i.neededBy)}</b></span>
-        ${draft ? `<button class="btn small" data-action="draft" data-id="${i.id}">${icon.mail}Draft email</button>` : ""}
-        ${ref ? `<button class="src" data-action="record" data-id="${ref}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
+        ${draft ? `<button class="btn small" data-action="draft" data-id="${esc(i.id)}">${icon.mail}Draft email</button>` : ""}
+        ${ref ? `<button class="src" data-action="record" data-id="${esc(ref)}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
       </div>
     </details>
   </li>`;
@@ -242,13 +247,13 @@ function homeRow(i) {
 function thingRow(i) {
   const done = i.state === "done";
   const ref = i.evidenceRefs?.[0];
-  const actions = i.actions.map((a) => (a.kind === "draft_email" ? `<button class="btn small" data-action="draft" data-id="${i.id}">${icon.mail}Draft email</button>` : "")).join("");
+  const actions = i.actions.map((a) => (a.kind === "draft_email" ? `<button class="btn small" data-action="draft" data-id="${esc(i.id)}">${icon.mail}Draft email</button>` : "")).join("");
   return `
   <li class="thing ${done ? "done" : ""}">
-    <button class="check" data-action="done" data-id="${i.id}" aria-pressed="${done}" aria-label="${done ? "Done" : "Mark done"}: ${esc(i.title)}">${icon.check}</button>
+    <button class="check" data-action="done" data-id="${esc(i.id)}" aria-pressed="${done}" aria-label="${done ? "Done" : "Mark done"}: ${esc(i.title)}">${icon.check}</button>
     <div><h3>${esc(i.title)}</h3><p>${esc(i.why)}</p></div>
     <div class="effect"><b>${money(i.cashEffect, { signed: true })}</b><span>${i.warning === "early_pay_discount" ? "saved" : "to your low point"}</span></div>
-    <div class="thing-actions"><span class="by">Act by <b>${shortDate(i.neededBy)}</b></span>${actions}${ref ? `<button class="src" data-action="record" data-id="${ref}">${esc(refLabel(ref))}</button>` : ""}</div>
+    <div class="thing-actions"><span class="by">Act by <b>${shortDate(i.neededBy)}</b></span>${actions}${ref ? `<button class="src" data-action="record" data-id="${esc(ref)}">${esc(refLabel(ref))}</button>` : ""}</div>
   </li>`;
 }
 
@@ -331,7 +336,7 @@ function viewDetails() {
   const rest = b.rest.length ? `<h2 class="section-title" style="margin-top:40px">More you could do</h2><ol class="things">${b.rest.map(thingRow).join("")}</ol>` : "";
   const watch = b.watch.length
     ? `<h2 class="section-title" style="margin-top:40px">Keep an eye on</h2><p class="section-note">Nothing to do yet. Neri tells you if these turn into actions.</p>
-       ${b.watch.map((w) => `<div class="watch-item"><h4>${esc(w.title)}</h4>${w.warning === "ar_concentration_risk" ? `<button class="btn small quiet" data-action="draft" data-id="${w.id}">${icon.mail}Draft a terms note</button>` : ""}<p>${esc(w.why)}</p>${w.partnerAction ? `<div style="grid-column:1/-1;margin-top:8px">${sampleCard(w.partnerAction)}</div>` : ""}</div>`).join("")}` : "";
+       ${b.watch.map((w) => `<div class="watch-item"><h4>${esc(w.title)}</h4>${w.warning === "ar_concentration_risk" ? `<button class="btn small quiet" data-action="draft" data-id="${esc(w.id)}">${icon.mail}Draft a terms note</button>` : ""}<p>${esc(w.why)}</p>${w.partnerAction ? `<div style="grid-column:1/-1;margin-top:8px">${sampleCard(w.partnerAction)}</div>` : ""}</div>`).join("")}` : "";
   return `
   <div class="page-head"><div><h1>Details</h1><p>The numbers behind today's brief. Tap any week or source to see where a number comes from.</p></div></div>
   ${figures}
@@ -380,11 +385,11 @@ function forecastBody() {
   <table class="weeks">
     <thead><tr><th>Week</th><th>Money in</th><th>Money out</th><th class="hide-sm">Lowest day</th><th>End of week</th></tr></thead>
     <tbody>
-      ${run.weeks.map((w) => `<tr class="row ${w.start === lowWeek ? "low" : ""}" data-action="week" data-week="${w.start}" tabindex="0">
+      ${run.weeks.map((w) => `<tr class="row ${w.start === lowWeek ? "low" : ""}" data-action="week" data-week="${esc(w.start)}" tabindex="0">
         <td>${w.start === lowWeek ? '<span class="mark" aria-hidden="true"></span>' : ""}${weekLabel(w.start)}</td>
         <td class="in">${w.inflow ? money(w.inflow) : "—"}</td>
         <td>${w.outflow ? money(-w.outflow) : "—"}</td>
-        <td class="hide-sm ${w.min < 0 ? "below" : ""}">${money(w.min)}</td>
+        <td class="hide-sm ${w.minClosing < 0 ? "below" : ""}">${money(w.minClosing)}</td>
         <td class="${w.closing < 0 ? "below" : ""}"><b>${money(w.closing)}</b></td>
       </tr>`).join("")}
     </tbody>
@@ -429,17 +434,17 @@ function viewNotes() {
 
 function noteRow(n) {
   const r = n.reading;
-  const meta = `<div class="meta"><span class="kind-chip ${r.kind}">${KIND_LABEL[r.kind]}</span><span>${n.via === "voice" ? "Said" : "Typed"} ${dayOf(n.createdAt)}, ${clock(n.createdAt)}</span>${n.state === "added" ? `<span class="settled-tag">Added to forecast</span>` : n.state === "kept" ? `<span class="settled-tag" style="color:var(--ink-faint)">Kept as a note</span>` : ""}</div>`;
+  const meta = `<div class="meta"><span class="kind-chip ${esc(r.kind)}">${KIND_LABEL[r.kind]}</span><span>${n.via === "voice" ? "Said" : "Typed"} ${dayOf(n.createdAt)}, ${clock(n.createdAt)}</span>${n.state === "added" ? `<span class="settled-tag">Added to forecast</span>` : n.state === "kept" ? `<span class="settled-tag" style="color:var(--ink-faint)">Kept as a note</span>` : ""}</div>`;
   if (n.state !== "new") return `<article class="note settled"><blockquote>${esc(n.text)}</blockquote>${meta}</article>`;
 
   const party = r.partyId ? app.ctx.parties.find((p) => p.id === r.partyId)?.name : null;
   const dir = r.direction === "in" ? "Money in" : r.direction === "out" ? "Money out" : "—";
   const field = (k, label, v, input) => `<div><dt>${label}</dt><dd>${v != null ? v : input}</dd></div>`;
-  const amountInput = `<input inputmode="decimal" placeholder="$ amount" data-note-field="amount" data-id="${n.id}" aria-label="Amount" />`;
-  const dateInput = `<input type="date" data-note-field="date" data-id="${n.id}" aria-label="Date" />`;
+  const amountInput = `<input inputmode="decimal" placeholder="$ amount" data-note-field="amount" data-id="${esc(n.id)}" aria-label="Amount" />`;
+  const dateInput = `<input type="date" data-note-field="date" data-id="${esc(n.id)}" aria-label="Date" />`;
   const reading = r.kind === "note"
     ? `<div class="reading"><h5>Neri's reading</h5><p class="impact" style="margin:0">No amount or date, so this stays a note. Neri will bring it up if it becomes relevant.</p>
-        <div class="actions"><button class="btn small" data-action="note-decide" data-d="keep" data-id="${n.id}">Keep as a note</button><button class="btn small quiet" data-action="note-decide" data-d="remove" data-id="${n.id}">Remove</button></div></div>`
+        <div class="actions"><button class="btn small" data-action="note-decide" data-d="keep" data-id="${esc(n.id)}">Keep as a note</button><button class="btn small quiet" data-action="note-decide" data-d="remove" data-id="${esc(n.id)}">Remove</button></div></div>`
     : `<div class="reading"><h5>Neri's reading</h5>
         <dl>
           ${field("dir", "Direction", dir)}
@@ -450,9 +455,9 @@ function noteRow(n) {
         </dl>
         <p class="impact">${noteImpact(n)}</p>
         <div class="actions">
-          <button class="btn small primary" data-action="note-decide" data-d="add" data-id="${n.id}" ${r.missing.length || n.effect?.outside ? "disabled" : ""}>Add to forecast</button>
-          <button class="btn small" data-action="note-decide" data-d="keep" data-id="${n.id}">Keep as a note</button>
-          <button class="btn small quiet" data-action="note-decide" data-d="remove" data-id="${n.id}">Remove</button>
+          <button class="btn small primary" data-action="note-decide" data-d="add" data-id="${esc(n.id)}" ${r.missing.length || n.effect?.outside ? "disabled" : ""}>Add to forecast</button>
+          <button class="btn small" data-action="note-decide" data-d="keep" data-id="${esc(n.id)}">Keep as a note</button>
+          <button class="btn small quiet" data-action="note-decide" data-d="remove" data-id="${esc(n.id)}">Remove</button>
         </div></div>`;
   return `<article class="note"><blockquote>${esc(n.text)}</blockquote>${meta}${reading}</article>`;
 }
@@ -490,16 +495,16 @@ function reviewCard(rv) {
   const body = m ? esc(m.body).replace(esc(m.excerpt), `<mark>${esc(m.excerpt)}</mark>`) : "";
   return `
   <article class="review-card">
-    <header><span class="ico">${s.channel === "whatsapp" ? icon.chat : icon.mail}</span><div><b>${esc(rv.party?.name ?? "Unknown sender")} about ${esc(rv.commitment.sourceRef.record)}</b><span>${s.channel === "email" ? "Email" : s.channel} from ${esc(m?.from ?? "")}, ${dayOf(s.receivedAt)} at ${clock(s.receivedAt)}</span></div></header>
+    <header><span class="ico">${s.channel === "whatsapp" ? icon.chat : icon.mail}</span><div><b>${esc(rv.party?.name ?? "Unknown sender")} about ${esc(rv.commitment.sourceRef.record)}</b><span>${s.channel === "email" ? "Email" : esc(s.channel)} from ${esc(m?.from ?? "")}, ${dayOf(s.receivedAt)} at ${clock(s.receivedAt)}</span></div></header>
     ${m ? `<div class="message">${body}</div>` : ""}
     <div class="change">
       <div><small>${esc(rv.commitment.sourceRef.record)}, ${money(rv.commitment.amount)}, expected</small><b>${shortDate(rv.from)}</b><span class="arrow">→</span><b>${shortDate(rv.to)}</b></div>
       <div><small>Your low point</small><b class="${rv.before.amount < 0 ? "below" : ""}">${money(rv.before.amount)}</b><span class="arrow">→</span><b class="${rv.after.amount < 0 ? "below" : ""}">${money(rv.after.amount)}</b></div>
     </div>
     <footer>
-      <button class="btn primary" data-action="signal" data-d="apply" data-id="${s.id}">Apply change</button>
-      <button class="btn" data-action="signal" data-d="dismiss" data-id="${s.id}">Dismiss</button>
-      <button class="btn quiet small" data-action="record" data-id="${rv.commitment.id}">See invoice</button>
+      <button class="btn primary" data-action="signal" data-d="apply" data-id="${esc(s.id)}">Apply change</button>
+      <button class="btn" data-action="signal" data-d="dismiss" data-id="${esc(s.id)}">Dismiss</button>
+      <button class="btn quiet small" data-action="record" data-id="${esc(rv.commitment.id)}">See invoice</button>
       <span class="conf">Neri is ${Math.round(s.confidence * 100)}% sure of this reading</span>
     </footer>
   </article>`;
@@ -530,7 +535,7 @@ function viewSources() {
       ${list.map((c) => {
         const on = connected.get(c.id);
         return `<div class="conn">${logoTile(c)}<b>${esc(c.name)}</b>
-          <div class="state ${on ? "on" : ""}">${on ? `<i class="dot"></i>Connected` : `<button class="btn" data-action="connect" data-id="${c.id}">${c.availability === "live" ? "Connect" : app.interest.has(c.id) ? "Requested" : c.availability === "next" ? "Coming next" : "Request"}</button>`}</div>
+          <div class="state ${on ? "on" : ""}">${on ? `<i class="dot"></i>Connected` : `<button class="btn" data-action="connect" data-id="${esc(c.id)}">${c.availability === "live" ? "Connect" : app.interest.has(c.id) ? "Requested" : c.availability === "next" ? "Coming next" : "Request"}</button>`}</div>
           <p class="reads">${on ? esc(on.detail) : esc(c.reads)}</p></div>`;
       }).join("")}
     </div></section>`;
@@ -585,12 +590,12 @@ function viewSettings() {
       <div class="seg control" role="group" aria-label="Appearance">${["auto", "light", "dark"].map((t) => `<button data-action="theme" data-t="${t}" aria-pressed="${theme === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div></div>
     <h2 class="section-title" style="margin-top:32px">Rules from your notes</h2>
     <p class="section-note">Things you told Neri about how people pay and get paid. They shape every forecast.</p>
-    ${app.ctx.rules.length ? app.ctx.rules.map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q><div>${esc(app.ctx.parties.find((p) => p.id === r.scope.partyId)?.name ?? "Everyone")}: ${r.kind === "flexibility" ? `can move payments up to ${r.params.extraDays} days` : r.kind === "lag_offset" ? `pays about ${r.params.offsetDays} days late` : r.kind}${r.confirmed ? "" : " (waiting for your OK)"}</div></div>`).join("") : `<p>No rules yet.</p>`}
+    ${app.ctx.rules.filter((r) => r.state !== "dismissed").length ? app.ctx.rules.filter((r) => r.state !== "dismissed").map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q><div>${esc(app.ctx.parties.find((p) => p.id === r.scope.partyId)?.name ?? "Everyone")}: ${r.kind === "flexibility" ? `can move payments up to ${r.params.extraDays} days` : r.kind === "lag_offset" ? `pays about ${r.params.offsetDays} days late` : r.kind}${r.state === "confirmed" ? "" : " (waiting for your OK)"}</div></div>`).join("") : `<p>No rules yet.</p>`}
   </div>`;
 }
 
 // ---------------------------------------------------------------- sheets
-function openSheet(html) {
+function openSheet(html, { mask = true } = {}) {
   closeSheet();
   const scrim = document.createElement("div");
   scrim.className = "scrim";
@@ -599,7 +604,7 @@ function openSheet(html) {
   sheet.className = "sheet";
   sheet.setAttribute("role", "dialog");
   sheet.setAttribute("aria-modal", "true");
-  sheet.innerHTML = masked(html);
+  sheet.innerHTML = mask ? masked(html) : html;
   document.body.append(scrim, sheet);
   sheet.querySelector("button, input, textarea")?.focus();
 }
@@ -619,18 +624,18 @@ async function showRecord(id) {
   const lag = p?.lagStats;
   const statusWord = { actual: "In the bank", committed: "Committed", likely: "Likely", possible: "Possible" };
   openSheet(`
-    ${sheetHead(esc(c.sourceRef.record), `${esc(p?.name ?? "Your plan")}${c.type ? `, ${c.type.replace("_", " ")}` : ""}`)}
+    ${sheetHead(esc(c.sourceRef.record), `${esc(p?.name ?? "Your plan")}${c.type ? `, ${esc(c.type.replace("_", " "))}` : ""}`)}
     <dl class="kv">
-      <dt>Amount</dt><dd>${money(c.amount)}${c.currency !== "USD" ? ` <span style="color:var(--ink-faint)">(priced in ${c.currency})</span>` : ""}</dd>
+      <dt>Amount</dt><dd>${money(c.amount, { currency: c.currency })}${c.currency !== (app.ctx.profile.baseCurrency ?? "USD") && rec.events[0] ? ` <span style="color:var(--ink-faint)">(${money(rec.events.reduce((t, e) => t + e.amountBase, 0))})</span>` : ""}</dd>
       ${c.anchors.due ? `<dt>Due</dt><dd>${dayDate(c.anchors.due)}</dd>` : ""}
       ${c.anchors.order ? `<dt>Order date</dt><dd>${dayDate(c.anchors.order)}</dd>` : ""}
       <dt>Status</dt><dd>${statusWord[c.status] ?? c.status}${c.probability ? `, ${Math.round(c.probability * 100)}% chance` : ""}</dd>
       ${lag ? `<dt>How they pay</dt><dd>${Math.abs(lag.medianDaysLate)} days ${lag.medianDaysLate >= 0 ? "late" : "early"}, last ${lag.n} payments</dd>` : ""}
       ${c.discount ? `<dt>Discount</dt><dd>${c.discount.pct}% if paid by ${shortDate(c.discount.byDate)}</dd>` : ""}
-      <dt>Source</dt><dd>${c.sourceRef.url ? `<a href="${esc(c.sourceRef.url)}" target="_blank" rel="noopener">${esc(sourceName(c.sourceRef.system))}: ${esc(c.sourceRef.record)}</a>` : `${esc(sourceName(c.sourceRef.system))}: ${esc(c.sourceRef.record)}`}</dd>
+      <dt>Source</dt><dd>${/^https?:\/\//.test(c.sourceRef.url ?? "") ? `<a href="${esc(c.sourceRef.url)}" target="_blank" rel="noopener">${esc(sourceName(c.sourceRef.system))}: ${esc(c.sourceRef.record)}</a>` : `${esc(sourceName(c.sourceRef.system))}: ${esc(c.sourceRef.record)}`}</dd>
     </dl>
     <h3 class="section-title">In the forecast</h3>
-    ${rec.events.map((e) => `<div class="event"><b>${dayDate(e.date)}<span class="status">${statusWord[e.status]}</span></b><span class="amt ${e.direction}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p></div>`).join("") || `<p style="color:var(--ink-soft)">Outside the 13-week view.</p>`}
+    ${rec.events.map((e) => `<div class="event"><b>${dayDate(e.date)}<span class="status">${statusWord[e.status]}</span></b><span class="amt ${e.direction === "in" ? "in" : "out"}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p></div>`).join("") || `<p style="color:var(--ink-soft)">Outside the 13-week view.</p>`}
     ${rec.message ? `<h3 class="section-title" style="margin-top:18px">The message behind the date</h3><div class="message">${esc(rec.message.body).replace(esc(rec.message.excerpt), `<mark>${esc(rec.message.excerpt)}</mark>`)}</div>` : ""}
     ${rec.rules.length ? `<h3 class="section-title" style="margin-top:18px">Your notes about ${esc(p?.name ?? "")}</h3>${rec.rules.map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q></div>`).join("")}` : ""}
     <p class="fineprint">A payment link or a promise is never treated as paid. Only the bank confirms that.</p>`);
@@ -647,8 +652,8 @@ function showWeek(start) {
   app.selectedWeek = start;
   const evs = run.events.filter((e) => e.date >= start && e.date <= addDays(start, 6) && e.status !== "possible");
   openSheet(`
-    ${sheetHead(`Week of ${weekLabel(start)}`, `Ends at ${money(w.closing)}. Lowest day ${money(w.min)}.`)}
-    ${evs.length ? evs.map((e) => `<div class="event"><b>${esc(partyNameFor(e))}<span class="status">${dayDate(e.date)}</span></b><span class="amt ${e.direction}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p><button class="src" data-action="record" data-id="${e.commitmentId}">${esc(e.sourceRef.record)}</button></div>`).join("") : `<p>No money moves this week.</p>`}`);
+    ${sheetHead(`Week of ${weekLabel(start)}`, `Ends at ${money(w.closing)}. Lowest day ${money(w.minClosing)}.`)}
+    ${evs.length ? evs.map((e) => `<div class="event"><b>${esc(partyNameFor(e))}<span class="status">${dayDate(e.date)}</span></b><span class="amt ${e.direction === "in" ? "in" : "out"}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p><button class="src" data-action="record" data-id="${esc(e.commitmentId)}">${esc(e.sourceRef.record)}</button></div>`).join("") : `<p>No money moves this week.</p>`}`);
 }
 function partyNameFor(e) {
   const pid = commitmentParty(e.commitmentId);
@@ -665,9 +670,9 @@ async function showDraft(itemId) {
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn primary" data-action="copy-draft">${icon.copy}Copy</button>
       <button class="btn" data-action="mail-draft">${icon.mail}Open in mail app</button>
-      <button class="btn quiet" data-action="done" data-id="${itemId}" data-close="1">Mark as done</button>
+      <button class="btn quiet" data-action="done" data-id="${esc(itemId)}" data-close="1">Mark as done</button>
     </div>
-    <p class="fineprint">Neri never sends anything for you. You send it, from your own mail.</p>`);
+    <p class="fineprint">Neri never sends anything for you. You send it, from your own mail.</p>`, { mask: false });
 }
 
 function showConnect(id) {
@@ -679,11 +684,11 @@ function showConnect(id) {
     <dl class="kv"><dt>Neri reads</dt><dd>${esc(c.reads)}</dd><dt>Access</dt><dd>Read-only. Turn it off any time.</dd><dt>Status</dt><dd>${AVAILABILITY_LABEL[c.availability]}</dd></dl>
     ${isLive
       ? `<p>You'll sign in with ${esc(c.name)} and pick which company to share. The first import takes a couple of minutes, then Neri keeps it fresh.</p>
-         <button class="btn primary" data-action="connect-go" data-id="${c.id}">Connect ${esc(c.name)}</button>
+         <button class="btn primary" data-action="connect-go" data-id="${esc(c.id)}">Connect ${esc(c.name)}</button>
          <p class="fineprint">${api.mode === "preview" ? "This preview uses a fictional business, so sign-in opens on your Neri server, not here." : ""}</p>`
       : `<p>${c.availability === "next" ? "This connector is being built next." : "This connector is on the list."} You don't have to wait: export from ${esc(c.name)} and upload the file. Neri reads it the same way.</p>
          <div style="display:flex;gap:8px;flex-wrap:wrap"><label class="btn primary">${icon.upload}Upload an export<input type="file" accept=".csv,.xlsx,.xls,.pdf" data-change="upload" hidden /></label>
-         <button class="btn" data-action="interest" data-id="${c.id}">${app.interest.has(c.id) ? "We'll tell you" : "Tell me when it's ready"}</button></div>`}`);
+         <button class="btn" data-action="interest" data-id="${esc(c.id)}">${app.interest.has(c.id) ? "We'll tell you" : "Tell me when it's ready"}</button></div>`}`);
 }
 
 // ---------------------------------------------------------------- toast
@@ -918,9 +923,10 @@ document.addEventListener("click", async (ev) => {
   if (a === "signal") {
     const res = await api.decideSignal(id, el.dataset.d);
     await refresh();
-    if (res?.alert) {
+    if (el.dataset.d === "apply") {
       location.hash = "#/today";
-      toast(res.alert.title, `${res.alert.detail} Today's list is re-ranked.`, "Details", () => (location.hash = "#/details"));
+      const low = app.brief.run.lowPoint;
+      toast(res?.alert?.title ?? "Change applied", res?.alert?.detail ? `${res.alert.detail} Today's list is re-ranked.` : `Your low point is now ${money(low.amount)} on ${shortDate(low.date)}. Today's list is re-ranked.`, "Details", () => (location.hash = "#/details"));
     } else {
       toast("Dismissed", "The forecast stays as it was.");
     }

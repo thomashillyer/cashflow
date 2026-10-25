@@ -119,7 +119,7 @@ export function createEngine(fixture) {
         inflow: wev.filter((e) => e.direction === "in").reduce((s, e) => s + e.amountBase, 0),
         outflow: wev.filter((e) => e.direction === "out").reduce((s, e) => s + e.amountBase, 0),
         closing: wd[wd.length - 1].closing,
-        min: Math.min(...wd.map((d) => d.closing)),
+        minClosing: Math.min(...wd.map((d) => d.closing)),
         pipelineClosing: wd[wd.length - 1].pipeline,
         eventIds: ids,
       });
@@ -133,7 +133,7 @@ export function createEngine(fixture) {
     const H = fixture.profile.freeCashLookaheadWeeks;
     const freeCash = weeks.map((wk, i) => {
       const ahead = weeks.slice(i, i + H);
-      const amount = Math.min(...ahead.map((x) => x.min)) - safetyLine;
+      const amount = Math.min(...ahead.map((x) => x.minClosing)) - safetyLine;
       return { week: wk.start, amount };
     });
     freeCash.forEach((f, i) => {
@@ -156,7 +156,7 @@ export function createEngine(fixture) {
       days,
       weeks,
       lowPoint: { week: mondayOf(low.date), date: low.date, amount: low.closing },
-      weeksBelowSafety: weeks.filter((w) => w.min < safetyLine).map((w) => w.start),
+      weeksBelowSafety: weeks.filter((w) => w.minClosing < safetyLine).map((w) => w.start),
       freeCash,
       events: evs,
     };
@@ -201,7 +201,7 @@ export function createEngine(fixture) {
       for (const c of allCommitments()) {
         const pt = party(c.partyId);
         if (!pt || STATUTORY_KINDS.has(pt.kind) || pt.kind === "customer") continue;
-        const rule = fixture.rules.find((r) => r.confirmed && r.kind === "flexibility" && r.scope.partyId === pt.id);
+        const rule = fixture.rules.find((r) => r.state === "confirmed" && r.kind === "flexibility" && r.scope.partyId === pt.id);
         const penalized = pt.tags.some((t) => p.thresholds.relationshipPenalty[t] !== undefined);
         if (!rule && (penalized || pt.kind !== "supplier")) continue;
         const ev = base.events.find((e) => e.commitmentId === c.id && e.direction === "out");
@@ -301,28 +301,30 @@ export function createEngine(fixture) {
       : 1;
     const ev = base.events.find((e) => e.commitmentId === c.id);
     const ref = c.sourceRef.record;
+    const base$ = base.events.filter((e) => e.commitmentId === c.id).reduce((t, e) => t + e.amountBase, 0) || c.amount;
+    const amt = c.currency === fixture.profile.baseCurrency ? money(c.amount) : `${money(c.amount, { currency: c.currency })} (${money(base$)})`;
     let title;
     let why;
     let actions;
     if (lever.kind === "defer" && !["supplier", "agency"].includes(pt.kind)) {
-      title = `Move the ${pt.name.toLowerCase()} (${money(c.amount)}) back ${lever.days / 7} weeks`;
+      title = `Move the ${pt.name.toLowerCase()} (${amt}) back ${lever.days / 7} weeks`;
       why = `It's planned for ${shortDate(ev.date)}, right as cash is lowest. Moving it to ${shortDate(addDays(ev.date, lever.days))} lifts your low point ${money(value)}.`;
       actions = [{ kind: "mark_done" }];
     } else if (lever.kind === "chase") {
       const lag = pt.lagStats;
-      title = `Call ${pt.name} about the ${money(c.amount)} ${ref.startsWith("INV") ? `invoice (${ref})` : "invoice"}`;
+      title = `Call ${pt.name} about the ${amt} ${ref.startsWith("INV") ? `invoice (${ref})` : "invoice"}`;
       const reason = lag && lag.medianDaysLate > 0
         ? `${pt.name} pays ${lag.medianDaysLate} days late on average (last ${lag.n} payments), so it's expected ${shortDate(ev.date)}`
         : `it's expected ${shortDate(ev.date)}${/\(([^)]*note[^)]*)\)/.test(ev.basis) ? ` (${ev.basis.match(/\(([^)]*note[^)]*)\)/)[1].replace(/^owner note: /, "your note: ")})` : ""}`;
       why = `It's due ${shortDate(c.anchors.due)}, but ${reason}. Paid on its due date, your low point rises ${money(value)}.`;
       actions = [{ kind: "draft_email" }, { kind: "mark_done" }];
     } else if (lever.kind === "defer") {
-      title = `Ask ${pt.name} for ${lever.days} more days on ${money(c.amount)}`;
+      title = `Ask ${pt.name} for ${lever.days} more days on ${amt}`;
       why = `${rule ? `You noted: “${rule.fromNote}.” ` : ""}Moving it from ${shortDate(ev.date)} to ${shortDate(addDays(ev.date, lever.days))} lifts your low point ${money(value)}.`;
       actions = [{ kind: "draft_email" }, { kind: "mark_done" }];
     } else {
       title = `Pay ${pt.name} by ${shortDate(c.discount.byDate)} to keep the ${c.discount.pct}% discount`;
-      why = `${money(c.amount)} is due ${shortDate(c.anchors.due)}. Paying early saves ${money(value)}, and you have room above your line through then.`;
+      why = `${amt} is due ${shortDate(c.anchors.due)}. Paying early saves ${money(value)}, and you have room above your line through then.`;
       actions = [{ kind: "mark_done" }];
     }
     return {
@@ -396,10 +398,11 @@ export function createEngine(fixture) {
     if (item.lever?.kind === "defer") {
       const c = commitmentById(item.lever.commitmentId);
       const ev = forecast().events.find((e) => e.commitmentId === c.id);
+      const amtText = money(c.amount, { currency: c.currency });
       return {
         to: "",
         subject: `${c.sourceRef.record}: request to move payment to ${shortDate(addDays(ev.date, item.lever.days))}`,
-        body: `Hi ${pt.name} team,\n\nWe have ${money(c.amount)} scheduled to you on ${shortDate(ev.date)} for ${c.sourceRef.record}. Could we move it to ${shortDate(addDays(ev.date, item.lever.days))}? Everything else on the order stays the same, and we'll confirm the transfer the day it goes out.\n\nThank you for working with us on this.\n\n${owner}\n${biz}`,
+        body: `Hi ${pt.name} team,\n\nWe have ${amtText} scheduled to you on ${shortDate(ev.date)} for ${c.sourceRef.record}. Could we move it to ${shortDate(addDays(ev.date, item.lever.days))}? Everything else on the order stays the same, and we'll confirm the transfer the day it goes out.\n\nThank you for working with us on this.\n\n${owner}\n${biz}`,
       };
     }
     return {

@@ -54,7 +54,7 @@ export function weekLabel(monday) {
 /** $41,800 (no cents for owner-facing amounts) */
 export function money(cents, { signed = false, currency = "USD" } = {}) {
   const v = Math.round(cents / 100);
-  const abs = Math.abs(v).toLocaleString("en-US");
+  const abs = Math.abs(v).toLocaleString(currency === "INR" ? "en-IN" : "en-US");
   const sym = currency === "USD" ? "$" : currency === "INR" ? "₹" : currency + " ";
   if (v < 0) return `−${sym}${abs}`;
   return `${signed && v > 0 ? "+" : ""}${sym}${abs}`;

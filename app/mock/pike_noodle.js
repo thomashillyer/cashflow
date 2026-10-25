@@ -109,7 +109,7 @@ commitments.push({ id: "booking-holiday-party", type: "sales_deal", partyId: "ca
 export { commitments };
 
 export const rules = [
-  { id: "rule-produce-flex", scope: { partyId: "pacific-produce" }, kind: "flexibility", params: { extraDays: 7 }, fromNote: "They'll hold an invoice a week if we ask", confirmed: true },
+  { id: "rule-produce-flex", scope: { partyId: "pacific-produce" }, kind: "flexibility", params: { extraDays: 7 }, fromNote: "They'll hold an invoice a week if we ask", state: "confirmed" },
 ];
 
 export const balances = [

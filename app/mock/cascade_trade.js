@@ -97,7 +97,7 @@ export const commitments = [
     legs: [leg("2026-12-22", 42000, "out", "committed", 0.95, "70% balance before ship on PO-2291 (ship Dec 22)")] },
   { id: "bill-DUT-2291", type: "bill", partyId: "customs-broker", amount: usd(9000), currency: "USD", anchors: { due: "2026-12-23" }, status: "likely", sourceRef: { system: "generic_file", record: "po-2291.pdf, landed cost estimate" },
     legs: [leg("2026-12-23", 9000, "out", "likely", 0.8, "duties and landing costs on PO-2291, estimated from the landed-cost sheet")] },
-  { id: "po-PO-2302-bal", type: "purchase_order", partyId: "jaipur-textiles", amount: usd(12000), currency: "INR", anchors: { ship: "2026-12-15" }, status: "committed", sourceRef: { system: "generic_file", record: "po-2302.xlsx" },
+  { id: "po-PO-2302-bal", type: "purchase_order", partyId: "jaipur-textiles", amount: 100000000, currency: "INR", anchors: { ship: "2026-12-15" }, status: "committed", sourceRef: { system: "generic_file", record: "po-2302.xlsx" },
     legs: [leg("2026-12-15", 12000, "out", "committed", 0.95, "50% balance at ship on PO-2302 (₹10,00,000 at 83.3 per USD)")] },
   { id: "bill-B-551", type: "bill", partyId: "ningbo-pack", amount: usd(4800), currency: "USD", anchors: { due: "2026-11-06" }, status: "committed", settlement: "open", sourceRef: zb("BILL-551"),
     legs: [leg("2026-11-06", 4800, "out", "committed", 0.98, "packaging bill due Nov 6")] },
@@ -127,8 +127,8 @@ export const commitments = [
 ];
 
 export const rules = [
-  { id: "rule-jaipur-flex", scope: { partyId: "jaipur-textiles" }, kind: "flexibility", params: { extraDays: 15 }, fromNote: "They'll give us 15 more days if I ask", confirmed: true },
-  { id: "rule-evergreen-lag", scope: { partyId: "evergreen-home" }, kind: "lag_offset", params: { offsetDays: 14 }, fromNote: "They always pay about two weeks late", confirmed: true },
+  { id: "rule-jaipur-flex", scope: { partyId: "jaipur-textiles" }, kind: "flexibility", params: { extraDays: 15 }, fromNote: "They'll give us 15 more days if I ask", state: "confirmed" },
+  { id: "rule-evergreen-lag", scope: { partyId: "evergreen-home" }, kind: "lag_offset", params: { offsetDays: 14 }, fromNote: "They always pay about two weeks late", state: "confirmed" },
 ];
 
 export const balances = [

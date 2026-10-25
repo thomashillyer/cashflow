@@ -13,7 +13,7 @@ export function cashChart(run, { width = 640, height = 260, mini = false, ghost 
 
   const series = [run, ghost, whatIf].filter(Boolean);
   let lo = Math.min(0, run.safetyLine, ...series.flatMap((r) => r.days.map((d) => d.closing)));
-  let hi = Math.max(run.safetyLine, ...series.flatMap((r) => r.days.map((d) => (pipeline ? Math.max(d.closing, d.pipeline ?? d.closing) : d.closing))));
+  let hi = Math.max(run.safetyLine, ...series.flatMap((r) => r.days.map((d) => (pipeline && typeof d.pipeline === "number" ? Math.max(d.closing, d.pipeline) : d.closing))));
   const span = hi - lo || 1;
   lo -= span * 0.08;
   hi += span * 0.1;
@@ -75,7 +75,7 @@ export function cashChart(run, { width = 640, height = 260, mini = false, ghost 
   if (!mini) svg += `<text class="label" x="${W - pad.r + 8}" y="${safetyY + 4}">Your line</text>`;
 
   // pipeline (possible deals), ghost (before a change), what-if
-  if (pipeline && !mini && run.days.some((d) => d.pipeline !== d.closing)) {
+  if (pipeline && !mini && run.days.every((d) => typeof d.pipeline === "number") && run.days.some((d) => d.pipeline !== d.closing)) {
     svg += `<path class="line ghost" d="${pathOf(stepPts(run, "pipeline"))}"/>`;
   }
   if (ghost) svg += `<path class="line ghost" d="${pathOf(stepPts(ghost))}"/>`;
