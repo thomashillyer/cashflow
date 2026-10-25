@@ -109,8 +109,8 @@ export type Rule = {
 };
 
 export type Lever =
-  | { kind: "chase"; commitmentId: string; assumeDate: string }
-  | { kind: "defer"; commitmentId: string; days: number }
+  | { kind: "chase"; commitmentId: string; assumeDate: string; legIndex?: number }   // legIndex omitted: the earliest remaining receipt
+  | { kind: "defer"; commitmentId: string; days: number; legIndex?: number }          // legIndex omitted: the earliest remaining payment
   | { kind: "split"; commitmentId: string; shares: number[] }
   | { kind: "pay_early"; commitmentId: string }
   | { kind: "ask_advance"; commitmentId: string; share: number };
