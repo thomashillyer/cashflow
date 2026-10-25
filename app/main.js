@@ -1332,7 +1332,7 @@ async function onClick(ev) {
     return;
   }
   if (a === "draft") return showDraft(id);
-  if (a === "record") return showRecord(id).catch(() => toast("Couldn't open that record", "Try again in a moment."));
+  if (a === "record") return showRecord(id);
   if (a === "week") {
     showWeek(el.dataset.week);
     if (route() === "details") {
