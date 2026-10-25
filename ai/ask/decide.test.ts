@@ -563,3 +563,45 @@ describe.each(fixtureNames)("fixture %s", (name) => {
 function addDaysIso(date: string, days: number): string {
   return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 }
+
+describe("review fixes", () => {
+  it("an existing foreign-currency commitment is stated in base currency from the run's legs, not its raw amount", () => {
+    const d = run(intent("afford", { commitmentId: "po-PO-2302" }), { records: withBalance($(300000)) });
+    const pay = d.headlineFacts.find((h) => h.label === "Payment")!;
+    expect(pay.amount).toBe(Math.round(200_000_000 * 0.012)); // INR 2,000,000 at 0.012 = $24,000
+    expect(pay.date).toBe("2026-12-01");
+  });
+
+  it("short of the line without the payment: act_now, not a verdict that blames the payment", () => {
+    const d = run(intent("afford", { draft: outPlan($(5000), "2026-12-15"), date: "2026-12-15" }), { records: withBalance($(160000)) });
+    expect(d.verdict).toBe("act_now");
+    expect(d.assumptions.join(" ")).toContain("even without this payment");
+  });
+
+  it("an afford question about a hire is a recurring item, not a one-time payment", () => {
+    const draft: CommitmentDraft = { type: "recurring", direction: "out", amount: $(6000), currency: "USD", anchors: { due: "2026-12-01" }, status: "committed", category: "cadence:monthly" };
+    const d = run(intent("afford", { draft, date: "2026-12-01", question: "afford a hire" }), { records: withBalance($(300000)) });
+    expect(d.verdict).toBe("yes");
+    expect(d.intent).toBe("afford");
+    expect(d.scenarioInputs!.recurring![0]).toMatchObject({ cadence: "monthly", amount: $(6000) });
+    expect(d.scenarioInputs!.commitments).toBeUndefined();
+  });
+
+  it("an on_track answer does not rest on a possible (quoted) deal", () => {
+    const d = run(intent("status"), { records: withBalance($(600000)) });
+    expect(d.verdict).toBe("on_track");
+    expect(JSON.stringify([d.whatWouldChange, d.convictionReasons])).not.toContain("RFQ-77");
+  });
+
+  it("invariants over every Decision: no synthetic citations; shortfall agrees with baseLowPoint", () => {
+    for (const d of seen) {
+      for (const c of d.citations) expect(c).not.toMatch(/ask-draft|~/);
+      if (d.verdict !== "need_info" && d.verdict !== "proposed") expect(d.citations.length).toBeGreaterThan(0);
+      const b = d.context.baseLowPoint;
+      if (b && d.context.safetyLine !== undefined) {
+        if (b.amount < d.context.safetyLine) expect(d.context.shortfall).toBe(d.context.safetyLine - b.amount);
+        else expect(d.context.shortfall).toBeUndefined();
+      }
+    }
+  });
+});

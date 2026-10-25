@@ -154,6 +154,8 @@ function assemble(f: Figures, d: DecisionDraft): Decision {
   const numbers: NumberFact[] = [...f.numbers];
   return {
     ...d,
+    // Synthetic drafts and virtual linked costs are not records the UI can open.
+    citations: d.citations.filter((id) => !id.includes(SYNTHETIC_PREFIX) && !id.includes("~")),
     numbers,
     allowed: {
       amounts: [...amounts].sort((a, b) => a - b),
@@ -451,7 +453,7 @@ function pathForMove(world: World, gap: Gap): Path {
 // The call on a clean run rests on the receipts that must land before the tightest day.
 function pathForOnTrack(world: World, run: ForecastRun, low: Day): Path {
   const events = run.events.filter(
-    (e) => e.direction === "in" && e.status !== "actual" && e.commitmentId && e.date >= run.asOf && e.date <= low.date,
+    (e) => e.direction === "in" && e.status !== "actual" && e.status !== "possible" && e.commitmentId && e.date >= run.asOf && e.date <= low.date,
   );
   const ids = uniq(events.map((e) => e.commitmentId!.split("~")[0]!));
   return { events, timingPartyIds: timingParties(world.records, ids) };
@@ -464,7 +466,7 @@ function lowFacts(label: string, d: Day) {
 // ---------------------------------------------------------------------------------------------------------
 // fix_gap and status
 
-function runFixGap(intent: AskIntent, ctx: DecideContext, window: Window | undefined, tightestLabel: string): Decision {
+function runFixGap(intent: AskIntent, ctx: DecideContext, window: Window | undefined, tightestLabel: string, extraAssumptions: string[] = []): Decision {
   const f = new Figures(ctx.profile.baseCurrency);
   const world = baseWorld(ctx);
   const win = window ?? { from: ctx.asOf, to: horizonEnd(ctx.profile, ctx.asOf) };
@@ -472,7 +474,7 @@ function runFixGap(intent: AskIntent, ctx: DecideContext, window: Window | undef
   if (!minDay(gap.run, win)) {
     return needInfo(intent, ctx, `Which dates should I look at? I can only see through ${horizonEnd(ctx.profile, ctx.asOf)}`, "The dates asked about are outside the forecast.");
   }
-  const assumptions = baseAssumptions(intent, ctx, f);
+  const assumptions = [...baseAssumptions(intent, ctx, f), ...extraAssumptions];
   const verdict: Decision["verdict"] = gap.below ? "act_now" : "on_track";
   const { rec, fb } = moveParts(f, world, gap);
   const path = gap.below ? pathForMove(world, gap) : pathForOnTrack(world, gap.run, gap.low);
@@ -566,10 +568,52 @@ function assumedOf(intent: AskIntent, dateAssumed: string | undefined): string |
   return dateAssumed ?? (intent.dateVague !== undefined || defaulted ? intent.date ?? "" : undefined);
 }
 
+// "Can I afford a hire / new fixed cost?" is a recurring item, not a one-time payment: evaluate it as the what_if
+// does (profile recurring item), then phrase the verdict as an afford answer.
+function affordRecurring(intent: AskIntent, ctx: DecideContext): Decision {
+  const d = runWhatIf(intent, ctx);
+  if (d.verdict !== "on_track" && d.verdict !== "act_now") return d;
+  const safety = d.context.safetyLine ?? 0;
+  if (d.verdict === "on_track") return { ...d, verdict: "yes" };
+  const baseOk = (d.context.baseLowPoint?.amount ?? 0) >= safety;
+  if (!baseOk) return d; // short of the line without the new cost: the gap is the story (act_now)
+  if (d.recommendation?.resultingLowPoint && d.recommendation.resultingLowPoint.amount >= safety) return { ...d, verdict: "yes_if" };
+  const { recommendation: _drop, fallback: _fb, ...rest } = d;
+  return { ...rest, verdict: "no", recommendation: { action: "Hold off on the new recurring cost until cash improves" } };
+}
+
+// The shortfall exists without the thing asked about: answer as fix_gap on the world without it (act_now).
+function actNowWithout(
+  intent: AskIntent, ctx: DecideContext, f: Figures, w2: World, assumptions: string[], assumed: string | undefined,
+  scenarioInputs: Decision["scenarioInputs"], subjectId: string, note: string, label: string,
+): Decision {
+  const gap = fixGap(ctx, w2, undefined, false);
+  const { rec, fb } = moveParts(f, w2, gap);
+  const conv = convict(ctx, f, w2, pathForMove(w2, gap), assumed);
+  assumptions.push(note);
+  const headline: Decision["headlineFacts"] = [lowFacts(label, gap.low), { label: "Safety line", amount: gap.run.safetyLine }];
+  if (rec?.resultingLowPoint) headline.push(lowFacts("Lowest cash point after the move", rec.resultingLowPoint));
+  return assemble(f, {
+    ...skeleton(intent, ctx),
+    verdict: "act_now",
+    headlineFacts: headline.slice(0, 3),
+    context: { baseLowPoint: gap.low, safetyLine: gap.run.safetyLine, shortfall: Math.max(0, gap.run.safetyLine - gap.low.amount) },
+    ...(rec ? { recommendation: rec } : {}),
+    ...(fb ? { fallback: fb } : {}),
+    assumptions,
+    conviction: conv.conviction,
+    convictionReasons: conv.convictionReasons,
+    ...(conv.whatWouldChange ? { whatWouldChange: conv.whatWouldChange } : {}),
+    ...(scenarioInputs ? { scenarioInputs } : {}),
+    citations: uniq([subjectId, ...(gap.pick ? [gap.pick.lever.commitmentId, ...gap.pick.item.evidenceRefs] : []), ...eventsOn(gap.run, gap.low.date)]),
+  });
+}
+
 function runAfford(intent: AskIntent, ctx: DecideContext): Decision {
   const f = new Figures(ctx.profile.baseCurrency);
   const assumptions = baseAssumptions(intent, ctx, f);
   const records = ctx.records;
+  if (intent.draft?.type === "recurring" && !intent.commitmentId) return affordRecurring(intent, ctx);
   const existing = intent.commitmentId ? records.commitments.find((c) => c.id === intent.commitmentId) : undefined;
   if (intent.commitmentId && !existing && !intent.draft) {
     return needInfo(intent, ctx, "Which order or bill do you mean?", "The item named was not found in the books.");
@@ -604,8 +648,7 @@ function runAfford(intent: AskIntent, ctx: DecideContext): Decision {
   }
   if (dir === "in") {
     // Already-expected receivable: nothing to afford; show the cash picture and the move that helps most.
-    assumptions.push("This is money you are owed rather than a spend, so the answer is the current cash picture.");
-    return runFixGap(intent, ctx, undefined, "Lowest cash point");
+    return runFixGap(intent, ctx, undefined, "Lowest cash point", ["This is money you are owed rather than a spend, so the answer is the current cash picture."]);
   }
 
   // Outbound plan (or existing outbound commitment).
@@ -613,14 +656,28 @@ function runAfford(intent: AskIntent, ctx: DecideContext): Decision {
     ? forecast(records, ctx.profile, { id: "base", kind: "base", overrides: world.overrides }, ctx.asOf, ctx.fxRates)
     : forecast(records, ctx.profile, { id: "base-without", kind: "what_if", overrides: [...world.overrides, { id: `ask-without-${target.id}`, target: { commitmentId: target.id }, change: { exclude: true }, origin: "owner" }] }, ctx.asOf, ctx.fxRates);
   const baseLow: Day = { date: without.lowPoint.date, amount: without.lowPoint.amount };
+  if (baseLow.amount < without.safetyLine) {
+    // Short of the line without this payment: the payment is not the cause.
+    const w2: World = synthetic
+      ? { records, profile: ctx.profile, overrides: world.overrides }
+      : { records, profile: ctx.profile, overrides: [...world.overrides, { id: `ask-without-${target.id}`, target: { commitmentId: target.id }, change: { exclude: true }, origin: "owner" }] };
+    return actNowWithout(intent, ctx, f, w2, assumptions, assumedOf(intent, dateAssumed), scenarioInputs, target.id,
+      `Cash is below the safety line even without ${synthetic ? "this payment" : label}, so the payment is not the cause.`, "Lowest cash point without the payment");
+  }
   const gap = fixGap(ctx, world, undefined, true);
-  const amountText = f.m(target.amount);
-  const planDate = f.d(dateOf);
-  const spend: Decision["headlineFacts"][number] = { label: synthetic ? "Planned payment" : "Payment", amount: target.amount, date: dateOf };
+  // The money asked about, in the base currency from the run's own legs (an existing item may be partly paid or foreign).
+  const legs = pendingEvents(gap.run, [target.id]).filter((e) => e.direction === "out");
+  const spendAmount = legs.length > 0 ? legs.reduce((a, e) => a + e.amountBase, 0) : target.amount;
+  const spendDate = legs.length > 0 ? legs.map((e) => e.date).sort()[0]! : dateOf;
+  const amountText = f.m(spendAmount);
+  const planDate = f.d(spendDate);
+  const spend: Decision["headlineFacts"][number] = { label: synthetic ? "Planned payment" : "Payment", amount: spendAmount, date: spendDate };
+  // baseLowPoint is the run without the payment (design table), so the shortfall is measured on it too; the low
+  // point with the payment is headlineFacts[0].
   const ctxFacts = {
     baseLowPoint: baseLow,
     safetyLine: gap.run.safetyLine,
-    ...(gap.below ? { shortfall: gap.run.safetyLine - gap.low.amount } : {}),
+    ...(baseLow.amount < gap.run.safetyLine ? { shortfall: gap.run.safetyLine - baseLow.amount } : {}),
   };
   const targetPath: Path = { events: pendingEvents(gap.run, [target.id]), timingPartyIds: [] };
   const citeBase = [target.id, ...eventsOn(gap.run, gap.low.date)];
@@ -788,26 +845,8 @@ function affordDeal(
       // The shortfall exists without this order: answer as fix_gap on the world without it.
       const without: Override = { id: `ask-without-${deal.id}`, target: { commitmentId: deal.id }, change: { exclude: true }, origin: "owner" };
       const w2: World = { records: world.records, profile: world.profile, overrides: [...world.overrides, without] };
-      const gap = fixGap(ctx, w2, undefined, false);
-      const { rec, fb } = moveParts(f, w2, gap);
-      const conv = convict(ctx, f, w2, pathForMove(w2, gap), assumed);
-      assumptions.push(`Cash is below the safety line even without ${label}, so the order is not the cause.`);
-      const headline: Decision["headlineFacts"] = [lowFacts("Lowest cash point without the order", gap.low), { label: "Safety line", amount: gap.run.safetyLine }];
-      if (rec?.resultingLowPoint) headline.push(lowFacts("Lowest cash point after the move", rec.resultingLowPoint));
-      return assemble(f, {
-        ...skeleton(intent, ctx),
-        verdict: "act_now",
-        headlineFacts: headline.slice(0, 3),
-        context: { baseLowPoint: gap.low, safetyLine: gap.run.safetyLine, shortfall: Math.max(0, gap.run.safetyLine - gap.low.amount) },
-        ...(rec ? { recommendation: rec } : {}),
-        ...(fb ? { fallback: fb } : {}),
-        assumptions,
-        conviction: conv.conviction,
-        convictionReasons: conv.convictionReasons,
-        ...(conv.whatWouldChange ? { whatWouldChange: conv.whatWouldChange } : {}),
-        ...(scenarioInputs ? { scenarioInputs } : {}),
-        citations: uniq([deal.id, ...(gap.pick ? [gap.pick.lever.commitmentId, ...gap.pick.item.evidenceRefs] : []), ...eventsOn(gap.run, gap.low.date)]),
-      });
+      return actNowWithout(intent, ctx, f, w2, assumptions, assumed, scenarioInputs, deal.id,
+        `Cash is below the safety line even without ${label}, so the order is not the cause.`, "Lowest cash point without the order");
     }
   }
 }
@@ -903,7 +942,7 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
     context: {
       baseLowPoint: baseLow,
       safetyLine: gap.run.safetyLine,
-      ...(gap.below ? { shortfall: gap.run.safetyLine - gap.low.amount } : {}),
+      ...(baseLow.amount < gap.run.safetyLine ? { shortfall: gap.run.safetyLine - baseLow.amount } : {}),
     },
     ...(rec ? { recommendation: rec } : {}),
     ...(fb ? { fallback: fb } : {}),
