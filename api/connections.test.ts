@@ -7,6 +7,7 @@ import { reviewCandidate } from "../ai/extract/document";
 import { propose } from "../ai/reconcile/match";
 import type { ZohoPullInput } from "../adapters/zoho_books";
 import type { BalanceSnapshot } from "../schema/records";
+import { forecast } from "../engine/forecast";
 import { buildConnectionService } from "./connections";
 import { sendError, type NeriRequest } from "./http";
 import { connectionRoutes } from "./routes/connections";
@@ -44,7 +45,7 @@ describe("tenant-bound Outlook review intake", () => {
     const pull = vi.fn(async () => ({ ok: true as const, data: { inputs: [email("one")], diagnostics: output(now().toISOString()).diagnostics } }));
     const ingest = vi.fn(readEmail);
     const service = buildConnectionService(microsoft, { outlookPull: pull, ingest, aiMode: "live" });
-    expect(service.list(business).connections[1]).toMatchObject({ id: "outlook", available: true, state: "waiting" });
+    expect(service.list(business).connections.find((c) => c.id === "outlook")).toMatchObject({ id: "outlook", available: true, state: "waiting" });
     await expect(service.sync(other, store, now, "outlook")).rejects.toMatchObject({ status: 403 });
     expect(pull).not.toHaveBeenCalled();
     const first = await service.sync(business, store, now, "outlook");
@@ -119,7 +120,7 @@ describe("tenant-bound Outlook review intake", () => {
     expect(result.counts).toMatchObject({ failed: 1, evidence: 1, proposals: 1 });
     expect((await store.load(business.id)).records.evidence).toHaveLength(1);
     expect(result.connection.message).not.toContain("private source body");
-    expect(service.list((await store.getBusiness(business.id))!).connections[1]?.state).toBe("error");
+    expect(service.list((await store.getBusiness(business.id))!).connections.find((c) => c.id === "outlook")?.state).toBe("error");
   });
 
   it("validates Microsoft configuration and does not leak failed authorization details", async () => {
@@ -308,8 +309,121 @@ describe("tenant-bound Zoho Books connection", () => {
   });
 });
 
+describe("tenant-bound Zoho CRM connection", () => {
+  const deal = { id: "crm-1", Deal_Name: "Example quote", Stage: "Quoted", Amount: 100, Currency: "USD", Closing_Date: "2026-11-10", Probability: 25, Account_Name: { id: "customer", name: "Example Customer" } };
+  const crmConnection = (service: ReturnType<typeof buildConnectionService>, business: Business) => service.list(business).connections.find((c) => c.id === "zoho_crm");
+
+  // Protects real adapter -> persistence -> forecast behavior. Provider responses are mocked; no live consent is tested.
+  it.each(["lost", "invoiced"])("keeps quotes out of base cash and retires an explicitly %s deal, then reopens it", async (ending) => {
+    const { store, business } = await setup();
+    business.profile.crm = { stageStatus: { Quoted: "possible", Won: "likely", Invoiced: "skip" } };
+    await store.saveProfile(business.id, business.profile);
+    let current = { ...deal };
+    const fetch = vi.fn<typeof globalThis.fetch>(async (raw, init) => {
+      const url = new URL(String(raw));
+      expect(init?.redirect).toBe("error");
+      if (url.hostname === "accounts.zoho.com") return Response.json({ access_token: "private-crm-token", expires_in: 3600 });
+      expect(url.origin).toBe("https://www.zohoapis.com");
+      expect(url.pathname).toBe("/crm/v6/Deals");
+      expect(init?.method).toBe("GET");
+      return Response.json({ data: [current], info: { more_records: false } });
+    });
+    const service = buildConnectionService(env, { fetch });
+    const pending = vi.spyOn(store, "listProposals");
+    const sync = () => service.sync(business, store, now, "zoho_crm");
+    const first = await sync();
+    expect(first).toMatchObject({ connection: { id: "zoho_crm", state: "ok" }, counts: { commitments: 1, settlements: 0 }, storeRevision: 1 });
+    const records = (await store.load(business.id)).records;
+    expect(records.commitments[0]).toMatchObject({ type: "sales_deal", status: "possible", probability: 0.25, amount: 10000 });
+    const run = forecast(records, { ...business.profile, recurring: [] }, { id: "base", kind: "base", overrides: [] }, "2026-10-25", {});
+    expect(run.events.filter((e) => e.commitmentId === records.commitments[0]!.id).every((e) => e.status === "possible")).toBe(true);
+    expect(run.days.every((day) => day.closing === run.openingBalance)).toBe(true);
+    expect(records.balances).toEqual([]);
+    expect((await sync()).summary?.written).toBe(false);
+    expect(pending).toHaveBeenCalledTimes(1);
+    current = { ...deal, Stage: "Won", Probability: 80 };
+    await sync();
+    const active = (await store.load(business.id)).records.commitments[0]!;
+    await store.saveOverrides(business.id, [{ id: "owner-date", target: { commitmentId: active.id }, change: { shiftDays: 5 }, origin: "owner" }]);
+    current = { ...deal, Stage: ending === "lost" ? "Lost" : "Invoiced", Probability: ending === "lost" ? 0 : 100 };
+    await sync();
+    const retired = (await store.load(business.id)).records;
+    expect(retired.commitments).toHaveLength(1);
+    expect(retired.commitments[0]).toMatchObject({ id: active.id, settlement: "cancelled", evidenceIds: active.evidenceIds });
+    expect(forecast(retired, { ...business.profile, recurring: [] }, { id: "base", kind: "base", overrides: [] }, "2026-10-25", {}).events).toEqual([]);
+    expect(await store.loadOverrides(business.id)).toHaveLength(1);
+    expect((await sync()).summary?.written).toBe(false);
+    current = { ...deal };
+    await sync();
+    expect((await store.load(business.id)).records.commitments[0]).toMatchObject({ id: active.id, settlement: "open", status: "possible", probability: 0.25 });
+    expect(fetch.mock.calls.filter(([raw]) => String(raw).includes("/oauth/v2/token"))).toHaveLength(1);
+    expect(JSON.stringify(first)).not.toContain("private-crm-token");
+  });
+
+  it("reports safe persistent attention for warnings and rejected rows and recovers on a clean read", async () => {
+    const { store, business } = await setup();
+    let warning = true;
+    const crmPull = vi.fn(async () => ({ ok: true as const, data: { parties: [], commitments: [], evidence: [], skipped: [], diagnostics: { ...output(now().toISOString()).diagnostics, rowsRejected: warning ? 1 : 0, warnings: warning ? ["private provider detail"] : [] } } }));
+    const service = buildConnectionService(env, { crmPull });
+    const result = await service.sync(business, store, now, "zoho_crm");
+    expect(result.connection).toMatchObject({ state: "error", message: expect.stringMatching(/check|review/i) });
+    expect(JSON.stringify(result)).not.toContain("private provider detail");
+    const reloaded = (await store.getBusiness(business.id))!;
+    expect(crmConnection(buildConnectionService(env), reloaded)?.state).toBe("error");
+    warning = false;
+    await service.sync(reloaded, store, now, "zoho_crm");
+    expect(crmConnection(service, (await store.getBusiness(business.id))!)).toMatchObject({ state: "ok", lastSyncedAt: now().toISOString() });
+  });
+
+  it("guards discovery and sync by tenant/configuration and sanitizes provider failures", async () => {
+    const { store, business, other } = await setup();
+    const crmPull = vi.fn(async () => ({ ok: false as const, error: { kind: "auth" as const, message: "private token", nextStep: "private", fallback: "file" as const } }));
+    const service = buildConnectionService(env, { crmPull });
+    expect(crmConnection(service, business)?.available).toBe(true);
+    for (const b of [other, { ...business, isSynthetic: true }]) {
+      expect(crmConnection(service, b)?.available).toBe(false);
+      await expect(service.sync(b, store, now, "zoho_crm")).rejects.toMatchObject({ status: 403 });
+    }
+    await expect(buildConnectionService({}, { crmPull }).sync(business, store, now, "zoho_crm")).rejects.toMatchObject({ status: 503 });
+    expect(crmPull).not.toHaveBeenCalled();
+    await expect(service.sync(business, store, now, "zoho_crm")).rejects.toMatchObject({ status: 502 });
+    expect(JSON.stringify(service.list(business))).not.toContain("private token");
+    expect((await store.load(business.id)).storeRevision).toBe(0);
+    expect((await store.getBusiness(business.id))!.profile.account?.connections).toBeUndefined();
+  });
+
+  it("coalesces duplicate CRM reads and serializes Books/CRM writes while sharing the token", async () => {
+    const { store, business } = await setup();
+    const tokenFetch = vi.fn<typeof globalThis.fetch>(async () => Response.json({ access_token: "shared-token", expires_in: 3600 }));
+    const booksPull = goodPull();
+    const crmPull = vi.fn(async () => ({ ok: true as const, data: { parties: [], commitments: [], evidence: [], skipped: [], diagnostics: { ...output(now().toISOString()).diagnostics, warnings: [] } } }));
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const service = buildConnectionService(env, { fetch: tokenFetch, pull: async (input) => {
+      expect(await input.token("zoho_books")).toBe("shared-token");
+      await held;
+      return booksPull(input);
+    }, crmPull: async (input) => {
+      expect(await input.token("zoho_crm")).toBe("shared-token");
+      return crmPull();
+    } });
+    const books = service.sync(business, store, now);
+    const crm1 = service.sync(business, store, now, "zoho_crm");
+    const crm2 = service.sync(business, store, now, "zoho_crm");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const ranDuringBooks = crmPull.mock.calls.length;
+    release();
+    const [, first, second] = await Promise.all([books, crm1, crm2]);
+    expect(ranDuringBooks).toBe(0);
+    expect(first).toEqual(second);
+    expect(crmPull).toHaveBeenCalledTimes(1);
+    expect(tokenFetch).toHaveBeenCalledTimes(1);
+    expect((await store.getBusiness(business.id))!.profile.account?.connections?.map((c) => c.id).sort()).toEqual(["zoho_books", "zoho_crm"]);
+  });
+});
+
 describe("connection HTTP contract", () => {
-  it("requires authentication, hides another tenant's connection, and rejects client account settings", async () => {
+  it.each(["zoho_books", "zoho_crm"] as const)("authenticates %s, hides another tenant's connection, and rejects client account settings", async (provider) => {
     const { store, business, other } = await setup();
     const pull = goodPull();
     const app = Fastify();
@@ -321,20 +435,22 @@ describe("connection HTTP contract", () => {
       r.business = req.headers.authorization === "owner" ? business : other;
       r.store = store;
     });
-    await app.register(connectionRoutes({ connections: buildConnectionService(env, { pull }), now }));
+    const crmPull = vi.fn(async () => ({ ok: true as const, data: { ...output(now().toISOString()), skipped: [] } }));
+    await app.register(connectionRoutes({ connections: buildConnectionService(env, { pull, crmPull }), now }));
     try {
       expect((await app.inject({ method: "GET", url: "/connections" })).statusCode).toBe(401);
-      expect((await app.inject({ method: "POST", url: "/connections/zoho_books/sync" })).statusCode).toBe(401);
+      expect((await app.inject({ method: "POST", url: `/connections/${provider}/sync` })).statusCode).toBe(401);
       const hidden = await app.inject({ method: "GET", url: "/connections", headers: { authorization: "other" } });
       expect(hidden.json().connections[0]).toMatchObject({ available: false, state: "waiting" });
-      expect((await app.inject({ method: "POST", url: "/connections/zoho_books/sync", headers: { authorization: "other" } })).statusCode).toBe(403);
-      const override = await app.inject({ method: "POST", url: "/connections/zoho_books/sync", headers: { authorization: "owner" }, payload: { accessToken: "client-secret", apiDomain: "https://attacker.example" } });
+      expect((await app.inject({ method: "POST", url: `/connections/${provider}/sync`, headers: { authorization: "other" } })).statusCode).toBe(403);
+      const override = await app.inject({ method: "POST", url: `/connections/${provider}/sync`, headers: { authorization: "owner" }, payload: { accessToken: "client-secret", apiDomain: "https://attacker.example" } });
       expect(override.statusCode).toBe(400);
       expect(override.body).not.toContain("client-secret");
       expect(pull).not.toHaveBeenCalled();
-      const success = await app.inject({ method: "POST", url: "/connections/zoho_books/sync", headers: { authorization: "owner" }, payload: {} });
+      expect(crmPull).not.toHaveBeenCalled();
+      const success = await app.inject({ method: "POST", url: `/connections/${provider}/sync`, headers: { authorization: "owner" }, payload: {} });
       expect(success.statusCode).toBe(200);
-      expect(success.json()).toMatchObject({ connection: { id: "zoho_books", state: "ok" }, counts: { commitments: 1 }, storeRevision: 1 });
+      expect(success.json()).toMatchObject({ connection: { id: provider, state: "ok" }, counts: { commitments: 1 }, storeRevision: 1 });
     } finally { await app.close(); }
   });
 });

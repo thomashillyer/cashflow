@@ -2,6 +2,7 @@
 // Credentials stay inside this service; neither discovery nor sync returns provider payloads.
 import { pullZoho } from "../adapters/zoho_books";
 import { pullOutlook } from "../adapters/outlook";
+import { pullZohoCrm } from "../adapters/zoho_crm";
 import { ingest } from "../ai/intake";
 import type { AiMode } from "./engine";
 import { ZOHO_REGIONS, type ZohoRegion } from "../adapters/zoho_books/client";
@@ -10,10 +11,10 @@ import { persistImport, type PersistSummary } from "./persist";
 import { refreshPending } from "./routes/review";
 import type { Business, Store } from "./store";
 
-export type ConnectionId = "zoho_books" | "outlook";
+export type ConnectionId = "zoho_books" | "zoho_crm" | "outlook";
 export type ConnectionStatus = {
   id: ConnectionId;
-  name: "Zoho Books" | "Outlook";
+  name: "Zoho Books" | "Zoho CRM" | "Outlook";
   available: boolean;
   state: "waiting" | "ok" | "error";
   lastSyncedAt?: string;
@@ -30,7 +31,7 @@ export interface ConnectionService {
   list(business: Business): ConnectionList;
   sync(business: Business, store: Store, now: () => Date, provider?: ConnectionId): Promise<ConnectionSyncResult>;
 }
-export type ConnectionOptions = { pull?: typeof pullZoho; fetch?: typeof fetch; outlookPull?: typeof pullOutlook; ingest?: typeof ingest; aiMode?: AiMode };
+export type ConnectionOptions = { pull?: typeof pullZoho; crmPull?: typeof pullZohoCrm; fetch?: typeof fetch; outlookPull?: typeof pullOutlook; ingest?: typeof ingest; aiMode?: AiMode };
 
 const identity = { id: "zoho_books", name: "Zoho Books" } as const;
 const unavailable = "Zoho Books isn't configured for this business. Ask your team to connect it, or upload an export.";
@@ -59,6 +60,14 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
   let renewing: Promise<string> | undefined;
   let errorMessage: string | undefined;
   let syncing: Promise<ConnectionSyncResult> | undefined;
+  // Both providers replace the saved profile after reading it. Serialize them so their
+  // connection state survives simultaneous Books/CRM requests; repeats still coalesce below.
+  let zohoQueue: Promise<unknown> = Promise.resolve();
+  function enqueue(work: () => Promise<ConnectionSyncResult>): Promise<ConnectionSyncResult> {
+    const next = zohoQueue.then(work);
+    zohoQueue = next.catch(() => undefined);
+    return next;
+  }
 
   const bound = (b: Business) => !b.isSynthetic && Boolean(businessId) && b.id === businessId;
   function status(b: Business): ConnectionStatus {
@@ -148,14 +157,87 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
     }
   }
 
+  // Zoho CRM: the same Zoho client and refresh token as Books (one consent covers both). Open deals and quoted
+  // RFQs become sales_deal commitments with the certainty the business's profile.crm mapping gives each stage,
+  // so quoted RFQs stay "possible" and never enter the main forecast line. Read-only.
+  const crm = { id: "zoho_crm", name: "Zoho CRM" } as const;
+  const crmMissing = "Zoho CRM isn't configured for this business. Ask your team to connect it, or upload a CRM export.";
+  const crmFailed = "Zoho CRM couldn't be read. Check that the connection allows CRM read access and try again, or upload a CRM export.";
+  const crmAttention = "Some deals need a check or could not be read. Check CRM stage mappings, probabilities and closing dates, including deals already invoiced, then sync again or upload a CRM export.";
+  const crmPull = options.crmPull ?? pullZohoCrm;
+  let crmError: string | undefined;
+  let crmSyncing: Promise<ConnectionSyncResult> | undefined;
+  function crmStatus(b: Business): ConnectionStatus {
+    if (!bound(b) || !configured) return { ...crm, available: false, state: "waiting", message: crmMissing };
+    const prior = b.profile.account?.connections?.find((c) => c.id === crm.id);
+    const lastSyncedAt = prior?.syncedAt;
+    const problem = crmError ?? (prior?.state === "error" ? crmAttention : undefined);
+    return {
+      ...crm, available: true, state: problem ? "error" : lastSyncedAt ? "ok" : "waiting", ...(lastSyncedAt ? { lastSyncedAt } : {}),
+      message: problem ?? (lastSyncedAt ? "Deals and RFQs were read. Sync again to check for changes." : "Ready to read your open deals and RFQs. Nothing has been imported yet."),
+    };
+  }
+  async function performCrm(b: Business, store: Store, now: () => Date): Promise<ConnectionSyncResult> {
+    const at = now().toISOString();
+    try {
+      const { records } = await store.load(b.id);
+      const result = await crmPull({
+        region: region!, token, now: at, existingEvidence: records.evidence,
+        ...(b.profile.crm ? { mapping: b.profile.crm } : {}),
+        fetch: (url, init) => fetchImpl(url, { ...init, redirect: "error" }),
+      });
+      if (!result.ok) {
+        if (result.error.kind === "auth") access = undefined;
+        throw new HttpError(502, "CONNECTOR_UNAVAILABLE", crmFailed, { retryable: true });
+      }
+      const data = result.data;
+      // A lost/already-invoiced deal must stop contributing cash. Only retire explicit
+      // skips: absence from a paginated or partial read is not proof a deal disappeared.
+      const skipped = new Set(data.skipped.map((deal) => deal.dealId));
+      const latest = await store.load(b.id);
+      const retired = latest.records.commitments.filter((c) => c.type === "sales_deal" && c.sourceRef.system === "crm" && skipped.has(c.sourceRef.record))
+        .map((c) => ({ ...c, settlement: "cancelled" as const }));
+      const summary = await persistImport(store, b.id, { parties: data.parties, commitments: [...data.commitments, ...retired], settlements: [], evidence: data.evidence });
+      if (summary.written) {
+        const latest = await store.load(b.id);
+        await refreshPending(store, b.id, latest.records, latest.storeRevision, at);
+      }
+      const latestBusiness = await store.getBusiness(b.id);
+      if (!latestBusiness || !bound(latestBusiness)) throw new HttpError(403, "FORBIDDEN", crmMissing);
+      const account = latestBusiness.profile.account ?? {};
+      const needsAttention = data.diagnostics.rowsRejected > 0 || data.diagnostics.warnings.length > 0;
+      const connection: ConnectionStatus = { ...crm, available: true, state: needsAttention ? "error" : "ok", lastSyncedAt: at, ...(needsAttention ? { message: crmAttention } : {}) };
+      await store.saveProfile(b.id, {
+        ...latestBusiness.profile, account: {
+          ...account, connections: [...(account.connections ?? []).filter((c) => c.id !== crm.id), { ...crm, state: connection.state, syncedAt: at }],
+        },
+      });
+      crmError = needsAttention ? crmAttention : undefined;
+      return {
+        connection,
+        counts: { parties: data.parties.length, commitments: data.commitments.length, settlements: 0, evidence: data.evidence.length, rejected: data.diagnostics.rowsRejected },
+        summary, storeRevision: summary.storeRevision,
+      };
+    } catch (error) {
+      crmError = crmFailed;
+      throw new HttpError(502, "CONNECTOR_UNAVAILABLE", crmError, { retryable: true });
+    }
+  }
+
   return {
-    list: (b) => ({ connections: [status(b)] }),
-    async sync(b, store, now) {
+    list: (b) => ({ connections: [status(b), crmStatus(b)] }),
+    async sync(b, store, now, provider = "zoho_books") {
       if (b.isSynthetic || (businessId && b.id !== businessId)) throw new HttpError(403, "FORBIDDEN", "This business cannot use that connection.");
+      if (provider === "zoho_crm") {
+        if (!configured || !bound(b)) throw new HttpError(503, "CONNECTOR_NOT_CONFIGURED", crmMissing);
+        if (crmSyncing) return crmSyncing;
+        crmSyncing = enqueue(() => performCrm(b, store, now));
+        try { return await crmSyncing; } finally { crmSyncing = undefined; }
+      }
       if (!configured || !bound(b)) throw new HttpError(503, "CONNECTOR_NOT_CONFIGURED", unavailable);
       // One in-flight pull per configured company prevents duplicate revision bumps on double-click.
       if (syncing) return syncing;
-      syncing = perform(b, store, now);
+      syncing = enqueue(() => perform(b, store, now));
       try { return await syncing; } finally { syncing = undefined; }
     },
   };
@@ -266,7 +348,7 @@ export function buildConnectionService(env: NodeJS.ProcessEnv, options: Connecti
   return {
     list: (b) => ({ connections: [...zoho.list(b).connections, status(b)] }),
     async sync(b, store, now, provider = "zoho_books") {
-      if (provider === "zoho_books") return zoho.sync(b, store, now);
+      if (provider === "zoho_books" || provider === "zoho_crm") return zoho.sync(b, store, now, provider);
       if (provider !== "outlook") throw new HttpError(404, "NOT_FOUND", "That connection isn't available.");
       if (b.isSynthetic || (businessId && b.id !== businessId)) throw new HttpError(403, "FORBIDDEN", "This business cannot use that connection.");
       if (!configured || !bound(b)) throw new HttpError(503, "CONNECTOR_NOT_CONFIGURED", missing);
