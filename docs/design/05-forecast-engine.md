@@ -32,7 +32,7 @@ type ForecastRun = {
   firstNegative?: string;      // date
   warnings: string[];          // data-quality: stale source, unresolved reviews, missing facts
   review?: { needed: boolean; reasons: { code: string; message: string; refs: string[] }[] };  // structured needs-review flag
-  days: { date: string; closing: number; eventIds: string[] }[];  // daily drill-down
+  days: { date: string; closing: number; pipeline?: number; eventIds: string[] }[];  // pipeline = closing + weighted possible deals; daily drill-down
   weeks: {
     start: string;             // Monday
     inflow: number; outflow: number; closing: number;

@@ -14,6 +14,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1500000,
+      "pipeline": 1500000,
       "eventIds": []
     },
     {
@@ -21,6 +22,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1500000,
+      "pipeline": 1500000,
       "eventIds": []
     },
     {
@@ -28,6 +30,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1500000,
+      "pipeline": 1500000,
       "eventIds": []
     },
     {
@@ -35,6 +38,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 1500000,
+      "pipeline": 1500000,
       "eventIds": []
     },
     {
@@ -42,6 +46,7 @@
       "inflow": 0,
       "outflow": 2000000,
       "closing": -500000,
+      "pipeline": -500000,
       "eventIds": [
         "evt-bill-supplier-0"
       ]
@@ -51,6 +56,7 @@
       "inflow": 5200000,
       "outflow": 0,
       "closing": 4700000,
+      "pipeline": 4700000,
       "eventIds": [
         "evt-inv-INV-104-0",
         "evt-loan-0"
@@ -61,6 +67,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 4700000,
+      "pipeline": 4700000,
       "eventIds": []
     },
     {
@@ -68,6 +75,7 @@
       "inflow": 0,
       "outflow": 1800000,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": [
         "evt-rec-payroll-0"
       ]
@@ -77,6 +85,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -84,6 +93,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -91,6 +101,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -98,6 +109,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -105,6 +117,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -112,6 +125,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -119,6 +133,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -126,6 +141,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -133,6 +149,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -140,6 +157,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -147,6 +165,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -154,6 +173,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -161,6 +181,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -168,6 +189,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -175,6 +197,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -182,6 +205,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -189,6 +213,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -196,6 +221,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -203,6 +229,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -210,6 +237,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -217,6 +245,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -224,6 +253,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -231,6 +261,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -238,6 +269,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -245,6 +277,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -252,6 +285,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -259,6 +293,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -266,6 +301,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -273,6 +309,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -280,6 +317,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -287,6 +325,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -294,6 +333,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -301,6 +341,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -308,6 +349,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -315,6 +357,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -322,6 +365,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -329,6 +373,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -336,6 +381,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -343,6 +389,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -350,6 +397,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -357,6 +405,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -364,6 +413,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -371,6 +421,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -378,6 +429,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -385,6 +437,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -392,6 +445,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -399,6 +453,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -406,6 +461,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -413,6 +469,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -420,6 +477,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -427,6 +485,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -434,6 +493,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -441,6 +501,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -448,6 +509,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -455,6 +517,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -462,6 +525,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -469,6 +533,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -476,6 +541,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -483,6 +549,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -490,6 +557,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -497,6 +565,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -504,6 +573,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -511,6 +581,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -518,6 +589,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -525,6 +597,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -532,6 +605,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -539,6 +613,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -546,6 +621,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -553,6 +629,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -560,6 +637,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -567,6 +645,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -574,6 +653,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -581,6 +661,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -588,6 +669,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -595,6 +677,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -602,6 +685,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     },
     {
@@ -609,6 +693,7 @@
       "inflow": 0,
       "outflow": 0,
       "closing": 2900000,
+      "pipeline": 2900000,
       "eventIds": []
     }
   ],

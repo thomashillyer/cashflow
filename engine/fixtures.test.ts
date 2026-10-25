@@ -60,6 +60,7 @@ describe.each(names)("fixture %s", (name) => {
     for (const w of r.weeks) {
       const ds = r.days.filter((d) => mondayOf(d.date) === w.start);
       expect(w.closing).toBe(ds.at(-1)!.closing);
+      expect(w.pipelineClosing).toBe(ds.at(-1)!.pipeline);
       expect(w.minClosing).toBe(Math.min(...ds.map((d) => d.closing)));
       expect(w.inflow).toBe(ds.reduce((a, d) => a + d.inflow, 0));
     }
