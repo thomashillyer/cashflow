@@ -29,7 +29,8 @@ import type {
 import type { Evidence, Records, Signal, SourceRef } from "../schema/records";
 import { extractDocument, MAX_SOURCE_CHARS, NO_CACHED_EXTRACTION, reviewCandidate } from "./extract/document";
 import { parseEmail, parsePaste, parseWhatsApp, type LinkKind, type MessageBundle } from "./extract/message";
-import { extractPdfText, type PdfText } from "./extract/pdf";
+import { extractPdfText, PDF_MAX_BYTES, type PdfText } from "./extract/pdf";
+import { extractScan } from "./extract/scan";
 import { classifySheet, documentToCandidate, tableToCandidates, type ColumnMapping, type SheetContent } from "./extract/sheet";
 import { extractSignals } from "./extract/signals";
 import type { SourceSegment } from "./normalize";
@@ -272,12 +273,22 @@ async function readPdf(
     sourceRef: opts.sourceRef,
   };
   let candidate: IntakeCandidate;
-  if (pdf.status !== "ok") {
+  if (pdf.status === "unreadable" && pdf.pages.length > 0 && bytes.byteLength <= PDF_MAX_BYTES) {
+    // A valid PDF with no text layer: read it with Claude vision (or the cache); always reviewed by the owner.
+    candidate = await extractScan(bytes, { ...extractOpts(env, candidateId, ids), evidenceId });
+    if (candidate.extraction !== "unreadable") evidence.extraction = "partial";
+    if (candidate.extraction === "partial") {
+      candidate = withCounterparty(candidate, env.ctx.records, [], opts.messageEmails ?? []);
+      if (opts.links) candidate = withLinks(candidate, opts.links);
+    }
+    if (pdf.note) candidate = { ...candidate, notes: [...candidate.notes, pdf.note] };
+  } else if (pdf.status !== "ok") {
     const reason = pdf.reason ?? "This PDF could not be read. Upload a text PDF or enter the fields manually.";
     candidate = reviewCandidate({ candidateId, revision: 1, evidenceIds: ids }, "unreadable", [reason]);
   } else {
     const segments: SourceSegment[] = pdf.pages.map((p) => ({ evidenceId, page: p.page, text: p.text }));
     candidate = await extractDocument(segments, extractOpts(env, candidateId, ids));
+    if (pdf.note) candidate = { ...candidate, notes: [...candidate.notes, pdf.note] };
     if (candidate.extraction !== "ok") evidence.extraction = candidate.extraction === "unreadable" ? "unreadable" : "partial";
     candidate = withCounterparty(candidate, env.ctx.records, segments.map((s) => s.text), opts.messageEmails ?? []);
     if (opts.links) candidate = withLinks(candidate, opts.links);
