@@ -52,7 +52,7 @@ show the same revision.
 
 - Today leads with one sentence and at most three actions, each with its dollar effect and an act-by date. Never padded to three.
 - Play brief reads the same sentence and items out loud (about 35 seconds). Drive mode is large type, two buttons, screen kept awake.
-- Home, Details, Play brief and drive mode surface the engine's forecast review status and reasons, even with no ranked actions. An all-clear requires `run.review.needed === false`; missing checks remain unverified, and the static preview explains that checks require the live server.
+- Home and Details show the engine's forecast review status and specific reasons, even with no ranked actions. Play brief and drive mode keep the cash advice and remind the owner to check forecast items when parked. An all-clear requires `run.review.needed === false`; missing checks remain unverified, and the static preview explains that checks require the live server.
 - Notes: anything typed or spoken is read as money in or out, amount, date, party and certainty. It reaches the forecast only after **Add to forecast**.
 - Every number has a source chip that opens its record: the invoice, its payment history, the message behind a moved date.
 - Nothing sends, pays or writes back. Drafts are copied or opened in the owner's own mail app.

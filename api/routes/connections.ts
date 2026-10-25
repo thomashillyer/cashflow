@@ -13,7 +13,7 @@ export const connectionRoutes = (deps: { connections: ConnectionService; now: ()
       throw new HttpError(400, "INVALID_ARGUMENT", "This connection is configured by your team. Sync does not accept account settings.");
     }
     const provider = (req.params as { provider: string }).provider;
-    if (provider !== "zoho_books" && provider !== "outlook") throw new HttpError(404, "NOT_FOUND", "That connection isn't available.");
+    if (provider !== "zoho_books" && provider !== "zoho_crm" && provider !== "outlook") throw new HttpError(404, "NOT_FOUND", "That connection isn't available.");
     return deps.connections.sync(businessOf(req), storeFor(req), deps.now, provider as ConnectionId);
   });
 };

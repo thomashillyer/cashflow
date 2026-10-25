@@ -217,12 +217,17 @@ function parseBalance(value) {
   return amount;
 }
 
+function sampleBanner() {
+  if (!app.ctx?.business?.sampleLoaded) return "";
+  return `<section class="panel" style="max-width:760px;margin-bottom:16px"><p><b>You're looking at sample data</b> — a fictional trading business. <button class="btn small" data-action="sample-clear">Clear sample data</button></p></section>`;
+}
+
 function viewEmptyForecast(title = "Add your business data") {
   return `<div class="page-head"><div><h1>${esc(title)}</h1><p>Your forecast starts with your bank balance, open invoices and bills.</p></div></div>
     <section class="panel" style="max-width:760px"><h2>No forecast yet</h2>
       <p>Upload your bank statement and books export, paste a message, or sync an available source. Review anything that needs your OK.</p>
       <a class="btn primary" href="#/sources">Add your first source</a>
-      <p class="fineprint">No files handy? <a href="/samples/"><b>Download sample files</b></a></p>
+      ${api.mode === "live" ? `<p><button class="btn primary" data-action="sample-load">Load sample data</button></p><p class="fineprint">Try Neri with a fictional trading business. You can clear it any time.</p>` : ""}
       ${waitingCount() ? `<a class="btn" href="#/review">Review imported items</a>` : ""}
     </section>${bankBalanceForm()}`;
 }
@@ -396,7 +401,7 @@ function render() {
   const r = route();
   if (!app.ctx && r !== "welcome" && r !== "setup") return;
   renderShell();
-  const views = { today: viewToday, details: viewDetails, notes: viewNotes, review: viewReview, sources: viewSources, settings: viewSettings, welcome: viewWelcome, setup: viewSetup };
+  const views = { today: () => sampleBanner() + viewToday(), details: viewDetails, notes: viewNotes, review: viewReview, sources: viewSources, settings: viewSettings, welcome: viewWelcome, setup: viewSetup };
   const prevDeck = document.getElementById("deck");
   const keepLeft = prevDeck ? prevDeck.scrollLeft : 0;
   const keepFocus = document.activeElement?.closest?.("#deck") ? document.activeElement.dataset.action + ":" + document.activeElement.dataset.id : null;
@@ -743,7 +748,13 @@ function noteRow(n) {
   if (n.state !== "new") return `<article class="note settled"><blockquote>${esc(n.text)}</blockquote>${meta}</article>`;
 
   const party = r.partyId ? app.ctx.parties.find((p) => p.id === r.partyId)?.name : null;
-  const dir = r.direction === "in" ? "Money in" : r.direction === "out" ? "Money out" : "—";
+  // The owner can flip a misread direction ("a loan coming in" read as money out) before adding it. Not for
+  // a promised invoice payment (priced as that invoice's timing) or a possible deal (always pipeline income).
+  const canSwitch = !r.invoiceId && r.status !== "possible";
+  const dirButton = (to, label) => canSwitch
+    ? `<button class="linklike dir-switch" data-action="note-direction" data-to="${to}" data-id="${esc(n.id)}">${label}</button>` : "";
+  const dir = r.direction === "in" ? `Money in${dirButton("out", "Switch to money out")}`
+    : r.direction === "out" ? `Money out${dirButton("in", "Switch to money in")}` : "—";
   const field = (k, label, v, input) => `<div><dt>${label}</dt><dd>${v != null ? v : input}</dd></div>`;
   const amountInput = `<input inputmode="decimal" placeholder="$ amount" data-note-field="amount" data-id="${esc(n.id)}" aria-label="Amount" />`;
   const dateInput = `<input type="date" data-note-field="date" data-id="${esc(n.id)}" aria-label="Date" />`;
@@ -889,7 +900,6 @@ function viewSources() {
   <div class="upload-band">
     <p><b>Start with a file.</b> Upload a bank statement, invoices, bills or a books export.</p>
     <label class="btn">${icon.upload}Upload a file<input type="file" accept=".csv,.xlsx,.pdf,.eml,.txt,.zip" data-change="upload" hidden /></label>
-    <p class="fineprint">No files handy? <a href="/samples/"><b>Download sample files</b></a></p>
   </div>
   ${app.ctx.business.sources.length ? `<section class="panel" style="max-width:760px;margin-block:24px"><h2>Your source records</h2>${app.ctx.business.sources.map((src) => `<p><b>${esc(src.id === "owner" ? "Owner-entered records" : src.label)}</b> — ${esc(src.state === "ok" ? src.detail || "Records imported" : "Waiting for data")}</p>`).join("")}</section>` : ""}
   ${api.mode === "live" ? bankBalanceForm() : ""}
@@ -1623,6 +1633,12 @@ async function onClick(ev) {
     history.replaceState(null, "", "#/today");
     return load();
   }
+  if (a === "sample-load" || a === "sample-clear") {
+    if (api.mode !== "live") return toast("Not available in the preview", "Open your Neri server to load sample data.");
+    await (a === "sample-load" ? api.loadSample() : api.clearSample());
+    await refresh();
+    return toast(a === "sample-load" ? "Sample data loaded" : "Sample data cleared");
+  }
   if (a === "signout") {
     await api.signOut();
     app.signup = { step: "email", email: "", name: "", error: "" };
@@ -1772,6 +1788,13 @@ async function onClick(ev) {
   if (a === "note-filter") {
     app.noteFilter = el.dataset.k;
     return render();
+  }
+  if (a === "note-direction") {
+    await api.updateNote(id, { direction: el.dataset.to });
+    app.notes = await api.notes();
+    render();
+    toast(el.dataset.to === "in" ? "Now reads as money in" : "Now reads as money out", "The cash effect is updated. Nothing is added until you choose Add to forecast.");
+    return;
   }
   if (a === "note-decide") {
     const d = el.dataset.d;

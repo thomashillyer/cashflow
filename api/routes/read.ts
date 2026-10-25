@@ -56,7 +56,7 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const partyByCommitment = Object.fromEntries(records.commitments.filter((c) => c.partyId).map((c) => [c.id, c.partyId!]));
     return {
       business: {
-        id: b.id, name: b.name, owner: acc.owner ?? "", asOf, synthetic: b.isSynthetic,
+        id: b.id, name: b.name, owner: acc.owner ?? "", asOf, synthetic: b.isSynthetic, sampleLoaded: acc.sampleLoaded === true,
         timezone: acc.timezone ?? "UTC", sources: sources(b, records),
       },
       profile,
