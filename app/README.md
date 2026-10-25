@@ -19,7 +19,8 @@ The app is static files, so it deploys as-is to the `neri-cash` Cloudflare Pages
 **https://neri-cash.pages.dev** (no custom domain). `.github/workflows/app-deploy.yml` publishes `main` to production
 and gives every same-repo pull request that touches `app/` its own preview link. It needs the repo secrets
 `CLOUDFLARE_API_TOKEN` (permission: Cloudflare Pages: Edit) and `CLOUDFLARE_ACCOUNT_ID`, and skips cleanly without
-them. `app/_headers` sets the security headers. Manual deploy: `npx wrangler pages deploy app --project-name neri-cash`.
+them. The project is a Direct Upload project (`npx wrangler pages project create neri-cash --production-branch main`);
+do not also connect it to Git in the dashboard, or every change deploys twice. `app/_headers` sets the security headers. Manual deploy: `npx wrangler pages deploy app --project-name neri-cash`.
 
 The hosted site runs the preview with fictional businesses until `config.js` points at a live API.
 

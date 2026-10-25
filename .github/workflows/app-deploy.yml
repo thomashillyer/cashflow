@@ -37,7 +37,7 @@ jobs:
       - name: Refuse to publish live config
         if: env.HAS_TOKEN == 'true'
         run: |
-          if grep -E '^window\.NERI_(API_BASE|SUPABASE_URL|SUPABASE_ANON_KEY) = "[^"]+"' app/config.js; then
+          if grep -nE "NERI_(API_BASE|SUPABASE_URL|SUPABASE_ANON_KEY)[[:space:]]*=[[:space:]]*['\"\`][^'\"\`]" app/config.js; then
             echo "::error::app/config.js has live values; every deploy is public. Keep them empty."
             exit 1
           fi
