@@ -26,7 +26,7 @@ export function toBase(amount: number, currency: string, profile: Profile, fx: R
   return rate === undefined ? undefined : Math.round(amount * rate);
 }
 
-function defaultDirection(c: Commitment): Direction {
+export function defaultDirection(c: Commitment): Direction {
   if (c.direction) return c.direction;
   if (c.type === "invoice" || c.type === "sales_deal") return "in";
   return "out";

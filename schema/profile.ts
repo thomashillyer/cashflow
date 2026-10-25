@@ -46,6 +46,7 @@ export type Profile = {
       maxPendingReviewsForHigh?: number;
     };
     stressDelayDays?: number;         // stress scenario: delay unsettled receipts by this many days (default 7)
+    splitIntervalDays?: number;       // split lever: days between installments (default 30)
   };
   actionLeadDays?: Partial<Record<Lever["kind"], number>>;  // e.g. { chase: 3, defer: 3 }
   signalSources: ("email" | "whatsapp" | "crm" | "owner")[];
