@@ -30,7 +30,7 @@ async function loadPreview(id) {
 
 // ---- account (multi-tenant sign-up) ------------------------------------------------
 // Preview keeps the account in this browser only. Live mode uses the API's auth routes
-// (business-email sign-in with a one-time code; Supabase auth behind the API).
+// (email and password go directly to Supabase; the API sees only session tokens).
 const ACCOUNT_KEY = "neri.account";
 function readAccount() {
   try {
@@ -74,6 +74,9 @@ const preview = {
     if (!/^\d{6}$/.test(code.trim())) throw new Error("Enter the 6-digit code from the email.");
     if (auth.authConfigured) await auth.verifyCode(email, code);
     return { ok: true };
+  },
+  async restoreAccount() {
+    return this.account();
   },
   async completeSetup({ email, businessName, kind, reserve, connect }) {
     const sandbox = kind === "restaurant" ? "pike_noodle" : "cascade_trade";
@@ -179,7 +182,7 @@ async function http(path, init) {
     await auth.signOut().catch(() => {});
     writeAccount(null);
     location.hash = "#/welcome";
-    throw new Error("Your session ended. Sign in again with a new code.");
+    throw new Error("Your session ended. Sign in again with your email and password.");
   }
   if (!res.ok) {
     // The API words its errors for the owner: { error: { code, message, fieldIssues, retryable } }.
@@ -194,10 +197,18 @@ async function http(path, init) {
 
 const live = {
   mode: "live",
+  async createAccount(email, password) {
+    if (!auth.authConfigured) throw new Error("Sign-in isn't configured on this server yet.");
+    return auth.createAccount(email, password);
+  },
+  async signIn(email, password) {
+    if (!auth.authConfigured) throw new Error("Sign-in isn't configured on this server yet.");
+    return auth.signIn(email, password);
+  },
   account() {
     return readAccount() ?? memAccount;
   },
-  // Sign-in goes straight to Supabase Auth (one-time code). The API only ever sees the session token.
+  // Sign-in goes straight to Supabase Auth. The API only ever sees the session token.
   async startSignup(email) {
     if (!auth.authConfigured) throw new Error("Sign-in isn't configured on this server yet.");
     await auth.sendCode(email);
@@ -206,6 +217,30 @@ const live = {
   async verifyCode(email, code) {
     await auth.verifyCode(email, code);
     return { ok: true };
+  },
+  // A returning owner already has a business. Restore it without calling /setup, which edits profiles.
+  async restoreAccount(session) {
+    if (!session?.user?.email) throw new Error("Sign in with your email first.");
+    openedBiz = null;
+    writeAccount(null); // A cached sample must not send X-Neri-Business during this lookup.
+    let context;
+    try {
+      context = await http("/context");
+    } catch (e) {
+      if (e.status === 404) return null; // No business yet outside demo mode.
+      throw e;
+    }
+    if (context.business.synthetic) return null; // A new user gets the default sample in demo mode.
+    const acc = {
+      businessId: context.business.id,
+      email: session.user.email,
+      owner: context.business.owner,
+      businessName: context.business.name,
+      connections: context.business.sources.map((s) => ({ id: s.id, name: s.label, state: s.state })),
+      reserveApplied: true,
+    };
+    writeAccount(acc);
+    return acc;
   },
   // Creates the tenant (business), sets the starter profile and reserve, starts the chosen connectors.
   async completeSetup(setup) {
@@ -288,4 +323,4 @@ const live = {
 };
 
 export const api = API_BASE ? live : preview;
-export const authLive = auth.authConfigured;
+export const authLive = Boolean(API_BASE && auth.authConfigured);

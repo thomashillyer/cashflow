@@ -1,5 +1,5 @@
 import { api, SANDBOXES, suggestBusinessName, authLive } from "./api.js";
-import { currentSession } from "./ui/auth.js";
+import { consumeEmailLink, currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
 import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
@@ -744,7 +744,7 @@ function viewSettings() {
       <div class="control" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${app.account?.sample ? `<button class="btn small primary" data-action="signout">Create your account</button>` : `<button class="btn small" data-action="signout">Sign out</button>`}</div></div>
     <h2 class="section-title" style="margin-top:28px">Security</h2>
     <p class="section-note">How your business's data is protected.</p>
-    <div class="setting"><h3>Sign-in</h3><p>${authLive ? "One-time codes to your business email. No passwords are stored." : "Preview sign-up. On a Neri server, sign-in uses one-time codes to your business email."}</p>
+    <div class="setting"><h3>Sign-in</h3><p>${authLive ? "Use your email and password. No email verification is needed." : "Preview sign-up stays in this browser. Real accounts use email and password on your Neri server."}</p>
       ${authLive && !app.account?.sample ? `<button class="btn small control" data-action="signout-all">Sign out everywhere</button>` : ""}</div>
     <div class="setting"><h3>Who can see your numbers</h3><p>Only members of ${esc(app.account?.businessName || "your business")}. You're the owner from sign-up; inviting teammates is coming.</p></div>
     <div class="setting"><h3>Your connected apps</h3><p>Read-only. Neri never writes back, sends or pays.</p></div>
@@ -761,26 +761,58 @@ function viewSettings() {
   </div>`;
 }
 
-// ---------------------------------------------------------------- Sign up (business email + code)
+// ---------------------------------------------------------------- Sign up (password accounts; browser-only preview)
 function viewWelcome() {
   const su = app.signup;
   const err = su.error ? `<p class="form-error" role="alert">${esc(su.error)}</p>` : "";
+  if (su.step === "name") {
+    return `<div class="portal-wrap"><div class="portal-mark">${logoLarge}</div>
+      <h1 class="portal-title">You're signed in</h1><p class="portal-sub">Set up your business for <b>${esc(su.email)}</b>.</p>
+      <form class="portal-form" data-submit="setup-name" novalidate>
+        <label for="bizname">Business name</label><input id="bizname" name="biz" value="${esc(su.name)}" placeholder="Your business" autocomplete="organization" maxlength="120" required />
+        ${err}<button class="btn primary big" type="submit">Continue</button>
+      </form></div>`;
+  }
+  if (authLive) {
+    const signingIn = su.mode === "signin";
+    return `<div class="portal-wrap">
+      <div class="portal-mark">${logoLarge}</div>
+      <h1 class="portal-title">${signingIn ? "Welcome back" : "Your CFO, in your pocket."}</h1>
+      <p class="portal-sub">${signingIn ? "Sign in to open your business." : "Create your account, then set up your business. No email verification needed."}</p>
+      <form class="portal-form" data-submit="${signingIn ? "password-signin" : "signup"}" novalidate>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="you@yourbusiness.com" value="${esc(su.email)}" required ${su.busy ? "disabled" : ""} />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="${signingIn ? "current-password" : "new-password"}" ${signingIn ? "" : 'minlength="8"'} placeholder="${signingIn ? "Your password" : "At least 8 characters"}" required ${su.busy ? "disabled" : ""} />
+        ${err}
+        <button class="btn primary big" type="submit" ${su.busy ? "disabled" : ""}>${su.busy ? (signingIn ? "Signing in…" : "Creating account…") : (signingIn ? "Sign in" : "Create account")}</button>
+      </form>
+      ${su.retry ? `<p class="portal-fine"><button class="btn" data-action="retry-signin" ${su.busy ? "disabled" : ""}>Try loading your business again</button></p>` : ""}
+      <p class="portal-fine"><button class="linklike" data-action="auth-mode" data-mode="${signingIn ? "signup" : "signin"}" ${su.busy ? "disabled" : ""}>${signingIn ? "New to Neri? Create an account" : "Already have an account? Sign in"}</button></p>
+      ${signingIn ? `<p class="portal-fine">Previously used an email link and haven't set a password? Ask the Neri team for help accessing your existing account.</p>` : ""}
+      <p class="portal-fine"><button class="linklike" data-action="sample" ${su.busy ? "disabled" : ""}>Look around with a sample business first</button></p>
+    </div>`;
+  }
   if (su.step === "code") {
     return `
     <div class="portal-wrap">
       <div class="portal-mark">${logoLarge}</div>
       <h1 class="portal-title">Check your email</h1>
-      <p class="portal-sub">We sent a 6-digit code to <b>${esc(su.email)}</b>.</p>
+      <p class="portal-sub">${authLive ? "Open the sign-in link we emailed to" : "Enter a preview code for"} <b>${esc(su.email)}</b>.</p>
+      ${authLive ? `<p class="portal-fine">Open the link in this browser, on this device. If your email app opens another browser, copy the link and paste it here.</p>` : ""}
+      ${err}
+      ${authLive ? `<details><summary>My email contains a six-digit code</summary>` : ""}
       <form class="portal-form" data-submit="verify" novalidate>
-        <label for="code">Code</label>
+        <label for="code">${authLive ? "If your email contains a 6-digit code, enter it here" : "Code"}</label>
         <input id="code" name="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required />
         <label for="bizname">Business name</label>
         <input id="bizname" name="biz" value="${esc(su.name)}" placeholder="Your business" autocomplete="organization" required />
-        ${err}
-        <button class="btn primary big" type="submit">Create account</button>
+        <button class="btn primary big" type="submit">${authLive ? "Continue with code" : "Create account"}</button>
       </form>
-      <p class="portal-fine">${authLive ? "The code works once and expires soon." : "Preview: any 6 digits work."}</p>
-      <p class="portal-fine"><button class="linklike" data-action="resend" ${resendWait() ? "disabled" : ""}>${resendWait() ? `Send a new code in ${resendWait()}s` : "Send a new code"}</button> <span aria-hidden="true">&nbsp;</span> <button class="linklike" data-action="signup-back">Use a different email</button></p>
+      ${authLive ? `</details>` : ""}
+      <p class="portal-fine">${authLive ? "The link or code works once and expires soon. You can also explore a sample business without signing in." : "Preview: any 6 digits work."}</p>
+      <p class="portal-fine"><button class="linklike" data-action="resend" ${resendWait() ? "disabled" : ""}>${resendWait() ? `Send a new email in ${resendWait()}s` : "Send a new email"}</button> <span aria-hidden="true">&nbsp;</span> <button class="linklike" data-action="signup-back">Use a different email</button></p>
+      <p class="portal-fine"><button class="linklike" data-action="sample">Explore a sample business</button></p>
     </div>`;
   }
   return `
@@ -794,7 +826,7 @@ function viewWelcome() {
       ${err}
       <button class="btn primary big" type="submit">Continue</button>
     </form>
-    <p class="portal-fine">No password to remember or leak: we email you a one-time code.</p>
+    <p class="portal-fine">${authLive ? "No password to remember or leak: we email you a one-time sign-in link or code." : "No password to remember or leak: preview sign-up uses any 6-digit code."}</p>
     <p class="portal-fine"><button class="linklike" data-action="sample">Look around with a sample business first</button></p>
   </div>`;
 }
@@ -812,7 +844,7 @@ function tickResend() {
     if (!b) return;
     const w = resendWait();
     b.disabled = w > 0;
-    b.textContent = w ? `Send a new code in ${w}s` : "Send a new code";
+    b.textContent = w ? `Send a new email in ${w}s` : "Send a new email";
     if (!w) clearInterval(resendTimer);
   }, 1000);
 }
@@ -845,7 +877,7 @@ async function unlock() {
     document.querySelector(".lock")?.remove();
     document.body.classList.remove("locked");
     await api.signOut();
-    app.signup = { step: "email", email: app.account?.email ?? "", name: "", error: "Your session ended. Sign in again with a new code." };
+    app.signup = { step: "email", mode: "signin", email: app.account?.email ?? "", name: "", error: "Your session ended. Sign in again with your email and password." };
     location.hash = "#/welcome";
     return load();
   }
@@ -1308,12 +1340,35 @@ async function onClick(ev) {
   if (a === "talk") return openTalk();
   if (a === "deck") return moveDeck(Number(el.dataset.dir));
   if (a === "unlock") return unlock();
+  if (a === "auth-mode") {
+    if (app.signup.busy) return;
+    app.signup = { ...app.signup, mode: el.dataset.mode, error: "" };
+    render();
+    return;
+  }
+  if (a === "retry-signin") {
+    if (app.signup.busy) return;
+    app.signup.busy = true;
+    render();
+    try {
+      const session = await currentSession();
+      if (session) await resumeSignin(session);
+      else {
+        app.signup.retry = false;
+        app.signup.error = "Your session ended. Sign in again with your email and password.";
+      }
+    } finally {
+      app.signup.busy = false;
+      render();
+    }
+    return;
+  }
   if (a === "resend") {
     try {
       await api.startSignup(app.signup.email);
       app.signup.sentAt = Date.now();
       app.signup.error = "";
-      toast("New code sent", `Check ${app.signup.email}.`);
+      toast("Sign-in email sent", `Check ${app.signup.email}.`);
     } catch (e) {
       app.signup.error = e.message;
     }
@@ -1550,6 +1605,24 @@ async function onSubmit(ev) {
     closeTalk();
     return doAsk(q);
   }
+  if (authLive && (kind === "signup" || kind === "password-signin")) {
+    if (app.signup.busy) return;
+    const fd = new FormData(f);
+    const email = String(fd.get("email") ?? "").trim();
+    const password = String(fd.get("password") ?? "");
+    app.signup = { ...app.signup, email, busy: true, error: "" };
+    render();
+    try {
+      const session = kind === "signup" ? await api.createAccount(email, password) : await api.signIn(email, password);
+      await resumeSignin(session);
+    } catch (e) {
+      app.signup.error = e.message;
+    } finally {
+      app.signup.busy = false;
+      render();
+    }
+    return;
+  }
   if (kind === "signup") {
     const email = String(new FormData(f).get("email") ?? "").trim();
     try {
@@ -1561,7 +1634,7 @@ async function onSubmit(ev) {
       app.signup.email = email;
     }
     render();
-    $("#code")?.focus();
+    if (!authLive) $("#code")?.focus();
     return;
   }
   if (kind === "verify") {
@@ -1570,13 +1643,22 @@ async function onSubmit(ev) {
     try {
       if (!name) throw new Error("Add your business name.");
       await api.verifyCode(app.signup.email, String(fd.get("code") ?? ""));
-      app.signup = { ...app.signup, name, step: "done", error: "" };
-      location.hash = "#/setup";
+      await resumeSignin(authLive ? await currentSession() : null, name);
     } catch (e) {
       app.signup.error = e.message;
       app.signup.name = name;
       render();
     }
+    return;
+  }
+  if (kind === "setup-name") {
+    const name = String(new FormData(f).get("biz") ?? "").trim();
+    if (!name || name.length > 120) {
+      app.signup.error = "Add your business name (up to 120 characters).";
+      return render();
+    }
+    app.signup = { ...app.signup, name, step: "done", error: "" };
+    location.hash = "#/setup";
     return;
   }
   if (kind === "park") {
@@ -1654,7 +1736,56 @@ window.addEventListener("resize", () => {
   }, 150);
 });
 
-load().catch((err) => {
+// Complete authentication before load() interprets the hash route or requests business data.
+async function resumeSignin(session, name = "") {
+  try {
+    const account = authLive ? await api.restoreAccount(session) : null;
+    app.account = account;
+    if (account) {
+      history.replaceState(null, "", "#/today");
+      return await load();
+    }
+    app.signup = { step: name ? "done" : "name", email: session?.user?.email ?? app.signup.email, name: name || suggestBusinessName(session?.user?.email ?? ""), error: "" };
+    history.replaceState(null, "", name ? "#/setup" : "#/welcome");
+    render();
+  } catch {
+    // Authentication succeeded. Keep its session, but do not show a half-loaded or cached business.
+    app.account = null;
+    app.ctx = null;
+    app.brief = null;
+    app.signup = { step: "email", mode: "signin", email: session?.user?.email ?? "", name: "", retry: true,
+      error: "You're signed in, but Neri couldn't load your business. Try loading it again." };
+    history.replaceState(null, "", "#/welcome");
+    render();
+  }
+}
+
+async function start() {
+  if (authLive) {
+    let session;
+    let fromLink;
+    try {
+      fromLink = await consumeEmailLink();
+      session = fromLink ?? await currentSession();
+    } catch (error) {
+      // Callback failures belong on sign-in, with no URL credentials or raw provider text rendered.
+      app.account = null;
+      app.signup.error = error.message;
+      history.replaceState(null, "", "#/welcome");
+      return render();
+    }
+    if (fromLink || (session && (!app.account || (!app.account.sample && app.account.email !== session.user.email)))) return resumeSignin(session);
+    if (!session && app.account && !app.account.sample) {
+      await api.signOut();
+      app.account = null;
+      app.signup.mode = "signin";
+      app.signup.error = "Your session ended. Sign in again with your email and password.";
+    }
+  }
+  return load();
+}
+
+start().catch((err) => {
   $("#view").innerHTML = `<section class="panel" style="max-width:640px;margin-top:40px"><h2 style="color:var(--ink);font-size:18px">Neri couldn't load your numbers</h2><p>${esc(err.message)}</p><p style="color:var(--ink-soft)">If you're running against the API, check the server is up, then reload.</p></section>`;
   console.error(err);
 });

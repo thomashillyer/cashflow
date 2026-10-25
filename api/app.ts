@@ -132,7 +132,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     const token = bearer(req);
     if (token !== null) {
       const user = token ? await opts.verify(token).catch(() => null) : null;
-      if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Your session ended. Sign in again with a new code.");
+      if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Your session ended. Sign in again with your email and password.");
       r.user = user;
     } else if (!deps.demoMode) {
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to see your numbers.");
