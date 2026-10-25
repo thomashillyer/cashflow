@@ -218,7 +218,7 @@ function applySignalRoute(store: Store, signalId: string, expectedRevision: numb
 // GET /brief and POST /work-items/:id/draft
 
 // REGION brief
-// `items` are the engine's ranked WorkItems (runChecks + rank, person 5) for the run you are returning;
+// `items` are the engine's ranked WorkItems for the run you are returning: `const { run, brief } = buildBrief({ records, profile, asOf, fxRates })` (engine/brief.ts), then `brief.today`;
 // `run`, `records`, `profile` are that same run's inputs, so every number in the words matches the chart.
 async function briefRoute(items: WorkItem[], ctx: BriefContext) {
   const { items: top, usedFallback } = await writeBrief(items, ctx);   // at most 3 items, order unchanged

@@ -247,10 +247,10 @@ function applySignalRoute(store: Store, signalId: string, expectedRevision: numb
 
 ## `GET /brief`
 
-Flow: engine (`runChecks` + `rank`, person 5) produces ranked `WorkItem[]` for one `ForecastRun` -> `writeBrief` writes only the words.
+Flow: `buildBrief({ records, profile, asOf, fxRates })` (`engine/brief.ts`, person 5) returns `{ run, brief }`; `brief.today` is the ranked `WorkItem[]` (at most three) for that one `ForecastRun` -> `writeBrief` writes only the words.
 
 ```ts
-// `items` are the engine's ranked WorkItems (runChecks + rank, person 5) for the run you are returning;
+// `items` are the engine's ranked WorkItems for the run you are returning: `const { run, brief } = buildBrief({ records, profile, asOf, fxRates })` (engine/brief.ts), then `brief.today`;
 // `run`, `records`, `profile` are that same run's inputs, so every number in the words matches the chart.
 async function briefRoute(items: WorkItem[], ctx: BriefContext) {
   const { items: top, usedFallback } = await writeBrief(items, ctx);   // at most 3 items, order unchanged
@@ -262,7 +262,7 @@ async function draftRoute(item: WorkItem, ctx: BriefContext) {
 }
 ```
 
-- **Inputs:** `items` (best first) and a `BriefContext`: `run`, `records`, `profile` (the same run's inputs), `business: { name }`, `mode`, optional `client`, `cacheDir`, `model`.
+- **Inputs:** `items` (`brief.today`, best first) and a `BriefContext`: `run`, `records`, `profile` (the same run's inputs), `business: { name }`, `mode`, optional `client`, `cacheDir`, `model`.
 - **Output:** `{ items, usedFallback }`. At most three items (never padded), same order, only `title` and `why` replaced. `cashEffect`, `score`, `neededBy`, `lever`, and `evidenceRefs` stay the engine's. `usedFallback` lists the item ids that got code-built text (the model's text failed `number_check`, or demo mode had no cache entry). That text is still valid; show it.
 - Return the run's `inputsHash` and the store revision with the brief, so the chart and the brief cannot mix revisions.
 - Every figure and date in `title` and `why` was checked against the engine's numbers (`ai/number_check.ts`). Claude never computes a figure.
