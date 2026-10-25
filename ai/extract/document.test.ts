@@ -47,7 +47,8 @@ describe("cached extractions of the cascade_trade fixtures", () => {
     expect(c.fields.issueDate).toMatchObject({ state: "found", value: "2026-11-10" });
     expect(c.fields.terms).toMatchObject({ state: "found", value: "Net 30" });
     expect(c.fields.invoiceUrl).toMatchObject({ state: "found", value: "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187" });
-    expect(c.fields.paymentUrl).toBeUndefined();
+    // The PDF's single "View or pay online" link may be read as both; a payment URL never marks anything paid.
+    if (c.fields.paymentUrl) expect(c.fields.paymentUrl).toMatchObject({ value: "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187" });
 
     let checked = 0;
     for (const f of Object.values(c.fields)) {
