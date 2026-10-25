@@ -323,7 +323,9 @@ function readSheets(env: Env, allSheets: SheetContent[], opts: {
     const produced: IntakeCandidate[] = [];
     try {
       const layout = classifySheet(sheet);
-      if (layout.layout === "table") {
+      // An owner-confirmed column mapping means "this is a table", whatever header detection thought.
+      const ownerSaysTable = Object.keys(opts.columnMapping ?? {}).length > 0;
+      if (layout.layout === "table" || ownerSaysTable) {
         const r = tableToCandidates(sheet, {
           ...sheetOpts, ...(opts.columnMapping ? { columnMapping: opts.columnMapping } : {}), ...(opts.headerRow ? { headerRow: opts.headerRow } : {}),
         });

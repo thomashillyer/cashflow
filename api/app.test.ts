@@ -301,7 +301,72 @@ describe("import -> review -> confirm (INV-1187)", () => {
     const text = readFileSync(join(import.meta.dirname, "../fixtures/cascade_trade/intake/owner-message-inv104.txt"), "utf8");
     const res = (await app.inject({ method: "POST", url: "/import/paste", headers: OTHER, payload: { text, receivedAt: "2026-10-25T16:00:00Z" } })).json();
     expect(res.preview.signals).toBeGreaterThanOrEqual(0);
-    expect((await app.inject({ method: "POST", url: "/import/sheet", headers: OTHER, payload: { text: "a,b" } })).statusCode).toBe(415);
+    expect((await app.inject({ method: "POST", url: "/import/docx", headers: OTHER, payload: { text: "a,b" } })).statusCode).toBe(415);
     expect((await app.inject({ method: "POST", url: "/import/paste", headers: OTHER, payload: { text: "  " } })).statusCode).toBe(400);
+  });
+});
+
+describe("spreadsheet and WhatsApp imports (adapters lane)", () => {
+  beforeEach(() => setup());
+  const csv = readFileSync(join(import.meta.dirname, "../fixtures/cascade_trade/intake/files/ar-aging.csv"));
+  const upload = (url: string, payload: Record<string, unknown>) => app.inject({ method: "POST", url, headers: OTHER, payload });
+
+  it("a CSV upload becomes candidates with diagnostics, and changes no cash by itself", async () => {
+    const before = (await store.load("cascade_trade")).records.commitments.length;
+    const res = await upload("/import/upload", { base64: csv.toString("base64"), fileName: "ar-aging.csv" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.candidates.length).toBe(4);
+    expect(body.diagnostics).toMatchObject({ rowsRead: 5, rowsImported: 3, rowsRejected: 2, source: "generic_file" });
+    expect(body.diagnostics.errors.map((e: { code: string }) => e.code).sort()).toEqual(["missing_amount", "missing_reference"]);
+    for (const e of body.diagnostics.errors) expect(e.nextStep).not.toBe("");
+    const blank = body.candidates.find((c: any) => c.fields.reference.value === "INV-1203");
+    expect(blank.fields.amount.state).toBe("missing");
+    expect((await store.load("cascade_trade")).records.commitments).toHaveLength(before);
+    // The original file's name and hash are kept on its evidence.
+    const ev = (await store.load("cascade_trade")).records.evidence.find((e) => e.fileName === "ar-aging.csv")!;
+    expect(ev).toMatchObject({ channel: "upload", format: "csv", sourceRef: { system: "generic_file" } });
+    expect(ev.fileHash).toHaveLength(64);
+  });
+
+  it("uploading the same file again is a repeat: nothing new is proposed", async () => {
+    const payload = { base64: csv.toString("base64"), fileName: "ar-aging.csv" };
+    await upload("/import/sheet", payload);
+    const proposals = (await store.listProposals("cascade_trade")).length;
+    const again = (await upload("/import/sheet", { ...payload, fileName: "renamed.csv" })).json();
+    expect(again).toMatchObject({ repeat: true, candidates: [], proposals: [], signals: [] });
+    expect(again.diagnostics).toMatchObject({ rowsImported: 0, rowsDuplicate: 5 });
+    expect((await store.listProposals("cascade_trade")).length).toBe(proposals);
+  });
+
+  it("pasted table text is read as CSV, and the owner's column mapping is applied", async () => {
+    const res = await upload("/import/sheet", { text: "Ref,Who,Net\nA-1,Acme,100.00\nA-2,Beta,250.00\n", columnMapping: { reference: 0, party: 1, amount: 2 }, headerRow: 1 });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().candidates).toHaveLength(2);
+  });
+
+  it("a bad mapping value or an unreadable file is a plain 4xx with the next step", async () => {
+    const bad = await upload("/import/sheet", { text: "a,b\n1,2", columnMapping: { amount: -1 } });
+    expect(bad.statusCode).toBe(200);   // ignored, not trusted
+    const broken = await upload("/import/upload", { base64: Buffer.from([1, 2, 3]).toString("base64"), fileName: "bad.xlsx" });
+    expect(broken.statusCode).toBe(422);
+    expect(broken.json().error.message).toMatch(/could not be opened.*Export|could not be opened/);
+    const none = await upload("/import/sheet", { fileName: "x.csv" });
+    expect(none.statusCode).toBe(400);
+  });
+
+  it("a WhatsApp .txt export is read, and an identical re-upload is a repeat", async () => {
+    const chat = readFileSync(join(import.meta.dirname, "../fixtures/cascade_trade/intake/whatsapp-evergreen.txt"));
+    const payload = { base64: chat.toString("base64"), fileName: "WhatsApp Chat.txt" };
+    const first = await upload("/import/whatsapp", payload);
+    expect(first.statusCode).toBe(200);
+    expect(first.json().diagnostics).toMatchObject({ source: "whatsapp", rowsRead: 3 });
+    const again = (await upload("/import/whatsapp", payload)).json();
+    expect(again.repeat).toBe(true);
+  });
+
+  it("anonymous demo callers still cannot upload", async () => {
+    await setup({ demoMode: true });
+    expect((await app.inject({ method: "POST", url: "/import/sheet", payload: { text: "a,b" } })).statusCode).toBe(401);
   });
 });

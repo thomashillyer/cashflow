@@ -53,7 +53,7 @@ Errors are `{ error: { code, message, fieldIssues, retryable }, revision? }`; `m
 | `GET /records/:id` | A commitment and what's behind it | `{ commitment, party, events, signals, rules, evidence, message }` |
 | `POST /setup` | Signed-in user creates their business: starter profile (`trading`, `restaurant`, `services`, `other`), reserve, connectors | the account `completeSetup` stores, plus `businessId` |
 | `PATCH /profile` (and `PUT`) | Partial, read-modify-write: `{ safetyLine?, owner?, timezone? }` | `{ profile, storeRevision }` |
-| `POST /import/:adapter` | `pdf` (`{ base64, fileName? }`), `email` / `whatsapp` (`{ text }` raw), `paste` (`{ text, receivedAt? }`), `upload` (by file extension) -> `ingest` -> persist evidence, candidates, proposals, signals | `IntakeResult` + `storeRevision` + `preview` counts |
+| `POST /import/:adapter` | `pdf` (`{ base64, fileName? }`), `email` / `whatsapp` (`{ text }` raw), `paste` (`{ text, receivedAt? }`), `sheet` (`{ base64, fileName }` CSV or XLSX, or `{ text }` as CSV; optional `columnMapping`, `headerRow`, `currency`, `dayFirst`), `whatsapp` also takes a `.txt`/`.zip` export as `{ base64, fileName }`, `upload` (by file extension: pdf, eml, csv, xlsx, zip, txt) -> `ingest` -> persist evidence, candidates, proposals, signals | `IntakeResult` + `storeRevision` + `preview` counts; file imports also return `diagnostics` (rows read/imported/rejected, row errors with `nextStep`, completeness), and a byte-identical file already imported returns `repeat: true` with no candidates |
 | `GET /review` | Proposed signals the app renders | `[{ signal (with effect), message, commitment, party, from, to, before, after, needsDate, notes }]` |
 | `GET /review/proposals` | Pending change proposals with candidate fields, evidence, target and notes; all proposed signals | `{ storeRevision, proposals, signals }` |
 | `POST /review/:id/confirm` | `{ expectedRevision?, commitmentId?, ownerEdits? }` -> `applyProposal` -> upsert -> revision +1 -> rebuild other pending proposals | `{ storeRevision, affectedRecordIds, warnings }`; `ApplyError` -> 409/422/404 per `ai/README.md` |
@@ -73,6 +73,5 @@ Owner notes and plans go in as **applied** owner Signals: the owner's own words,
 ## Not served yet
 
 - `days[].pipeline` on the run: the app can draw the band from `weeks[].pipelineClosing`.
-- Spreadsheet imports (`/import/sheet`): need the adapters lane's XLSX/CSV reader; returns 415 with the next step.
 - Confirm is not one database transaction (the RPC can't apply ops yet); the revision check narrows the window.
 - Owner notes, the account details and import notes live in `businesses.profile.account` (no migration needed).
