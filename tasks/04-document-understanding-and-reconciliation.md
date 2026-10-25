@@ -10,6 +10,10 @@ Unstructured invoices, POs, and messages become reviewable changes to canonical 
 
 Own PDF/message extraction, structured candidate validation, invoice/PO classification, field provenance, counterparty matching, cross-source reconciliation, and confirmed create/link/update behavior. Person 1 supplies raw source evidence, workbook content, and URL results. Person 3 renders previews; person 2 consumes confirmed canonical records.
 
+## Technical handoff
+
+Follow the [technical plan](../docs/TECHNICAL_PLAN.md) and the current [five-person lanes](../docs/design/09-api-repo-lanes.md#five-people) where this earlier checklist differs. Layer 1 extracts structured candidates; Layer 2 reconciles accepted records and applies profile rules to cash events. Person 3 owns API routes; person 5 coordinates store/integration and owns deterministic warnings/ranking. Person 4 owns AI extraction, proposals, explanations, Ask Neri, and drafts.
+
 ## First 30 minutes
 
 - [ ] Inspect one text PDF, XLSX invoice/PO, and email/WhatsApp message containing an invoice link.

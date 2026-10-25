@@ -12,6 +12,10 @@ Own source adapters, original file/message/URL storage, XLSX row/sheet reading, 
 
 Deliver candidate payloads to person 4 and import/source status to person 3. Coordinate with person 5 for persistence and deployment configuration. Pick implementation paths with the team at kickoff; do not introduce a second application or data store.
 
+## Technical handoff
+
+Follow the [technical plan](../docs/TECHNICAL_PLAN.md) and the current [five-person lanes](../docs/design/09-api-repo-lanes.md#five-people) where this earlier checklist differs. Layer 1 extracts structured candidates; Layer 2 reconciles accepted records and applies profile rules to cash events. Person 3 owns API routes; person 5 coordinates store/integration and owns deterministic warnings/ranking. Person 4 owns AI extraction, proposals, explanations, Ask Neri, and drafts.
+
 ## First 30 minutes
 
 - [ ] Inspect representative receivables/payables exports, a PDF, XLSX invoice/PO, message, and invoice URL.

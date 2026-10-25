@@ -3,10 +3,10 @@
 One pure function, deterministic and fast enough to rerun on every click:
 
 ```ts
-forecast(records: Records, profile: Profile, scenario: Scenario, asOf: string): ForecastRun
+forecast(records: Records, profile: Profile, scenario: Scenario, asOf: string, fxRates: Record<string, number>): ForecastRun
 ```
 
-It knows nothing about any industry beyond what the profile says. No I/O, no clock (use `asOf`), no randomness.
+It knows nothing about any industry beyond what the profile says. No I/O, no clock (use `asOf`), no randomness. Fixed FX rates are explicit inputs captured at the API boundary and saved with the run; the pure engine never fetches them.
 
 ## Steps in each run
 
@@ -38,12 +38,14 @@ type ForecastRun = {
     pipelineClosing: number;   // closing + probability-weighted possible deals
     eventIds: string[];
   }[];
-  lowPoint: { week: string; amount: number };
+  lowPoint: { week: string; date?: string; amount: number };
   weeksBelowSafety: string[];
   freeCash: { week: string; amount: number; weeksFree: number }[];
   events: CashEvent[];         // fully dated, with basis and overriddenBy
 };
 ```
+
+Daily balances determine the low point, first-negative date, safety warnings, and free-cash windows; weekly closes are summaries and cannot hide an intervening daily deficit. The low point keeps its week and may include its exact date. See the [technical plan](../TECHNICAL_PLAN.md) for snapshot/settlement boundaries and partial-week horizon behavior.
 
 ## Scenarios
 
@@ -79,7 +81,7 @@ lag_p = (n_p × median_p + k × defaultLagDays) / (n_p + k),   k = profile.lagSh
 Money is only "free" if it stays above the safety line through upcoming outflows, not just this week.
 
 ```
-free(w)  = min(closing over weeks w … w+H) − safetyLine,   H = profile.freeCashLookaheadWeeks (6)
+free(w)  = min(daily closing balances in weeks w … w+H) − safetyLine,   H = profile.freeCashLookaheadWeeks (6)
 weeksFree = consecutive weeks from w where free > 0
 ```
 
@@ -99,7 +101,7 @@ Each run converts at one fixed rate per currency, stored on the run. Foreign-cur
 ## Simulation
 
 ```ts
-simulate(records, profile, baseOverrides, levers: Lever[], asOf): {
+simulate(records, profile, baseOverrides, levers: Lever[], asOf, fxRates): {
   run: ForecastRun;
   lowPointDelta: number;     // new low point − base low point
   freeCashDelta: number;
