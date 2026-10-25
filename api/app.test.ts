@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { buildApp, type Verifier } from "./app";
+import { buildApp, servedConfig, type Verifier } from "./app";
 import { loadSample, loadSamples } from "./demo";
 import { MemoryStore } from "./store";
 import { APPLY_ERROR_STATUS } from "./routes/review";
@@ -458,5 +458,30 @@ describe("saved owner overrides (#40)", () => {
     expect((await app.inject({ method: "DELETE", url: `/overrides/ov-1?expectedRevision=${expectedRevision}`, headers: other })).statusCode).toBe(404);
     expect((await app.inject({ method: "GET", url: "/overrides", headers: { "x-neri-business": id } })).statusCode).toBe(401);
     expect(await store.loadOverrides(id)).toHaveLength(1);
+  });
+});
+
+describe("served app/config.js", () => {
+  const appDir = join(import.meta.dirname, "../app");
+  const committed = readFileSync(join(appDir, "config.js"), "utf8");
+
+  it("switches the app to same-origin and sets public Supabase values, keeping other lines", async () => {
+    const live = await buildApp({ store: new MemoryStore(), verify: async () => null, staticDir: appDir,
+      appConfig: { supabaseUrl: "https://example.supabase.co", supabaseAnonKey: "anon-key" } });
+    const res = await live.inject({ method: "GET", url: "/config.js" });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/javascript/);
+    expect(res.body).toContain('window.NERI_API_BASE = "same-origin";');
+    expect(res.body).toContain('window.NERI_SUPABASE_URL = "https://example.supabase.co";');
+    expect(res.body).toContain('window.NERI_SUPABASE_ANON_KEY = "anon-key";');
+    expect(res.body).toContain("window.NERI_LOCK_MINUTES = 15;");
+    await live.close();
+  });
+
+  it("leaves sign-in off without both Supabase values, and never touches the committed file", () => {
+    const out = servedConfig(committed, { supabaseUrl: "https://example.supabase.co" });
+    expect(out).toContain('window.NERI_API_BASE = "same-origin";');
+    expect(out).toContain('window.NERI_SUPABASE_URL = "";');
+    expect(readFileSync(join(appDir, "config.js"), "utf8")).toBe(committed);
   });
 });

@@ -41,6 +41,7 @@ const app = await buildApp({
   // Live Claude only with a key, and never by default on the public demo (anonymous callers could spend it).
   aiMode: env.ANTHROPIC_API_KEY && (env.NERI_AI_MODE === "live" || (!demoMode && env.NERI_AI_MODE !== "cache_only")) ? "live" : "cache_only",
   staticDir: env.NERI_STATIC_DIR ?? join(import.meta.dirname, "../app"),
+  appConfig: { supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY },
   allowReset: demoMode || env.NERI_ALLOW_RESET === "1",
   logger: true,
 });
