@@ -115,7 +115,45 @@ describe("tableToCandidates: variations", () => {
       expect(c.extraction).toBe("partial");
       expect(validateCandidate(c)).toEqual([]);
     }
-    expect(val(r.candidates[2]!.fields.amount)).toBe(0); // an explicit 0 in the sheet is a stated value, not a coerced missing
+    // A 0 in the sheet (often an uncached formula) is not a stated amount either.
+    expect(r.candidates[2]!.fields.amount.state).toBe("missing");
+    expect(r.candidates[2]!.extraction).toBe("partial");
+  });
+
+  it("refuses free text in an amount cell instead of scraping its digits", () => {
+    const cells = ["28k", "10% of 28,000", "Net 30", "see inv 1187", "2 x 5,000", "1.2M", "maybe 28k?"];
+    const r = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ...cells.map((t, i) => [`INV-${i}`, `C${i}`, t] as SheetCell[])]), { ...opts, currency: "USD" });
+    expect(r.candidates).toHaveLength(cells.length);
+    for (const c of r.candidates) expect(c.fields.amount.state).toBe("missing");
+    const ok = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["INV-1", "A", "USD 6,200.00"], ["INV-2", "B", "$4,000"], ["INV-3", "C", "(50.00)"]]), { ...opts, currency: "USD" });
+    expect(ok.candidates.map((c) => val(c.fields.amount))).toEqual([620000, 400000, undefined]);
+  });
+
+  it("rejects footer rows that start with Total in the invoice column", () => {
+    const r = tableToCandidates(sheet([
+      ["Invoice #", "Customer", "Amount"], ["INV-1", "A", 10], ["Total (1 invoice)", null, 10], ["Total 10", null, 10], ["TOTAL USD", null, 10],
+    ]), opts);
+    expect(r.candidates).toHaveLength(1);
+    expect(r.rejectedRows.map((x) => x.row)).toEqual([3, 4, 5]);
+  });
+
+  it("rejects repeated invoice numbers for the same party (line items), keeps same number for different parties", () => {
+    const lines = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["INV-1", "A", 20], ["INV-1", "A", 30]]), opts);
+    expect(lines.candidates).toEqual([]);
+    expect(lines.rejectedRows).toHaveLength(2);
+    const two = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["0042", "A", 20], ["0042", "B", 30]]), opts);
+    expect(two.candidates).toHaveLength(2);
+  });
+
+  it("marks a candidate partial when no currency is known", () => {
+    const c = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["INV-1", "A", 10]]), opts).candidates[0]!;
+    expect(c.fields.currency.state).toBe("missing");
+    expect(c.extraction).toBe("partial");
+  });
+
+  it("falls through to the document layout when the 'table' has no invoice-number data rows", () => {
+    const s = sheet([["Invoice #", "INV-1", "Amount Due", "$500"], ["Bill to", "X"]]);
+    expect(classifySheet(s).layout).not.toBe("table");
   });
 
   it("rejects rows with no reference, junk text in the reference column, and totals; skips blanks", () => {
@@ -289,6 +327,38 @@ describe("documentToCandidate: edge cases", () => {
       [null, null, null],
     ];
     expect(documentToCandidate(sheet(rows), opts).fields.amount.state).toBe("missing");
+  });
+
+  it("does not read a SKU grid's Total header, or 'Total Qty 400', as the document total", () => {
+    const rows: SheetCell[][] = [
+      ["Invoice #", "INV-1", null, "Bill to", "Puget Market"],
+      ["SKU", "Qty", "Unit price", "Total"],
+      ["M-1", 2, 50, 100],
+      [null, null, null, null],
+      ["Total Qty 400", null, null, null],
+    ];
+    const c = documentToCandidate(sheet(rows), opts);
+    expect(c.fields.amount.state).toBe("missing");
+    const withTotal = documentToCandidate(sheet([...rows, ["Total due USD 31,200.00"]]), opts);
+    expect(val(withTotal.fields.amount)).toBe(3120000);
+  });
+
+  it("does not take an address under a title as the invoice number", () => {
+    const rows: SheetCell[][] = [["INVOICE"], ["123 Main Street, Seattle"], ["Bill to", "Puget Market"], ["Total", "USD 10.00"]];
+    expect(documentToCandidate(sheet(rows), opts).fields.reference.state).toBe("missing");
+  });
+
+  it("a balance-only sheet keeps the balance as amount with a note and as outstanding", () => {
+    const c = documentToCandidate(sheet(form([100], [[null, "Balance due", "USD 60.00"]])), opts);
+    expect(val(c.fields.amount)).toBe(6000);
+    expect(c.fields.outstanding && val(c.fields.outstanding)).toBe(6000);
+    expect(c.notes.join(" ")).toMatch(/Only a balance/);
+  });
+
+  it("a conflicting total does not also claim the amount is missing", () => {
+    const c = documentToCandidate(sheet(form([100], [[null, "Total", 100], [null, "Total due", 120]])), { ...opts, currency: "USD" });
+    expect(c.notes.join(" ")).not.toMatch(/Amount is missing/);
+    expect(c.extraction).toBe("partial");
   });
 
   it("flags differing totals as a conflict instead of choosing", () => {

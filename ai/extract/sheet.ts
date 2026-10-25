@@ -109,8 +109,18 @@ type Ctx = { sheet: SheetContent; dayFirst?: boolean; notes: string[] };
 
 const nonNegative = (n: number | undefined) => (n !== undefined && n >= 0 ? n : undefined);
 
+// A money literal: digits with separators, optionally a currency symbol or ISO code. parseAmount strips every
+// non-digit, so free text ("28k", "Net 30", "10% of 28,000") must be refused here first.
+function looksLikeMoney(v: string): boolean {
+  const m = /^\(?-?\s*(?:([A-Za-z]{3})\s*)?[$€£¥]?\s*(\d[\d.,\s]*)\)?\s*(?:([A-Za-z]{3}))?-?$/.exec(v.trim());
+  return !!m && (!m[1] || !!currencyCode(m[1])) && (!m[3] || !!currencyCode(m[3]));
+}
+
 function amountField(ctx: Ctx, row: number, cell: SheetCell | undefined, currency: string, label: string, shown?: string): Field<number> {
-  return cellField(ctx.sheet, row, cell, (v) => (typeof cell === "number" ? numToMinor(cell, currency) : nonNegative(parseAmount(v, currency))), label, shown);
+  return cellField(ctx.sheet, row, cell, (v) => {
+    if (typeof cell === "number") return numToMinor(cell, currency);
+    return looksLikeMoney(v) ? nonNegative(parseAmount(v, currency)) : undefined;
+  }, label, shown);
 }
 
 function dateField(ctx: Ctx, row: number, cell: SheetCell | undefined, label: string, shown?: string): Field<string> {
@@ -149,6 +159,11 @@ function businessField(sheet: SheetContent, name: string): Field<string> {
 
 // ---------- table layout ----------
 
+// Footer rows: in the reference cell any text that starts with "Total" ("Total (4 invoices)", "Total 50,200");
+// in other cells only the bare word, so a customer called "Total Wine" survives.
+const TOTAL_REF = /^\s*(grand |sub[ -]?|report )?totals?\b/i;
+const TOTAL_CELL = /^(grand |sub[ -]?|report )?totals?\s*:?$/i;
+
 const HEADER_PATTERNS: Record<ColumnKey, RegExp[]> = {
   reference: [/^(invoice|inv|bill|document|doc|reference|ref)( (#|no|num|number|id))?$/, /^(number|no|#|id)$/],
   party: [/^(customer|client|vendor|supplier|buyer|seller|payee|bill to|billed to|sold to|pay to|party|account|name)( name)?$/],
@@ -181,7 +196,8 @@ function findTableHeader(rows: SheetCell[][]): { headerRow: number; columns: Col
   for (let r = 0; r < Math.min(n, 25); r++) {
     const columns = inferColumns(rows[r] ?? []);
     if (columns.reference === undefined || columns.amount === undefined) continue;
-    if (rows.slice(r + 1, n).some((x) => !blankRow(x))) return { headerRow: r + 1, columns };
+    // At least one data row must carry an invoice-number-like value, or this is a header block of a single document.
+    if (rows.slice(r + 1, n).some((x) => /\d/.test(text(x[columns.reference!])) && !TOTAL_REF.test(text(x[columns.reference!])))) return { headerRow: r + 1, columns };
   }
   return undefined;
 }
@@ -227,7 +243,7 @@ function labelOf(cell: SheetCell | undefined): LabelHit | undefined {
     const m = re.exec(lowered);
     if (!m) continue;
     const inline = cell.trim().slice(cell.trim().length - m[1]!.length).trim();
-    if (AMOUNT_LABELS.has(key) && !/^(?:[A-Za-z]{3}\s*)?[$€£]?\s*[(-]?\d/.test(inline)) continue;
+    if (AMOUNT_LABELS.has(key) && !looksLikeMoney(inline)) continue;
     return { key, label: norm(cell.trim().slice(0, cell.trim().length - m[1]!.length)), inline };
   }
   return undefined;
@@ -242,8 +258,10 @@ function findLineItems(rows: SheetCell[][]): LineBlock | undefined {
   for (let r = 0; r < n; r++) {
     const heads = (rows[r] ?? []).map((c) => (typeof c === "string" ? norm(c) : ""));
     const descCol = heads.findIndex((h) => /^(description|item|items|product|service|details|item description)$/.test(h));
-    if (descCol < 0) continue;
-    if (!heads.some((h, i) => i !== descCol && /^(qty|quantity|unit price|price|rate|amount|line total|total)$/.test(h))) continue;
+    const numeric = heads.filter((h, i) => i !== descCol && /^(qty|quantity|unit price|price|rate|amount|line total|total)$/.test(h));
+    const hasUnits = numeric.some((h) => /^(qty|quantity|unit price|price|rate)$/.test(h));
+    // A grid headed "SKU | Qty | Unit price | Total" is a line block too; its "Total" is not the document total.
+    if (!(descCol >= 0 ? numeric.length >= 1 : hasUnits && numeric.length >= 2)) continue;
     const amountCol = heads.findIndex((h) => /^(amount|line total|total|extended( amount| price)?|ext amount|ext price)$/.test(h));
     const items: number[] = [];
     for (let i = r + 1; i < n; i++) {
@@ -262,8 +280,11 @@ type Found = { key: LabelKey; label: string; r: number; c: number; cell: SheetCe
 // Value for a label: inline text, else the next non-blank cell to the right, else the cell below.
 function valueFor(rows: SheetCell[][], r: number, c: number, hit: LabelHit): Found | undefined {
   const found = valueNear(rows, r, c, hit);
-  // A bare "Invoice" is usually the page title; it only labels a value that looks like a number.
-  if (found && hit.label === "invoice" && !/\d/.test(found.shown)) return undefined;
+  // A bare "Invoice" is usually the page title; it only labels an id-like value beside it (not an address below it).
+  if (found && hit.label === "invoice") {
+    const idLike = /^[A-Za-z0-9][A-Za-z0-9\-/_.]+$/.test(text(found.cell)) && /\d/.test(text(found.cell));
+    if (!idLike || (hit.inline === undefined && found.r !== r)) return undefined;
+  }
   return found;
 }
 
@@ -324,9 +345,14 @@ function assemble(args: {
     buyerName: kind === "invoice" ? counterparty : business,
     ...fields,
   };
-  const ok = full.amount.state === "found";
   const notes = [...args.notes];
-  if (!ok) notes.push("Amount is missing; enter it manually before this can be confirmed.");
+  if (full.amount.state === "found" && full.amount.value === 0) {
+    full.amount = missing("amount is 0; check the source");
+    notes.push("The sheet shows an amount of 0 (possibly an uncalculated formula); treated as missing.");
+  }
+  if (full.amount.state === "missing") notes.push("Amount is missing; enter it manually before this can be confirmed.");
+  if (full.currency.state !== "found") notes.push("Currency is missing; amounts were read assuming 2 decimal places.");
+  const ok = full.amount.state === "found" && full.currency.state === "found";
   const lacking = [full.reference, full.amount, full.dueDate, counterparty].filter((f) => f.state !== "found").length;
   return {
     id: args.id,
@@ -344,7 +370,6 @@ function assemble(args: {
 
 // ---------- tableToCandidates ----------
 
-const TOTAL_CELL = /^(grand |sub[ -]?|report )?totals?\s*:?$/i;
 
 export function tableToCandidates(sheet: SheetContent, opts: TableOptions): TableResult {
   const empty = (reason: string, mapping: ProposedMapping): TableResult => ({ candidates: [], rejectedRows: [], proposedMapping: mapping, reason });
@@ -383,20 +408,38 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
   const business = businessField(sheet, opts.business.name);
   const defaultCurrency = opts.currency ? currencyCode(opts.currency) : undefined;
 
+  if (/^amount due$/.test(norm(headers.amount ?? ""))) {
+    baseNotes.push("The amount column is headed \"Amount due\"; after part payments that is a balance, not the invoice total.");
+  }
+
   const candidates: IntakeCandidate[] = [];
   const rejectedRows: TableResult["rejectedRows"] = [];
   const n = trimmedRowCount(sheet.rows);
+  // The same invoice number twice for the same party is a line-item listing, not two invoices.
+  const refKey = (row: SheetCell[]) => `${text(row[columns.reference!]).toLowerCase()}|${columns.party !== undefined ? text(row[columns.party]).toLowerCase() : ""}`;
+  const refCounts = new Map<string, number>();
+  for (let r = headerRow; r < n; r++) {
+    const row = sheet.rows[r] ?? [];
+    const ref = text(row[columns.reference]);
+    if (blankRow(row) || !/\d/.test(ref) || TOTAL_REF.test(ref)) continue;
+    refCounts.set(refKey(row), (refCounts.get(refKey(row)) ?? 0) + 1);
+  }
   for (let r = headerRow; r < n; r++) {
     const row = sheet.rows[r] ?? [];
     const rowNo = r + 1;
     if (blankRow(row)) continue;
-    if (row.some((c) => typeof c === "string" && TOTAL_CELL.test(c.trim()))) {
+    const refText = text(row[columns.reference]);
+    if (TOTAL_REF.test(refText) || row.some((c) => typeof c === "string" && TOTAL_CELL.test(c.trim()))) {
       rejectedRows.push({ row: rowNo, reason: "Totals row; not an invoice." });
       continue;
     }
-    const refText = text(row[columns.reference]);
     if (refText === "") { rejectedRows.push({ row: rowNo, reason: "No invoice number." }); continue; }
     if (!/\d/.test(refText)) { rejectedRows.push({ row: rowNo, reason: `"${refText}" does not look like an invoice number.` }); continue; }
+
+    if ((refCounts.get(refKey(row)) ?? 0) > 1) {
+      rejectedRows.push({ row: rowNo, reason: `Invoice number "${refText}" repeats with the same party; looks like line items, not separate invoices.` });
+      continue;
+    }
 
     const notes = [...baseNotes];
     const ctx: Ctx = { sheet, ...(opts.dayFirst !== undefined ? { dayFirst: opts.dayFirst } : {}), notes };
@@ -487,11 +530,12 @@ export function documentToCandidate(sheet: SheetContent, opts: SheetOptions): In
     amount = missing(`total "${totalCells[0]!.shown}" could not be read`);
   }
 
-  // Outstanding: a balance/amount-due line next to a stated total.
+  // Outstanding: a balance/amount-due line. Alone, it is also all we have for the amount, so say so.
   let outstanding: Field<number> | undefined;
-  if (tierA.length > 0 && tierB[0]) {
+  if (tierB[0]) {
     const o = asAmount(tierB[0], "Outstanding");
     if (o.state === "found") outstanding = o;
+    if (tierA.length === 0) notes.push("Only a balance/amount due line is stated; used as the amount, but after part payments it is less than the invoice total.");
   }
 
   // Reconciliation note only: line items + charges vs the stated total. Never overrides it.
