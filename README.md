@@ -10,6 +10,8 @@ This repository contains the design and contributor checklists. The application 
 2. Find your assigned role in the [task board](tasks/README.md); lane ownership is in [09-api-repo-lanes](docs/design/09-api-repo-lanes.md#five-people).
 3. Freeze [`schema/records.ts`](docs/design/03-data-model.md) at 11:00 and commit fixture records so every lane builds against the same data.
 4. Integrate at 1:00, freeze features at 3:00, submit by 5:30 ([timeline](docs/design/11-plan-demo-risks.md)).
+5. Run the app and API: [`api/README.md`](api/README.md) (`npm run dev`, http://localhost:8787).
+6. Wiring the AI modules into routes (api/app and integration lanes): [`ai/README.md`](ai/README.md), with a runnable example in [`ai/integration.example.test.ts`](ai/integration.example.test.ts).
 
 ## Five roles
 

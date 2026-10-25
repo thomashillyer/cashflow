@@ -45,7 +45,7 @@ Sources (accounting, bank, signals, owner)
                     + Evidence, Settlement, BalanceSnapshot, Override, Scenario
   -> engine/        expand, lag, forecast, simulate      [05-forecast-engine.md]
   -> engine/        warnings, rank -> WorkItems          [07-warnings-and-ranking.md]
-  -> ai/            Claude: extraction, brief text, Ask Neri, drafts  [08-claude-layer.md]
+  -> ai/            Claude: extraction, brief text, Ask Neri, drafts  [08-claude-layer.md; wiring into routes: ai/README.md]
   -> api/ + app/    three things, forecast chart, Ask Neri, approve   [09-api-repo-lanes.md]
 profiles/           business profile config, read by adapters, engine, warnings  [02-business-profile.md]
 ```
@@ -92,7 +92,7 @@ Five owners: Niru (data ingestion), Thomas (cashflow engine), SilverBeck (UI and
 
 ## Commands
 
-Node 22, TypeScript strict, vitest. `dev` and `demo` are added when the api/app lands.
+Node 22, TypeScript strict, vitest. API details: `api/README.md`.
 
 ```
 npm install
@@ -102,7 +102,9 @@ npm run setup:supabase # validate Supabase vars in .env + read-only connectivity
 npx supabase start     # local Postgres + API (Docker); `npx supabase status` for keys
 npx supabase db reset  # apply supabase/migrations/ locally
 npx supabase db push   # apply migrations to the linked shared project
-npm run dev        # api + app (not yet)
+npm run dev        # api + app on http://localhost:8787 (NERI_STORE=memory DEMO_MODE=1 for no database)
+npm start          # same, without watch (production)
+npm run seed:demo  # upsert the synthetic samples into Supabase (service role; idempotent)
 npm run demo       # demo profile + cached Claude responses (not yet)
 ```
 
@@ -139,6 +141,7 @@ npm run demo       # demo profile + cached Claude responses (not yet)
 
 - Never push to `main`. Branch per issue (`p<person>/<topic>`, e.g. `p4/reconcile`), open a PR with `Closes #<issue>`, and say if it is stacked on another PR.
 - Keep PRs small: one issue each.
+- The pre-push hook (`scripts/hooks/pre-push`) blocks pushes to `main`; `npm install` enables it (`prepare` sets `core.hooksPath` to `scripts/hooks` for the clone, so all worktrees, and leaves an existing different `core.hooksPath` alone).
 - **Before pushing**, run `npm run typecheck && npm test` and a **local subagent review** (below) on your branch, and fix the must-fix findings. Pushing means the work is reviewed: once a PR is open, it can be merged (squash) without waiting for another review.
 
 ### Local PR review (Claude Code)

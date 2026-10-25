@@ -34,6 +34,8 @@ Every pattern is a list of legs: a share of the total, an anchor date, an offset
 ```
 
 - **Anchors are a fixed set:** `order`, `ship`, `delivery`, `invoice`, `due`, `month_end`, `weekday`. The engine stays generic because it only understands these.
+- **`month_end`** is the last day of the calendar month of the invoice date (else due, order, delivery); `offsetDays` counts from it, so "net 30 EOM" is `{ anchor: "month_end", offsetDays: 30 }`. **`weekday`** needs a leg `weekday` (0 = Monday .. 6 = Sunday) and resolves to the first such day on/after the invoice date (else order, else due), plus `offsetDays`; without `weekday` the leg is not scheduled and warns.
+- **Card settlement:** `revenueModel.settleLagDays` (dailySales, default 0) lands each day's sales that many days after the sale.
 - **`linkedCosts`** lets a sales deal pull in its supplier payments. That is how "can I afford this order?" works for any business that buys before it sells.
 - **Lead times** (`leadTimes.transitDays`, `leadTimes.productionDays`) let the engine estimate a missing anchor (for example, delivery = ship + transit).
 
@@ -64,9 +66,11 @@ type Profile = {
     signalAutoApplyConfidence: number;
     rankFloor: number;
     relationshipPenalty: Record<string, number>;   // tag -> multiplier, e.g. { "preferred": 0.5 }
+    splitIntervalDays?: number;       // split lever: days between installments (default 30)
   };
   signalSources: ("email" | "whatsapp" | "crm" | "owner")[];
   vocabulary: Record<string, string>;
+  engine?: EngineTunables;            // see "Engine tunables" below; every field optional
 };
 
 type PaymentPattern = {
@@ -80,6 +84,29 @@ type Anchor = "order" | "ship" | "delivery" | "invoice" | "due" | "month_end" | 
 ```
 
 Validation: the shares of a pattern's legs must sum to 1.0.
+
+## Engine tunables (`engine`, optional)
+
+Every number the engine uses that depends on the business reads from the profile. The optional `engine` group holds the ones that do not already live in `thresholds` (`stressDelayDays`, `splitIntervalDays`, `staleAfterHours` stay there). Omit any field for its default; the defaults reproduce the engine's behavior before the group existed. Code reads them only through `engineSettings(profile)` in `engine/settings.ts`. A value that is not finite or is out of range (day counts must be whole numbers > 0, `settlementMatchDays` >= 0; confidences 0..1; `iqrScaleDays` and `urgencyScaleDays` > 0; `affordabilityStep` in (0, 1]; anchor/type lists non-empty and known) falls back to its default, and the forecast carries an `invalid_profile` review reason for it (profiles stored in the database skip the file checks in `schema/profiles.test.ts`).
+
+| Field | Controls | Default |
+|---|---|---|
+| `statusConfidence.committed` / `.likely` / `.possible` | Confidence of an event by status (a commitment's own `probability` wins for `possible`; `actual` is always 1) | 0.95 / 0.7 / 0.3 |
+| `dailySalesConfidence` | Confidence of each forecast daily-sales event | 0.6 |
+| `salesHistoryDays` | Days of actual sales receipts averaged by the daily-sales model | 28 |
+| `lag.maxSamples` | Most recent paid receivables per customer used by the lag model | 12 |
+| `lag.noHistoryConfidence` | Lag confidence for a customer with no payment history (uses `defaultLagDays`) | 0.1 |
+| `lag.iqrScaleDays` | Spread that halves lag confidence: `n/(n+k) × 1/(1 + IQR/iqrScaleDays)` | 14 |
+| `lag.laggedAnchors` | Inflow-leg anchors that wait for the customer, so the customer's lag applies | `due`, `invoice`, `delivery`, `month_end` |
+| `lag.laggedTypes` | Commitment types whose inflow legs get the customer's lag | `invoice`, `sales_deal` |
+| `settlementMatchDays` | A books settlement and a bank line (same amount) this many days apart are one payment | 3 |
+| `staleFallbackDays` | Balance age that needs review when `thresholds.staleAfterHours` is not set | 7 |
+| `noSnapshotLookbackDays` | With no balance snapshot, how far back left-out actuals are reported | 90 |
+| `deferDays` | Defer lever length for a payable with no confirmed flexibility rule | 10 |
+| `affordabilityStep` | Grid step of the "smallest upfront share" search for a deal | 0.05 |
+| `urgencyScaleDays` | Ranking decay: `score = value / (1 + daysUntilNeeded / urgencyScaleDays) × confidence × relationship` | 7 |
+
+Kept as engine constants (math, not business choices): `actual` confidence 1 and owner-rule lag confidence 1, median and quartiles (0.25/0.75) in the lag model, round-half-up of lag days, the basis-point grid of the affordability search, and the three items of "three things to do today". `restaurant.json` shows `salesHistoryDays` and `dailySalesConfidence` explicitly. `agency.json` adds `order` to `lag.laggedAnchors`: both `milestones_50_50` legs are client invoices on net-60 terms (the first billed at order, the second at delivery), so both wait on the client and get the client's lag. `trading.json` and `contractor.json` keep the default list, because their order-day legs are upfront deposits paid before work starts. The other fields use the defaults.
 
 ## Starter templates to ship
 

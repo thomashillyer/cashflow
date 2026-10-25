@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
-  BalanceSnapshot, CashEvent, Commitment, Evidence, Party, Records, Rule, Settlement, Signal,
+  BalanceSnapshot, CashEvent, Commitment, Evidence, Party, Records, Rule, Settlement, Signal, WorkItem,
 } from "../schema/records";
 import type { ChangeProposal, ConfirmationResult, IntakeCandidate } from "../schema/intake";
 import { TABLES, fromRow, toRow, type Row } from "./rows";
@@ -99,6 +99,67 @@ export const upsertIntakeCandidates = (db: SupabaseClient, b: string, r: IntakeC
   upsert(db, "intake_candidates", b, r);
 export const upsertChangeProposals = (db: SupabaseClient, b: string, r: ChangeProposal[]) =>
   upsert(db, "change_proposals", b, r);
+
+export type LoadedWorkItems = {
+  items: WorkItem[];
+  // ForecastRun.inputsHash of the run they were ranked from, kept per business (so an empty ranking
+  // is still current). Undefined when nothing was ever saved; compare with the current run's
+  // inputsHash and re-rank when it differs.
+  inputsHash?: string;
+};
+
+// Work items (engine/rank.ts output), best first. Pass their id/state back to buildBrief as
+// `prior` so done and dismissed items stay that way across reruns.
+export async function loadWorkItems(db: SupabaseClient, businessId: string): Promise<LoadedWorkItems> {
+  // Hash first, then items: a save landing in between gives new items with an old hash (one extra
+  // re-rank), never old items with a new hash (which would read as current and skip a re-rank).
+  const businessRes = await db.from("businesses").select("work_items_inputs_hash").eq("id", businessId).maybeSingle();
+  if (businessRes.error) throw toStoreError(`load work items hash ${businessId}`, businessRes.error);
+  const itemsRes = await db.from("work_items").select("*").eq("business_id", businessId)
+    .order("score", { ascending: false }).order("id");
+  if (itemsRes.error) throw toStoreError(`load work items ${businessId}`, itemsRes.error);
+  const rows = (itemsRes.data as Row[]).map((r) => fromRow<WorkItem & { inputsHash?: string }>(r, "work_items"));
+  // Compatibility: rows stamped before the per-business hash existed count only when every row agrees.
+  const rowHashes = new Set(rows.map((r) => r.inputsHash));
+  const legacy = rowHashes.size === 1 ? rows[0]!.inputsHash : undefined;
+  const inputsHash = (businessRes.data as { work_items_inputs_hash?: string | null } | null)
+    ?.work_items_inputs_hash ?? legacy;
+  return {
+    items: rows.map(({ inputsHash: _hash, ...item }) => item),
+    ...(inputsHash ? { inputsHash } : {}),
+  };
+}
+
+// Service-role only: save a fresh ranking from the run with `inputsHash`, in one transaction through
+// the save_work_items RPC (serialized per business). `state` is never written: new rows take the
+// column default ('open') and existing rows keep theirs, so a recompute can't undo an owner's
+// tick-off. Open items the new ranking no longer produces are removed; done and dismissed items are
+// kept. Every row and the business record the run they were last checked against, so an empty
+// ranking still reads as current. Throws StoreError NOT_FOUND (404) for an unknown business and
+// INVALID_ARGUMENT (400) for a missing or duplicate id or an empty hash.
+export async function saveWorkItems(
+  db: SupabaseClient, businessId: string, items: WorkItem[], inputsHash: string,
+): Promise<void> {
+  const rows = items.map(({ state: _state, ...rest }) => {
+    const { business_id: _business, ...row } = toRow(rest, businessId);
+    return row;
+  });
+  const { error } = await db.rpc("save_work_items", {
+    p_business_id: businessId, p_items: rows, p_inputs_hash: inputsHash,
+  });
+  if (error) throw toStoreError(`save work items ${businessId}`, error);
+}
+
+// Service-role only: the owner ticks an item off or dismisses it. Changes work-item state only;
+// never sends or pays. Throws NOT_FOUND when no row was updated (wrong id, or RLS blocked it).
+export async function setWorkItemState(
+  db: SupabaseClient, businessId: string, id: string, state: WorkItem["state"],
+): Promise<void> {
+  const { data, error } = await db.from("work_items").update({ state })
+    .eq("business_id", businessId).eq("id", id).select("id");
+  if (error) throw toStoreError(`set work item ${id}`, error);
+  if (!data?.length) throw new StoreError("NOT_FOUND", 404, `set work item ${id}: no such work item`);
+}
 
 // Atomic confirm through the confirm_change_proposal RPC (one transaction). Throws StoreError
 // with code STALE_REVIEW / IDEMPOTENCY_CONFLICT / PROPOSAL_NOT_PENDING / PROPOSAL_UNRESOLVED (409),

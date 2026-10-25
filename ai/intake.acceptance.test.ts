@@ -274,7 +274,8 @@ describe("purchase orders", () => {
       type: "purchase_order", direction: "in", status: e.status, amount: e.amount, reference: "HH-PO-552",
     });
     const after = confirmAll(before, result);
-    expect(after.commitments.find((c) => c.type === "purchase_order")).toMatchObject({ status: "likely", amount: 1000000, outstanding: 1000000 });
+    expect(after.commitments.find((c) => c.type === "purchase_order")).toMatchObject({ status: "likely", amount: 1000000 });
+    expect(after.commitments.find((c) => c.type === "purchase_order")!.outstanding).toBeUndefined();
   });
 
   it("po-partial-invoice: the PO's remainder plus the invoice is 1,000,000 of inflow, never 1,400,000", async () => {
@@ -294,14 +295,41 @@ describe("purchase orders", () => {
     r = confirmAll(r, invResult);
 
     const invoice = r.commitments.find((c) => c.reference === "INV-1203")!;
-    expect(invoice).toMatchObject({ type: "invoice", amount: e.invoice.amount, outstanding: e.invoice.amount });
+    expect(invoice).toMatchObject({ type: "invoice", amount: e.invoice.amount });
+    expect(invoice.outstanding).toBeUndefined();
     expect(poRemaining(r, po.id)).toBe(e.poRemaining);
-    expect(byId(r, po.id).outstanding).toBe(e.poRemaining);
+    // Applying the link records it only; the PO's own amount and outstanding stay whole, because the
+    // engine (expand: coveredByLinked) is the one place linked coverage is subtracted.
+    expect(byId(r, po.id)).toMatchObject({ amount: 1000000, linkedCommitmentIds: [invoice.id] });
 
     const newInflow = forecastableInflow(r) - forecastableInflow(before);
     expect(newInflow).toBe(e.totalForecastIn);
     expect(newInflow).not.toBe(1400000);
+
+    // Engine level: run the real expand() over the confirmed records. The invoice is a normal money-in
+    // commitment, so it contributes its full 400,000.
+    const contributed = (rec: Records, commitmentId: string) =>
+      expand(rec, profile, meta.asOf, horizonEnd(profile, meta.asOf), meta.fxRates).events
+        .filter((ev) => ev.commitmentId === commitmentId).reduce((sum, ev) => sum + ev.amount, 0);
+    expect(contributed(r, invoice.id)).toBe(e.invoice.amount);
+
+    // The PO's remainder: the engine has no customer-PO pattern yet (issue #2), so this PO falls back to
+    // the supplier-PO legs, whose "ship" leg has no date here and is left unscheduled. Give it a ship date
+    // so expand() schedules the remainder, and check only the amount: coverage is subtracted exactly once
+    // (600,000), not twice (200,000, the double-subtraction bug) and not zero times (1,000,000).
+    const scheduled = structuredClone(r);
+    byId(scheduled, po.id).anchors = { ...po.anchors, ship: "2026-12-20" };
+    const poRemainder = contributed(scheduled, po.id);
+    expect(poRemainder).toBe(e.poRemaining);
+    const total = contributed(scheduled, invoice.id) + poRemainder;
+    expect(total).toBe(e.totalForecastIn);
+    expect(total).not.toBe(1400000);
+    expect(total).not.toBe(800000);
   });
+
+  // Known gap (issue #2): no money-in pattern for customer POs, so the engine cannot yet schedule this
+  // PO's remaining 600,000 as inflow with real dates and direction. Amount coverage is asserted above.
+  it.todo("po-partial-invoice: the PO's remaining 600,000 appears as money in at its expected date (issue #2)");
 });
 
 describe("unreadable input", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeRef, propose, TEMP_COMMITMENT } from "./match";
+import { normalizeRef, poAllocated, poRemaining, propose, TEMP_COMMITMENT } from "./match";
 import { baseRecords, candidate, f, inv1187 } from "./testkit";
 
 const ctx = { storeRevision: 7, now: "2026-11-26T12:00:00Z" };
@@ -141,5 +141,47 @@ describe("propose", () => {
     const p = propose(inv, records, ctx);
     expect(p.action).toBe("create");
     expect(p.ops).toContainEqual({ op: "linkCommitments", fromId: TEMP_COMMITMENT, toId: "po-HH-PO-552", allocated: 400000 });
+  });
+});
+
+describe("poAllocated / poRemaining (read helpers; the engine owns coverage in the forecast)", () => {
+  const withLinks = () => {
+    const records = baseRecords();
+    records.commitments.push({
+      id: "po-HH-PO-552", type: "purchase_order", direction: "in", reference: "HH-PO-552", partyId: "party-harbor-hearth",
+      amount: 1000000, currency: "USD", anchors: { order: "2026-11-02" }, status: "likely", sourceRef: { system: "upload", record: "ev-po" },
+      linkedCommitmentIds: ["inv-INV-1203", "missing-id"],
+    });
+    records.commitments.push({
+      id: "inv-INV-1203", type: "invoice", direction: "in", reference: "INV-1203", partyId: "party-harbor-hearth",
+      amount: 400000, outstanding: 400000, currency: "USD", anchors: { due: "2026-12-16" }, status: "committed",
+      sourceRef: { system: "upload", record: "ev-1203" }, linkedCommitmentIds: ["po-HH-PO-552"],
+    });
+    return records;
+  };
+
+  it("computes allocation from linked invoices, never from the PO's outstanding", () => {
+    const r = withLinks();
+    const po = r.commitments.find((c) => c.id === "po-HH-PO-552")!;
+    expect(poAllocated(r, po)).toBe(400000);
+    expect(poRemaining(r, po.id)).toBe(600000);
+    po.outstanding = 123; // a stale outstanding must not change the helpers
+    expect(poRemaining(r, po.id)).toBe(600000);
+  });
+
+  it("ignores cancelled or credited invoices, like the engine does", () => {
+    const r = withLinks();
+    const inv = r.commitments.find((c) => c.id === "inv-INV-1203")!;
+    inv.settlement = "cancelled";
+    expect(poRemaining(r, "po-HH-PO-552")).toBe(1000000);
+    inv.settlement = "credited";
+    expect(poRemaining(r, "po-HH-PO-552")).toBe(1000000);
+  });
+
+  it("is undefined for a non-PO and the full amount when nothing is linked", () => {
+    const r = withLinks();
+    expect(poRemaining(r, "inv-INV-1203")).toBeUndefined();
+    r.commitments.find((c) => c.id === "po-HH-PO-552")!.linkedCommitmentIds = [];
+    expect(poRemaining(r, "po-HH-PO-552")).toBe(1000000);
   });
 });

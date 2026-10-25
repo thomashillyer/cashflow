@@ -31,6 +31,7 @@ type ForecastRun = {
   firstBelowSafety?: string;   // date
   firstNegative?: string;      // date
   warnings: string[];          // data-quality: stale source, unresolved reviews, missing facts
+  review?: { needed: boolean; reasons: { code: string; message: string; refs: string[] }[] };  // structured needs-review flag
   days: { date: string; closing: number; eventIds: string[] }[];  // daily drill-down
   weeks: {
     start: string;             // Monday
@@ -60,6 +61,7 @@ Daily balances determine the low point, first-negative date, safety warnings, an
 - Payables stay on their contractual dates; past late payment is not permission to pay late.
 - If a receipt and a large outflow land on the same day and the order matters, flag that intraday ordering is unknown.
 - No data, stale data, or unresolved material reviews can never produce an all-clear brief. Say what is missing.
+  The engine sets `ForecastRun.review` (`needed` plus coded reasons with record refs) for every warning that means data is missing or unresolved, so consumers check `review.needed` instead of parsing `warnings`. Informational notes (lever no-ops, short horizon) do not set it.
 - Report both "below safety line" and "below zero"; a positive month-end can hide a mid-month payroll gap.
 
 ## Payment-lag model
@@ -71,9 +73,9 @@ lag_p = (n_p × median_p + k × defaultLagDays) / (n_p + k),   k = profile.lagSh
 ```
 
 - `n_p` = number of past paid invoices for the party; `median_p` = median of (paid − due) in days, negative allowed.
-- Use the last 12 payments at most, so behavior changes show up.
+- Use the last 12 payments at most (profile `engine.lag.maxSamples`), so behavior changes show up.
 - A confirmed `lag_offset` rule replaces the model for that party.
-- **Confidence:** start at `n / (n + k)`, reduce by spread: `confidence = n/(n+k) × 1/(1 + iqrDays/14)`. Shown to the owner as "based on Customer A's last 8 payments."
+- **Confidence:** start at `n / (n + k)`, reduce by spread: `confidence = n/(n+k) × 1/(1 + iqrDays/14)` (14 is profile `engine.lag.iqrScaleDays`; with no history, `engine.lag.noHistoryConfidence`, default 0.1). Shown to the owner as "based on Customer A's last 8 payments."
 - `event.basis` example: `"due 2026-12-02 + 22 days (median of last 8 payments)"`.
 
 ## Free cash

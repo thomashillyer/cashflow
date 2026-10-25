@@ -82,8 +82,11 @@ function cascadeTrade(): Records {
     party("party-shenzhen-ceramics", "Shenzhen Ceramics Co.", "supplier", ["preferred", "reliable"], ["Best quality; slow around Lunar New Year"]),
     party("party-jaipur-textiles", "Jaipur Textiles", "supplier", ["preferred"], ["Good partner; prices in rupees"]),
     party("party-ningbo-pack", "Ningbo Pack", "supplier", ["avoid"], ["Quality issues last year"]),
+    party("party-cascade-customs", "Cascade Customs Brokerage", "supplier", [], ["Bills duties and landing costs when a container clears"]),
   ];
-  r.balances = [balance("bal-cascade", 0, "2026-11-16")]; // opening cash is set below so the low point lands near the design target
+  // Opening cash is a fixed literal, chosen once by hand so the base low point sits near the design target (about -$6K in
+  // the week of Dec 21). It is never tuned against the engine, so fixtures/expected/engine/cascade_trade.json stays independent.
+  r.balances = [balance("bal-cascade", $(145000), "2026-11-16")];
   const eg = history("EG", "party-evergreen-home", [13, 15, 14, 14, 16, 13, 14, 15], "2026-02-10", $(20000));
   const pm = history("PM", "party-puget-market", [-7, -8, -6, -7, -7, -9, -6, -7], "2026-02-15", $(15000));
   const hh = history("HH", "party-harbor-hearth", [0, 1, 0, 0], "2026-07-20", $(10000));
@@ -91,7 +94,10 @@ function cascadeTrade(): Records {
   r.settlements = [...eg.settlements, ...pm.settlements, ...hh.settlements];
   r.commitments.push(
     invoice("INV-1187", "party-evergreen-home", $(28000), "2026-12-10", "2026-11-10"),
-    invoice("INV-1203", "party-harbor-hearth", $(12000), "2026-12-20", "2026-11-20"),
+    // The due date matters: with Harbor's learned lag (holiday delay) INV-1203 lands about Jan 6, after rent on Jan 1. So when
+    // the Evergreen signal moves INV-1187 into January, nothing refills the account between Dec 25 and rent and the dip
+    // deepens (about -$12K on Jan 1). Due earlier, INV-1203 lands before rent and the signal no longer moves the low point.
+    invoice("INV-1203", "party-harbor-hearth", $(12000), "2026-12-28", "2026-11-28"),
     invoice("INV-1215", "party-puget-market", $(115000), "2027-01-12", "2026-12-13"),
     {
       id: "po-PO-2291", type: "purchase_order", direction: "out", reference: "PO-2291", partyId: "party-shenzhen-ceramics", amount: $(60000), currency: "USD",
@@ -101,7 +107,10 @@ function cascadeTrade(): Records {
       id: "po-PO-2302", type: "purchase_order", direction: "out", reference: "PO-2302", partyId: "party-jaipur-textiles", amount: 200_000_000, currency: "INR",
       anchors: { order: "2026-12-01", ship: "2026-12-15" }, patternId: "supplier_50_50", status: "committed", settlement: "open", sourceRef: src("generic_file", "po-2302.xlsx"),
     },
-    { id: "bill-duties-2291", type: "bill", direction: "out", reference: "DUTIES-2291", category: "duties", amount: $(9000), currency: "USD", anchors: { due: "2026-12-18" }, status: "likely", settlement: "open", sourceRef: src("generic_file", "po-2291.pdf") },
+    {
+      id: "bill-duties-2291", type: "bill", direction: "out", reference: "DUTIES-2291", partyId: "party-cascade-customs", category: "duties", amount: $(9000), currency: "USD",
+      anchors: { due: "2026-12-18" }, status: "likely", settlement: "open", sourceRef: src("generic_file", "broker-inv-2291.pdf"),
+    },
     {
       id: "rfq-harbor-spring", type: "sales_deal", direction: "in", reference: "RFQ-77", partyId: "party-harbor-hearth", amount: $(60000), currency: "USD",
       anchors: { order: "2026-12-05", delivery: "2027-02-01" }, status: "possible", probability: 0.4, sourceRef: src("email", "rfq-77"),
@@ -117,36 +126,70 @@ function cascadeTrade(): Records {
   return r;
 }
 
-// ---- pike_noodle: Pike Street Noodle Bar (restaurant, daily card sales, no receivables) ----
+// ---- pike_noodle: Pike Street Noodle Bar (restaurant, daily card sales, weekly payroll, no receivables) ----
+// Story (docs/design/10-testing-and-fixtures.md): a busy December with holiday catering, then a slow January where the
+// annual liquor license, the kitchen-line lease buyout and the quarterly estimated tax (profile recurring, Jan 15) land
+// in the same week as payroll. The low point is Friday Jan 15, 2027.
+//
+// Seasonal sales are out of scope for the engine today: the daily-sales model averages the last 28 days of card receipts
+// and shapes them by weekday only, so it cannot know January covers are softer. Rather than fake seasonality, the January
+// dip comes from real January outflows a restaurant has (committed bills), and the December bump from owner-entered
+// catering deposits (plans, likely). Neither needs an engine change.
 function pikeNoodle(): Records {
   const r = empty();
-  r.parties = [party("party-sound-produce", "Sound Produce", "supplier", [], []), party("party-noodle-wholesale", "Noodle Wholesale", "supplier", [], [])];
+  r.parties = [
+    party("party-sound-produce", "Sound Produce", "supplier", [], []),
+    party("party-noodle-wholesale", "Noodle Wholesale", "supplier", [], []),
+    party("party-wslcb", "Washington State Liquor and Cannabis Board", "supplier", [], ["Liquor license renews every January"]),
+    party("party-pacific-leasing", "Pacific Restaurant Leasing", "supplier", [], ["Kitchen line lease ends in January with a buyout payment"]),
+    party("party-catering-guests", "Holiday catering guests", "customer", [], ["Office holiday parties pay a deposit when they book"]),
+  ];
+  // Start-of-day snapshot on asOf: bank lines dated before it are history only (already inside this balance).
   r.balances = [balance("bal-pike", $(22000), "2026-11-16")];
   const weights = [0.6, 0.7, 0.8, 1.0, 1.5, 1.8, 1.4];
   const mean = weights.reduce((a, b) => a + b, 0) / 7;
+  // Card deposits land settleLagDays after the sale (profiles/restaurant.json), so each deposit is shaped by its
+  // sale date's weekday: history stays in phase with the forecast.
+  const restaurant = JSON.parse(readFileSync(join(root, "profiles/restaurant.json"), "utf8")) as Profile;
+  const lag = restaurant.revenueModel.kind === "dailySales" ? (restaurant.revenueModel.settleLagDays ?? 0) : 0;
   const events: CashEvent[] = [];
   for (let i = 28; i >= 1; i--) {
     const date = addDays("2026-11-16", -i);
     const noise = ((i * 37) % 11) - 5; // deterministic wobble, +-$50
-    const amount = $((2200 * weights[dowOf(date)]!) / mean + noise * 10);
+    const amount = $((2200 * weights[dowOf(addDays(date, -lag))]!) / mean + noise * 10);
     events.push({ id: `bank-sales-${date}`, legIndex: 0, date, amount, currency: "USD", amountBase: amount, direction: "in", status: "actual", confidence: 1, basis: "card settlement", category: "sales", sourceRef: src("bank_csv", `sales-${date}`) });
   }
+  // Six Friday payroll runs before the snapshot: material for recurring detection (weekly, Friday, about $7,500, matching
+  // the profile's rec-payroll). Dated before 2026-11-16, so they are history, never forecast or added to opening cash.
+  const payroll = [7380, 7520, 7465, 7610, 7500, 7445];
+  payroll.forEach((amt, i) => {
+    const date = addDays("2026-10-09", i * 7);
+    events.push({ id: `bank-payroll-${date}`, legIndex: 0, date, amount: $(amt), currency: "USD", amountBase: $(amt), direction: "out", status: "actual", confidence: 1, basis: "payroll run", category: "payroll", sourceRef: src("bank_csv", `payroll-${date}`) });
+  });
   r.events = events;
-  // Weekly food and noodle bills on Thursdays through the horizon, net-7 from the invoice date.
-  const bills: [string, string, string, number][] = [];
+  // Weekly produce bills on Thursdays through the horizon, plus noodles every other week, net-7 from the invoice date.
+  const bills: [string, string, string, number, string?][] = [];
   for (let i = 0; i < 13; i++) {
     const due = addDays("2026-11-19", i * 7);
-    const noodle = i % 3 === 1;
-    bills.push([`${noodle ? "NW" : "FP"}-${4400 + i}`, noodle ? "party-noodle-wholesale" : "party-sound-produce", due, noodle ? 2600 : 3800 + (i % 4) * 100]);
+    bills.push([`FP-${4400 + i}`, "party-sound-produce", due, 3800 + (i % 4) * 100]);
+    if (i % 2 === 0) bills.push([`NW-${4400 + i}`, "party-noodle-wholesale", due, 1500]);
   }
-  r.commitments = bills.map(([ref, partyId, due, amt]) => ({
-    id: `bill-${ref}`, type: "bill", direction: "out", reference: ref, partyId, amount: $(amt), currency: "USD", anchors: { invoice: addDays(due, -7), due }, status: "committed", outstanding: $(amt), settlement: "open", sourceRef: src("zoho_books", ref),
+  // January: annual liquor license renewal and the kitchen-line lease buyout (final balloon payment).
+  bills.push(["WSLCB-2027", "party-wslcb", "2027-01-11", 2500, "license"]);
+  bills.push(["PRL-LEASE-88-BUYOUT", "party-pacific-leasing", "2027-01-14", 18000, "equipment lease"]);
+  r.commitments = bills.map(([ref, partyId, due, amt, category]) => ({
+    id: `bill-${ref}`, type: "bill", direction: "out", reference: ref, partyId, ...(category ? { category } : {}), amount: $(amt), currency: "USD", anchors: { invoice: addDays(due, -7), due }, status: "committed", outstanding: $(amt), settlement: "open", sourceRef: src("zoho_books", ref),
   }));
+  // December: holiday-party catering deposits the owner expects (owner plans, likely; not invoices, so no lag).
+  const catering: [string, number][] = [["2026-12-04", 2000], ["2026-12-11", 3500], ["2026-12-18", 2500]];
+  for (const [due, amt] of catering) {
+    r.commitments.push({ id: `plan-catering-${due}`, type: "plan", direction: "in", category: "catering", partyId: "party-catering-guests", amount: $(amt), currency: "USD", anchors: { due }, status: "likely", sourceRef: src("owner", `catering-${due}`) });
+  }
   return r;
 }
 
-const fixtures: { name: string; profile: string; asOf: string; fxRates: Record<string, number>; records: Records; openingTarget?: { lowPoint: number } }[] = [
-  { name: "cascade_trade", profile: "profiles/trading.json", asOf: "2026-11-16", fxRates: { INR: 0.012 }, records: cascadeTrade(), openingTarget: { lowPoint: -$(6000) } },
+const fixtures: { name: string; profile: string; asOf: string; fxRates: Record<string, number>; records: Records }[] = [
+  { name: "cascade_trade", profile: "profiles/trading.json", asOf: "2026-11-16", fxRates: { INR: 0.012 }, records: cascadeTrade() },
   { name: "pike_noodle", profile: "profiles/restaurant.json", asOf: "2026-11-16", fxRates: {}, records: pikeNoodle() },
 ];
 const demo = demoRunway();
@@ -156,12 +199,6 @@ fixtures.unshift({ name: "demo_runway", profile: "fixtures/demo_runway/profile.j
 for (const f of fixtures) {
   const profile = JSON.parse(readFileSync(join(root, f.profile), "utf8")) as Profile;
   const base = { id: "base", kind: "base" as const, overrides: [] };
-  if (f.openingTarget) {
-    // Tune opening cash (to the nearest $1,000) so the base low point matches the design target.
-    f.records.balances[0]!.amount = 0;
-    const at0 = forecast(f.records, profile, base, f.asOf, f.fxRates).lowPoint.amount;
-    f.records.balances[0]!.amount = Math.round((f.openingTarget.lowPoint - at0) / $(1000)) * $(1000);
-  }
   write(`fixtures/${f.name}/fixture.json`, { name: f.name, profile: f.profile, asOf: f.asOf, fxRates: f.fxRates });
   write(`fixtures/${f.name}/records.json`, f.records);
   const run = forecast(f.records, profile, base, f.asOf, f.fxRates);

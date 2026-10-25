@@ -9,7 +9,9 @@ import type { Profile } from "../schema/profile";
 import { forecast } from "./forecast";
 import { simulate } from "./simulate";
 import { partyLag } from "./lag";
-import { mondayOf } from "./dates";
+import { addDays, dowOf, mondayOf } from "./dates";
+import { resolveEventSource } from "./resolve";
+import { signalEffect } from "./signal_effect";
 
 const root = join(import.meta.dirname, "..");
 const read = <T>(path: string): T => JSON.parse(readFileSync(join(root, path), "utf8")) as T;
@@ -76,6 +78,11 @@ describe.each(names)("fixture %s", (name) => {
     }
   });
 
+  it("every event in the base run resolves to a source record", () => {
+    const unresolved = run().events.filter((e) => resolveEventSource(e, records, profile, meta.asOf).kind === "unresolved").map((e) => e.id);
+    expect(unresolved).toEqual([]);
+  });
+
   it("stress never reduces a payment and changes the run hash", () => {
     const b = run();
     const s = forecast(records, profile, stress, meta.asOf, meta.fxRates);
@@ -84,6 +91,69 @@ describe.each(names)("fixture %s", (name) => {
     expect(outs(s)).toEqual(outs(b));
     expect(s.lowPoint.amount).toBeLessThanOrEqual(b.lowPoint.amount);
   });
+
+  it("bank lines before the latest balance snapshot are history only: never forecast, never added to opening cash", () => {
+    const r = run();
+    const snap = records.balances.filter((b) => b.asOf <= meta.asOf).reduce((m, b) => (b.asOf > m ? b.asOf : m), "");
+    const ids = new Set(r.events.map((e) => e.id));
+    for (const e of records.events.filter((x) => x.date < snap)) expect(ids.has(e.id), e.id).toBe(false);
+    const sameCcy = records.balances.every((b) => b.currency === profile.baseCurrency) && records.events.every((e) => e.currency === profile.baseCurrency);
+    if (snap && sameCcy && records.balances.filter((b) => b.asOf === snap).length === records.balances.length) {
+      const since = records.events.filter((e) => e.date >= snap && e.date < meta.asOf).reduce((a, e) => a + (e.direction === "in" ? e.amount : -e.amount), 0);
+      expect(r.openingBalance).toBe(records.balances.reduce((a, b) => a + b.amount, 0) + since);
+    }
+  });
+
+  it("source-system commitments have a unique (system, record) source, as the database requires", () => {
+    const keyed = records.commitments.filter((c) => ["zoho_books", "bank_csv", "generic_file"].includes(c.sourceRef.system));
+    const keys = keyed.map((c) => `${c.sourceRef.system}|${c.sourceRef.record}`);
+    expect(keys.filter((k, i) => keys.indexOf(k) !== i)).toEqual([]);
+  });
+
+  it("stress stays at or below base with an overdue receipt added", () => {
+    // Due far enough back that the profile's payment lag still lands it before asOf.
+    const due = new Date(Date.parse(`${meta.asOf}T00:00:00Z`) - (profile.defaultLagDays + 3) * 86400000).toISOString().slice(0, 10);
+    const r: Records = {
+      ...records,
+      commitments: [...records.commitments, { id: "inv-overdue-probe", type: "invoice", amount: Math.max(1, Math.abs(run().openingBalance)), currency: profile.baseCurrency, anchors: { due }, status: "committed", sourceRef: { system: "test", record: "probe" } }],
+    };
+    const b = forecast(r, profile, base, meta.asOf, meta.fxRates);
+    const s = forecast(r, profile, stress, meta.asOf, meta.fxRates);
+    expect(s.lowPoint.amount).toBeLessThanOrEqual(b.lowPoint.amount);
+    for (const x of [b, s]) expect(x.days.some((d) => d.eventIds.some((id) => x.events.find((e) => e.id === id)?.commitmentId === "inv-overdue-probe"))).toBe(false);
+  });
+
+  it("review is present; needed iff reasons; every needs-review warning has a structured reason (#42)", () => {
+    for (const r of [run(), forecast(records, profile, stress, meta.asOf, meta.fxRates)]) {
+      expect(r.review).toBeDefined();
+      expect(r.review!.needed).toBe(r.review!.reasons.length > 0);
+      for (const x of r.review!.reasons) expect(r.warnings).toContain(x.message);
+      const flagged = new Set(r.review!.reasons.map((x) => x.message));
+      const mustFlag = r.warnings.filter((w) => /needs review|needs reconciliation|no FX rate|cannot be trusted|refresh before|^Overdue|^Unconfirmed|matches no forecast event|not forecast|check the allocation|double count/.test(w));
+      expect(mustFlag.filter((w) => !flagged.has(w))).toEqual([]);
+      if (mustFlag.length > 0) expect(r.review!.needed).toBe(true);
+    }
+    expect(read<{ review?: unknown }>(`fixtures/${name}/forecast_run.json`).review).toEqual(run().review);
+  });
+
+  it("an overdue receipt makes the run need review, citing it (#42)", () => {
+    const due = new Date(Date.parse(`${meta.asOf}T00:00:00Z`) - (profile.defaultLagDays + 3) * 86400000).toISOString().slice(0, 10);
+    const r: Records = {
+      ...records,
+      commitments: [...records.commitments, { id: "inv-overdue-probe", type: "invoice", amount: 100, currency: profile.baseCurrency, anchors: { due }, status: "committed", sourceRef: { system: "test", record: "probe" } }],
+    };
+    const x = forecast(r, profile, base, meta.asOf, meta.fxRates);
+    expect(x.review!.needed).toBe(true);
+    expect(x.review!.reasons.some((y) => y.code === "overdue_receipt" && y.refs.includes("inv-overdue-probe"))).toBe(true);
+  });
+
+  if (expected.review) {
+    it("matches the expected review flag", () => {
+      const r = run();
+      expect(r.review!.needed).toBe(expected.review.needed);
+      expect([...new Set(r.review!.reasons.map((x) => x.code))].sort()).toEqual([...(expected.review.codes ?? [])].sort());
+    });
+  }
 
   it("simulate leaves the base untouched", () => {
     const c = records.commitments.find((x) => x.direction === "out" && x.settlement !== "paid");
@@ -106,6 +176,7 @@ describe.each(names)("fixture %s", (name) => {
       if (lp.week) expect(r.lowPoint.week).toBe(lp.week);
       if (lp.date) expect(r.lowPoint.date).toBe(lp.date);
     }
+    if (expected.lowPointMonth) expect(run().lowPoint.date.slice(0, 7), "low point month").toBe(expected.lowPointMonth);
     if (expected.freeCash) {
       const f = run().freeCash.find((x) => x.week === expected.freeCash.week);
       expect(Math.abs((f?.amount ?? 0) - expected.freeCash.amount)).toBeLessThanOrEqual(expected.freeCash.tolerance);
@@ -126,10 +197,18 @@ describe.each(names)("fixture %s", (name) => {
       expect(sig.state).toBe("proposed");
       const moved = (r: Records) => forecast(r, profile, base, meta.asOf, meta.fxRates).events.find((e) => e.commitmentId === expected.signal.commitmentId)!;
       expect(moved(records).overriddenBy ?? []).not.toContain(sig.id);
-      const applied = moved({ ...records, signals: records.signals.map((s) => (s.id === sig.id ? { ...s, state: "applied" as const } : s)) });
+      const withApplied: Records = { ...records, signals: records.signals.map((s) => (s.id === sig.id ? { ...s, state: "applied" as const } : s)) };
+      const applied = moved(withApplied);
       expect(applied.date).toBe(expected.signal.newDate);
       expect(applied.overriddenBy).toContain(sig.id);
       expect(sig.sourceRef.excerpt?.text).toBeTruthy();
+      const eff = signalEffect(records, profile, [], sig.id, meta.asOf, meta.fxRates)!;
+      const appliedRun = forecast({ ...records, signals: records.signals.map((s) => (s.id === sig.id ? { ...s, state: "applied" as const } : s)) }, profile, base, meta.asOf, meta.fxRates);
+      expect(eff).toEqual({ lowPointDelta: appliedRun.lowPoint.amount - run().lowPoint.amount, week: appliedRun.lowPoint.week });
+      if (expected.signal.deepensLowPoint) {
+        const after = forecast(withApplied, profile, base, meta.asOf, meta.fxRates).lowPoint.amount;
+        expect(after, "applying the signal lowers the low point").toBeLessThan(run().lowPoint.amount);
+      }
     });
   }
 
@@ -146,16 +225,29 @@ describe.each(names)("fixture %s", (name) => {
   }
 
   if (expected.noReceivableEvents) {
-    it("has no receivable events, only recurring items and daily sales", () => {
-      expect(records.commitments.every((c) => c.direction === "out")).toBe(true);
+    it("has no receivables: no invoices or sales deals, so no lagged receipts", () => {
+      expect(records.commitments.filter((c) => c.type === "invoice" || c.type === "sales_deal").map((c) => c.id)).toEqual([]);
+      expect(records.commitments.filter((c) => c.direction === "in" && c.type !== "plan").map((c) => c.id)).toEqual([]);
+    });
+  }
+  if (expected.recurringHistory) {
+    it("has bank history for recurring detection: a steady weekly series before the as-of date", () => {
+      const { category, minCount } = expected.recurringHistory as { category: string; minCount: number };
+      expect(profile.recurring.some((x) => x.category === category), `profile has a ${category} recurring item`).toBe(true);
+      const past = records.events.filter((e) => e.category === category && e.direction === "out" && e.status === "actual" && e.date < meta.asOf).map((e) => e.date).sort();
+      expect(past.length).toBeGreaterThanOrEqual(minCount);
+      expect(new Set(past.map(dowOf)).size, "same weekday").toBe(1);
+      past.slice(1).forEach((d, i) => expect(d).toBe(addDays(past[i]!, 7)));
     });
   }
   if (expected.hasDailySales) {
     it("forecasts daily sales from history, shaped by weekday", () => {
       const sales = run().events.filter((e) => e.commitmentId === "daily-sales");
       expect(sales.length).toBe(run().days.length);
-      const byDow = (d: number) => sales.find((e) => new Date(e.date + "T00:00:00Z").getUTCDay() === d)!.amount;
-      expect(byDow(6)).toBeGreaterThan(byDow(1)); // Saturday beats Monday
+      // Weekday of the sale, not the settlement: card sales land settleLagDays after the sale.
+      const lag = profile.revenueModel.kind === "dailySales" ? (profile.revenueModel.settleLagDays ?? 0) : 0;
+      const byDow = (d: number) => sales.find((e) => new Date(e.date + "T00:00:00Z").getUTCDay() === (d + lag) % 7)!.amount;
+      expect(byDow(6)).toBeGreaterThan(byDow(1)); // Saturday sales beat Monday sales
     });
   }
 });

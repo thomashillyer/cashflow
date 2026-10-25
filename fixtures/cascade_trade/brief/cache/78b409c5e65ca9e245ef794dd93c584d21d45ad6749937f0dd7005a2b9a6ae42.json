@@ -1,0 +1,10 @@
+{
+  "key": "78b409c5e65ca9e245ef794dd93c584d21d45ad6749937f0dd7005a2b9a6ae42",
+  "promptVersion": "write_brief@2",
+  "model": "claude-opus-5-5",
+  "source": "live",
+  "output": {
+    "title": "Chase Evergreen Home on INV-1187",
+    "why": "Evergreen Home's $28,000 on INV-1187 is due Dec 10 but is expected Dec 26, after your lowest point. Getting it by Dec 18 lifts your lowest point from -$5,500 to $14,000."
+  }
+}

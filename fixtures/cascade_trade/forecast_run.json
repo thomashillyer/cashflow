@@ -1,7 +1,7 @@
 {
-  "id": "run-base-4c3b0c31431c",
+  "id": "run-base-2459ce5bd446",
   "asOf": "2026-11-16",
-  "inputsHash": "4c3b0c31431c31926b8fc93c04f03fb421a58adb301870a918dc453a467c1887",
+  "inputsHash": "2459ce5bd446160d8538913962e21c4227f0d17005e90c89ac32afff0613dc8c",
   "scenarioId": "base",
   "fxRates": {
     "USD": 1,
@@ -333,32 +333,30 @@
     },
     {
       "date": "2026-12-29",
-      "inflow": 1200000,
+      "inflow": 0,
       "outflow": 0,
-      "closing": 3450000,
-      "eventIds": [
-        "evt-inv-INV-1203-0"
-      ]
+      "closing": 2250000,
+      "eventIds": []
     },
     {
       "date": "2026-12-30",
       "inflow": 0,
       "outflow": 0,
-      "closing": 3450000,
+      "closing": 2250000,
       "eventIds": []
     },
     {
       "date": "2026-12-31",
       "inflow": 0,
       "outflow": 0,
-      "closing": 3450000,
+      "closing": 2250000,
       "eventIds": []
     },
     {
       "date": "2027-01-01",
       "inflow": 0,
       "outflow": 650000,
-      "closing": 2800000,
+      "closing": 1600000,
       "eventIds": [
         "evt-rec-rent-1"
       ]
@@ -367,36 +365,38 @@
       "date": "2027-01-02",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2800000,
+      "closing": 1600000,
       "eventIds": []
     },
     {
       "date": "2027-01-03",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2800000,
+      "closing": 1600000,
       "eventIds": []
     },
     {
       "date": "2027-01-04",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2800000,
+      "closing": 1600000,
       "eventIds": []
     },
     {
       "date": "2027-01-05",
       "inflow": 0,
       "outflow": 0,
-      "closing": 2800000,
+      "closing": 1600000,
       "eventIds": []
     },
     {
       "date": "2027-01-06",
-      "inflow": 0,
+      "inflow": 1200000,
       "outflow": 0,
       "closing": 2800000,
-      "eventIds": []
+      "eventIds": [
+        "evt-inv-INV-1203-0"
+      ]
     },
     {
       "date": "2027-01-07",
@@ -756,24 +756,24 @@
     },
     {
       "start": "2026-12-28",
-      "inflow": 1200000,
+      "inflow": 0,
       "outflow": 650000,
-      "closing": 2800000,
-      "minClosing": 2250000,
-      "pipelineClosing": 3124000,
+      "closing": 1600000,
+      "minClosing": 1600000,
+      "pipelineClosing": 1924000,
       "eventIds": [
-        "evt-inv-INV-1203-0",
         "evt-rec-rent-1"
       ]
     },
     {
       "start": "2027-01-04",
-      "inflow": 0,
+      "inflow": 1200000,
       "outflow": 1400000,
       "closing": 1400000,
       "minClosing": 1400000,
       "pipelineClosing": 800000,
       "eventIds": [
+        "evt-inv-INV-1203-0",
         "evt-rec-payroll-4"
       ]
     },
@@ -911,7 +911,22 @@
       "weeksFree": 1
     }
   ],
-  "warnings": [],
+  "warnings": [
+    "Unconfirmed: email message says INV-1187 moves to 2027-01-08; not in the forecast until approved."
+  ],
+  "review": {
+    "needed": true,
+    "reasons": [
+      {
+        "code": "unconfirmed_signal",
+        "message": "Unconfirmed: email message says INV-1187 moves to 2027-01-08; not in the forecast until approved.",
+        "refs": [
+          "sig-evergreen-jan",
+          "inv-INV-1187"
+        ]
+      }
+    ]
+  },
   "events": [
     {
       "id": "evt-po-PO-2291-0",
@@ -941,7 +956,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -976,7 +991,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "basis": "recurring monthly: Rent, anchored on 2026-12-01",
       "category": "rent",
       "sourceRef": {
         "system": "profile",
@@ -1028,7 +1043,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -1080,7 +1095,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring quarterly: Quarterly estimated taxes, from 2026-12-15",
+      "basis": "recurring quarterly: Quarterly estimated taxes, anchored on 2026-12-15",
       "category": "tax",
       "sourceRef": {
         "system": "profile",
@@ -1102,7 +1117,7 @@
       "category": "duties",
       "sourceRef": {
         "system": "generic_file",
-        "record": "po-2291.pdf"
+        "record": "broker-inv-2291.pdf"
       }
     },
     {
@@ -1116,7 +1131,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -1141,23 +1156,6 @@
       }
     },
     {
-      "id": "evt-inv-INV-1203-0",
-      "commitmentId": "inv-INV-1203",
-      "legIndex": 0,
-      "date": "2026-12-29",
-      "amount": 1200000,
-      "currency": "USD",
-      "amountBase": 1200000,
-      "direction": "in",
-      "status": "committed",
-      "confidence": 0.5333333333333333,
-      "basis": "due 2026-12-20 + 9 days (median 0 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
-      "sourceRef": {
-        "system": "zoho_books",
-        "record": "INV-1203"
-      }
-    },
-    {
       "id": "evt-rec-rent-1",
       "commitmentId": "rec-rent",
       "legIndex": 1,
@@ -1168,7 +1166,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "basis": "recurring monthly: Rent, anchored on 2026-12-01",
       "category": "rent",
       "sourceRef": {
         "system": "profile",
@@ -1193,6 +1191,23 @@
       }
     },
     {
+      "id": "evt-inv-INV-1203-0",
+      "commitmentId": "inv-INV-1203",
+      "legIndex": 0,
+      "date": "2027-01-06",
+      "amount": 1200000,
+      "currency": "USD",
+      "amountBase": 1200000,
+      "direction": "in",
+      "status": "committed",
+      "confidence": 0.5333333333333333,
+      "basis": "due 2026-12-28 + 9 days (median 0 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1203"
+      }
+    },
+    {
       "id": "evt-rec-payroll-4",
       "commitmentId": "rec-payroll",
       "legIndex": 4,
@@ -1203,7 +1218,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -1238,7 +1253,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
@@ -1273,7 +1288,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "basis": "recurring monthly: Rent, anchored on 2026-12-01",
       "category": "rent",
       "sourceRef": {
         "system": "profile",
@@ -1291,7 +1306,7 @@
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
-      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "basis": "recurring biweekly: Payroll, anchored on 2026-11-13",
       "category": "payroll",
       "sourceRef": {
         "system": "profile",
