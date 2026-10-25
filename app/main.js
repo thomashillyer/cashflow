@@ -58,7 +58,8 @@ async function load() {
 
 async function refresh() {
   const prevThree = new Set((app.brief?.three ?? []).map((i) => i.id + i.cashEffect));
-  [app.brief, app.review, app.notes] = await Promise.all([api.brief(), api.review(), api.notes()]);
+  // Context too, so names for commitments added by Review, notes or plans (live partyByCommitment) stay current.
+  [app.brief, app.review, app.notes, app.ctx] = await Promise.all([api.brief(), api.review(), api.notes(), api.context()]);
   app.ctx.safetyLine = app.brief.run.safetyLine;
   if (app.scenario === "stress") app.stressRun = await api.forecast("stress");
   if (prevThree.size) {
@@ -1133,8 +1134,9 @@ async function doAsk(q, via = "typed") {
   try {
     if (parking) {
       const n = await api.parkNote(q, via);
-      app.notes = await api.notes();
       turn.note = n.id;
+      // The note is saved; a failed list reload shouldn't make the owner park it twice.
+      app.notes = await api.notes().catch(() => app.notes);
       if (via === "voice") speak([`Got it. ${readingSentence(n)} It's in your notes, and nothing changes until you add it.`]);
     } else {
       turn.a = await api.ask(q);
