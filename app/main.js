@@ -381,7 +381,8 @@ function viewToday() {
   if (forecastEmpty()) return viewEmptyForecast();
   const b = app.brief;
   const s = summary();
-  const n = b.three.length;
+  const sales = forecastEmpty() ? [] : salesActions(3 - b.three.length);
+  const n = b.three.length + sales.length;
   const waitingRev = waitingCount();
   const waitingNotes = notesWaiting();
   const waiting = [waitingRev ? `${waitingRev} ${waitingRev === 1 ? "message" : "messages"}` : "", waitingNotes ? `${waitingNotes} ${waitingNotes === 1 ? "note" : "notes"}` : ""].filter(Boolean).join(" and ");
@@ -403,8 +404,8 @@ function viewToday() {
         <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
         ${n > 1 ? `<div class="deck-nav"><button class="deck-arrow" data-action="deck" data-dir="-1" aria-label="Previous">${arrow("left")}</button><button class="deck-arrow" data-action="deck" data-dir="1" aria-label="Next">${arrow("right")}</button></div>` : ""}
       </div>
-      ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}</ol>
-        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the flagged items below first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
+      ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}${sales.map((x, k) => salesCard(x, b.three.length + k, n)).join("")}</ol>
+        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${Array.from({ length: n }, (_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the flagged items below first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
       ${forecastChecksCompact()}
     </section>
@@ -440,6 +441,40 @@ function homeCard(i, k, n) {
     </div>
   </li>`;
 }
+// Sales moves for the days the cash list is short: open deals and quoted RFQs from the CRM (the forecast's
+// "possible" money, never in the main line). Cash actions always come first; these only fill empty slots.
+// Every figure is the forecast event's own amount and date; nothing is estimated here.
+function salesActions(limit) {
+  if (limit <= 0) return [];
+  const run = app.brief.run;
+  const byDeal = new Map();
+  for (const e of run.events ?? []) {
+    if (e.status !== "possible" || e.direction !== "in" || !e.commitmentId || e.date < run.asOf) continue;
+    if (!byDeal.has(e.commitmentId)) byDeal.set(e.commitmentId, e);
+  }
+  const partyName = (cid) => app.ctx.parties.find((p) => p.id === app.ctx.partyOf?.(cid))?.name;
+  return [...byDeal.values()]
+    .sort((a, b2) => a.date.localeCompare(b2.date) || b2.amountBase - a.amountBase)
+    .slice(0, limit)
+    .map((e) => {
+      const who = partyName(e.commitmentId);
+      const deal = (e.sourceRef?.record ?? "").replace(/\s*\(.*\)\s*$/, "") || "this deal";
+      return { id: `sales-${e.commitmentId}`, ref: e.commitmentId, who, deal, amount: e.amountBase, date: e.date, basis: e.basis };
+    });
+}
+function salesCard(s, k, n) {
+  return `
+  <li class="card sales" aria-label="Thing ${k + 1} of ${n}">
+    <p class="card-effect"><b>${money(s.amount)}</b><span>if it closes</span><em class="card-tag">Sales</em></p>
+    <h3 class="card-title">Follow up ${s.who ? `with ${esc(s.who)} ` : ""}on ${esc(s.deal)}</h3>
+    <p class="card-why">${esc(s.basis.charAt(0).toUpperCase() + s.basis.slice(1))}. Possible money: it stays off your main forecast until the deal is won.</p>
+    <div class="card-actions">
+      <span class="card-by">Expected <b>${shortDate(s.date)}</b></span>
+      <button class="src" data-action="record" data-id="${esc(s.ref)}" title="Open the deal">${esc(s.deal)}</button>
+    </div>
+  </li>`;
+}
+
 function arrow(dir) {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"}"/></svg>`;
 }
