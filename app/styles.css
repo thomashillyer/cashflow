@@ -609,7 +609,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .note.inline { padding: 0; border: 0; margin-top: 10px; }
 .note.inline blockquote, .note.inline .meta { display: none; }
 
-.home-hints { margin-top: 22px; }
 .dock { margin-top: 28px; }
 .dock.stick {
   position: sticky; bottom: 0; z-index: 10; margin-top: 32px;
@@ -618,7 +617,36 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 }
 .dock .askbar { margin-top: 0; padding: 8px 8px 8px 22px; }
 .dock .askbar input { font-size: 16.5px; padding: 10px 0; }
-.home-hints + .dock { margin-top: 14px; }
+
+/* Ask Neri: the main way in, so it reads as the brightest thing at the bottom of the page */
+.askbar.branded {
+  padding-left: 10px; gap: 10px;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 55%, var(--rule));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent), var(--shadow);
+  transition: border-color .15s, box-shadow .15s;
+}
+.askbar.branded:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent), var(--shadow);
+}
+.askbar.branded input { font-weight: 500; }
+.askbar.branded input::placeholder { color: var(--ink-soft); font-weight: 450; }
+.ask-mark { display: grid; place-items: center; flex-shrink: 0; }
+.ask-mark .mark { width: 34px; height: 34px; border-radius: 50%; box-shadow: 0 0 0 1px var(--rule); }
+
+/* Suggested questions sit in one row right on top of the bar; the row scrolls sideways when it runs long */
+.dock-hints {
+  display: flex; gap: 8px; margin: 0 0 10px; padding: 2px 2px 2px 6px; overflow-x: auto; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+          mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+.dock-hints::-webkit-scrollbar { display: none; }
+.dock-hints .hint {
+  flex-shrink: 0; white-space: nowrap; font-size: 13.5px; padding: 6px 13px; color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--rule));
+}
+.dock-hints .hint:hover { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 40%, var(--rule)); }
 
 /* ---------- Details: the dashboard ---------- */
 .kpis {
@@ -646,8 +674,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     background: var(--bg); border-top: 1px solid var(--rule);
   }
   .dock .askbar { box-shadow: none; padding: 4px 4px 4px 16px; }
+  .dock .askbar.branded { padding-left: 6px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent); }
+  .ask-mark .mark { width: 30px; height: 30px; }
+  .dock-hints { margin-bottom: 8px; }
+  .dock-hints .hint { font-size: 13px; padding: 5px 11px; }
+  .home:has(.dock-hints) { padding-bottom: 116px; }
   .dock .askbar input { font-size: 16px; padding: 8px 0; }
-  .home-hints { margin-top: 24px; }
   .wide-only { display: none; }
   .kpis { grid-template-columns: 1fr 1fr; }
 }
