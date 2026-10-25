@@ -230,7 +230,7 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
 
   const cash = openingCash(records, profile, asOf, fx, warnings);
   const opening = cash.opening;
-  const expanded = expand(records, profile, asOf, end, fx);
+  const expanded = expand(records, profile, asOf, end, fx, cash.counted);
   warnings.push(...expanded.warnings);
 
   // Fixed costs behind a "weeks of fixed costs" safety line: recurring outflows inside the horizon.

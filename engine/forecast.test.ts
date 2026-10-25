@@ -1223,21 +1223,84 @@ describe("settlement / bank-line identity: a payment counts once (#96)", () => {
     expect(m.pairs).toEqual([]);
   });
 
-  it("mismatched amounts are not merged; the unseen settlement stays expected and names the bank line", () => {
+  it("an unmatched settlement and bank line (different amount or date) are one payment; the books' figure counts", () => {
     const r = { ...empty(), balances: [bal($(100))], commitments: [inv()], settlements: [settle("set-1", "2026-10-26", $(25))], events: [bank("bank-1", "2026-10-26", $(20))] };
     const run = forecast(r, profile, base, asOf, {});
-    expect(expected(run)).toEqual([$(30)]);
-    expect(run.warnings.join(" ")).toMatch(/payment of \$25\.00 recorded on 2026-10-26 but not seen in the bank \(bank line bank-1 has a different amount or date\)/);
+    expect(expected(run)).toEqual([$(25)]);
+    expect(run.warnings.join(" ")).toMatch(/settlement set-1 and bank line bank-1 differ \(amount\/date\); treated as one payment, counting the books' \$25\.00 \(needs reconciliation\)/);
+    expect(run.warnings.join(" ")).not.toMatch(/double count|not seen in the bank/);
   });
 
-  it("mismatched amounts that together exceed what is owed warn of a possible double count", () => {
-    const pre = forecast({ ...empty(), balances: [bal($(100))], commitments: [inv()], settlements: [settle("set-1", "2026-10-24", $(25))], events: [bank("bank-1", "2026-10-26", $(30))] }, profile, base, asOf, {});
-    expect(expected(pre)).toEqual([]);
-    expect(pre.warnings.join(" ")).toMatch(/payments recorded \(\$55\.00\) exceed the amount \(\$50\.00\).*possible double count/);
-    // With outstanding set, the books reflect the $25 settlement; the $20 bank line is beyond it.
-    const out = forecast({ ...empty(), balances: [bal($(100))], commitments: [inv({ outstanding: $(25) })], settlements: [settle("set-1", "2026-10-24", $(25))], events: [bank("bank-1", "2026-10-26", $(20))] }, profile, base, asOf, {});
-    expect(expected(out)).toEqual([$(5)]);
-    expect(out.warnings.join(" ")).toMatch(/\$20\.00 paid per bank line bank-1 is beyond what outstanding reflects.*possible double count/);
+  it("review A: outstanding set, settlement 10-16 and bank line 10-21 of $1,000 are one payment, $1,000 still expected", () => {
+    const r = empty();
+    r.balances = [bal($(5000), "2026-10-14")];
+    r.commitments = [com("inv", { type: "bill", amount: $(2000), outstanding: $(1000), anchors: { due: "2026-11-05" } })];
+    r.settlements = [settle("set-a", "2026-10-16", $(1000))];
+    r.events = [bank("bank-a", "2026-10-21", $(1000), { direction: "out" })];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(1000)]);
+    expect(closing(run, "2026-11-06")).toBe($(3000));
+    expect(run.warnings.join(" ")).toMatch(/settlement set-a and bank line bank-a differ/);
+  });
+
+  it("review B: outstanding unset, settlement $1,000 and bank line $985 count as the books' $1,000", () => {
+    const r = empty();
+    r.balances = [bal($(5000))];
+    r.commitments = [com("inv", { type: "invoice", amount: $(2000), anchors: { due: "2026-11-05" } })];
+    r.settlements = [settle("set-b", "2026-10-26", $(1000))];
+    r.events = [bank("bank-b", "2026-10-26", $(985))];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(1000)]);
+  });
+
+  it("review C: only actuals the run counts reduce what is expected (two accounts, ambiguous window)", () => {
+    const snap = (account: string, amount: number, d: string) => ({ id: `bal-${account}`, account, amount, currency: "USD", asOf: d, sourceRef: src });
+    const mk = (e: CashEvent, c: Commitment) => forecast({ ...empty(), balances: [snap("chk", $(1000), "2026-10-20"), snap("sav", $(1000), "2026-10-24")], commitments: [c], events: [e] }, profile, base, asOf, {});
+    // An untagged bill payment between the two snapshot dates is counted in opening cash (conservative), so it pays the bill once.
+    const bill = com("inv", { type: "bill", amount: $(300), anchors: { due: "2026-11-05" } });
+    const paidOut = mk(bank("bank-c", "2026-10-22", $(300), { direction: "out" }), bill);
+    expect(paidOut.openingBalance).toBe($(1700));
+    expect(expected(paidOut)).toEqual([]);
+    // An untagged receipt in the same window is left out of opening cash, so the invoice stays expected.
+    const invoice = com("inv", { type: "invoice", amount: $(300), anchors: { due: "2026-11-05" } });
+    const leftOut = mk(bank("bank-c", "2026-10-22", $(300)), invoice);
+    expect(leftOut.openingBalance).toBe($(2000));
+    expect(expected(leftOut)).toEqual([$(300)]);
+  });
+
+  it("a payment from an account with no snapshot does not cancel the bill", () => {
+    const r = { ...empty(), balances: [bal($(1000))], commitments: [com("inv", { type: "bill", amount: $(300), anchors: { due: "2026-11-05" } })], events: [bank("card-1", "2026-10-26", $(300), { direction: "out", account: "card" })] };
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(300)]);
+    expect(closing(run, "2026-11-06")).toBe($(700));
+  });
+
+  it("an actual on the (exclusive) horizon end is not a payment toward the commitment", () => {
+    const c = inv();
+    const at = matchPayments(c, { ...empty(), events: [bank("a1", "2027-01-25", $(20))] }, "2027-01-25", []);
+    const before = matchPayments(c, { ...empty(), events: [bank("a1", "2027-01-24", $(20))] }, "2027-01-25", []);
+    expect(at.actuals).toEqual([]);
+    expect(before.actuals.map((e) => e.id)).toEqual(["a1"]);
+  });
+
+  it("payments beyond the amount warn of a possible double count and name a same-party invoice the excess matches", () => {
+    const r = empty();
+    r.balances = [bal($(1000))];
+    r.commitments = [
+      com("inv", { type: "invoice", partyId: "p1", reference: "INV-1", amount: $(100), anchors: { due: "2026-11-05" } }),
+      com("inv2", { type: "invoice", partyId: "p1", reference: "INV-2", amount: $(50), anchors: { due: "2026-11-05" } }),
+    ];
+    r.events = [bank("bank-1", "2026-10-26", $(150))];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([]);
+    expect(expected(run, "inv2")).toEqual([$(50)]);
+    expect(run.warnings.join(" ")).toMatch(/INV-1: payments recorded \(\$150\.00\) exceed the amount \(\$100\.00\); the extra \$50\.00 matches INV-2 of the same party, which bank line bank-1 may also pay; possible double count/);
+  });
+
+  it("with outstanding set, bank-only money beyond what the books reflect reduces further", () => {
+    const run = forecast({ ...empty(), balances: [bal($(100))], commitments: [inv({ outstanding: $(25) })], events: [bank("bank-1", "2026-10-26", $(45))] }, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(5)]);
+    expect(run.warnings.join(" ")).toMatch(/\$20\.00 paid per bank line bank-1 is beyond what outstanding reflects/);
   });
 
   it("bank lines in the other direction or another currency do not count as payments", () => {
