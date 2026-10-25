@@ -291,10 +291,9 @@ function viewToday() {
     </section>
 
     <section class="convo" aria-label="Conversation with Neri">${app.askLog.map(turnHtml).join("")}</section>
-    ${app.askLog.length ? "" : `<div class="ask-hints home-hints">${askHints().map((h) => `<button class="hint" data-action="hint" data-q="${esc(h)}">${esc(h)}</button>`).join("")}</div>`}
-
-    <div class="dock ${app.askLog.length ? "stick" : ""}">
-      ${askBar("Ask Neri, or park a thought")}
+    <div class="dock stick">
+      ${app.askLog.length ? "" : `<div class="dock-hints" role="group" aria-label="Try asking">${askHints().map((h) => `<button class="hint" data-action="hint" data-q="${esc(h)}">${esc(h)}</button>`).join("")}</div>`}
+      ${askBar("Ask Neri, or park a thought", [], true)}
     </div>
   </div>`;
 }
@@ -412,9 +411,10 @@ function spokenLength() {
   return Math.max(10, Math.round(words / 2.6));
 }
 
-function askBar(placeholder, hints = []) {
+function askBar(placeholder, hints = [], branded = false) {
   return `
-  <form class="askbar" data-submit="ask">
+  <form class="askbar ${branded ? "branded" : ""}" data-submit="ask">
+    ${branded ? `<span class="ask-mark" aria-hidden="true">${logo}</span>` : ""}
     <label class="sr" for="askq">Ask Neri</label>
     <input id="askq" name="q" placeholder="${esc(placeholder)}" autocomplete="off" />
     ${canListen ? `<button type="button" class="mic" data-action="mic-ask" aria-pressed="${app.stopListen ? "true" : "false"}" title="Speak">${icon.mic}<span class="sr">Speak</span></button>` : ""}
