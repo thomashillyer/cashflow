@@ -824,7 +824,7 @@ body.portal::before { background: transparent; }
   padding: 18px 8px 14px; border-radius: 18px; border: 1px solid var(--rule); background: var(--surface);
   text-align: center; transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
 }
-.app-tile:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+.app-tile:not(:disabled):hover { transform: translateY(-1px); box-shadow: var(--shadow); }
 .app-tile .logo { width: 48px; height: 48px; border-radius: 13px; font-size: 15px; font-weight: 700; color: #fff; display: grid; place-items: center; }
 .app-name { font-size: 13px; font-weight: 600; line-height: 1.25; color: var(--ink); min-height: 2.5em; display: grid; align-items: start; }
 .tick {
@@ -974,3 +974,13 @@ a { text-underline-offset: 0.18em; }
 .source-paste textarea::placeholder, .bank-balance input::placeholder { color: var(--ink-faint); }
 
 .bank-balance select { display: block; width: 100%; max-width: 360px; margin-bottom: 14px; border: 1px solid var(--rule); border-radius: var(--radius-sm); background: var(--surface); padding: 12px; }
+
+/* Keep unavailable providers visible without suggesting they can connect. */
+.conn.is-unavailable { background: var(--sunken); border-style: dashed; }
+.conn.is-unavailable > .logo, .app-tile.is-unavailable > .logo { filter: grayscale(1); }
+.conn.is-unavailable > b, .app-tile.is-unavailable .app-name { color: var(--ink-faint); }
+.conn > .state { grid-column: 2 / -1; grid-row: 3; margin-top: 6px; }
+.conn > .btn { grid-column: 2 / -1; justify-self: start; margin-top: 8px; }
+.conn .conn-fallback { grid-column: 2 / -1; margin: 4px 0 0; font-size: 12px; color: var(--ink-faint); }
+.app-tile:disabled { cursor: not-allowed; background: var(--bg); border-style: dashed; opacity: 1; }
+.conn .btn:disabled { cursor: not-allowed; }

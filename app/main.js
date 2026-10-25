@@ -784,10 +784,14 @@ function viewSources() {
         const hasRecords = source?.state === "ok";
         const needsAttention = connection?.state === "error" || source?.state === "error";
         const syncing = app.syncing === connection?.id;
-        return `<div class="conn">${logoTile(c)}<b>${esc(c.name)}</b>
-          <div class="state ${hasRecords ? "on" : ""}">${needsAttention ? `<span class="conn-status"><i class="dot bad"></i>Needs attention</span>` : hasRecords ? `<span class="conn-status"><i class="dot"></i>Records imported</span>` : `<span>${source ? "Waiting for data" : "No data yet"}</span>`}</div>
+        const canSync = connection?.available === true;
+        const canImport = c.import === "file";
+        const unavailable = !canSync && !canImport;
+        const availability = c.availability === "live" ? "Sync not configured" : c.availability === "next" ? "Coming next" : "Planned";
+        return `<div class="conn ${unavailable ? "is-unavailable" : ""}" data-connector="${esc(c.id)}">${logoTile(c)}<b>${esc(c.name)}</b>
+          <div class="state ${hasRecords ? "on" : ""}">${needsAttention ? `<span class="conn-status"><i class="dot bad"></i>Needs attention</span>` : hasRecords ? `<span class="conn-status"><i class="dot"></i>Records imported</span>` : `<span>${source ? "Waiting for data" : unavailable ? availability : "No data yet"}</span>`}</div>
           <p class="reads">${esc(connection?.state === "error" ? connection.message : source?.detail || connection?.message || c.reads)}</p>
-          ${connection?.available === true ? `<button class="btn" data-action="connection-sync" data-id="${esc(connection.id)}" ${app.syncing ? "disabled" : ""}>${syncing ? "Syncing…" : "Sync now"}</button>` : `<button class="btn" data-action="connect" data-id="${esc(c.id)}">Import options</button>`}
+          ${canSync ? `<button class="btn" data-action="connection-sync" data-id="${esc(connection.id)}" ${app.syncing ? "disabled" : ""}>${syncing ? "Syncing…" : "Sync now"}</button>` : canImport ? `<button class="btn" data-action="connect" data-id="${esc(c.id)}">Upload an export</button>` : `<button class="btn" disabled>${c.availability === "live" ? "Sync unavailable" : "Not available yet"}</button><p class="conn-fallback">Upload an export or paste text above.</p>`}
         </div>`;
       }).join("")}
     </div></section>`;
@@ -1019,17 +1023,18 @@ function viewSetup() {
     tz = new Intl.DateTimeFormat("en-US", { timeZoneName: "longGeneric" }).formatToParts(new Date()).find((x) => x.type === "timeZoneName")?.value ?? "";
   } catch {}
   const tile = (c) => {
-    const on = st.picked.has(c.id);
+    const available = c.availability === "live";
+    const on = available && st.picked.has(c.id);
     const state = st.connecting && on ? "waiting" : "";
-    return `<button class="app-tile ${on ? "on" : ""}" data-action="pick" data-id="${esc(c.id)}" aria-pressed="${on}" title="${esc(c.reads)}">
+    return `<button class="app-tile ${on ? "on" : ""} ${available ? "" : "is-unavailable"}" data-action="pick" data-id="${esc(c.id)}" aria-pressed="${on}" ${available ? "" : "disabled"} title="${esc(c.reads)}">
       ${logoTile(c)}<span class="app-name">${esc(c.name)}</span>
-      <span class="tick" aria-hidden="true">${state ? `<i class="d ${state === "ok" ? "" : "amber"}"></i>` : icon.check}</span>
+      ${available ? `<span class="tick" aria-hidden="true">${state ? `<i class="d amber"></i>` : icon.check}</span>` : `<span class="soon">${c.availability === "next" ? "Coming next" : "Planned"}</span>`}
     </button>`;
   };
   return `
   <div class="setup">
     <h1 class="portal-title">Set up ${esc(name)}</h1>
-    <p class="portal-sub">Choose the tools you use. After setup, upload their exports or sync a source available on your server.</p>
+    <p class="portal-sub">Choose the available tools you use. Greyed-out connectors are still being built; you can upload their exports on Sources.</p>
     <div class="kind-row" role="radiogroup" aria-label="Type of business">
       ${KINDS.map((k) => `<button class="kind-pill" role="radio" aria-checked="${st.kind === k.id}" data-action="kind" data-k="${k.id}">${k.label}</button>`).join("")}
     </div>
@@ -1507,6 +1512,7 @@ async function onClick(ev) {
     return render();
   }
   if (a === "pick") {
+    if (!CONNECTORS.some((c) => c.id === id && c.availability === "live")) return;
     const p = app.setup.picked;
     p.has(id) ? p.delete(id) : p.add(id);
     el.classList.toggle("on", p.has(id));
@@ -1520,7 +1526,7 @@ async function onClick(ev) {
     render();
     const dollars = Number(String(st.reserve).replace(/[^\d.]/g, ""));
     try {
-      await api.completeSetup({ email: app.signup.email, businessName: app.signup.name, kind: st.kind, reserve: dollars ? Math.round(dollars * 100) : null, connect: [...st.picked] });
+      await api.completeSetup({ email: app.signup.email, businessName: app.signup.name, kind: st.kind, reserve: dollars ? Math.round(dollars * 100) : null, connect: [...st.picked].filter((id) => CONNECTORS.some((c) => c.id === id && c.availability === "live")) });
     } catch (e) {
       st.connecting = false;
       render();

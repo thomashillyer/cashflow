@@ -2,7 +2,7 @@
 // has a no-setup fallback: export a file, upload it, or paste text.
 //
 // availability:
-//   "live"    — an adapter or file format exists; hosted sync requires server-reported capability
+//   "live"    — a hosted connector or file import exists; sync requires server-reported capability
 //   "next"    — next to build (locked in the Neri roadmap)
 //   "planned" — on the list; file import works now
 // reads: what Neri takes from it, in the owner's words. Always read-only.
@@ -31,7 +31,7 @@ export const CONNECTORS = [
 
   // Bank and cards
   { id: "bank_feed", name: "Bank feeds", category: "bank", availability: "next", reads: "Balances and transactions from most US banks" },
-  { id: "bank_csv", name: "Bank statement", category: "bank", availability: "live", reads: "Upload a CSV or PDF statement" },
+  { id: "bank_csv", import: "file", name: "Bank statement", category: "bank", availability: "live", reads: "Upload a CSV or PDF statement" },
   { id: "mercury", name: "Mercury", category: "bank", availability: "planned", reads: "Balances, transactions" },
   { id: "amex", name: "American Express", mark: "AX", category: "bank", availability: "planned", reads: "Card balance and statement date" },
 
@@ -44,7 +44,7 @@ export const CONNECTORS = [
   { id: "katana", name: "Katana", category: "erp", availability: "planned", reads: "Manufacturing and purchase orders" },
 
   // CRM and sales
-  { id: "zoho_crm", name: "Zoho CRM", category: "crm", availability: "live", reads: "Deals, RFQs, quotes, shipments, samples" },
+  { id: "zoho_crm", name: "Zoho CRM", category: "crm", availability: "next", reads: "Deals, RFQs, quotes, shipments, samples" },
   { id: "salesforce", name: "Salesforce", category: "crm", availability: "planned", reads: "Opportunities, stages, close dates" },
   { id: "hubspot", name: "HubSpot", category: "crm", availability: "planned", reads: "Deals, stages, close dates" },
   { id: "pipedrive", name: "Pipedrive", category: "crm", availability: "planned", reads: "Deals, stages, expected close" },
@@ -54,7 +54,7 @@ export const CONNECTORS = [
   { id: "square", name: "Square", category: "commerce", availability: "planned", reads: "Daily sales and payout timing" },
   { id: "shopify", name: "Shopify", category: "commerce", availability: "planned", reads: "Orders, payouts" },
   { id: "toast", name: "Toast", category: "commerce", availability: "planned", reads: "Daily sales, tips, payouts" },
-  { id: "pos_csv", name: "Sales export", category: "commerce", availability: "live", reads: "Upload daily sales from any POS" },
+  { id: "pos_csv", import: "file", name: "Sales export", category: "commerce", availability: "live", reads: "Upload daily sales from any POS" },
   { id: "paypal", name: "PayPal", category: "commerce", availability: "planned", reads: "Payments received, balance" },
 
   // Payroll
@@ -69,18 +69,18 @@ export const CONNECTORS = [
 
   // Comms
   { id: "m365", name: "Outlook email", mark: "MS", category: "comms", availability: "live", reads: "Email messages and attachments" },
-  { id: "whatsapp", name: "WhatsApp Business", mark: "WA", category: "comms", availability: "live", reads: "Customer and supplier messages" },
-  { id: "google", name: "Gmail and Google Calendar", mark: "G", category: "comms", availability: "next", reads: "Mail and calendar" },
+  { id: "whatsapp", name: "WhatsApp Business", mark: "WA", category: "comms", availability: "planned", reads: "Customer and supplier messages" },
+  { id: "google", name: "Gmail", mark: "G", category: "comms", availability: "live", reads: "Email messages and attachments" },
   { id: "slack", name: "Slack", category: "comms", availability: "planned", reads: "Channel and DM messages you choose" },
 
   // Documents
-  { id: "sharepoint", name: "OneDrive and SharePoint", mark: "OD", category: "docs", availability: "live", reads: "Quotes, POs, contracts" },
+  { id: "sharepoint", name: "OneDrive and SharePoint", mark: "OD", category: "docs", availability: "planned", reads: "Quotes, POs, contracts" },
   { id: "gdrive", name: "Google Drive", category: "docs", availability: "next", reads: "Quotes, POs, contracts" },
   { id: "dropbox", name: "Dropbox", category: "docs", availability: "planned", reads: "Quotes, POs, contracts" },
 
   // Logistics
   { id: "flexport", name: "Flexport", category: "logistics", availability: "planned", reads: "Ship and arrival dates" },
-  { id: "shipment_csv", name: "Shipment tracker export", category: "logistics", availability: "live", reads: "Upload ETAs from any forwarder" },
+  { id: "shipment_csv", import: "file", name: "Shipment tracker export", category: "logistics", availability: "live", reads: "Upload ETAs from any forwarder" },
 ];
 
 export const AVAILABILITY_LABEL = {
