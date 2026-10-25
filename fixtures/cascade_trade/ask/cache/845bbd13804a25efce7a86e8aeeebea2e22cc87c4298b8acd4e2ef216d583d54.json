@@ -1,0 +1,13 @@
+{
+  "key": "845bbd13804a25efce7a86e8aeeebea2e22cc87c4298b8acd4e2ef216d583d54",
+  "promptVersion": "cfo_voice@1",
+  "model": "claude-opus-5-5",
+  "source": "live",
+  "output": {
+    "headline": "Act now: chase Evergreen Home to pay INV-1187 by Dec 10, which lifts your lowest point by $26,000.",
+    "why": "If Evergreen Home pays INV-1187 on Jan 5, 2027 instead of Dec 26, your cash drops to -$12,000 on Jan 1, 2027. You are already at -$5,500 on Dec 25, $40,500 under your $35,000 safety line. Getting paid by Dec 10 lifts your lowest point by $26,000, to $14,000 on Jan 8, 2027. If Evergreen Home will not pay early, chase Harbor and Hearth to pay INV-1203 by Dec 28, which lifts it by $6,500 on its own.",
+    "nextStep": "Chase Evergreen Home now to pay INV-1187 by Dec 10.",
+    "convictionNote": "Medium confidence: this is based on 8 payments from Evergreen Home, and I assumed Jan 5, 2027 for 'in early January'.",
+    "whatWouldChange": "The timing of the $28,000 payment from Evergreen Home on INV-1187, now expected Jan 5, 2027, is the least certain part of this forecast."
+  }
+}

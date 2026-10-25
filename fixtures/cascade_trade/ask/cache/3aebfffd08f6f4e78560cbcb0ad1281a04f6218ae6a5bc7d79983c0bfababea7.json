@@ -1,0 +1,13 @@
+{
+  "key": "3aebfffd08f6f4e78560cbcb0ad1281a04f6218ae6a5bc7d79983c0bfababea7",
+  "promptVersion": "cfo_voice@1",
+  "model": "claude-opus-5-5",
+  "source": "live",
+  "output": {
+    "headline": "Act now: chase Evergreen Home to pay INV-1187 by Dec 10, which lifts your lowest point by $19,500.",
+    "why": "If this happens, your cash drops to -$5,500 on Dec 25, $40,500 under your $35,000 safety line. Getting INV-1187 paid early lifts your lowest point by $19,500, to $14,000 on Jan 8, 2027, still under the safety line but out of the red. If Evergreen Home refuses, ask Cascade Customs Brokerage for 10 more days on DUTIES-2291, which lifts it by $9,000 on its own.",
+    "nextStep": "Chase Evergreen Home to pay INV-1187 by Dec 10, and no later than Dec 12.",
+    "convictionNote": "Medium confidence: Evergreen Home has 8 payments on record, and the start date is assumed as Mar 1, 2027 for \"from March\".",
+    "whatWouldChange": "Evergreen Home's $28,000 payment on INV-1187 is the least certain piece. It is expected Dec 26, and if it does not come in early, the low point stays at -$5,500."
+  }
+}

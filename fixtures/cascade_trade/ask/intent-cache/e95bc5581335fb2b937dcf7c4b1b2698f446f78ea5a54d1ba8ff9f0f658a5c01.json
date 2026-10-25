@@ -2,7 +2,7 @@
   "key": "e95bc5581335fb2b937dcf7c4b1b2698f446f78ea5a54d1ba8ff9f0f658a5c01",
   "promptVersion": "read_intent@1",
   "model": "claude-opus-5-5",
-  "source": "stand-in",
+  "source": "live",
   "output": {
     "kind": "status",
     "partyPhrase": null,

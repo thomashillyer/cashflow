@@ -2,7 +2,7 @@
   "key": "d88158fc3f251b1dbe8f4f73cd318b7619b6883a44fb169c5ad49816dc5571e4",
   "promptVersion": "read_intent@1",
   "model": "claude-opus-5-5",
-  "source": "stand-in",
+  "source": "live",
   "output": {
     "kind": "afford",
     "partyPhrase": "Shenzhen",
