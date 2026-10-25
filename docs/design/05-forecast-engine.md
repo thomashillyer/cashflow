@@ -94,7 +94,7 @@ From the profile: a fixed amount, or N weeks of average fixed costs (recurring o
 ## Deals
 
 - `likely` (won, not yet invoiced): in the main line in full, including linked supplier costs.
-- `possible` (quoted RFQ): never in the main line; contributes `probability × amount` to `pipelineClosing` only.
+- `possible` (quoted RFQ): never in the main line; contributes `probability × amount` to the separate daily `days[].pipeline` and weekly `pipelineClosing` balances, including linked supplier costs in their direction.
 
 ## Currency
 
