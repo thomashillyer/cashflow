@@ -74,7 +74,7 @@ Layer 1 captures source Evidence and extracts/maps it into structured intake can
 
 ## How we score against the rubric
 
-Four equally weighted criteria, each scored 1 to 8 (https://hack.claudeseattle.org/).
+Five equally weighted criteria, each scored 1 to 8 with no middle; the score is the mean (https://hack.claudeseattle.org/). The rules each criterion implies for our work are in `CLAUDE.md` (North star).
 
 | Criterion | What 7–8 means | Design choice that earns it |
 |---|---|---|
@@ -82,3 +82,4 @@ Four equally weighted criteria, each scored 1 to 8 (https://hack.claudeseattle.o
 | Ease for a small business | Plug-and-play; clear README; no code | A new business picks a starter profile and uploads an accounting export. Every live connector has a file or forward fallback. README in three steps. |
 | Impact on operations | Changes how a core part of the business runs | "Three things to do today" turns cash management into a daily habit, with the email already drafted. |
 | Creativity | Something judges hadn't thought of | Signals from outside the books move the forecast, with the message cited. Deals become probability-weighted cash before they're signed. One engine, swapped profiles. |
+| Teamwork | Every member had a distinct, visible role; the team shows how they worked together | Five lanes with named owners, shared contracts in `schema/`, issue-per-task and review-before-push PRs, and `docs/TEAM.md` for non-code roles (pitch, research, design). The demo shows how we worked together. |
