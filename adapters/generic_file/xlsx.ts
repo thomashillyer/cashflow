@@ -3,6 +3,7 @@
 // Sheets over the row/column limit are still returned; ai/extract/sheet.ts reports the limit problem.
 
 import ExcelJS from "exceljs";
+import { assertZipBudget } from "../core/zip";
 import { SHEET_MAX_COLUMNS, SHEET_MAX_ROWS, type SheetCell, type SheetContent } from "../../ai/extract/sheet";
 
 function cellValue(v: ExcelJS.CellValue): SheetCell {
@@ -33,6 +34,7 @@ function trim(rows: SheetCell[][]): SheetCell[][] {
 }
 
 export async function readXlsx(bytes: Uint8Array, evidenceId: string): Promise<SheetContent[]> {
+  await assertZipBudget(bytes);   // an XLSX is a zip: never let exceljs inflate more than the budget
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(bytes as unknown as ArrayBuffer);
   const out: SheetContent[] = [];

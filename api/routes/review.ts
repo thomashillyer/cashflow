@@ -94,7 +94,7 @@ function validOwnerEdits(body: unknown, target: Commitment): CommitmentFieldChan
   });
 }
 
-type Prepared = { input: IntakeInput; prepared?: Extract<PreparedImport, { ok: true; repeat: false }> } | { repeat: PreparedImport & { repeat: true } };
+type Prepared = { input: IntakeInput; prepared?: Extract<PreparedImport, { ok: true; repeat: false }> } | { repeat: Extract<PreparedImport, { repeat: true }> };
 
 // Request body -> IntakeInput. Spreadsheets and WhatsApp exports are read by the adapters lane
 // (adapters/prepare.ts); the rest is passed through as before.
@@ -122,8 +122,9 @@ async function toInput(adapter: string, body: Record<string, unknown>, now: stri
   });
   const fromFile = async (k: "sheet" | "whatsapp", name: string, data: Uint8Array): Promise<Prepared> => {
     const opts = sheetOptions();
+    const retry = ["columnMapping", "headerRow", "dayFirst", "currency"].some((f) => body[f] !== undefined);
     const p = await prepareFileImport({
-      kind: k, fileName: name, bytes: data, receivedAt: now, records, business,
+      kind: k, fileName: name, bytes: data, receivedAt: now, records, business, retry,
       ...(opts.currency ? { currency: opts.currency } : {}), ...(opts.dayFirst !== undefined ? { dayFirst: opts.dayFirst } : {}),
       ...(opts.columnMapping ? { columnMapping: opts.columnMapping } : {}), ...(opts.headerRow ? { headerRow: opts.headerRow } : {}),
     });
@@ -139,7 +140,7 @@ async function toInput(adapter: string, body: Record<string, unknown>, now: stri
       return fromFile("sheet", fileName ?? "pasted.csv", data);
     }
     case "whatsapp":
-      if (typeof body.base64 === "string" || /\.(zip|txt)$/i.test(fileName ?? "")) return fromFile("whatsapp", fileName ?? "chat.txt", bytes());
+      if (typeof body.base64 === "string" || (text === undefined && /\.(zip|txt)$/i.test(fileName ?? ""))) return fromFile("whatsapp", fileName ?? "chat.txt", bytes());
       return { input: { kind: "whatsapp", raw: raw() } };
     case "paste": {
       const t = raw();
@@ -169,7 +170,7 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       // Same bytes as a file already imported: nothing to ingest, so nothing can change.
       return {
         evidence: [], candidates: [], proposals: [], signals: [], notes: [], storeRevision, repeat: true,
-        diagnostics: prep.repeat.diagnostics, preview: { candidates: 0, proposals: {}, signals: 0 },
+        repeatOf: prep.repeat.evidenceId, diagnostics: prep.repeat.diagnostics, preview: { candidates: 0, proposals: {}, signals: 0 },
       };
     }
     const input = prep.input;
@@ -183,7 +184,10 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const proposals = result.proposals.filter((p) => existing.get(p.id)?.state !== "confirmed" && existing.get(p.id)?.state !== "dismissed");
     const known = new Set(records.signals.map((s) => s.id));
     const signals = result.signals.filter((s) => !known.has(s.id));
-    await deps.store.saveIntake(b.id, { evidence: result.evidence, candidates: result.candidates, proposals, signals });
+    // Evidence last: it carries the file hash that makes a later upload a repeat, so a failure partway
+    // through must leave the file importable again.
+    await deps.store.saveIntake(b.id, { evidence: [], candidates: result.candidates, proposals, signals });
+    await deps.store.saveIntake(b.id, { evidence: result.evidence, candidates: [], proposals: [], signals: [] });
     if (result.notes.length) {
       const acc = b.profile.account ?? {};
       const seen = new Set((acc.intakeNotes ?? []).map((n) => `${n.scope}\u0000${n.text}`));

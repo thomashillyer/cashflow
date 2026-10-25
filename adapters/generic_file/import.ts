@@ -12,6 +12,7 @@ import {
 import { summarize, type ImportDiagnostics, type RowError, type RowErrorCode } from "../core/diagnostics";
 import { sha256Hex } from "../core/hash";
 import { fileEvidenceId } from "../core/ids";
+import { ZipTooLarge } from "../core/zip";
 import { readCsv } from "./csv";
 import { readXlsx } from "./xlsx";
 
@@ -87,10 +88,13 @@ export async function importFile(input: FileInput, opts: ImportOptions): Promise
   let sheets: SheetContent[];
   try {
     sheets = ext === "csv" ? [readCsv(input.bytes, id, input.fileName)] : await readXlsx(input.bytes, id);
-  } catch {
+  } catch (err) {
     const u = unsupported(input, hash, now);
+    const tooBig = err instanceof ZipTooLarge;
     return { ...u, evidence: { ...u.evidence, format: ext, extraction: "unreadable" },
-      diagnostics: { ...u.diagnostics, errors: [{ ...u.diagnostics.errors[0]!, message: `"${input.fileName}" could not be opened; it may be damaged or password protected.` }] } };
+      diagnostics: { ...u.diagnostics, errors: [{ ...u.diagnostics.errors[0]!,
+        message: tooBig ? `"${input.fileName}" is too large to read.` : `"${input.fileName}" could not be opened; it may be damaged or password protected.`,
+        nextStep: tooBig ? "Export a shorter date range, or split the workbook, and upload it again." : u.diagnostics.errors[0]!.nextStep }] } };
   }
 
   const evidence: Evidence = {

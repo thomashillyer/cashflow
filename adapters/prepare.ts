@@ -21,17 +21,23 @@ export type PrepareOptions = {
   dayFirst?: boolean;
   columnMapping?: ColumnMapping;
   headerRow?: number;
+  retry?: boolean;       // the owner supplied corrections: never answer "already imported"
 };
+
+// Only evidence that was actually read can make a later identical upload a repeat. A file that came
+// back unreadable or unsupported, or an owner correcting how it was read, is always worth trying again.
+const readable = (e: Evidence) => e.extraction === "ok" || e.extraction === "partial";
 
 export type PreparedImport =
   | { ok: true; repeat: false; input: IntakeInput; diagnostics: ImportDiagnostics; fileEvidence?: Evidence }
-  | { ok: true; repeat: true; diagnostics: ImportDiagnostics }
+  | { ok: true; repeat: true; diagnostics: ImportDiagnostics; evidenceId: string }
   | { ok: false; message: string; nextStep: string; diagnostics: ImportDiagnostics };
 
 export async function prepareFileImport(o: PrepareOptions): Promise<PreparedImport> {
+  const known = o.retry ? [] : o.records.evidence.filter(readable);
   if (o.kind === "whatsapp") {
-    const r = await importWhatsAppExport({ fileName: o.fileName, bytes: o.bytes, receivedAt: o.receivedAt, existingEvidence: o.records.evidence });
-    if (r.repeat) return { ok: true, repeat: true, diagnostics: r.diagnostics };
+    const r = await importWhatsAppExport({ fileName: o.fileName, bytes: o.bytes, receivedAt: o.receivedAt, existingEvidence: known });
+    if (r.repeat) return { ok: true, repeat: true, diagnostics: r.diagnostics, evidenceId: r.diagnostics.evidenceId };
     if (!r.input) {
       const e = r.diagnostics.errors[0]!;
       return { ok: false, message: e.message, nextStep: e.nextStep, diagnostics: r.diagnostics };
@@ -42,12 +48,12 @@ export async function prepareFileImport(o: PrepareOptions): Promise<PreparedImpo
   const r = await importFile(
     { fileName: o.fileName, bytes: o.bytes, receivedAt: o.receivedAt },
     {
-      business: o.business, existingEvidence: o.records.evidence,
+      business: o.business, existingEvidence: known,
       ...(o.currency ? { currency: o.currency } : {}), ...(o.dayFirst !== undefined ? { dayFirst: o.dayFirst } : {}),
       ...(o.columnMapping ? { columnMapping: o.columnMapping } : {}), ...(o.headerRow ? { headerRow: o.headerRow } : {}),
     },
   );
-  if (r.repeat) return { ok: true, repeat: true, diagnostics: r.diagnostics };
+  if (r.repeat) return { ok: true, repeat: true, diagnostics: r.diagnostics, evidenceId: r.evidence.id };
   if (r.sheets.length === 0) {
     const e = r.diagnostics.errors[0]!;
     return { ok: false, message: e.message, nextStep: e.nextStep, diagnostics: r.diagnostics };
@@ -67,7 +73,8 @@ export async function prepareFileImport(o: PrepareOptions): Promise<PreparedImpo
 // (file name, hash, real format) so the Review screen can show the original and repeats are detectable.
 export function enrichEvidence(evidence: Evidence[], fileEvidence: Evidence | undefined): Evidence[] {
   if (!fileEvidence) return evidence;
+  const rank: Record<Evidence["extraction"], number> = { ok: 0, partial: 1, unreadable: 2, unsupported: 3 };
   return evidence.map((e) => (e.id === fileEvidence.id
-    ? { ...fileEvidence, extraction: e.extraction, ...(e.parentId ? { parentId: e.parentId } : {}) }
+    ? { ...fileEvidence, extraction: rank[e.extraction] >= rank[fileEvidence.extraction] ? e.extraction : fileEvidence.extraction, ...(e.parentId ? { parentId: e.parentId } : {}) }
     : e));
 }
