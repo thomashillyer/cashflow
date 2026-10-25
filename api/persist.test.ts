@@ -102,4 +102,55 @@ describe("persistImport (#148)", () => {
     expect(write.commitments).toEqual([]);
     expect(summary.commitments.unchanged).toBe(1);
   });
+
+  // MemoryStore enforces none of Supabase's unique keys, so check the write list itself.
+  const uniqueIds = (rows: { id: string }[]) => expect(new Set(rows.map((r) => r.id)).size).toBe(rows.length);
+
+  it("an invoice and a bill with the same provider id stay two records of the right type", async () => {
+    const { store, id } = await setup();
+    const both = (now: string) => buildAccounting({ system: "quickbooks", now, payments: [], docs: [
+      invoice({ providerId: "7", number: "INV-7", status: "open" as never, balance: 280 }),
+      invoice({ kind: "bill", providerId: "7", number: "B-7", partyId: "v1", partyName: "Ningbo Pack", total: 90, balance: 90, status: "open" as never, sheet: "bills" }),
+    ] });
+    await persistImport(store, id, both("2026-11-25T10:00:00Z"));
+    const again = await persistImport(store, id, both("2026-11-26T10:00:00Z"));
+    expect(again.written).toBe(false);
+    const { records } = await store.load(id);
+    expect(records.commitments.map((c) => [c.type, c.reference]).sort()).toEqual([["bill", "B-7"], ["invoice", "INV-7"]]);
+  });
+
+  it("a new invoice that takes a renumbered invoice's old number gets its own id", () => {
+    const first = pull("2026-11-25T10:00:00Z");
+    const existing = { ...first, events: [], signals: [], rules: [], balances: [] };
+    const next = buildAccounting({ system: "zoho_books", now: "2026-11-26T10:00:00Z", payments: [], docs: [
+      invoice({ number: "1002", raw: { v: 6 } }),
+      invoice({ providerId: "i2", number: "1001", total: 50, balance: 50, status: "open" as never, raw: { v: 7 }, row: 2 }),
+    ] });
+    const { write } = planImport(existing, next);
+    uniqueIds(write.commitments);
+    expect(write.commitments.find((c) => c.reference === "1002")?.id).toBe("inv-1001");
+    expect(write.commitments.find((c) => c.reference === "1001")?.id).toMatch(/^inv-1001~[0-9a-f]{12}$/);
+  });
+
+  it("an invoice deleted and re-created in the books gets its own evidence, not a dangling link", () => {
+    const first = pull("2026-11-25T10:00:00Z");
+    const existing = { ...first, events: [], signals: [], rules: [], balances: [] };
+    const recreated = buildAccounting({ system: "zoho_books", now: "2026-11-26T10:00:00Z", payments: [], docs: [invoice({ providerId: "i9" })] });
+    const { write } = planImport(existing, recreated);
+    const linked = write.commitments[0]!.evidenceIds ?? [];
+    const known = new Set([...existing.evidence, ...write.evidence].map((e) => e.id));
+    expect(linked.every((e) => known.has(e))).toBe(true);
+    expect(write.evidence).toHaveLength(1);
+  });
+
+  it("a field the books stop sending clears, while the owner's category stays", async () => {
+    const { store, id } = await setup();
+    await persistImport(store, id, pull("2026-11-25T10:00:00Z"));
+    const { records } = await store.load(id);
+    await store.upsertRecords(id, { commitments: [{ ...records.commitments[0]!, category: "wholesale" }] });
+    await persistImport(store, id, pull("2026-11-26T10:00:00Z", invoice({ balance: undefined, status: "open" as never, raw: { v: 8 } })));
+    const after = (await store.load(id)).records.commitments[0]!;
+    expect(after.outstanding).toBeUndefined();
+    expect(after.category).toBe("wholesale");
+  });
 });
