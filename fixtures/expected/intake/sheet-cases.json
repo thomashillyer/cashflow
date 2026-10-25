@@ -1,0 +1,20 @@
+{
+  "_comment": "Expected outcomes for fixtures/cascade_trade/intake/sheets/*.json (ai/extract/sheet.ts). Amounts are minor units; rows are 1-based spreadsheet rows.",
+  "business": "Cascade Trade Co.",
+  "cases": [
+    { "id": "ar-aging-table", "input": "ar-aging-table.json",
+      "expect": { "layout": "table", "headerRow": 4, "candidates": 4, "kind": "invoice", "direction": "in",
+        "rejectedRows": [{ "row": 10, "reason": "Totals row" }],
+        "byReference": {
+          "INV-1187": { "row": 5, "amount": 2800000, "party": "Evergreen Home", "dueDate": "2026-12-10" },
+          "INV-104": { "row": 6, "amount": 1200000, "party": "Puget Market", "dueDate": "2026-10-30" },
+          "INV-1203": { "row": 7, "amount": 400000, "party": "Harbor and Hearth", "dueDate": "2026-11-11" },
+          "INV-1190": { "row": 8, "amount": 620050, "party": "Puget Market", "dueDate": "2026-11-04" } } } },
+    { "id": "single-invoice", "input": "single-invoice.json",
+      "expect": { "layout": "document", "kind": "invoice", "direction": "in", "reference": "INV-1204",
+        "party": "Harbor and Hearth", "amount": 3120000, "currency": "USD", "dueDate": "2026-11-19",
+        "poReference": "HH-PO-552", "terms": "Net 30", "noteAboutTotalMismatch": false } },
+    { "id": "messy", "input": "messy.json",
+      "expect": { "layout": "unknown", "candidates": 0 } }
+  ]
+}
