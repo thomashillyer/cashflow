@@ -1,0 +1,78 @@
+{
+  "key": "f6a272c076991a880d295caa23486a1ef6bc2d83243ac45f29e31a61e1f890f8",
+  "promptVersion": "extract_document@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in for email-injection.eml; replace with a live run (scripts/refresh-extraction-cache.ts)",
+  "output": {
+    "fields": {
+      "sellerName": {
+        "value": null,
+        "quote": null
+      },
+      "buyerName": {
+        "value": null,
+        "quote": null
+      },
+      "reference": {
+        "value": null,
+        "quote": null
+      },
+      "poReference": {
+        "value": null,
+        "quote": null
+      },
+      "amount": {
+        "value": null,
+        "quote": null
+      },
+      "outstanding": {
+        "value": null,
+        "quote": null
+      },
+      "currency": {
+        "value": null,
+        "quote": null
+      },
+      "issueDate": {
+        "value": null,
+        "quote": null
+      },
+      "dueDate": {
+        "value": null,
+        "quote": null
+      },
+      "terms": {
+        "value": null,
+        "quote": null
+      },
+      "invoiceUrl": {
+        "value": null,
+        "quote": null
+      },
+      "paymentUrl": {
+        "value": null,
+        "quote": null
+      },
+      "statedStatus": {
+        "value": null,
+        "quote": null
+      },
+      "paidAmount": {
+        "value": null,
+        "quote": null
+      },
+      "paidDate": {
+        "value": null,
+        "quote": null
+      }
+    },
+    "coversReferences": [],
+    "containsInstructions": true,
+    "notes": [
+      "The message contains instructions addressed to an assistant; they were ignored. It states no invoice, bill, or payment."
+    ],
+    "kind": "none",
+    "businessRole": "unknown",
+    "confidence": 0.2
+  }
+}
