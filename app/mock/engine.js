@@ -402,9 +402,11 @@ export function createEngine(fixture) {
     const pt = party(item.partyId);
     const owner = fixture.business.owner;
     const biz = fixture.business.name;
+    const toHint = pt?.contacts?.emailDomains?.[0] ? `someone@${pt.contacts.emailDomains[0]}` : undefined;
     if (item.lever?.kind === "chase") {
       const c = commitmentById(item.lever.commitmentId);
       return {
+        toHint,
         to: pt.contacts?.emailDomains?.[0] ? `ap@${pt.contacts.emailDomains[0]}` : "",
         subject: `${c.sourceRef.record}: ${money(c.amount)} due ${shortDate(c.anchors.due)}`,
         body: `Hi ${pt.name} team,\n\nA quick note on ${c.sourceRef.record} for ${money(c.amount)}, due ${shortDate(c.anchors.due)}. We have a large supplier payment going out right after it, so payment on the due date would really help us this month.\n\n${c.invoiceUrl ? `You can view the invoice here: ${c.invoiceUrl}\n\n` : ""}Could you confirm the date it will go out? Happy to talk if anything is holding it up.\n\nThanks,\n${owner}\n${biz}`,
@@ -415,6 +417,7 @@ export function createEngine(fixture) {
       const ev = forecast().events.find((e) => e.commitmentId === c.id);
       const amtText = money(c.amount, { currency: c.currency });
       return {
+        toHint,
         to: "",
         subject: `${c.sourceRef.record}: request to move payment to ${shortDate(addDays(ev.date, item.lever.days))}`,
         body: `Hi ${pt.name} team,\n\nWe have ${amtText} scheduled to you on ${shortDate(ev.date)} for ${c.sourceRef.record}. Could we move it to ${shortDate(addDays(ev.date, item.lever.days))}? Everything else on the order stays the same, and we'll confirm the transfer the day it goes out.\n\nThank you for working with us on this.\n\n${owner}\n${biz}`,
