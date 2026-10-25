@@ -743,12 +743,13 @@ function noteRow(n) {
   if (n.state !== "new") return `<article class="note settled"><blockquote>${esc(n.text)}</blockquote>${meta}</article>`;
 
   const party = r.partyId ? app.ctx.parties.find((p) => p.id === r.partyId)?.name : null;
-  // The owner can flip a misread direction ("a loan coming in" read as money out) before adding it.
-  const dirButton = (to, label) =>
-    `<button class="linklike dir-switch" data-action="note-direction" data-to="${to}" data-id="${esc(n.id)}">${label}</button>`;
+  // The owner can flip a misread direction ("a loan coming in" read as money out) before adding it. Not for
+  // a promised invoice payment (priced as that invoice's timing) or a possible deal (always pipeline income).
+  const canSwitch = !r.invoiceId && r.status !== "possible";
+  const dirButton = (to, label) => canSwitch
+    ? `<button class="linklike dir-switch" data-action="note-direction" data-to="${to}" data-id="${esc(n.id)}">${label}</button>` : "";
   const dir = r.direction === "in" ? `Money in${dirButton("out", "Switch to money out")}`
-    : r.direction === "out" ? `Money out${dirButton("in", "Switch to money in")}`
-    : `—${dirButton("in", "Money in")}${dirButton("out", "Money out")}`;
+    : r.direction === "out" ? `Money out${dirButton("in", "Switch to money in")}` : "—";
   const field = (k, label, v, input) => `<div><dt>${label}</dt><dd>${v != null ? v : input}</dd></div>`;
   const amountInput = `<input inputmode="decimal" placeholder="$ amount" data-note-field="amount" data-id="${esc(n.id)}" aria-label="Amount" />`;
   const dateInput = `<input type="date" data-note-field="date" data-id="${esc(n.id)}" aria-label="Date" />`;
