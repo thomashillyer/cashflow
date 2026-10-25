@@ -983,7 +983,7 @@ function median(xs: number[]): number {
 }
 
 // "When does Evergreen usually pay?", "how late is Harbor?": a timing question, not a balance question.
-const TIMING_RE = /\bwhen\b|\bhow\s+(?:late|long|early|fast|quickly|soon)\b|\busually\b|\btypically\b|\bnormally\b|\bon\s+average\b|\bpay(?:s)?\s+(?:late|early|on\s+time)\b|\blag\b/i;
+const TIMING_RE = /\bwhen\b[^?]*\bpay(?:s|ing|ment)?\b|\bwhen\b[^?]*\bpaid\b|\bhow\s+(?:late|long|early|fast|quickly|soon)\b|\busually\b|\btypically\b|\bnormally\b|\bon\s+average\b|\bpay(?:s)?\s+(?:late|early|on\s+time)\b|\blag\b/i;
 
 function runLookup(intent: AskIntent, ctx: DecideContext): Decision {
   const f = new Figures(ctx.profile.baseCurrency, ctx.asOf);

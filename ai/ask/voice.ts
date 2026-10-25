@@ -56,7 +56,7 @@ type Rec = NonNullable<Decision["recommendation"]>;
 function actionBy(d: Decision, action: string, byDate?: string): string {
   const a = stripEnd(action);
   if (!byDate) return a;
-  return extractDates(a, { asOf: d.asOf }).length > 0 ? a : `${a} by ${date(d, byDate)}`;
+  return /\bby\s+[A-Z][a-z]{2}\s+\d/.test(a) ? a : `${a} by ${date(d, byDate)}`;
 }
 
 function factLines(d: Decision): string[] {
