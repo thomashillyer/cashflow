@@ -4,6 +4,7 @@ import {
   mergeEnv,
   parseApiKeysOutput,
   parseArgs,
+  parseEnv,
   pickKeys,
   validateEnv,
 } from "./supabase-setup.mjs";
@@ -113,6 +114,19 @@ describe("validateEnv", () => {
     expect(validateEnv({ ...good, SUPABASE_ANON_KEY: "not-a-key" }).errors).toHaveLength(1);
     expect(validateEnv({ ...good, SUPABASE_ANON_KEY: jwt({ role: "anon", ref: "otherprojectref12345" }) }).errors).toHaveLength(1);
     expect(validateEnv(good, { projectRef: "otherprojectref12345" }).errors).toHaveLength(1);
+  });
+  it("rejects masked new-style keys", () => {
+    const r = validateEnv({ ...good, SUPABASE_SERVICE_ROLE_KEY: "sb_secret_ab••••••" });
+    expect(r.errors).toHaveLength(1);
+  });
+  it("ignores unquoted inline comments in .env", () => {
+    const env = parseEnv(`SUPABASE_URL=https://${REF}.supabase.co # team\nSUPABASE_ANON_KEY="a # b"\n`);
+    expect(env.SUPABASE_URL).toBe(`https://${REF}.supabase.co`);
+    expect(env.SUPABASE_ANON_KEY).toBe("a # b");
+  });
+  it("updates every duplicate line when merging with force", () => {
+    const r = mergeEnv("SUPABASE_ANON_KEY=a\nSUPABASE_ANON_KEY=b\n", { SUPABASE_ANON_KEY: "new" }, { force: true });
+    expect(r.text).toBe("SUPABASE_ANON_KEY=new\nSUPABASE_ANON_KEY=new\n");
   });
   it("accepts new-style keys and local URLs", () => {
     const r = validateEnv({

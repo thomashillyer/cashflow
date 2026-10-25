@@ -36,7 +36,8 @@ export function pickKeys(entries) {
 
 function stripQuotes(v) {
   const t = v.trim();
-  return t.length >= 2 && /^(["']).*\1$/.test(t) ? t.slice(1, -1) : t;
+  if (t.length >= 2 && /^(["']).*\1$/.test(t)) return t.slice(1, -1);
+  return t.replace(/\s+#.*$/, ""); // unquoted inline comment, as dotenv does
 }
 
 /** Minimal .env reader: returns a plain object of KEY -> value. */
@@ -61,18 +62,19 @@ export function mergeEnv(existingText, values, { force = false } = {}) {
   for (const [name, value] of Object.entries(values)) {
     if (value === undefined) continue;
     const re = new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=(.*)$`);
-    const idx = lines.findIndex((l) => re.test(l));
-    if (idx === -1) {
+    const idxs = lines.flatMap((l, i) => (re.test(l) ? [i] : []));
+    if (idxs.length === 0) {
       lines.push(`${name}=${value}`);
       set.push({ name, length: value.length });
       continue;
     }
-    const current = stripQuotes(re.exec(lines[idx])[1]);
+    // dotenv uses the last occurrence, so that is the effective value.
+    const current = stripQuotes(re.exec(lines[idxs[idxs.length - 1]])[1]);
     if (current !== "" && !force) {
       kept.push(name);
       continue;
     }
-    lines[idx] = `${name}=${value}`;
+    for (const idx of idxs) lines[idx] = `${name}=${value}`;
     set.push({ name, length: value.length });
   }
   return { text: lines.join("\n") + "\n", set, kept };
@@ -107,7 +109,11 @@ export function decodeJwtPayload(token) {
 export function checkKey(name, key, role, urlRef) {
   const newStyle = role === "anon" ? "sb_publishable_" : "sb_secret_";
   const otherStyle = role === "anon" ? "sb_secret_" : "sb_publishable_";
-  if (key.startsWith(newStyle)) return undefined;
+  if (key.startsWith(newStyle)) {
+    return /^sb_(secret|publishable)_[A-Za-z0-9_-]+$/.test(key)
+      ? undefined
+      : `${name} contains characters a real key never has (masked or truncated value?).`;
+  }
   if (key.startsWith(otherStyle)) return `${name} looks like a ${role === "anon" ? "secret/service" : "publishable/anon"} key; the two values are swapped.`;
   const payload = decodeJwtPayload(key);
   if (!payload) return `${name} does not look like a Supabase key (expected a JWT or an ${newStyle}... key). Check for stray quotes or truncation.`;

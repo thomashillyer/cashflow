@@ -54,19 +54,23 @@ if (fromCli) {
   const projectRef = opts.projectRef ?? DEFAULT_PROJECT_REF;
   let stdout;
   try {
-    stdout = execFileSync("npx", ["-y", "supabase@2", "projects", "api-keys", "--project-ref", projectRef, "-o", "json"], {
+    // --reveal is needed to get unmasked sb_secret_ keys.
+    const cliArgs = ["-y", "supabase@2", "projects", "api-keys", "--project-ref", projectRef, "-o", "json"];
+    if (withServiceRole) cliArgs.push("--reveal");
+    stdout = execFileSync("npx", cliArgs, {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (e) {
+    if (e.code === "ENOENT") fail("Could not run npx. Install Node 22 (with npm) and make sure it is on PATH.");
     const detail = `${e.stderr ?? ""}${e.stdout ?? ""}${e.message ?? ""}`;
     if (/access token|not logged in|supabase login|SUPABASE_ACCESS_TOKEN/i.test(detail)) {
       fail(
         "Not logged in to Supabase. Run: npx -y supabase@2 login (you must be invited to the Supabase org first), then rerun this script.",
       );
     }
-    if (/forbidden|not found|403|404|do not have permission|unauthorized/i.test(detail)) {
+    if (/forbidden|403|do not have permission|unauthorized|project .*not found|cannot find project/i.test(detail)) {
       fail(
         `Project ${projectRef} is not visible to your Supabase account. You need an invite to the Supabase org; otherwise use the default flow (paste the shared values into .env).`,
       );
@@ -83,6 +87,7 @@ if (fromCli) {
   if (!keys.anon) fail("Could not find an anon/publishable key for this project.");
   if (withServiceRole && !keys.serviceRole) fail("Could not find a service_role/secret key for this project.");
 
+  if (existsSync(envPath)) chmodSync(envPath, 0o600); // tighten before rewriting
   const existing = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
   const merged = mergeEnv(
     existing,
@@ -100,7 +105,8 @@ if (!existsSync(envPath)) {
 chmodSync(envPath, 0o600);
 
 const env = parseEnv(readFileSync(envPath, "utf8"));
-const { errors, warnings, lengths } = validateEnv(env, { requireServiceRole, projectRef: opts.projectRef });
+const expectedRef = opts.projectRef ?? (env.SUPABASE_PROJECT_REF || undefined);
+const { errors, warnings, lengths } = validateEnv(env, { requireServiceRole, projectRef: expectedRef });
 for (const [name, length] of Object.entries(lengths)) console.log(`${name}: present (${length} chars)`);
 for (const w of warnings) console.log(`warning: ${w}`);
 if (errors.length > 0) {
@@ -117,7 +123,7 @@ try {
     console.log("(If the schema is not pushed yet, a missing businesses table is expected.)");
     process.exitCode = 1;
   } else {
-    console.log(`connected (businesses: ${data.length === 0 ? "table is empty" : "1+ rows readable"})`);
+    console.log(`connected (businesses: ${data.length === 0 ? "no readable rows: RLS or not seeded yet" : "1+ rows readable"})`);
   }
 } catch (e) {
   console.log(`connection check failed: ${e.message}`);

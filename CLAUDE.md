@@ -100,7 +100,7 @@ npm run demo       # demo profile + cached Claude responses (not yet)
 - **Rules:**
   - The hosted project ("Cashflow") holds synthetic data only.
   - Never commit `.env` or paste keys into PRs, issues, or chat.
-  - The anon key is read-only; writes go through server code with the service role, or RPCs.
+  - Under the hackathon RLS policies the anon key can read and write rows of synthetic businesses only. It ships to the browser, so treat it as non-secret but not harmless; anything beyond synthetic rows needs server code with the service role.
   - Schema changes are a new migration file (timestamp after `20261025120000`) in a PR, never dashboard edits.
 
 ## Definition of done (for any change)
