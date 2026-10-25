@@ -76,6 +76,19 @@ describe.each(files)("profile %s", (file) => {
     } else expect(["deals", "retainers"]).toContain(m.kind);
   });
 
+  it("engine tunables, when set, are in range", () => {
+    const e = p.engine ?? {};
+    const unit = (x: number | undefined) => x === undefined || (x >= 0 && x <= 1);
+    const days = (x: number | undefined) => x === undefined || (Number.isInteger(x) && x > 0);
+    expect(Object.values(e.statusConfidence ?? {}).every(unit), "statusConfidence").toBe(true);
+    expect(unit(e.dailySalesConfidence) && unit(e.lag?.noHistoryConfidence), "confidences").toBe(true);
+    expect([e.salesHistoryDays, e.settlementMatchDays, e.staleFallbackDays, e.noSnapshotLookbackDays, e.deferDays, e.urgencyScaleDays, e.lag?.maxSamples].every(days), "day counts").toBe(true);
+    expect(e.lag?.iqrScaleDays === undefined || e.lag.iqrScaleDays > 0, "iqrScaleDays").toBe(true);
+    expect(e.affordabilityStep === undefined || (e.affordabilityStep > 0 && e.affordabilityStep <= 1), "affordabilityStep").toBe(true);
+    for (const a of e.lag?.laggedAnchors ?? []) expect(ANCHORS).toContain(a);
+    for (const t of e.lag?.laggedTypes ?? []) expect(TYPES).toContain(t);
+  });
+
   it("forecasts a minimal book with zero code changes", () => {
     const src = { system: "test", record: "x" };
     const records: Records = {

@@ -11,7 +11,8 @@
 import type { CashEvent, Commitment, Records } from "../schema/records";
 import type { Profile } from "../schema/profile";
 import { addDays } from "./dates";
-import { DAILY_SALES_ID, SALES_HISTORY_DAYS } from "./expand";
+import { DAILY_SALES_ID } from "./expand";
+import { engineSettings } from "./settings";
 
 export type RecurringItem = Profile["recurring"][number];
 
@@ -34,7 +35,7 @@ function findCommitment(id: string, records: Records): Commitment | undefined {
   return { ...s.claim.draft, id, sourceRef: s.claim.draft.sourceRef ?? s.sourceRef };
 }
 
-// `asOf` is the run's as-of date; daily-sales history is the same window the engine averaged (SALES_HISTORY_DAYS before it).
+// `asOf` is the run's as-of date; daily-sales history is the same window the engine averaged (engineSettings(profile).salesHistoryDays before it).
 export function resolveEventSource(event: CashEvent, records: Records, profile: Profile, asOf: string): EventSource {
   const id = event.commitmentId;
   // A bank line is the source of its own money, even when it settles an invoice (partial payment).
@@ -59,7 +60,7 @@ export function resolveEventSource(event: CashEvent, records: Records, profile: 
     const item = profile.recurring.find((r) => r.id === id);
     if (item) return { kind: "profile_recurring", item };
     if (id === DAILY_SALES_ID && profile.revenueModel.kind === "dailySales") {
-      const from = addDays(asOf, -SALES_HISTORY_DAYS);
+      const from = addDays(asOf, -engineSettings(profile).salesHistoryDays);
       const historyEventIds = records.events
         .filter((e) => e.direction === "in" && e.category === "sales" && e.date >= from && e.date < asOf)
         .map((e) => e.id);
