@@ -798,17 +798,48 @@ function noteImpact(n) {
 }
 
 // ---------------------------------------------------------------- Review
+// How the owner recognises an imported message: what it was about and who sent it, never its message id.
+function messageLabel(item) {
+  // Only the message itself carries the subject and sender; an attachment's evidence does not, and the store does
+  // not promise the message comes first.
+  const named = item.evidence?.find((e) => e.sourceRef?.subject || e.sourceRef?.from);
+  const ev = named ?? item.evidence?.[0];
+  const sr = named?.sourceRef ?? {};
+  const when = ev?.receivedAt ? dayOf(ev.receivedAt) : "";
+  const byline = [sr.from ? `From ${sr.from}` : "", when].filter(Boolean).join(", ");
+  return { subject: sr.subject, from: sr.from, when, byline, title: sr.subject ?? (sr.from ? `Message from ${sr.from}` : "Imported document") };
+}
+
+// Read successfully, and it holds no invoice, bill, PO or payment the forecast could use (or it is a plain update
+// handled as a signal): nothing for the owner to apply. An item that could not be read, or is only half read,
+// is NOT quiet: it still asks the owner for a clearer source.
+function isQuiet(item) {
+  const c = item.candidate;
+  return !!c && c.extraction === "ok" && (c.kind === "none" || c.kind === "conversational_update") && !item.proposal.ops?.length && !item.proposal.conflicts?.length;
+}
+
+function quietPanel(list) {
+  return `<details class="panel" style="margin-bottom:20px"><summary><b>${list.length} message${list.length === 1 ? "" : "s"} read, nothing to apply</b></summary>
+    <ul style="list-style:none;padding:0;margin:12px 0 0">${list.map((item) => {
+      const l = messageLabel(item);
+      const why = (item.notes ?? [])[0] ?? item.proposal.reasons?.[0] ?? "No invoice, bill, PO or payment in it.";
+      return `<li style="padding:10px 0;border-top:1px solid rgba(128,128,128,.25)"><b>${esc(l.title)}</b>${l.byline ? `<br><small>${esc(l.byline)}</small>` : ""}<br><span>${esc(why)}</span><br><button class="btn" data-action="proposal" data-id="${esc(item.proposal.id)}" data-d="dismiss" ${app.decidingProposal ? "disabled" : ""}>Dismiss</button></li>`;
+    }).join("")}</ul></details>`;
+}
+
 function proposalCard(item) {
   const p = item.proposal;
   const fields = item.candidate?.fields ?? {};
   const found = (field) => fields[field]?.state === "found" ? fields[field].value : null;
   const labels = { create: "Add record", link: "Link source", update: "Update record" };
   const canConfirm = Boolean(labels[p.action] && p.ops.length && !p.conflicts.length);
-  const reference = found("reference") ?? item.target?.reference ?? item.evidence[0]?.sourceRef?.record ?? "Imported document";
+  const label = messageLabel(item);
+  const reference = found("reference") ?? item.target?.reference ?? label.title;
   const amount = found("amount");
   const due = found("dueDate");
   return `<article class="panel" style="margin-bottom:20px">
     <h2>${esc(reference)}</h2>
+    ${label.byline ? `<p class="fineprint" style="margin-top:-6px">${esc(label.byline)}</p>` : ""}
     ${amount != null ? `<p>${money(amount, { currency: found("currency") ?? app.ctx.profile.baseCurrency })}${due ? `, due ${dayDate(due)}` : ""}</p>` : ""}
     <p>${esc(found("sellerName") ?? found("buyerName") ?? "Check the source before confirming.")}</p>
     <ul>${[...p.reasons, ...(item.notes ?? [])].map((text) => `<li>${esc(text)}</li>`).join("")}</ul>
@@ -825,7 +856,8 @@ function viewReview() {
   return `
   <div class="page-head"><div><h1>Review</h1><p>Messages and uploads that could change your forecast. Nothing changes until you apply it.</p></div></div>
   <div style="max-width:760px">
-  ${documents.map(proposalCard).join("")}
+  ${documents.filter((d) => !isQuiet(d)).map(proposalCard).join("")}
+  ${documents.some(isQuiet) ? quietPanel(documents.filter(isQuiet)) : ""}
   ${unresolvedSignals.map(({ signal, notes }) => `<article class="panel" style="margin-bottom:20px"><h2>Imported message needs a match</h2><p>${esc(signal.sourceRef?.excerpt?.text ?? "This message could affect a record, but Neri couldn't match it safely.")}</p>${(notes ?? []).map((n) => `<p>${esc(n)}</p>`).join("")}<p>Ask your team to match the message to the right invoice before applying it.</p><button class="btn" data-action="signal" data-d="dismiss" data-id="${esc(signal.id)}">Dismiss</button></article>`).join("")}
   ${items.length ? items.map(reviewCard).join("") : documents.length || unresolvedSignals.length ? "" : `<section class="panel"><p style="margin:0">Nothing to review. When an email, WhatsApp message or upload could move your cash, it waits here for your OK.</p></section>`}
   </div>`;

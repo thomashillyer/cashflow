@@ -1217,3 +1217,17 @@ describe("demo sandbox (#173, #153)", () => {
     expect(await sb.storeFor("a".repeat(16), biz, store)).not.toBe(a);
   });
 });
+
+describe("Review shows who a message is from (subject and sender on the evidence)", () => {
+  beforeEach(() => setup());
+
+  it("an imported email's Review item carries its subject and sender, not just a message id", async () => {
+    const raw = readFileSync(join(import.meta.dirname, "../fixtures/cascade_trade/intake/email-inv1187.eml"), "utf8");
+    const res = await app.inject({ method: "POST", url: "/import/email", headers: OTHER, payload: { text: raw } });
+    expect(res.statusCode).toBe(200);
+    const pending = (await app.inject({ method: "GET", url: "/review/proposals", headers: OTHER })).json();
+    expect(pending.proposals.length).toBeGreaterThan(0);
+    const sources = pending.proposals.flatMap((p: { evidence: { sourceRef: { subject?: string; from?: string; record: string } }[] }) => p.evidence.map((e) => e.sourceRef));
+    expect(sources).toContainEqual(expect.objectContaining({ subject: "RE: Invoice INV-1187 from Cascade Trade Co.", from: "Dana Whitfield <accounts@evergreenhome.example>" }));
+  });
+});
