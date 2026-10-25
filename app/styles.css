@@ -1003,3 +1003,8 @@ a { text-underline-offset: 0.18em; }
 }
 .checks-body p { margin: 0 0 8px; color: var(--ink-soft); font-size: 14px; }
 .checks-body ul { margin: 0 0 12px; padding-left: 18px; font-size: 13.5px; color: var(--ink-soft); display: grid; gap: 6px; }
+
+/* Sales moves fill today's list after the cash actions */
+.card-tag { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); align-self: center; }
+.card.sales .card-effect b { color: var(--ink-soft); }
