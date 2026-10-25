@@ -486,7 +486,7 @@ describe("allowed covers every figure in the code-built strings", () => {
   it("amounts and dates pass number_check against allowed; N%, N days, N payments are in allowed.numbers", () => {
     expect(seen.length).toBeGreaterThan(40);
     for (const d of seen) {
-      const allowed = { amounts: d.allowed.amounts, dates: d.allowed.dates };
+      const allowed = d.allowed;
       for (const s of strings(d)) {
         const r = checkText(s, ["x"], allowed, { currency: d.currency, asOf: d.asOf });
         expect(r, s).toMatchObject({ ok: true });
