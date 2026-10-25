@@ -3,6 +3,7 @@
 // forecast, simulate and brief applies them. Each write bumps the business revision, so cached work items and
 // briefs recompute. An override changes a forecast line only: nothing here sends, pays or moves money.
 
+import { createHash } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Override } from "../../schema/records";
 import type { Deps } from "../app";
@@ -32,6 +33,16 @@ function ownBusiness(req: FastifyRequest): Business {
   if (b.isSynthetic && !(req as NeriRequest).sandboxed) throw new HttpError(403, "FORBIDDEN", "The sample is shared; set up your business to save changes.");
   return b;
 }
+
+// Overdue decisions are plain owner overrides with stable ids, so one item has at most one decision:
+// "done" = exclude the leg (owner input, never a bank actual); "open" = stillOpen marker (keeps it in the
+// forecast as expected now and out of the flags and the assumed-paid rule). "clear" removes either (Undo).
+export const overdueIds = (commitmentId: string, legIndex?: number) => {
+  const key = `${commitmentId}|${legIndex ?? "all"}`;
+  const h = createHash("sha1").update(key).digest("hex").slice(0, 10);
+  const safe = commitmentId.replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 70);
+  return { done: `owner-done-${safe}-${legIndex ?? "all"}-${h}`, open: `owner-open-${safe}-${legIndex ?? "all"}-${h}` };
+};
 
 export const overrideRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   // Compare-and-bump first, so of two writes from the same revision only one goes through (the other is a
@@ -82,6 +93,33 @@ export const overrideRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       return created ? [...list, override] : list.map((o) => (o.id === id ? override : o));
     });
     return { override, created, storeRevision };
+  });
+
+  // Body: { commitmentId, legIndex?, decision: "done" | "open" | "clear", expectedRevision }.
+  app.post("/overdue-decision", async (req) => {
+    const b = ownBusiness(req);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const { commitmentId, legIndex, decision } = body;
+    const issue = (field: string) => new HttpError(400, "INVALID_ARGUMENT", "That choice didn't look right. Reload and try again.", { fieldIssues: [{ field, issue: "invalid" }] });
+    if (typeof commitmentId !== "string" || !commitmentId || commitmentId.length > 200) throw issue("commitmentId");
+    if (legIndex !== undefined && !(Number.isSafeInteger(legIndex) && (legIndex as number) >= 0)) throw issue("legIndex");
+    if (decision !== "done" && decision !== "open" && decision !== "clear") throw issue("decision");
+    const expected = expectedRevision(req);
+    const { records } = await storeFor(req).load(b.id);
+    if (!records.commitments.some((c) => c.id === commitmentId)) {
+      throw new HttpError(400, "INVALID_ARGUMENT", "That change points at a record we don't have.", { fieldIssues: [{ field: "commitmentId", issue: "unknown" }] });
+    }
+    const leg = legIndex as number | undefined;
+    const ids = overdueIds(commitmentId, leg);
+    const target = { commitmentId, ...(leg !== undefined ? { legIndex: leg } : {}) };
+    const next: Override | null = decision === "done"
+      ? { id: ids.done, target, change: { exclude: true }, origin: "owner", originId: "owner:paid-or-done" }
+      : decision === "open" ? { id: ids.open, target, change: { stillOpen: true }, origin: "owner", originId: "owner:still-open" } : null;
+    const storeRevision = await write(req, b.id, expected, (list) => {
+      const rest = list.filter((o) => o.id !== ids.done && o.id !== ids.open);
+      return next ? [...rest, next] : rest;
+    });
+    return { decision, override: next, storeRevision };
   });
 
   app.delete("/overrides/:id", async (req) => {

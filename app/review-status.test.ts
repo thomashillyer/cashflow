@@ -116,3 +116,24 @@ describe("forecast checks in the owner brief", () => {
     expect(output.panel).toContain("&lt;script&gt;");
   });
 });
+
+describe("overdue items in the forecast checks", () => {
+  const bill = (id: string, due: string) => ({ id, type: "bill" as const, amount: 10000, currency: "USD", anchors: { due }, status: "committed" as const, sourceRef: { system: "zoho_books", record: id } });
+  const run = () => makeRun({ ...records, commitments: [bill("bill-recent", "2026-10-22"), bill("bill-old", "2026-10-01")] });
+
+  it("each overdue flag gets Paid / done and Still open; older items sit in one quiet line with Still open", () => {
+    const output = render(run());
+    expect(output.panel).toContain('data-decision="done" data-cid="bill-recent"');
+    expect(output.panel).toContain("Paid / done");
+    expect(output.panel).toContain('data-decision="open" data-cid="bill-recent"');
+    expect(output.panel).toContain("1 older item assumed paid. Review");
+    expect(output.panel).toContain('data-decision="open" data-cid="bill-old"');
+    expect(output.panel).not.toContain('data-decision="done" data-cid="bill-old"');
+    expect(output.panel).toContain("assumed paid (due before 2026-10-12)");
+  });
+
+  it("has no owner buttons in the offline preview", () => {
+    const output = render(run(), "preview");
+    expect(output.panel).not.toContain('data-action="overdue"');
+  });
+});

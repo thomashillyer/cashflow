@@ -3,6 +3,7 @@
   "displayName": "Services and agency",
   "baseCurrency": "USD",
   "horizonWeeks": 13,
+  "assumeSettledBeforeWeeks": 1,
   "freeCashLookaheadWeeks": 6,
   "defaultLagDays": 15,
   "lagShrinkageK": 3,
