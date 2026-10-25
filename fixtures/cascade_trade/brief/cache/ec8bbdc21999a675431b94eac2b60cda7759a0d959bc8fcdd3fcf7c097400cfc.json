@@ -1,0 +1,10 @@
+{
+  "key": "ec8bbdc21999a675431b94eac2b60cda7759a0d959bc8fcdd3fcf7c097400cfc",
+  "promptVersion": "write_brief@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in; replace with a live run (scripts/refresh-brief-cache.ts)",
+  "output": {
+    "title": "Ask Jaipur Textiles for 10 more days",
+    "why": "Jaipur Textiles' $12,000 balance falls due Dec 15. Moving it back 10 days lifts your lowest point from −$5,500 to $6,500, but the ask needs to go out by Dec 12."
+  }
+}

@@ -1,0 +1,296 @@
+{
+  "id": "run-base-4c3b0c31431c",
+  "asOf": "2026-11-16",
+  "inputsHash": "4c3b0c31431c31926b8fc93c04f03fb421a58adb301870a918dc453a467c1887",
+  "scenarioId": "base",
+  "fxRates": {
+    "USD": 1,
+    "INR": 0.012
+  },
+  "openingBalance": 14500000,
+  "safetyLine": 3500000,
+  "days": [],
+  "weeks": [
+    {
+      "start": "2026-11-16",
+      "inflow": 0,
+      "outflow": 1800000,
+      "closing": 12700000,
+      "minClosing": 12700000,
+      "pipelineClosing": 12700000,
+      "eventIds": [
+        "evt-po-PO-2291-0"
+      ]
+    },
+    {
+      "start": "2026-11-23",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 11300000,
+      "minClosing": 11300000,
+      "pipelineClosing": 11300000,
+      "eventIds": [
+        "evt-rec-payroll-1"
+      ]
+    },
+    {
+      "start": "2026-11-30",
+      "inflow": 0,
+      "outflow": 1850000,
+      "closing": 9450000,
+      "minClosing": 9450000,
+      "pipelineClosing": 9774000,
+      "eventIds": [
+        "evt-po-PO-2302-0",
+        "evt-rec-rent-0"
+      ]
+    },
+    {
+      "start": "2026-12-07",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 8050000,
+      "minClosing": 8050000,
+      "pipelineClosing": 8374000,
+      "eventIds": [
+        "evt-rec-payroll-2"
+      ]
+    },
+    {
+      "start": "2026-12-14",
+      "inflow": 0,
+      "outflow": 7200000,
+      "closing": 850000,
+      "minClosing": 850000,
+      "pipelineClosing": 1174000,
+      "eventIds": [
+        "evt-po-PO-2291-1",
+        "evt-po-PO-2302-1",
+        "evt-rec-est-tax-0",
+        "evt-bill-duties-2291-0"
+      ]
+    },
+    {
+      "start": "2026-12-21",
+      "inflow": 2800000,
+      "outflow": 1400000,
+      "closing": 2250000,
+      "minClosing": -550000,
+      "pipelineClosing": 2574000,
+      "eventIds": [
+        "evt-rec-payroll-3",
+        "evt-inv-INV-1187-0"
+      ]
+    },
+    {
+      "start": "2026-12-28",
+      "inflow": 1200000,
+      "outflow": 650000,
+      "closing": 2800000,
+      "minClosing": 2250000,
+      "pipelineClosing": 3124000,
+      "eventIds": [
+        "evt-inv-INV-1203-0",
+        "evt-rec-rent-1"
+      ]
+    },
+    {
+      "start": "2027-01-04",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 1400000,
+      "minClosing": 1400000,
+      "pipelineClosing": 800000,
+      "eventIds": [
+        "evt-rec-payroll-4"
+      ]
+    },
+    {
+      "start": "2027-01-11",
+      "inflow": 11500000,
+      "outflow": 0,
+      "closing": 12900000,
+      "minClosing": 1400000,
+      "pipelineClosing": 12300000,
+      "eventIds": [
+        "evt-inv-INV-1215-0"
+      ]
+    },
+    {
+      "start": "2027-01-18",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 11500000,
+      "minClosing": 11500000,
+      "pipelineClosing": 10900000,
+      "eventIds": [
+        "evt-rec-payroll-5"
+      ]
+    },
+    {
+      "start": "2027-01-25",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "minClosing": 11500000,
+      "pipelineClosing": 10660000,
+      "eventIds": []
+    },
+    {
+      "start": "2027-02-01",
+      "inflow": 0,
+      "outflow": 2050000,
+      "closing": 9450000,
+      "minClosing": 9450000,
+      "pipelineClosing": 8610000,
+      "eventIds": [
+        "evt-rec-rent-2",
+        "evt-rec-payroll-6"
+      ]
+    },
+    {
+      "start": "2027-02-08",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "minClosing": 9450000,
+      "pipelineClosing": 8610000,
+      "eventIds": []
+    }
+  ],
+  "lowPoint": {
+    "week": "2026-12-21",
+    "date": "2026-12-25",
+    "amount": -550000
+  },
+  "firstBelowSafety": "2026-12-15",
+  "firstNegative": "2026-12-25",
+  "weeksBelowSafety": [
+    "2026-12-14",
+    "2026-12-21",
+    "2026-12-28",
+    "2027-01-04",
+    "2027-01-11"
+  ],
+  "freeCash": [
+    {
+      "week": "2026-11-16",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-11-23",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-11-30",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-12-07",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-12-14",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-12-21",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-12-28",
+      "amount": -2100000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2027-01-04",
+      "amount": -2100000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2027-01-11",
+      "amount": -2100000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2027-01-18",
+      "amount": 5950000,
+      "weeksFree": 4
+    },
+    {
+      "week": "2027-01-25",
+      "amount": 5950000,
+      "weeksFree": 3
+    },
+    {
+      "week": "2027-02-01",
+      "amount": 5950000,
+      "weeksFree": 2
+    },
+    {
+      "week": "2027-02-08",
+      "amount": 5950000,
+      "weeksFree": 1
+    }
+  ],
+  "warnings": [],
+  "events": [
+    {
+      "id": "evt-po-PO-2302-0",
+      "commitmentId": "po-PO-2302",
+      "legIndex": 0,
+      "date": "2026-12-01",
+      "amount": 100000000,
+      "currency": "INR",
+      "amountBase": 1200000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "order 2026-12-01",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2302.xlsx"
+      }
+    },
+    {
+      "id": "evt-po-PO-2302-1",
+      "commitmentId": "po-PO-2302",
+      "legIndex": 1,
+      "date": "2026-12-15",
+      "amount": 100000000,
+      "currency": "INR",
+      "amountBase": 1200000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "ship 2026-12-15",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2302.xlsx"
+      }
+    },
+    {
+      "id": "evt-inv-INV-1187-0",
+      "commitmentId": "inv-INV-1187",
+      "legIndex": 0,
+      "date": "2026-12-26",
+      "amount": 2800000,
+      "currency": "USD",
+      "amountBase": 2800000,
+      "direction": "in",
+      "status": "committed",
+      "confidence": 0.6342771982116245,
+      "basis": "due 2026-12-10 + 16 days (median 14 of last 8 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1187"
+      }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "key": "4caadfec9b0db52619d40760509d1779a5702ab1d9579eedff09adb1002114b4",
+  "promptVersion": "draft_message@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in; replace with a live run (scripts/refresh-brief-cache.ts)",
+  "output": {
+    "subject": "Payment timing for PO-2302",
+    "body": "Hello Jaipur Textiles team,\n\nThank you for your continued partnership. We would like to ask whether you could allow 10 more days on PO-2302 for the balance that falls due Dec 15. It would help us manage our cash through the year-end period, and we would be grateful for any flexibility you can offer.\n\nPlease let me know what is possible.\n\nThank you,\nCascade Trade Co."
+  }
+}
