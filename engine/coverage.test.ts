@@ -272,6 +272,38 @@ describe("daily-sales average with receipts in another currency (review of #32)"
   });
 });
 
+describe("daily-sales weekday weights are validated; closed days emit nothing (#119)", () => {
+  const sale = (date: string): CashEvent => ({ id: `s-${date}`, legIndex: 0, date, amount: $(700), currency: "USD", amountBase: $(700), direction: "in", status: "actual", confidence: 1, basis: "bank", category: "sales", sourceRef: src });
+  // Oct 11-24: 14 days of $700 receipts before asOf (Sun Oct 25)
+  const records = (): Records => ({ ...withBal(), events: Array.from({ length: 14 }, (_, i) => sale(addDays("2026-10-11", i))) });
+  const run = (weekdayWeights: number[]) => forecast(records(), { ...profile, revenueModel: { kind: "dailySales", weekdayWeights } }, base, AS_OF, {});
+  const sales = (r: ReturnType<typeof forecast>) => r.events.filter((e) => e.commitmentId === "daily-sales");
+
+  it.each([
+    ["a negative weight", [1, 1, 1, 1, 1, 1, -1]],
+    ["all zero", [0, 0, 0, 0, 0, 0, 0]],
+    ["six weights", [1, 1, 1, 1, 1, 1]],
+    ["eight weights", [1, 1, 1, 1, 1, 1, 1, 1]],
+    ["NaN", [1, 1, 1, 1, 1, 1, Number.NaN]],
+    ["Infinity", [1, 1, 1, 1, 1, 1, Number.POSITIVE_INFINITY]],
+  ])("%s: invalid_profile and no daily sales", (_, w) => {
+    const r = run(w);
+    expect(sales(r)).toEqual([]);
+    expect(r.review?.reasons.find((x) => x.code === "invalid_profile")?.refs).toEqual(["daily-sales"]);
+  });
+
+  it("a closed day (weight 0) emits no event; open days carry the week's sales", () => {
+    // Closed Mondays: weights [0,1,1,1,1,1,1], mean 6/7. History Oct 11-24 has 2 Mondays (weight 0) and 12 open days:
+    // weight-days = 12 / (6/7) = 14, avg = 14 x $700 / 14 = $700; an open day = 700 x 1 / (6/7) = $816.67 -> 81667 cents.
+    const r = run([0, 1, 1, 1, 1, 1, 1]);
+    const ev = sales(r);
+    expect(ev.length).toBeGreaterThan(0);
+    expect(ev.some((e) => new Date(`${e.date}T00:00:00Z`).getUTCDay() === 1)).toBe(false); // no Monday events
+    expect(ev.every((e) => e.amount === 81667)).toBe(true);
+    expect(r.review?.reasons.some((x) => x.code === "invalid_profile")).toBe(false);
+  });
+});
+
 describe("daily-sales legIndex is the sale date's day number, stable across asOf (#118)", () => {
   const p: Profile = { ...profile, revenueModel: { kind: "dailySales", weekdayWeights: [1, 1, 1, 1, 1, 1, 1], settleLagDays: 2 } };
   const sale = (date: string): CashEvent => ({ id: `s-${date}`, legIndex: 0, date, amount: $(700), currency: "USD", amountBase: $(700), direction: "in", status: "actual", confidence: 1, basis: "bank", category: "sales", sourceRef: src });

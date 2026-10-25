@@ -514,21 +514,27 @@ export const DAILY_SALES_ID = "daily-sales";
 // legIndex of the daily-sales event for a sale date: its day number since 1970-01-01 (UTC). Stable across runs.
 export const dailySalesLegIndex = (saleDate: string): number => diffDays(saleDate, "1970-01-01");
 
+function validWeekdayWeights(w: unknown): w is number[] {
+  return Array.isArray(w) && w.length === 7 && w.every((x) => typeof x === "number" && Number.isFinite(x) && x >= 0) && w.some((x) => x > 0);
+}
+
 // Daily-sales revenue model: average daily sales from the last salesHistoryDays (profile engine.salesHistoryDays, default 28) days of actual "sales" receipts, shaped by the
 // profile's weekday weights (index 0 = Monday). With `settleLagDays` (card settlement), each sale day's money lands
 // that many days later. Settlement dates that already have actual sales receipts are not forecast again.
 function expandDailySales(records: Records, profile: Profile, asOf: string, horizonEnd: string, fx: Record<string, number>, warnings: Notes, tun: EngineSettings = engineSettings(profile)): CashEvent[] {
   if (profile.revenueModel.kind !== "dailySales") return [];
-  const weights = profile.revenueModel.weekdayWeights;
+  const weights: unknown = profile.revenueModel.weekdayWeights;
+  // Exactly seven weights (Mon..Sun), each a finite number >= 0 (0 = closed that day), at least one > 0. Anything else
+  // (a negative weight would forecast negative sales) skips the model with a needs-review reason.
+  if (!validWeekdayWeights(weights)) {
+    warnings.review("invalid_profile", "Daily-sales model needs exactly seven weekday weights, each a number >= 0 and at least one > 0; no sales forecast.", [DAILY_SALES_ID]);
+    return [];
+  }
   const lag = Math.max(0, Math.round(profile.revenueModel.settleLagDays ?? 0));
-  const meanW = weights.reduce((a, b) => a + b, 0) / (weights.length || 1);
+  const meanW = weights.reduce((a, b) => a + b, 0) / weights.length;
   const { salesHistoryDays: historyDays, dailySalesConfidence } = tun;
   const from = addDays(asOf, -historyDays);
   const history = records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date >= from && e.date < asOf);
-  if (weights.length !== 7 || meanW <= 0) {
-    warnings.review("invalid_profile", "Daily-sales model needs seven positive weekday weights; no sales forecast.", [DAILY_SALES_ID]);
-    return [];
-  }
   if (history.length === 0) {
     warnings.review("no_sales_history", `No sales receipts in the ${historyDays} days before ${asOf}; daily sales are not forecast.`);
     return [];
@@ -570,6 +576,7 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
     if (booked.has(date)) continue;
     const w = weights[dowOf(sale)]!;
     const amount = Math.round((avg * w) / meanW);
+    if (amount <= 0) continue; // closed day (weight 0) or nothing to forecast: no $0 events
     const settles = lag ? `; sales of ${sale} settle ${lag} days later` : "";
     out.push({
       id: `evt-daily-sales-${date}`,
