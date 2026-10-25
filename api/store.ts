@@ -37,7 +37,7 @@ export type Account = {
   timezone?: string;
   kind?: string;                       // starter profile the owner picked
   aliases?: string[];                  // other names the business goes by (intake matching)
-  connections?: { id: string; name: string; state: "ok" | "waiting" | "error" }[];
+  connections?: { id: string; name: string; state: "ok" | "waiting" | "error"; message?: string; syncedAt?: string }[];
   ownerUserId?: string;                // Supabase auth user id of the owner (membership fallback)
   asOf?: string;                       // fixed "today" for synthetic samples; real businesses use the clock
   fxRates?: Record<string, number>;
@@ -150,6 +150,20 @@ export class MemoryStore implements Store {
 
   addMember(businessId: string, userId: string): void {
     this.need(businessId).members.add(userId);
+  }
+
+  // Copies a whole business in (the demo sandbox seeds itself from the real store this way).
+  async seedBusiness(s: {
+    business: Business; records: Records; storeRevision: number; proposals: ChangeProposal[]; candidates: IntakeCandidate[];
+    workItems: WorkItem[]; inputsHash?: string; overrides: Override[];
+  }): Promise<void> {
+    const c = structuredClone(s);
+    this.biz.set(c.business.id, {
+      ...c.business, records: c.records, storeRevision: c.storeRevision, members: new Set(),
+      proposals: new Map(c.proposals.map((p) => [p.id, p])), candidates: new Map(c.candidates.map((x) => [x.id, x])),
+      workItems: new Map(c.workItems.map((w) => [w.id, w])), ...(c.inputsHash ? { workItemsHash: c.inputsHash } : {}),
+      overrides: c.overrides, decisions: new Map(),
+    });
   }
 
   async getBusiness(id: string): Promise<Business | null> {

@@ -6,7 +6,7 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Override } from "../../schema/records";
 import type { Deps } from "../app";
-import { businessOf, HttpError } from "../http";
+import { storeFor, type NeriRequest, businessOf, HttpError } from "../http";
 import type { Business } from "../store";
 import { checkOverride, MAX_OVERRIDES, OVERRIDE_ID } from "../overrides";
 import { refreshPending } from "./review";
@@ -29,7 +29,7 @@ function idParam(req: FastifyRequest): string {
 // Samples are shared by every visitor: a saved change would move everyone's forecast.
 function ownBusiness(req: FastifyRequest): Business {
   const b = businessOf(req);
-  if (b.isSynthetic) throw new HttpError(403, "FORBIDDEN", "The sample is shared; set up your business to save changes.");
+  if (b.isSynthetic && !(req as NeriRequest).sandboxed) throw new HttpError(403, "FORBIDDEN", "The sample is shared; set up your business to save changes.");
   return b;
 }
 
@@ -37,22 +37,22 @@ export const overrideRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   // Compare-and-bump first, so of two writes from the same revision only one goes through (the other is a
   // 409 and reloads). Then read the list fresh, change it and save it. If the save fails the request is a
   // 500, the old list stays, and the bump costs one extra recompute.
-  const write = async (businessId: string, expected: number, change: (list: Override[]) => Override[]) => {
-    const storeRevision = await deps.store.bumpRevisionIf(businessId, expected);
+  const write = async (req: FastifyRequest, businessId: string, expected: number, change: (list: Override[]) => Override[]) => {
+    const storeRevision = await storeFor(req).bumpRevisionIf(businessId, expected);
     if (storeRevision === null) {
-      const { storeRevision: now } = await deps.store.load(businessId);
+      const { storeRevision: now } = await storeFor(req).load(businessId);
       throw new HttpError(409, "STALE_REVIEW", "Your books changed since you opened this. Reload and try again.", { revision: now, retryable: true });
     }
-    await deps.store.saveOverrides(businessId, change(await deps.store.loadOverrides(businessId)));
+    await storeFor(req).saveOverrides(businessId, change(await storeFor(req).loadOverrides(businessId)));
     // Pending Review proposals carry the revision they were built at; rebuild them so they stay confirmable.
-    const { records } = await deps.store.load(businessId);
-    await refreshPending(deps.store, businessId, records, storeRevision, deps.now().toISOString());
+    const { records } = await storeFor(req).load(businessId);
+    await refreshPending(storeFor(req), businessId, records, storeRevision, deps.now().toISOString());
     return storeRevision;
   };
 
   app.get("/overrides", async (req) => {
     const b = businessOf(req);
-    const [{ storeRevision }, overrides] = await Promise.all([deps.store.load(b.id), deps.store.loadOverrides(b.id)]);
+    const [{ storeRevision }, overrides] = await Promise.all([storeFor(req).load(b.id), storeFor(req).loadOverrides(b.id)]);
     return { overrides, storeRevision };
   });
 
@@ -69,7 +69,7 @@ export const overrideRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     }
     const expected = expectedRevision(req);
     const override = parsed.value;
-    const [{ records }, current] = await Promise.all([deps.store.load(b.id), deps.store.loadOverrides(b.id)]);
+    const [{ records }, current] = await Promise.all([storeFor(req).load(b.id), storeFor(req).loadOverrides(b.id)]);
     if (!records.commitments.some((c) => c.id === override.target.commitmentId)) {
       throw new HttpError(400, "INVALID_ARGUMENT", "That change points at a record we don't have.", { fieldIssues: [{ field: "target.commitmentId", issue: "unknown" }] });
     }
@@ -77,7 +77,7 @@ export const overrideRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       throw new HttpError(422, "TOO_MANY", `You have ${MAX_OVERRIDES} saved changes. Remove one first.`);
     }
     let created = false;
-    const storeRevision = await write(b.id, expected, (list) => {
+    const storeRevision = await write(req, b.id, expected, (list) => {
       created = !list.some((o) => o.id === id);
       return created ? [...list, override] : list.map((o) => (o.id === id ? override : o));
     });
@@ -88,8 +88,8 @@ export const overrideRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const b = ownBusiness(req);
     const id = idParam(req);
     const expected = expectedRevision(req);
-    if (!(await deps.store.loadOverrides(b.id)).some((o) => o.id === id)) throw new HttpError(404, "NOT_FOUND", "That change isn't saved any more.");
-    const storeRevision = await write(b.id, expected, (list) => list.filter((o) => o.id !== id));
+    if (!(await storeFor(req).loadOverrides(b.id)).some((o) => o.id === id)) throw new HttpError(404, "NOT_FOUND", "That change isn't saved any more.");
+    const storeRevision = await write(req, b.id, expected, (list) => list.filter((o) => o.id !== id));
     return { id, deleted: true, storeRevision };
   });
 };

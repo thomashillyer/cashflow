@@ -7,6 +7,8 @@ import { join } from "node:path";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { HttpError, sendError, type NeriRequest, type User } from "./http";
+import type Anthropic from "@anthropic-ai/sdk";
+import { AskLiveGuard, type AskLiveOptions } from "./ask-live";
 import type { AiMode } from "./engine";
 import type { Store } from "./store";
 import { readRoutes } from "./routes/read";
@@ -18,6 +20,7 @@ import { overrideRoutes } from "./routes/overrides";
 import { sourceRoutes } from "./routes/sources";
 import type { Fetch } from "../adapters/connector";
 import type { SourceAccessFn } from "./sourceAccess";
+import { SandboxStore, VISITOR_HEADER, VISITOR_ID } from "./sandbox";
 import { isBehind, type SchemaStatus, type SchemaStatusFn } from "./schema-status";
 
 // Verifies a Supabase access token. Returns null for an invalid or expired token.
@@ -28,19 +31,32 @@ export type AppOptions = {
   verify: Verifier;
   demoMode?: boolean;              // DEMO_MODE=1: unauthenticated requests may use synthetic businesses
   defaultBusiness?: string;        // sample opened when the caller has no business of their own
-  aiMode?: AiMode;
-  staticDir?: string;              // serve the app (same origin) when present
+  aiMode?: AiMode;                 // brief, drafts and document intake
+  askMode?: AiMode;                // POST /ask only; default: aiMode
+  askClient?: Anthropic;           // tests inject a stub; live Ask otherwise builds a client from ANTHROPIC_API_KEY
+  askLive?: AskLiveOptions;        // timeout and hourly cap for live Ask (NERI_ASK_LIVE_MAX_PER_HOUR)
+  askCacheDirs?: { intent?: string; voice?: string }; // tests point the live cache at a temp dir
+  staticDir?: string;             // serve the app (same origin) when present
   // Public values for the served app/config.js (the anon key is public by design; never the service-role key).
   appConfig?: { supabaseUrl?: string; supabaseAnonKey?: string };
   now?: () => Date;
   allowReset?: boolean;            // POST /demo/reset (synthetic businesses only)
   logger?: boolean | { stream: NodeJS.WritableStream }; // tests pass a stream to capture log lines
+  sandboxes?: SandboxStore;        // tests inject one to control the clock and limits
   schemaStatus?: SchemaStatusFn;   // GET /ready: repo vs database migration version (Supabase store only)
   sourceAccess?: SourceAccessFn;   // per-business tokens for Zoho / Outlook pulls (api/sourceAccess.ts); none = "not connected"
   sourceFetch?: Fetch;             // tests inject a fake provider
 };
 
-export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">> & { schemaStatus?: SchemaStatusFn; sourceAccess?: SourceAccessFn; sourceFetch?: Fetch };
+export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "askMode" | "now" | "allowReset">> & {
+  askGuard: AskLiveGuard;
+  askClient?: Anthropic;
+  askCacheDirs?: { intent?: string; voice?: string };
+  schemaStatus?: SchemaStatusFn;
+  sandboxes: SandboxStore;         // per-visitor copies of the synthetic samples (demo mode)
+  sourceAccess?: SourceAccessFn;   // tokens for Zoho / Outlook pulls (api/sourceAccess.ts); none = "not connected"
+  sourceFetch?: Fetch;
+};
 
 const READY_CACHE_MS = 30_000;
 
@@ -77,6 +93,12 @@ function bearer(req: FastifyRequest): string | null {
   return m ? m[1]! : "";
 }
 
+// The visitor's random id (X-Neri-Visitor), or null when absent or malformed.
+function visitorOf(req: FastifyRequest): string | null {
+  const v = req.headers[VISITOR_HEADER];
+  return typeof v === "string" && VISITOR_ID.test(v) ? v : null;
+}
+
 const BUSINESS_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
@@ -85,8 +107,13 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     demoMode: opts.demoMode ?? false,
     defaultBusiness: opts.defaultBusiness ?? "cascade_trade",
     aiMode: opts.aiMode ?? "cache_only",
+    askMode: opts.askMode ?? opts.aiMode ?? "cache_only",
+    askGuard: new AskLiveGuard(opts.askLive),
+    ...(opts.askClient ? { askClient: opts.askClient } : {}),
+    ...(opts.askCacheDirs ? { askCacheDirs: opts.askCacheDirs } : {}),
     now: opts.now ?? (() => new Date()),
     allowReset: opts.allowReset ?? false,
+    sandboxes: opts.sandboxes ?? new SandboxStore(),
     ...(opts.schemaStatus ? { schemaStatus: opts.schemaStatus } : {}),
     ...(opts.sourceAccess ? { sourceAccess: opts.sourceAccess } : {}),
     ...(opts.sourceFetch ? { sourceFetch: opts.sourceFetch } : {}),
@@ -118,7 +145,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   });
 
   // Liveness only: Fly health-checks this. It must stay 200 while the process is up, whatever the database says.
-  app.get("/health", async () => ({ ok: true, demoMode: deps.demoMode, aiMode: deps.aiMode }));
+  app.get("/health", async () => ({ ok: true, demoMode: deps.demoMode, aiMode: deps.aiMode, askMode: deps.askMode }));
 
   // Readiness: is the database migrated to what this code expects? Cached ~30s.
   let cached: { at: number; status: SchemaStatus | null } | undefined;
@@ -136,10 +163,13 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   app.addHook("preHandler", async (req) => {
     if (!isApiPath(req.url)) return;
     const r = req as NeriRequest;
+    r.store = deps.store;
+    const visitor = visitorOf(req);
+    if (visitor) r.visitorId = visitor;
     const token = bearer(req);
     if (token !== null) {
       const user = token ? await opts.verify(token).catch(() => null) : null;
-      if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Your session ended. Sign in again with a new code.");
+      if (!user) throw new HttpError(401, "UNAUTHENTICATED", "Your session ended. Sign in again with your email and password.");
       r.user = user;
     } else if (!deps.demoMode) {
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to see your numbers.");
@@ -163,6 +193,16 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     if (!business) throw notFound;
     if (!business.isSynthetic && !(r.user && await deps.store.isMember(business.id, r.user.id))) throw notFound;
     r.business = business;
+    // Demo samples are shared, so a visitor works on a private copy; the real store is never written.
+    if (deps.demoMode && business.isSynthetic) {
+      if (visitor) {
+        r.store = await deps.sandboxes.storeFor(visitor, business, deps.store);
+        r.sandboxed = true;
+        r.business = (await r.store.getBusiness(business.id)) ?? business;   // the visitor's profile and notes
+      } else if (req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS") {
+        throw new HttpError(403, "FORBIDDEN", "The sample is shared. Reload the page to get your own copy.");
+      }
+    }
   });
 
   await app.register(readRoutes(deps));

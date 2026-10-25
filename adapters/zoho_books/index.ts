@@ -3,7 +3,7 @@
 // what is stored, and the engine, not this module, creates future cash events. Owner overrides are
 // separate records this module never emits, so a refresh cannot erase them.
 
-import type { Evidence } from "../../schema/records";
+import type { BalanceSnapshot, Evidence } from "../../schema/records";
 import { buildAccounting, isoDate, str, toMinor, type AccountingDoc, type AccountingImport, type AccountingPayment, type DocStatus } from "../accounting/common";
 import { ConnectorFailure, type Fetch, type PullResult, type TokenProvider } from "../connector";
 import { ZohoClient, type ZohoRecord, type ZohoRegion } from "./client";
@@ -17,7 +17,9 @@ export type ZohoPullInput = {
   existingEvidence?: Evidence[];     // to report repeats; the store still upserts by sourceRef
 };
 
-export type ZohoPull = AccountingImport;
+// `balances`: the bank and cash accounts' balances as of today, the forecast's opening cash. Empty when Zoho did not
+// allow it (the Banking permission), with a warning in the diagnostics.
+export type ZohoPull = AccountingImport & { balances: BalanceSnapshot[] };
 
 export { toMinor };
 
@@ -112,5 +114,36 @@ async function pull(input: ZohoPullInput): Promise<ZohoPull> {
     if (!(err instanceof ConnectorFailure) || err.error.kind === "auth") throw err;
     warnings.push("Payment history could not be fully read (Zoho Books asked us to slow down). Invoices and bills are complete; import again later for payment history.");
   }
-  return buildAccounting({ system: "zoho_books", docs, payments, now: input.now, warnings, ...(input.existingEvidence ? { existingEvidence: input.existingEvidence } : {}) });
+  const { balances, warning } = await readBalances(client, input.now);
+  if (warning) warnings.push(warning);
+  const built = buildAccounting({ system: "zoho_books", docs, payments, now: input.now, warnings, ...(input.existingEvidence ? { existingEvidence: input.existingEvidence } : {}) });
+  return { ...built, balances };
+}
+
+// Bank and cash accounts -> opening cash. Read-only; a missing permission or a hiccup is a plain warning, never a
+// failed pull: invoices and bills are still useful without it.
+async function readBalances(client: ZohoClient, now: string): Promise<{ balances: BalanceSnapshot[]; warning?: string }> {
+  const asOf = now.slice(0, 10);
+  try {
+    const { records } = await client.list("bankaccounts", "bankaccounts");
+    const balances: BalanceSnapshot[] = [];
+    let unreadable = 0;
+    for (const a of records) {
+      const type = str(a.account_type);
+      if (a.is_active === false || (type !== "bank" && type !== "cash")) continue;
+      const id = str(a.account_id);
+      const currency = str(a.currency_code);
+      const amount = currency ? toMinor(a.bank_balance ?? a.balance, currency) : undefined;
+      if (!id || !currency || amount === undefined) { unreadable++; continue; }
+      balances.push({ id: `bal-zoho_books-${id}`, account: str(a.account_name) ?? id, amount, currency, asOf, sourceRef: { system: "zoho_books", record: `bankaccount:${id}` } });
+    }
+    const note = unreadable ? ` ${unreadable} account${unreadable === 1 ? " was" : "s were"} skipped because its balance could not be read.` : "";
+    if (balances.length === 0) return { balances, warning: `No bank balance was found in Zoho Books.${note} Enter your balance, or upload a bank statement.` };
+    return { balances, ...(unreadable ? { warning: note.trim() } : {}) };
+  } catch (err) {
+    if (err instanceof ConnectorFailure && err.error.kind === "auth") {
+      return { balances: [], warning: "Bank balances were not read: Zoho Books needs the Banking permission. Reconnect Zoho Books with it, enter your balance, or upload a bank statement." };
+    }
+    return { balances: [], warning: "Bank balances could not be read just now. Enter your balance, or upload a bank statement." };
+  }
 }

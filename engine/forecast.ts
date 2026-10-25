@@ -7,6 +7,7 @@ import type { Profile } from "../schema/profile";
 import type { ForecastRun } from "../schema/forecast";
 import { addDays, dateRange, diffDays, mondayOf } from "./dates";
 import { expand, money, toBase } from "./expand";
+import { fmtDate, ownerLabel } from "../ai/labels";
 import { adjust } from "./adjust";
 import { Notes } from "./review";
 import { engineSettings, engineSettingsIssues } from "./settings";
@@ -236,15 +237,15 @@ function rollOverdueOutflows(events: CashEvent[], profile: Profile, asOf: string
 }
 
 // Proposed signals and rules change nothing until the owner approves them, so the run says so instead of looking settled.
-function unconfirmed(records: Records, profile: Profile, warnings: Notes): void {
+function unconfirmed(records: Records, profile: Profile, asOf: string, warnings: Notes): void {
   const byId = new Map(records.commitments.map((c) => [c.id, c]));
   for (const s of records.signals) {
     if (s.state !== "proposed") continue;
     const c = s.commitmentId ? byId.get(s.commitmentId) : undefined;
-    const ref = c?.reference ?? s.commitmentId ?? "an unmatched item";
+    const ref = c?.reference ?? (s.commitmentId ? ownerLabel(s.commitmentId, { recurring: profile.recurring }) : "an unmatched item");
     const k = s.claim;
     const says =
-      k.kind === "date_change" ? `${ref} moves to ${k.newDate}`
+      k.kind === "date_change" ? `${ref} moves to ${fmtDate(k.newDate, asOf)}`
       : k.kind === "amount_change" ? `${ref} changes to ${money(k.newAmount, c?.currency ?? profile.baseCurrency)}`
       : k.kind === "cancel" ? `${ref} is cancelled`
       : `there is a new ${k.kind === "plan" ? "plan" : "commitment"}`;
@@ -252,7 +253,7 @@ function unconfirmed(records: Records, profile: Profile, warnings: Notes): void 
   }
   for (const r of records.rules) {
     if (r.state !== "proposed") continue;
-    warnings.review("unconfirmed_rule", `Unconfirmed: ${r.kind} rule ${r.id} from an owner note is not applied until confirmed.`, [r.id]);
+    warnings.review("unconfirmed_rule", `Unconfirmed: ${r.kind.replace(/_/g, " ")} rule from an owner note is not applied until confirmed.`, [r.id]);
   }
 }
 
@@ -260,7 +261,7 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
   const records = normalize(input);
   const end = horizonEnd(profile, asOf);
   const horizonDays = diffDays(end, asOf);
-  const warnings = new Notes();
+  const warnings = new Notes(asOf);
   // Invalid engine tunables fall back to their defaults (engineSettings); the owner still needs to know.
   for (const issue of engineSettingsIssues(profile)) warnings.review("invalid_profile", `Profile ${profile.id}: ${issue} (needs review).`, [profile.id]);
   const fx = { [profile.baseCurrency]: 1, ...fxRates };
@@ -293,7 +294,7 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     }
   }
 
-  unconfirmed(records, profile, warnings);
+  unconfirmed(records, profile, asOf, warnings);
 
   const inHorizon = (e: CashEvent) => e.date >= asOf && e.date < end;
   const main = events.filter((e) => e.status !== "possible" && inHorizon(e));

@@ -1,11 +1,12 @@
 import { api, SANDBOXES, suggestBusinessName, authLive } from "./api.js";
-import { currentSession } from "./ui/auth.js";
+import { consumeEmailLink, currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
 import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
+import { isQuestion } from "./ui/question.js";
 import { icon, logo, logoLarge } from "./ui/icons.js";
 import { speak, listen, canSpeak, canListen, speakable, spokenMoney } from "./ui/speech.js";
-import { addDays, dayDate, esc, greeting, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
+import { addDays, dayDate, esc, greeting, humanizeId, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -22,6 +23,7 @@ const app = {
   stressRun: null,
   whatIf: null,
   askLog: [],
+  attach: [], // files the owner added in the Ask bar, waiting to be sent
   mask: false,
   fresh: new Set(),
   noteFilter: "all",
@@ -132,8 +134,9 @@ function summary() {
     // what causes the dip: the biggest outflows in the week up to the low point
     const window = run.events.filter((e) => e.direction === "out" && e.date <= low.date && e.date > addDays(low.date, -8));
     const causes = window.sort((a, b2) => b2.amountBase - a.amountBase).slice(0, 2).map((e) => {
-      const c = e.sourceRef?.record ?? "";
+      const rec = e.sourceRef?.record ?? "";
       const pn = name(commitmentParty(e.commitmentId));
+      const c = app.ctx.profile?.recurring?.find((r) => r.id === rec)?.name?.toLowerCase() ?? humanizeId(rec);
       return pn ? `${pn} (${money(e.amountBase)})` : `${c} (${money(e.amountBase)})`;
     });
     return {
@@ -212,6 +215,7 @@ function route() {
   return ROUTES.includes(r) ? r : "today";
 }
 window.addEventListener("hashchange", () => {
+  closeSheet();
   render();
   window.scrollTo(0, 0);
 });
@@ -446,9 +450,12 @@ function spokenLength() {
 }
 
 function askBar(placeholder, hints = [], branded = false) {
-  return `
+  const files = branded && app.attach.length
+    ? `<ul class="attach-list" aria-label="Files to send">${app.attach.map((f, k) => `<li class="attach-chip"><span>${esc(f.name)}</span><button type="button" data-action="unattach" data-k="${k}" aria-label="Remove ${esc(f.name)}">×</button></li>`).join("")}</ul>`
+    : "";
+  return `${files}
   <form class="askbar ${branded ? "branded" : ""}" data-submit="ask">
-    ${branded ? `<span class="ask-mark" aria-hidden="true">${logo}</span>` : ""}
+    ${branded ? `<label class="attach-btn" title="Add photos or files"><span class="sr">Add photos or files</span>${icon.plus}<input type="file" multiple accept="image/*,.pdf,.csv,.xlsx,.xls,.doc,.docx,.eml,.txt" data-change="attach" hidden /></label>` : ""}
     <label class="sr" for="askq">Ask Neri</label>
     <input id="askq" name="q" placeholder="${esc(placeholder)}" autocomplete="off" />
     ${canListen ? `<button type="button" class="mic" data-action="mic-ask" aria-pressed="${app.stopListen ? "true" : "false"}" title="Speak">${icon.mic}<span class="sr">Speak</span></button>` : ""}
@@ -738,7 +745,7 @@ function viewSettings() {
       <div class="control" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${app.account?.sample ? `<button class="btn small primary" data-action="signout">Create your account</button>` : `<button class="btn small" data-action="signout">Sign out</button>`}</div></div>
     <h2 class="section-title" style="margin-top:28px">Security</h2>
     <p class="section-note">How your business's data is protected.</p>
-    <div class="setting"><h3>Sign-in</h3><p>${authLive ? "One-time codes to your business email. No passwords are stored." : "Preview sign-up. On a Neri server, sign-in uses one-time codes to your business email."}</p>
+    <div class="setting"><h3>Sign-in</h3><p>${authLive ? "Use your email and password. No email verification is needed." : "Preview sign-up stays in this browser. Real accounts use email and password on your Neri server."}</p>
       ${authLive && !app.account?.sample ? `<button class="btn small control" data-action="signout-all">Sign out everywhere</button>` : ""}</div>
     <div class="setting"><h3>Who can see your numbers</h3><p>Only members of ${esc(app.account?.businessName || "your business")}. You're the owner from sign-up; inviting teammates is coming.</p></div>
     <div class="setting"><h3>Your connected apps</h3><p>Read-only. Neri never writes back, sends or pays.</p></div>
@@ -755,26 +762,58 @@ function viewSettings() {
   </div>`;
 }
 
-// ---------------------------------------------------------------- Sign up (business email + code)
+// ---------------------------------------------------------------- Sign up (password accounts; browser-only preview)
 function viewWelcome() {
   const su = app.signup;
   const err = su.error ? `<p class="form-error" role="alert">${esc(su.error)}</p>` : "";
+  if (su.step === "name") {
+    return `<div class="portal-wrap"><div class="portal-mark">${logoLarge}</div>
+      <h1 class="portal-title">You're signed in</h1><p class="portal-sub">Set up your business for <b>${esc(su.email)}</b>.</p>
+      <form class="portal-form" data-submit="setup-name" novalidate>
+        <label for="bizname">Business name</label><input id="bizname" name="biz" value="${esc(su.name)}" placeholder="Your business" autocomplete="organization" maxlength="120" required />
+        ${err}<button class="btn primary big" type="submit">Continue</button>
+      </form></div>`;
+  }
+  if (authLive) {
+    const signingIn = su.mode === "signin";
+    return `<div class="portal-wrap">
+      <div class="portal-mark">${logoLarge}</div>
+      <h1 class="portal-title">${signingIn ? "Welcome back" : "Your CFO, in your pocket."}</h1>
+      <p class="portal-sub">${signingIn ? "Sign in to open your business." : "Create your account, then set up your business. No email verification needed."}</p>
+      <form class="portal-form" data-submit="${signingIn ? "password-signin" : "signup"}" novalidate>
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" placeholder="you@yourbusiness.com" value="${esc(su.email)}" required ${su.busy ? "disabled" : ""} />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="${signingIn ? "current-password" : "new-password"}" ${signingIn ? "" : 'minlength="8"'} placeholder="${signingIn ? "Your password" : "At least 8 characters"}" required ${su.busy ? "disabled" : ""} />
+        ${err}
+        <button class="btn primary big" type="submit" ${su.busy ? "disabled" : ""}>${su.busy ? (signingIn ? "Signing in…" : "Creating account…") : (signingIn ? "Sign in" : "Create account")}</button>
+      </form>
+      ${su.retry ? `<p class="portal-fine"><button class="btn" data-action="retry-signin" ${su.busy ? "disabled" : ""}>Try loading your business again</button></p>` : ""}
+      <p class="portal-fine"><button class="linklike" data-action="auth-mode" data-mode="${signingIn ? "signup" : "signin"}" ${su.busy ? "disabled" : ""}>${signingIn ? "New to Neri? Create an account" : "Already have an account? Sign in"}</button></p>
+      ${signingIn ? `<p class="portal-fine">Previously used an email link and haven't set a password? Ask the Neri team for help accessing your existing account.</p>` : ""}
+      <p class="portal-fine"><button class="linklike" data-action="sample" ${su.busy ? "disabled" : ""}>Look around with a sample business first</button></p>
+    </div>`;
+  }
   if (su.step === "code") {
     return `
     <div class="portal-wrap">
       <div class="portal-mark">${logoLarge}</div>
       <h1 class="portal-title">Check your email</h1>
-      <p class="portal-sub">We sent a 6-digit code to <b>${esc(su.email)}</b>.</p>
+      <p class="portal-sub">${authLive ? "Open the sign-in link we emailed to" : "Enter a preview code for"} <b>${esc(su.email)}</b>.</p>
+      ${authLive ? `<p class="portal-fine">Open the link in this browser, on this device. If your email app opens another browser, copy the link and paste it here.</p>` : ""}
+      ${err}
+      ${authLive ? `<details><summary>My email contains a six-digit code</summary>` : ""}
       <form class="portal-form" data-submit="verify" novalidate>
-        <label for="code">Code</label>
+        <label for="code">${authLive ? "If your email contains a 6-digit code, enter it here" : "Code"}</label>
         <input id="code" name="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required />
         <label for="bizname">Business name</label>
         <input id="bizname" name="biz" value="${esc(su.name)}" placeholder="Your business" autocomplete="organization" required />
-        ${err}
-        <button class="btn primary big" type="submit">Create account</button>
+        <button class="btn primary big" type="submit">${authLive ? "Continue with code" : "Create account"}</button>
       </form>
-      <p class="portal-fine">${authLive ? "The code works once and expires soon." : "Preview: any 6 digits work."}</p>
-      <p class="portal-fine"><button class="linklike" data-action="resend" ${resendWait() ? "disabled" : ""}>${resendWait() ? `Send a new code in ${resendWait()}s` : "Send a new code"}</button> <span aria-hidden="true">&nbsp;</span> <button class="linklike" data-action="signup-back">Use a different email</button></p>
+      ${authLive ? `</details>` : ""}
+      <p class="portal-fine">${authLive ? "The link or code works once and expires soon. You can also explore a sample business without signing in." : "Preview: any 6 digits work."}</p>
+      <p class="portal-fine"><button class="linklike" data-action="resend" ${resendWait() ? "disabled" : ""}>${resendWait() ? `Send a new email in ${resendWait()}s` : "Send a new email"}</button> <span aria-hidden="true">&nbsp;</span> <button class="linklike" data-action="signup-back">Use a different email</button></p>
+      <p class="portal-fine"><button class="linklike" data-action="sample">Explore a sample business</button></p>
     </div>`;
   }
   return `
@@ -788,7 +827,7 @@ function viewWelcome() {
       ${err}
       <button class="btn primary big" type="submit">Continue</button>
     </form>
-    <p class="portal-fine">No password to remember or leak: we email you a one-time code.</p>
+    <p class="portal-fine">${authLive ? "No password to remember or leak: we email you a one-time sign-in link or code." : "No password to remember or leak: preview sign-up uses any 6-digit code."}</p>
     <p class="portal-fine"><button class="linklike" data-action="sample">Look around with a sample business first</button></p>
   </div>`;
 }
@@ -806,7 +845,7 @@ function tickResend() {
     if (!b) return;
     const w = resendWait();
     b.disabled = w > 0;
-    b.textContent = w ? `Send a new code in ${w}s` : "Send a new code";
+    b.textContent = w ? `Send a new email in ${w}s` : "Send a new email";
     if (!w) clearInterval(resendTimer);
   }, 1000);
 }
@@ -839,7 +878,7 @@ async function unlock() {
     document.querySelector(".lock")?.remove();
     document.body.classList.remove("locked");
     await api.signOut();
-    app.signup = { step: "email", email: app.account?.email ?? "", name: "", error: "Your session ended. Sign in again with a new code." };
+    app.signup = { step: "email", mode: "signin", email: app.account?.email ?? "", name: "", error: "Your session ended. Sign in again with your email and password." };
     location.hash = "#/welcome";
     return load();
   }
@@ -979,14 +1018,14 @@ function showWeek(start) {
 }
 function partyNameFor(e) {
   const pid = commitmentParty(e.commitmentId);
-  return app.ctx.parties.find((p) => p.id === pid)?.name ?? (e.sourceRef.system === "owner" ? "Your plan" : e.sourceRef.record);
+  return app.ctx.parties.find((p) => p.id === pid)?.name ?? (e.sourceRef.system === "owner" ? "Your plan" : (app.ctx.profile?.recurring?.find((r) => r.id === e.sourceRef.record)?.name ?? (/^(rec-|revenueModel\.)/.test(e.sourceRef.record) ? humanizeId(e.sourceRef.record) : e.sourceRef.record)));
 }
 
 async function showDraft(itemId) {
   const d = await api.draft(itemId);
   openSheet(`
     ${sheetHead("Draft email", "Edit it, then copy it or open it in your mail app.")}
-    <div class="draft-field"><label for="d-to">To</label><input id="d-to" value="${esc(d.to)}" /></div>
+    <div class="draft-field"><label for="d-to">To</label><input id="d-to" value="${esc(d.to)}"${d.to || !d.toHint ? "" : ` placeholder="${esc(d.toHint)}"`} /></div>
     <div class="draft-field"><label for="d-sub">Subject</label><input id="d-sub" value="${esc(d.subject)}" /></div>
     <div class="draft-field"><label for="d-body">Message</label><textarea id="d-body">${esc(d.body)}</textarea></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -995,6 +1034,37 @@ async function showDraft(itemId) {
       <button class="btn quiet" data-action="done" data-id="${esc(itemId)}" data-close="1">Mark as done</button>
     </div>
     <p class="fineprint">Neri never sends anything for you. You send it, from your own mail.</p>`, { mask: false });
+}
+
+// Apps Neri can read for real today (Sources > Connect). Everything else connects by file until its connector is ready.
+const PULLABLE = new Set(["zoho_books", "zoho_crm", "m365"]);
+
+async function pullApps(ids, onStep) {
+  const out = [];
+  for (const id of ids.filter((x) => PULLABLE.has(x))) {
+    const name = CONNECTORS.find((c) => c.id === id)?.name ?? id;
+    onStep?.(name);
+    try {
+      out.push({ id, name, ok: true, res: await api.pullSource(id) });
+    } catch (e) {
+      out.push({ id, name, ok: false, error: e.message });
+    }
+  }
+  return out;
+}
+
+// One plain sentence per app: what was read, or why not and what to do instead.
+function pullSummary(results) {
+  if (!results.length) return "Nothing to read yet. Upload a file or connect an app whenever you're ready.";
+  return results.map((r) => {
+    if (!r.ok) return `${r.name}: ${r.error}`;
+    const s = r.res?.summary ?? {};
+    const warn = r.res?.diagnostics?.warnings?.[0];
+    const what = r.res?.kind === "messages"
+      ? `${s.messages ?? 0} message${s.messages === 1 ? "" : "s"} to review`
+      : `${r.res?.diagnostics?.rowsRead ?? 0} item${r.res?.diagnostics?.rowsRead === 1 ? "" : "s"} read`;
+    return `${r.name}: ${what}.${warn ? ` ${warn}` : ""}`;
+  }).join(" ");
 }
 
 function showConnect(id) {
@@ -1206,14 +1276,43 @@ function readingSentence(n) {
 }
 
 // ---------------------------------------------------------------- actions
-// One bar for everything: questions get answers; anything else is a thought to park.
-const QUESTION = /\?\s*$|^(what|when|where|who|whom|why|how|can|could|will|would|should|shall|is|are|was|do|does|did|am|show|tell|give|list|explain)\b/i;
+// Re-render without losing what the owner was typing in the Ask bar.
+function keepTyped(fn) {
+  const typed = $("#askq")?.value ?? "";
+  fn();
+  const box = $("#askq");
+  if (box && typed) box.value = typed;
+}
+
+// Files from the Ask bar's + or an Upload button. The server reads them and anything that could move cash
+// waits in Review; the preview has no server, so it says so instead of pretending.
+async function sendFiles(files) {
+  const label = files.length === 1 ? files[0].name : `${files.length} files`;
+  if (api.mode === "preview") {
+    toast(`${label} not read`, "This preview runs on sample data, so files stay in your browser. On your Neri server they're read and wait in Review.");
+    return;
+  }
+  let sent = 0;
+  for (const f of files) {
+    try {
+      await api.uploadFile(f);
+      sent++;
+    } catch (e) {
+      toast(`${f.name} wasn't read`, e.message);
+    }
+  }
+  if (sent) {
+    app.review = await api.review().catch(() => app.review);
+    toast(sent === files.length ? `${label} read` : `${sent} of ${files.length} files read`, "Anything that could move your cash is waiting in Review.", "Open Review", () => (location.hash = "#/review"));
+    render();
+  }
+}
 
 async function doAsk(q, via = "typed") {
   q = q.trim();
   if (!q) return;
   if (route() !== "today") location.hash = "#/today";
-  const parking = !QUESTION.test(q);
+  const parking = !isQuestion(q);
   const turn = { q, pending: true, parking };
   app.askLog.push(turn);
   render();
@@ -1273,12 +1372,35 @@ async function onClick(ev) {
   if (a === "talk") return openTalk();
   if (a === "deck") return moveDeck(Number(el.dataset.dir));
   if (a === "unlock") return unlock();
+  if (a === "auth-mode") {
+    if (app.signup.busy) return;
+    app.signup = { ...app.signup, mode: el.dataset.mode, error: "" };
+    render();
+    return;
+  }
+  if (a === "retry-signin") {
+    if (app.signup.busy) return;
+    app.signup.busy = true;
+    render();
+    try {
+      const session = await currentSession();
+      if (session) await resumeSignin(session);
+      else {
+        app.signup.retry = false;
+        app.signup.error = "Your session ended. Sign in again with your email and password.";
+      }
+    } finally {
+      app.signup.busy = false;
+      render();
+    }
+    return;
+  }
   if (a === "resend") {
     try {
       await api.startSignup(app.signup.email);
       app.signup.sentAt = Date.now();
       app.signup.error = "";
-      toast("New code sent", `Check ${app.signup.email}.`);
+      toast("Sign-in email sent", `Check ${app.signup.email}.`);
     } catch (e) {
       app.signup.error = e.message;
     }
@@ -1337,7 +1459,7 @@ async function onClick(ev) {
     const dollars = Number(String(st.reserve).replace(/[^\d.]/g, ""));
     // Preview: connectors marked Ready sign in on the Neri server; here they show as connected. Others wait for a file.
     try {
-      await new Promise((r) => setTimeout(r, st.picked.size ? 1100 : 0));
+      if (api.mode === "preview") await new Promise((r) => setTimeout(r, st.picked.size ? 1100 : 0));
       await api.completeSetup({ email: app.signup.email, businessName: app.signup.name, kind: st.kind, reserve: dollars ? Math.round(dollars * 100) : null, connect: [...st.picked] });
     } catch (e) {
       st.connecting = false;
@@ -1345,9 +1467,16 @@ async function onClick(ev) {
       toast("Couldn't finish setup", `${e.message} Try again, or upload a file instead.`);
       return;
     }
+    // Live: read each ticked app now, so Home opens with the real numbers. A failure is shown in words and the
+    // owner can upload a file instead; one app failing never stops the others.
+    const results = api.mode === "preview" ? [] : await pullApps([...st.picked], (name) => {
+      const btn = document.querySelector('[data-action="connect-all"]');
+      if (btn) btn.textContent = `Reading ${name}…`;
+    });
     st.connecting = false;
     history.replaceState(null, "", "#/today");
     await load();
+    if (results.length) return toast("All set", pullSummary(results));
     const c = app.account.connections;
     const ok = c.filter((x) => x.state === "ok").length;
     toast("All set", c.length ? `${ok} connected${c.length - ok ? `, ${c.length - ok} waiting for a file` : ""}. Here's today.` : "Upload a file or connect an app whenever you're ready.");
@@ -1374,6 +1503,10 @@ async function onClick(ev) {
   if (a === "listen") return toggleListen();
   if (a === "drive") return openDrive();
   if (a === "drive-close") return closeDrive();
+  if (a === "unattach") {
+    app.attach.splice(Number(el.dataset.k), 1);
+    return keepTyped(render);
+  }
   if (a === "mic-ask") return startCapture("ask");
   if (a === "mic-note") return startCapture("note");
   if (a === "mic-drive") return startCapture("drive");
@@ -1435,7 +1568,15 @@ async function onClick(ev) {
   }
   if (a === "connect") return showConnect(id);
   if (a === "connect-go") {
-    toast("Sign-in opens on your Neri server", "This preview runs a fictional business with sample data.");
+    if (api.mode === "preview" || !PULLABLE.has(id)) {
+      toast("Sign-in opens on your Neri server", "This preview runs a fictional business with sample data.");
+      return;
+    }
+    el.disabled = true;
+    const results = await pullApps([id], (name) => { el.textContent = `Reading ${name}…`; });
+    closeSheet();
+    await load();
+    toast(results[0]?.ok ? "Connected" : "Couldn't connect", pullSummary(results));
     return;
   }
   if (a === "interest") {
@@ -1496,11 +1637,38 @@ async function onSubmit(ev) {
   if (!f) return;
   ev.preventDefault();
   const kind = f.dataset.submit;
-  if (kind === "ask") return doAsk(new FormData(f).get("q") ?? "");
+  if (kind === "ask") {
+    const q = new FormData(f).get("q") ?? "";
+    if (app.attach.length) {
+      const files = app.attach;
+      app.attach = [];
+      await sendFiles(files);
+      if (!String(q).trim()) return render();
+    }
+    return doAsk(q);
+  }
   if (kind === "talk-typed") {
     const q = String(new FormData(f).get("q") ?? "");
     closeTalk();
     return doAsk(q);
+  }
+  if (authLive && (kind === "signup" || kind === "password-signin")) {
+    if (app.signup.busy) return;
+    const fd = new FormData(f);
+    const email = String(fd.get("email") ?? "").trim();
+    const password = String(fd.get("password") ?? "");
+    app.signup = { ...app.signup, email, busy: true, error: "" };
+    render();
+    try {
+      const session = kind === "signup" ? await api.createAccount(email, password) : await api.signIn(email, password);
+      await resumeSignin(session);
+    } catch (e) {
+      app.signup.error = e.message;
+    } finally {
+      app.signup.busy = false;
+      render();
+    }
+    return;
   }
   if (kind === "signup") {
     const email = String(new FormData(f).get("email") ?? "").trim();
@@ -1513,7 +1681,7 @@ async function onSubmit(ev) {
       app.signup.email = email;
     }
     render();
-    $("#code")?.focus();
+    if (!authLive) $("#code")?.focus();
     return;
   }
   if (kind === "verify") {
@@ -1522,13 +1690,22 @@ async function onSubmit(ev) {
     try {
       if (!name) throw new Error("Add your business name.");
       await api.verifyCode(app.signup.email, String(fd.get("code") ?? ""));
-      app.signup = { ...app.signup, name, step: "done", error: "" };
-      location.hash = "#/setup";
+      await resumeSignin(authLive ? await currentSession() : null, name);
     } catch (e) {
       app.signup.error = e.message;
       app.signup.name = name;
       render();
     }
+    return;
+  }
+  if (kind === "setup-name") {
+    const name = String(new FormData(f).get("biz") ?? "").trim();
+    if (!name || name.length > 120) {
+      app.signup.error = "Add your business name (up to 120 characters).";
+      return render();
+    }
+    app.signup = { ...app.signup, name, step: "done", error: "" };
+    location.hash = "#/setup";
     return;
   }
   if (kind === "park") {
@@ -1570,10 +1747,17 @@ async function onChange(ev) {
     await load();
     return;
   }
-  if (el.dataset.change === "upload") {
-    const file = el.files?.[0];
-    if (file) toast(`${file.name} received`, api.mode === "preview" ? "This preview uses sample data, so the file isn't imported. On your Neri server it goes to Review first." : "Reading it now. New items will wait in Review.");
+  if (el.dataset.change === "attach") {
+    app.attach.push(...Array.from(el.files ?? []));
     el.value = "";
+    keepTyped(render);
+    $("#askq")?.focus();
+    return;
+  }
+  if (el.dataset.change === "upload") {
+    const files = Array.from(el.files ?? []);
+    el.value = "";
+    if (files.length) await sendFiles(files);
     return;
   }
   if (el.dataset.noteField) {
@@ -1599,7 +1783,56 @@ window.addEventListener("resize", () => {
   }, 150);
 });
 
-load().catch((err) => {
+// Complete authentication before load() interprets the hash route or requests business data.
+async function resumeSignin(session, name = "") {
+  try {
+    const account = authLive ? await api.restoreAccount(session) : null;
+    app.account = account;
+    if (account) {
+      history.replaceState(null, "", "#/today");
+      return await load();
+    }
+    app.signup = { step: name ? "done" : "name", email: session?.user?.email ?? app.signup.email, name: name || suggestBusinessName(session?.user?.email ?? ""), error: "" };
+    history.replaceState(null, "", name ? "#/setup" : "#/welcome");
+    render();
+  } catch {
+    // Authentication succeeded. Keep its session, but do not show a half-loaded or cached business.
+    app.account = null;
+    app.ctx = null;
+    app.brief = null;
+    app.signup = { step: "email", mode: "signin", email: session?.user?.email ?? "", name: "", retry: true,
+      error: "You're signed in, but Neri couldn't load your business. Try loading it again." };
+    history.replaceState(null, "", "#/welcome");
+    render();
+  }
+}
+
+async function start() {
+  if (authLive) {
+    let session;
+    let fromLink;
+    try {
+      fromLink = await consumeEmailLink();
+      session = fromLink ?? await currentSession();
+    } catch (error) {
+      // Callback failures belong on sign-in, with no URL credentials or raw provider text rendered.
+      app.account = null;
+      app.signup.error = error.message;
+      history.replaceState(null, "", "#/welcome");
+      return render();
+    }
+    if (fromLink || (session && (!app.account || (!app.account.sample && app.account.email !== session.user.email)))) return resumeSignin(session);
+    if (!session && app.account && !app.account.sample) {
+      await api.signOut();
+      app.account = null;
+      app.signup.mode = "signin";
+      app.signup.error = "Your session ended. Sign in again with your email and password.";
+    }
+  }
+  return load();
+}
+
+start().catch((err) => {
   $("#view").innerHTML = `<section class="panel" style="max-width:640px;margin-top:40px"><h2 style="color:var(--ink);font-size:18px">Neri couldn't load your numbers</h2><p>${esc(err.message)}</p><p style="color:var(--ink-soft)">If you're running against the API, check the server is up, then reload.</p></section>`;
   console.error(err);
 });

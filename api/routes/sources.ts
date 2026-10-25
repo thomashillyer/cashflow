@@ -9,10 +9,12 @@ import type { ConnectorError } from "../../adapters/connector";
 import { isSourceId, pullSource, type SourceId } from "../../adapters/pull";
 import type { Deps } from "../app";
 import { businessIdentity } from "../engine";
-import { businessOf, HttpError } from "../http";
+import { businessOf, HttpError, userOf } from "../http";
 import { persistImport } from "../persist";
 
 const LABEL: Record<SourceId, string> = { zoho_books: "Zoho Books", zoho_crm: "Zoho CRM", outlook: "Outlook", quickbooks: "QuickBooks", xero: "Xero" };
+// The app calls Microsoft 365 "m365"; the adapter reads Outlook.
+const ALIAS: Record<string, SourceId> = { m365: "outlook" };
 const MAX_MESSAGES = 15;     // each message can cost model calls: the rest wait for the next pull
 
 const STATUS: Record<ConnectorError["kind"], { status: number; code: string; retryable: boolean }> = {
@@ -27,12 +29,26 @@ const httpFor = (e: ConnectorError) => new HttpError(STATUS[e.kind].status, STAT
 export const sourceRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   const running = new Set<string>();
 
+  // What the Sources screen shows for this connection: connected with a time, or the plain reason it is not.
+  async function mark(businessId: string, id: string, state: "ok" | "error", message: string | undefined, now: string) {
+    const fresh = await deps.store.getBusiness(businessId);
+    if (!fresh) return;
+    const acc = fresh.profile.account ?? {};
+    const prev = (acc.connections ?? []).find((c) => c.id === id);
+    // A repeat pull that changes nothing writes nothing (so the store revision, and pending Review items, stay put).
+    if (prev && prev.state === state && (prev.message ?? undefined) === message) return;
+    const rest = (acc.connections ?? []).filter((c) => c.id !== id);
+    const entry = { id, name: LABEL[ALIAS[id] ?? (isSourceId(id) ? id : "zoho_books")] ?? id, state, ...(message ? { message } : {}), ...(state === "ok" ? { syncedAt: now } : {}) };
+    await deps.store.saveProfile(businessId, { ...fresh.profile, account: { ...acc, connections: [...rest, entry], ...(state === "ok" ? { syncedAt: now } : {}) } });
+  }
+
   app.post("/sources/:source/pull", async (req) => {
     const b = businessOf(req);
-    const { source } = req.params as { source: string };
+    const { source: asked } = req.params as { source: string };
+    const source = ALIAS[asked] ?? asked;
     if (!isSourceId(source)) throw new HttpError(404, "NOT_FOUND", "That source isn't available. Upload a file or paste the text instead.");
     if (b.isSynthetic) throw new HttpError(403, "SAMPLE_BUSINESS", "The samples already have their data. Sign in and set up your own business to connect a source.");
-    const access = await deps.sourceAccess?.(b.id, source);
+    const access = await deps.sourceAccess?.({ business: b, ...(userOf(req) ? { user: userOf(req)! } : {}) }, source);
     if (!access) throw new HttpError(422, "SOURCE_NOT_SET_UP", `${LABEL[source]} isn't connected for this business yet. Connect it in Sources, or upload an export or paste the text instead.`);
 
     const lock = `${b.id}:${source}`;
@@ -50,12 +66,21 @@ export const sourceRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         ...(deps.sourceFetch ? { fetch: deps.sourceFetch } : {}),
         knownDomains: [...new Set(records.parties.flatMap((p) => p.contacts?.emailDomains ?? []))],
       });
-      if (!pulled.ok) throw httpFor(pulled.error);
+      if (!pulled.ok) {
+        await mark(b.id, asked, "error", `${pulled.error.message} ${pulled.error.nextStep}`, now).catch(() => undefined);
+        throw httpFor(pulled.error);
+      }
       const p = pulled.data;
 
       if (p.kind === "records") {
         const summary = await persistImport(deps.store, b.id, p.records);
-        return { source, kind: "records", summary, diagnostics: p.diagnostics, ...(p.unallocatedPayments ? { unallocatedPayments: p.unallocatedPayments.length } : {}) };
+        // Opening cash: the books' bank balances, written like any record (latest per account wins in the engine).
+        // Written only when it changed, so a repeat pull leaves the store revision (and pending Review items) alone.
+        const stored = new Map(records.balances.map((x) => [x.id, x]));
+        const changed = (p.balances ?? []).filter((x) => { const o = stored.get(x.id); return !o || o.amount !== x.amount || o.asOf !== x.asOf || o.currency !== x.currency; });
+        if (changed.length) await deps.store.upsertRecords(b.id, { balances: changed });
+        await mark(b.id, asked, "ok", undefined, now).catch(() => undefined);
+        return { source, kind: "records", summary: { ...summary, balances: p.balances?.length ?? 0 }, diagnostics: p.diagnostics, ...(p.unallocatedPayments ? { unallocatedPayments: p.unallocatedPayments.length } : {}) };
       }
 
       // Messages: the same intake as an upload. Nothing is applied here.
@@ -77,9 +102,10 @@ export const sourceRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         newSignals.forEach((s) => seenSignals.add(s.id));
       }
       const waiting = p.inputs.length - todo.length;
+      await mark(b.id, asked, "ok", undefined, now).catch(() => undefined);
       return {
         source, kind: "messages", diagnostics: p.diagnostics,
-        summary: { messages: todo.length, waiting, candidates, proposals, signals },
+        summary: { messages: todo.length, waiting, alreadyRead: p.diagnostics.rowsDuplicate, candidates, proposals, signals },
       };
     } finally {
       running.delete(lock);
