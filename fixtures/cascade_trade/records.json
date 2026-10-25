@@ -487,8 +487,8 @@
       "amount": 1200000,
       "currency": "USD",
       "anchors": {
-        "invoice": "2026-11-24",
-        "due": "2026-12-24"
+        "invoice": "2026-11-28",
+        "due": "2026-12-28"
       },
       "status": "committed",
       "outstanding": 1200000,

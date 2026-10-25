@@ -139,7 +139,7 @@ npm run demo       # demo profile + cached Claude responses (not yet)
 
 - Never push to `main`. Branch per issue (`p<person>/<topic>`, e.g. `p4/reconcile`), open a PR with `Closes #<issue>`, and say if it is stacked on another PR.
 - Keep PRs small: one issue each.
-- The pre-push hook (`scripts/hooks/pre-push`) blocks pushes to `main`; `npm install` enables it (`prepare` runs `git config core.hooksPath scripts/hooks`).
+- The pre-push hook (`scripts/hooks/pre-push`) blocks pushes to `main`; `npm install` enables it (`prepare` sets `core.hooksPath` to `scripts/hooks` for the clone, so all worktrees, and leaves an existing different `core.hooksPath` alone).
 - **Before pushing**, run `npm run typecheck && npm test` and a **local subagent review** (below) on your branch, and fix the must-fix findings. Pushing means the work is reviewed: once a PR is open, it can be merged (squash) without waiting for another review.
 
 ### Local PR review (Claude Code)

@@ -94,8 +94,10 @@ function cascadeTrade(): Records {
   r.settlements = [...eg.settlements, ...pm.settlements, ...hh.settlements];
   r.commitments.push(
     invoice("INV-1187", "party-evergreen-home", $(28000), "2026-12-10", "2026-11-10"),
-    // Due on Christmas Eve, so it lands after New Year (holiday delay): applying the Evergreen signal then deepens the dip.
-    invoice("INV-1203", "party-harbor-hearth", $(12000), "2026-12-24", "2026-11-24"),
+    // The due date matters: with Harbor's learned lag (holiday delay) INV-1203 lands about Jan 6, after rent on Jan 1. So when
+    // the Evergreen signal moves INV-1187 into January, nothing refills the account between Dec 25 and rent and the dip
+    // deepens (about -$12K on Jan 1). Due earlier, INV-1203 lands before rent and the signal no longer moves the low point.
+    invoice("INV-1203", "party-harbor-hearth", $(12000), "2026-12-28", "2026-11-28"),
     invoice("INV-1215", "party-puget-market", $(115000), "2027-01-12", "2026-12-13"),
     {
       id: "po-PO-2291", type: "purchase_order", direction: "out", reference: "PO-2291", partyId: "party-shenzhen-ceramics", amount: $(60000), currency: "USD",

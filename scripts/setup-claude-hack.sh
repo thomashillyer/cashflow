@@ -124,7 +124,7 @@ if ! grep -qs '.local/bin' "$RC"; then
 fi
 
 # Enable the repo's pre-push hook (blocks pushes to main) when this script runs from the repo checkout.
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 if command -v git >/dev/null 2>&1 && [[ -f "$REPO_DIR/scripts/hooks/pre-push" ]]; then
   git -C "$REPO_DIR" config core.hooksPath scripts/hooks && ok "Enabled the pre-push hook (git config core.hooksPath scripts/hooks)"
 fi
