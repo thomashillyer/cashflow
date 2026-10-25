@@ -24,18 +24,19 @@ const main = readFileSync(new URL("./main.js", import.meta.url), "utf8");
 const boot = main.lastIndexOf("\nstart().catch");
 if (boot < 0) throw new Error("The app boot entrypoint changed; update this screen harness.");
 const ui = main.slice(0, boot).replace(/^import .*;\n/gm, "");
-function render(run: ForecastRun, mode = "live") {
+function render(run: ForecastRun, mode = "live", note?: unknown) {
   const drive = { innerHTML: "" };
   const supplied = {
     brief: { run, three: [], rest: [], watch: [], combined: null, shortfall: null },
     ctx: { parties: [], business: { asOf }, profile, partyOf: () => undefined },
     account: { owner: "Owner" },
+    note,
   };
   const escape = (s: unknown) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   return runInNewContext(`${ui}
     Object.assign(app, supplied);
     renderDrive();
-    ({ summary: summary(), html: viewToday(), spoken: spokenBrief(), panel: typeof forecastReviewPanel === "function" ? forecastReviewPanel() : "", drive: drive.innerHTML });`, {
+    ({ summary: summary(), html: viewToday(), spoken: spokenBrief(), panel: typeof forecastReviewPanel === "function" ? forecastReviewPanel() : "", drive: drive.innerHTML, noteHtml: supplied.note ? noteRow(supplied.note) : "" });`, {
     supplied, drive, api: { account: () => null, mode },
     document: { addEventListener() {}, querySelector: () => drive },
     window: { addEventListener() {}, NERI_LOCK_MINUTES: 0 },
@@ -44,8 +45,15 @@ function render(run: ForecastRun, mode = "live") {
     addDays: (d: string, n: number) => new Date(Date.parse(d) + n * 86400000).toISOString().slice(0, 10),
     speakable: String, greeting: () => "Hello", canSpeak: false, canListen: false,
     ASK_HINTS: [], CONNECTORS: [], CATEGORIES: [], logo: "", icon: {},
-  }) as { summary: { headline: string; take: string; tone: string }; html: string; spoken: string[]; panel: string; drive: string };
+  }) as { summary: { headline: string; take: string; tone: string }; html: string; spoken: string[]; panel: string; drive: string; noteHtml: string };
 }
+
+it("lets the owner clarify an unknown loan direction before adding it", () => {
+  const output = render(makeRun(), "live", { id: "loan", text: "A 50k loan next week", createdAt: `${asOf}T12:00:00Z`, via: "typed", state: "new", reading: { kind: "investment", direction: null, amount: 5000000, date: "2026-11-01", status: "likely", missing: ["direction"] } });
+  expect(output.noteHtml).toContain('data-action="note-direction" data-to="in"');
+  expect(output.noteHtml).toContain('data-action="note-direction" data-to="out"');
+  expect(output.noteHtml).toMatch(/data-d="add"[^>]*disabled/);
+});
 
 describe("forecast checks in the owner brief", () => {
   it("shows the engine's no-data reason instead of an all-clear when the action list is empty", () => {

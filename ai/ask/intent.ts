@@ -26,6 +26,7 @@ import { parseAmount } from "../normalize";
 import { resolveDatePhrase } from "../extract/signals";
 import { nameSimilarity, resolveParty } from "../reconcile/parties";
 import { normalizeRef } from "../reconcile/match";
+import { readCashMovement } from "../cash-direction";
 
 // ---------------------------------------------------------------------------
 // Model output schema
@@ -504,10 +505,14 @@ export function resolveIntent(question: string, raw: AskIntentRaw, ctx: ResolveI
   // ---- synthetic draft (afford, what_if, tell plan) when no existing commitment is named
   const draftKind = kind === "afford" || kind === "what_if" || (kind === "tell" && !isRule);
   if (draftKind && !instructed && !commitmentId && amount) {
-    const type = raw.commitmentType;
+    const movement = readCashMovement(question);
+    const type = movement?.funding ? "plan" : raw.commitmentType;
+    if (movement?.direction === null) {
+      need("Is this money coming in or going out?");
+    } else {
     const direction =
       type === "sales_deal" ? "in"
-        : type === "plan" ? "out" // an outbound plan; a model slip must never turn a payment into an inflow
+        : type === "plan" ? movement?.direction ?? "out"
         : type === "recurring" ? raw.direction ?? "out"
           : raw.direction ?? (party?.kind === "customer" ? "in" : party?.kind === "supplier" ? "out" : "out");
     const date = intent.date ?? addDays(asOf, DEFAULT_DAYS_OUT);
@@ -516,6 +521,7 @@ export function resolveIntent(question: string, raw: AskIntentRaw, ctx: ResolveI
       amount: amount.amount,
       currency: amount.currency,
       status: "likely" as const,
+      ...(direction === "in" && movement?.funding ? { funding: true as const } : {}),
       sourceRef: { system: "owner", record: askDraftId(question) },
     };
     let draft: CommitmentDraft;
@@ -529,6 +535,7 @@ export function resolveIntent(question: string, raw: AskIntentRaw, ctx: ResolveI
     }
     intent.draft = draft;
     if (!intent.date) intent.date = date;
+    }
   }
 
   // ---- required slots (docs/design/08-claude-layer.md)

@@ -176,7 +176,7 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       if (k === "partyId") { if (typeof v !== "string") throw new HttpError(400, "INVALID_ARGUMENT", "Pick a customer or supplier."); r.partyId = v; }
       if (k === "kind") { if (!["investment", "new_business", "collection", "spend", "note"].includes(String(v))) throw new HttpError(400, "INVALID_ARGUMENT", "Pick a kind."); r.kind = v as ThoughtReading["kind"]; }
     }
-    r.missing = r.missing.filter((m) => (m === "amount" ? r.amount == null : m === "date" ? r.date == null : true));
+    r.missing = r.missing.filter((m) => (m === "amount" ? r.amount == null : m === "date" ? r.date == null : m === "direction" ? r.direction == null : true));
     const next = { ...t, reading: r };
     await saveThoughts(req, b, (b.profile.account?.thoughts ?? []).map((x) => (x.id === t.id ? next : x)));
     return (await view(req, b, [next]))[0];

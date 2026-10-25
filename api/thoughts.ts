@@ -8,9 +8,10 @@ import type { Profile } from "../schema/profile";
 import type { CommitmentDraft, Override, Records, Signal } from "../schema/records";
 import { forecast } from "../engine/forecast";
 import type { Thought, ThoughtReading } from "./store";
+import { readCashMovement } from "../ai/cash-direction";
 
 const KINDS: { kind: ThoughtReading["kind"]; re: RegExp; direction: "in" | "out"; status: "likely" | "possible" }[] = [
-  { kind: "investment", re: /\b(invest|investment|equipment|machine|cooler|truck|forklift|warehouse|expan\w*|loan|capex|renovat\w*|upgrade)\b/, direction: "out", status: "likely" },
+  { kind: "investment", re: /\b(invest|investment|equipment|machine|cooler|truck|forklift|warehouse|expan\w*|capex|renovat\w*|upgrade)\b/, direction: "out", status: "likely" },
   { kind: "new_business", re: /\b(rfq|quote|quoted|lead|prospect|new customer|might order|could order|order from|deal|catering|booking|tender|bid)\b/, direction: "in", status: "possible" },
   { kind: "collection", re: /\b(collect|owes?|owe us|chase|will pay|can pay|pay by|pay us|payment from|receivable|overdue|paying late|pays late)\b/, direction: "in", status: "likely" },
   { kind: "spend", re: /\b(buy|spend|pay|paying|deposit|hire|hiring|purchase|rent|bonus|tax|container|fix|repair|order)\b/, direction: "out", status: "likely" },
@@ -56,7 +57,16 @@ export function readThought(text: string, records: Records, asOf: string): Thoug
   const ref = (c: Records["commitments"][number]) => (c.reference ?? c.sourceRef.record).toLowerCase();
   const named = records.commitments.find((c) => ref(c).length > 3 && q.includes(ref(c)));
   const openInvoice = named?.type === "invoice" && (named.settlement ?? "open") === "open" ? named : undefined;
-  const match = openInvoice ? KINDS.find((k) => k.kind === "collection")! : KINDS.find((k) => k.re.test(q));
+  const movement = readCashMovement(text);
+  const loan = /\b(loan|financing|funding|borrow\w*|credit line|line of credit|capital injection)\b/.test(q);
+  const known = KINDS.find((k) => k.re.test(q));
+  const match = loan
+    ? { kind: "investment" as const, direction: movement?.direction ?? null, status: "likely" as const }
+    : openInvoice ? KINDS.find((k) => k.kind === "collection")!
+      : known?.kind === "new_business" ? known
+        : movement?.direction === "in" ? { kind: "collection" as const, direction: "in" as const, status: "likely" as const }
+        : known
+          ?? (movement?.direction === "out" ? { kind: "spend" as const, direction: "out" as const, status: "likely" as const } : undefined);
   const amount = parseAmount(text);
   const date = parseWhen(q, asOf);
   const party = named?.partyId
@@ -67,15 +77,20 @@ export function readThought(text: string, records: Records, asOf: string): Thoug
       });
   if (!match) return { kind: "note", direction: null, status: null, amount, date, ...(party ? { partyId: party.id } : {}), missing: [] };
   let invoiceId: string | undefined;
+  let ambiguousInvoice = false;
   if (match.kind === "collection" && party) {
-    invoiceId = openInvoice?.id
-      ?? records.commitments.find((c) => c.partyId === party.id && c.type === "invoice" && (c.settlement ?? "open") === "open")?.id;
+    const invoices = records.commitments.filter((c) => c.partyId === party.id && c.type === "invoice"
+      && (c.settlement ?? "open") === "open" && (amount == null || (c.outstanding ?? c.amount) === amount));
+    invoiceId = openInvoice?.id ?? (invoices.length === 1 ? invoices[0]!.id : undefined);
+    ambiguousInvoice = !openInvoice && invoices.length > 1;
   }
   const invoice = records.commitments.find((c) => c.id === invoiceId);
   const probability = match.status === "possible"
     ? (/\b(likely|probably|confirmed|verbal)\b/.test(q) ? 0.6 : /\b(maybe|might|hinted|long shot)\b/.test(q) ? 0.3 : 0.4)
     : undefined;
   const missing: string[] = [];
+  if (match.direction == null) missing.push("direction");
+  if (ambiguousInvoice) missing.push("invoice reference");
   if (!invoice && amount == null) missing.push("amount");
   if (date == null) missing.push("date");
   return {
@@ -107,6 +122,7 @@ export function ownerSignal(
   const draft: CommitmentDraft = {
     type: status === "possible" ? "sales_deal" : "plan",
     direction: r.direction,
+    ...(r.direction === "in" && readCashMovement(t.text)?.funding ? { funding: true as const } : {}),
     ...(r.partyId ? { partyId: r.partyId } : {}),
     amount: r.amount,
     currency: profile.baseCurrency,

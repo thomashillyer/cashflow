@@ -754,7 +754,8 @@ function noteRow(n) {
   const dirButton = (to, label) => canSwitch
     ? `<button class="linklike dir-switch" data-action="note-direction" data-to="${to}" data-id="${esc(n.id)}">${label}</button>` : "";
   const dir = r.direction === "in" ? `Money in${dirButton("out", "Switch to money out")}`
-    : r.direction === "out" ? `Money out${dirButton("in", "Switch to money in")}` : "—";
+    : r.direction === "out" ? `Money out${dirButton("in", "Switch to money in")}`
+      : canSwitch ? `${dirButton("in", "Money in")}${dirButton("out", "Money out")}` : "—";
   const field = (k, label, v, input) => `<div><dt>${label}</dt><dd>${v != null ? v : input}</dd></div>`;
   const amountInput = `<input inputmode="decimal" placeholder="$ amount" data-note-field="amount" data-id="${esc(n.id)}" aria-label="Amount" />`;
   const dateInput = `<input type="date" data-note-field="date" data-id="${esc(n.id)}" aria-label="Date" />`;
