@@ -1,0 +1,13 @@
+{
+  "key": "0e265fa72cb4002f814b2d47ab51fa59a1e752dc537ea4417c84a9c0e6a6c465",
+  "promptVersion": "cfo_voice@2",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "headline": "If Evergreen Home pays on Jan 15, your lowest point falls to -$33,500 on Jan 14.",
+    "why": "A Jan 15 payment pushes your lowest point to -$33,500 on Jan 14, down from -$5,500 on Dec 25. Ten more days on PO-2302 lifts it by $12,000, to -$21,500. If that doesn't work, ask Harbor and Hearth for 40% up front on HH-PO-552, which lifts it by $4,000 on its own.",
+    "nextStep": "Ask Jaipur Textiles for 10 more days on PO-2302 by Dec 12.",
+    "convictionNote": "Medium confidence: I assumed Jan 15 for \"in January\".",
+    "whatWouldChange": "The exact date Evergreen Home pays."
+  }
+}

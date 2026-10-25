@@ -151,7 +151,7 @@ describe("afford, outbound plan", () => {
   it("no when no single move keeps cash above the line", () => {
     const d = run(ask, { records: withBalance($(200000)) });
     expect(d.verdict).toBe("no");
-    expect(d.recommendation!.action).toBe("Hold off on the $40,000 payment due 2026-12-15 until cash improves");
+    expect(d.recommendation!.action).toBe("Hold off on the $40,000 payment due Dec 15 until cash improves");
     expect(d.recommendation!.lever).toBeUndefined();
     expect(d.headlineFacts[0]!.amount!).toBeLessThan(d.context.safetyLine!);
   });
@@ -168,7 +168,7 @@ describe("afford, outbound plan", () => {
   it("with no date, assumes 30 days out and caps conviction at medium", () => {
     const noDate: CommitmentDraft = { ...draft, anchors: {} };
     const d = run(intent("afford", { draft: noDate }), { records: withBalance($(300000)) });
-    expect(d.assumptions.join(" ")).toContain("assumed 2026-12-16, 30 days out");
+    expect(d.assumptions.join(" ")).toContain("assumed Dec 16, 30 days out");
     expect(d.scenarioInputs!.commitments![0]!.anchors).toEqual({ due: "2026-12-16" });
     expect(d.conviction).toBe("medium");
   });
@@ -187,7 +187,7 @@ describe("fix_gap", () => {
     expect(d.verdict).toBe("act_now");
     expect(d.context).toEqual({ baseLowPoint: { date: "2026-12-25", amount: -550_000 }, safetyLine: $(35000), shortfall: $(35000) + 550_000 });
     expect(d.recommendation).toMatchObject({
-      action: "Chase Evergreen Home to pay INV-1187 by 2026-12-10",
+      action: "Chase Evergreen Home to pay INV-1187",
       lever: { kind: "chase", commitmentId: "inv-INV-1187", assumeDate: "2026-12-10" },
       byDate: "2026-12-12",
       cashEffect: 1_950_000,
@@ -200,7 +200,7 @@ describe("fix_gap", () => {
   it("fallback is a different commitment and party, with its standalone effect", () => {
     const d = run(intent("fix_gap"));
     expect(d.fallback).toMatchObject({
-      action: "If that does not work: ask Cascade Customs Brokerage for 10 more days on DUTIES-2291",
+      action: "Ask Cascade Customs Brokerage for 10 more days on DUTIES-2291",
       lever: { kind: "defer", commitmentId: "bill-duties-2291", days: 10 },
       cashEffect: 900_000,
     });
@@ -238,7 +238,7 @@ describe("what_if", () => {
     expect(baseLow!.amount).toBe(-550_000);
     expect(newLow!.amount!).toBeLessThan(baseLow!.amount!);
     expect(d.context.baseLowPoint).toEqual({ date: "2026-12-25", amount: -550_000 });
-    expect(d.assumptions.join(" ")).toContain("Evergreen Home pays INV-1187 on 2027-01-15, instead of 2026-12-26");
+    expect(d.assumptions.join(" ")).toContain("Evergreen Home pays INV-1187 on Jan 15, 2027, instead of Dec 26");
     expect(d.verdict).toBe("act_now");
     expect(d.recommendation).toBeDefined();
   });
@@ -351,7 +351,7 @@ describe("tell", () => {
     expect(d.verdict).toBe("proposed");
     expect(d.proposal).toEqual({ kind: "commitment", draft });
     expect(d.headlineFacts).toEqual([{ label: "Planned payment", amount: $(40000), date: "2026-12-15" }]);
-    expect(d.recommendation!.action).toBe("Confirm to add the $40,000 payment on 2026-12-15 to your forecast");
+    expect(d.recommendation!.action).toBe("Confirm to add the $40,000 payment on Dec 15 to your forecast");
     expect(d.scenarioInputs).toBeUndefined();
   });
 
@@ -417,7 +417,7 @@ describe("conviction", () => {
     const d = run(intent("fix_gap"));
     expect(d.conviction).toBe("high");
     expect(d.convictionReasons).toEqual(["Based on 8 payments from Evergreen Home."]);
-    expect(d.whatWouldChange).toBe("Least certain: the $28,000 receipt from Evergreen Home (INV-1187), expected 2026-12-26.");
+    expect(d.whatWouldChange).toBe("Least certain: the $28,000 receipt from Evergreen Home (INV-1187), expected Dec 26.");
   });
 
   it("medium: pending reviews block high even with a long history", () => {
@@ -457,7 +457,7 @@ describe("conviction", () => {
   it("caps: a stale balance caps at medium, using profile.thresholds.staleAfterHours", () => {
     const d = run(intent("fix_gap"), { records: withBalance(records.balances[0]!.amount, "2026-11-10") });
     expect(d.conviction).toBe("medium");
-    expect(d.convictionReasons).toContain("The bank balance was last updated on 2026-11-10, 6 days old.");
+    expect(d.convictionReasons).toContain("The bank balance was last updated on Nov 10, 6 days old.");
     const noStale: Profile = { ...profile, thresholds: { ...profile.thresholds, staleAfterHours: undefined } };
     expect(run(intent("fix_gap"), { profile: noStale, records: withBalance(records.balances[0]!.amount, "2026-11-10") }).conviction).toBe("high");
   });
@@ -603,5 +603,42 @@ describe("review fixes", () => {
         else expect(d.context.shortfall).toBeUndefined();
       }
     }
+  });
+});
+
+describe("answer the question asked (lead)", () => {
+  it("afford when already short without the item: lead short_before, with the shortfall as a fact", () => {
+    const d = run(intent("afford", { draft: outPlan($(40000), "2026-12-15"), date: "2026-12-15" }));
+    expect(d.verdict).toBe("act_now");
+    expect(d.lead).toEqual({ kind: "short_before" });
+    expect(d.context.shortfall).toBeGreaterThan(0);
+  });
+
+  it("what_if leads with the effect and names the change in human dates", () => {
+    const d = run(intent("what_if", { commitmentId: "inv-INV-1187", partyId: "party-evergreen-home", date: "2027-01-15" }));
+    expect(d.lead).toEqual({ kind: "effect", subject: "Evergreen Home pays INV-1187 on Jan 15, 2027" });
+    expect(d.allowed.dates).toContain("2027-01-15");
+  });
+
+  it("status over a long window leads with the tightest week (its Monday); this month does not", () => {
+    const w = run(intent("status", { window: { from: "2026-11-16", to: "2027-02-14" } }));
+    expect(w.lead).toEqual({ kind: "tightest", weekStart: "2026-12-21" });
+    expect(w.allowed.dates).toContain("2026-12-21");
+    expect(run(intent("status", { window: { from: "2026-11-16", to: "2026-11-30" } })).lead).toBeUndefined();
+  });
+
+  it("a timing lookup leads with the lag and sample count; a balance lookup does not", () => {
+    const d = run({ ...intent("lookup", { partyId: "party-evergreen-home" }), question: "When does Evergreen usually pay?" });
+    expect(d.lead).toMatchObject({ kind: "timing", subject: "Evergreen Home", timing: { samples: 8, rule: false } });
+    expect(d.lead!.timing!.days).toBeGreaterThan(0);
+    expect(d.numbers).toContainEqual({ label: "days", value: d.lead!.timing!.days, unit: "days" });
+    expect(run({ ...intent("lookup", { partyId: "party-evergreen-home" }), question: "What do I owe Evergreen?" }).lead).toBeUndefined();
+  });
+
+  it("no ISO dates in code-built action or assumption strings, and no 'If that does not work' prefix", () => {
+    const d = run(intent("fix_gap"));
+    const texts = [d.recommendation!.action, d.fallback!.action, ...d.assumptions, ...d.convictionReasons, d.whatWouldChange ?? ""];
+    for (const t of texts) expect(t).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(d.fallback!.action).not.toMatch(/^If /);
   });
 });

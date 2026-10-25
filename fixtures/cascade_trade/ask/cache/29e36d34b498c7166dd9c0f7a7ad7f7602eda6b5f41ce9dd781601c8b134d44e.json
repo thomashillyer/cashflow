@@ -1,0 +1,13 @@
+{
+  "key": "29e36d34b498c7166dd9c0f7a7ad7f7602eda6b5f41ce9dd781601c8b134d44e",
+  "promptVersion": "cfo_voice@2",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "headline": "If Evergreen Home pays INV-1187 on Jan 5, 2027, your lowest point falls to −$12,000 on Jan 1, 2027.",
+    "why": "With this, your lowest cash point is −$12,000 on Jan 1, 2027, against a safety line of $35,000. Without it, your lowest point is −$5,500 on Dec 25. Doing this moves your lowest point to $14,000 on Jan 8, 2027. If that doesn't work, chase Harbor and Hearth to pay INV-1203 by Dec 28, which lifts your lowest point by $6,500 on its own. Assumptions: Assumed Jan 5, 2027 for \"in early January\"; Assumed Evergreen Home pays INV-1187 on Jan 5, 2027, instead of Dec 26.",
+    "nextStep": "Chase Evergreen Home to pay INV-1187 by Dec 12.",
+    "convictionNote": "Medium confidence: Based on 8 payments from Evergreen Home; The date is an assumption: Jan 5, 2027.",
+    "whatWouldChange": "Least certain: the $28,000 receipt from Evergreen Home (INV-1187), expected Jan 5, 2027."
+  }
+}

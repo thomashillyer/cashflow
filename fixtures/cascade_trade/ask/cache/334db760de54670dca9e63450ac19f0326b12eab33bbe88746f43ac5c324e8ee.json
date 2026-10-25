@@ -1,6 +1,6 @@
 {
-  "key": "f2f5f4a31853b42bb20d07c8d0407eddb30f548958e7fac3f01a17830f77c18c",
-  "promptVersion": "cfo_voice@1",
+  "key": "334db760de54670dca9e63450ac19f0326b12eab33bbe88746f43ac5c324e8ee",
+  "promptVersion": "cfo_voice@2",
   "model": "claude-opus-5-5",
   "source": "stand-in",
   "output": {

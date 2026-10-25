@@ -72,6 +72,15 @@ export type Decision = {
     safetyLine?: number;
     shortfall?: number;              // how far below the safety line, positive
   };
+  // The question asked, answered first. The headline must open with this before the recommendation:
+  //   short_before: afford, but cash is already below the safety line without the item ("Not yet: you're already $X below ... without it")
+  //   effect: what_if ("If <subject>, your lowest point falls to $X on Dec 28"); subject is code-built, dates human
+  //   tightest: status over a long window ("Your tightest week starts Dec 21: $X on Dec 25"); weekStart is the Monday
+  //   timing: lookup about when a party pays ("Evergreen usually pays about 14 days late, based on 8 payments"); subject is the party name
+  lead?: {
+    kind: "short_before" | "effect" | "tightest" | "timing"; subject?: string; weekStart?: string;
+    timing?: { days: number; samples: number; rule: boolean };  // days: + after the due date, - before; rule: a confirmed payment rule
+  };
   recommendation?: {
     action: string;                  // code-built imperative: "Ask Harbor and Hearth for 40% up front"
     lever?: Lever;                   // when the move is an engine lever

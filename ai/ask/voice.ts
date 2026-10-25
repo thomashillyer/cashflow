@@ -51,11 +51,12 @@ const lcFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s.charAt(0).toLowerCase(
 
 type Rec = NonNullable<Decision["recommendation"]>;
 
-// "Ask Harbor for 40% up front by Dec 1": adds the act-by date unless the action already names it.
+// "Ask Harbor for 40% up front by Dec 1": adds the act-by date unless the action already names a date
+// (one by-date in the sentence, never "by Dec 10 by Dec 12").
 function actionBy(d: Decision, action: string, byDate?: string): string {
   const a = stripEnd(action);
   if (!byDate) return a;
-  return extractDates(a, { asOf: d.asOf }).some((x) => x.date === byDate) ? a : `${a} by ${date(d, byDate)}`;
+  return extractDates(a, { asOf: d.asOf }).length > 0 ? a : `${a} by ${date(d, byDate)}`;
 }
 
 function factLines(d: Decision): string[] {
@@ -73,6 +74,7 @@ const facts = (d: Decision, business: string, vocabulary: Record<string, string>
   intent: d.intent,
   asOf: d.asOf,
   currency: d.currency,
+  ...(d.lead ? { lead: { kind: d.lead.kind, ...(d.lead.timing ? { timing: d.lead.timing } : {}), ...(d.lead.subject ? { subject: d.lead.subject } : {}), ...(d.lead.weekStart ? { weekStart: date(d, d.lead.weekStart) } : {}) } } : {}),
   headlineFacts: d.headlineFacts.map((f) => ({
     label: f.label,
     ...(f.amount !== undefined ? { amount: money(d, f.amount) } : {}),
@@ -112,6 +114,7 @@ const join = (parts: (string | undefined)[]) => parts.filter((p): p is string =>
 // context.baseLowPoint is the run without it (decide.ts). State the with-plan low point first.
 function withPlanLow(d: Decision): { date: string; amount: number } | undefined {
   const f = d.headlineFacts[0];
+  if (d.lead?.kind === "short_before") return undefined; // already short without it: the low point is the base run
   if (!f || f.amount === undefined || f.date === undefined || !/lowest cash point/i.test(f.label)) return undefined;
   const outboundAfford = d.intent === "afford" && d.headlineFacts.some((x) => /payment$/i.test(x.label));
   if (d.intent !== "what_if" && !outboundAfford) return undefined;
@@ -141,13 +144,42 @@ function fallbackLine(d: Decision): string | undefined {
   const f = d.fallback;
   if (!f) return undefined;
   const effect = f.cashEffect !== undefined ? `, which lifts your lowest point by ${money(d, f.cashEffect)} on its own` : "";
-  return `If they refuse, ${lcFirst(stripEnd(f.action))}${effect}.`;
+  return `If that doesn't work, ${lcFirst(stripEnd(f.action))}${effect}.`;
 }
 
 const convictionNote = (d: Decision) => {
   const reasons = d.convictionReasons.map(stripEnd).filter(Boolean);
   return `${cap(d.conviction)} confidence: ${reasons.length ? reasons.join("; ") : "no weak spots found in the data behind this"}.`;
 };
+
+// The headline that answers the question asked before it gives the move (d.lead), or undefined.
+function leadHeadline(d: Decision, r: Rec | undefined): string | undefined {
+  const l = d.lead;
+  const f0 = d.headlineFacts[0];
+  if (!l) return undefined;
+  if (l.kind === "short_before" && d.context.shortfall !== undefined) {
+    const low = d.context.baseLowPoint;
+    const head = `Not yet: you're already ${money(d, d.context.shortfall)} below your safety line${low ? ` on ${date(d, low.date)}` : ""} without it.`;
+    return r ? `${head} First, ${lcFirst(actionBy(d, r.action, r.byDate))}.` : head;
+  }
+  if (l.kind === "effect" && l.subject && f0?.amount !== undefined && f0.date !== undefined) {
+    const b = d.context.baseLowPoint;
+    const move = !b || f0.amount === b.amount ? "stays at" : f0.amount < b.amount ? "falls to" : "rises to";
+    return `If ${l.subject}, your lowest point ${move} ${money(d, f0.amount)} on ${date(d, f0.date)}.`;
+  }
+  if (l.kind === "timing" && l.timing && l.subject) {
+    const { days, samples, rule } = l.timing;
+    const n = Math.abs(days);
+    const span = days === 0 ? "on the due date" : `${n} day${n === 1 ? "" : "s"} ${days > 0 ? "late" : "early"}`;
+    if (rule) return `Per your rule, ${l.subject} pays ${span}.`;
+    if (samples === 0) return `I have no payment history for ${l.subject}; the forecast assumes it pays ${span}.`;
+    return `${l.subject} usually pays ${days === 0 ? span : `about ${span}`}, based on ${samples} payment${samples === 1 ? "" : "s"}.`;
+  }
+  if (l.kind === "tightest" && l.weekStart && f0?.amount !== undefined && f0.date !== undefined) {
+    return `Your tightest week starts ${date(d, l.weekStart)}: cash bottoms out at ${money(d, f0.amount)} on ${date(d, f0.date)}.`;
+  }
+  return undefined;
+}
 
 export function fallbackVoice(d: Decision): CfoVoice {
   const r = d.recommendation;
@@ -181,9 +213,9 @@ export function fallbackVoice(d: Decision): CfoVoice {
     case "yes_if":
     case "act_now": {
       const step = r ? `${cap(actionBy(d, r.action, r.byDate))}.` : undefined;
-      const headline = !r ? (d.verdict === "yes_if" ? "Yes, if you make the change below." : "Act now.")
+      const headline = leadHeadline(d, r) ?? (!r ? (d.verdict === "yes_if" ? "Yes, if you make the change below." : "Act now.")
         : d.verdict === "yes_if" ? `Yes, if you ${lcFirst(actionBy(d, r.action, r.byDate))}.`
-        : `Act now: ${lcFirst(actionBy(d, r.action, r.byDate))}.`;
+        : `Act now: ${lcFirst(actionBy(d, r.action, r.byDate))}.`);
       return { headline, why: join([lowPointLine(d), r && effectLine(d, r), fallbackLine(d), assumptionsLine(d)]), nextStep: step, ...base };
     }
     case "yes":
@@ -201,8 +233,13 @@ export function fallbackVoice(d: Decision): CfoVoice {
         ...base,
       };
     case "on_track":
-      return { headline: "You're on track.", why: join([lowPointLine(d), assumptionsLine(d)]), ...base };
+      return { headline: leadHeadline(d, undefined) ?? "You're on track.", why: join([lowPointLine(d), assumptionsLine(d)]), ...base };
     case "info": {
+      const lh = leadHeadline(d, undefined);
+      if (lh) {
+        const lines = d.headlineFacts.map((f) => `${f.label}: ${[f.amount !== undefined ? money(d, f.amount) : undefined, f.date !== undefined ? `on ${date(d, f.date)}` : undefined].filter(Boolean).join(" ")}`);
+        return { headline: lh, why: join([lines.length ? `${lines.join("; ")}.` : undefined, assumptionsLine(d)]), ...base };
+      }
       const [first, ...rest] = factLines(d);
       return {
         headline: first ? `${first}.` : "Here is what your books show.",
@@ -253,7 +290,7 @@ function assemble(d: Decision, v: CfoVoice, usedFallback: boolean, ctx: Pick<Voi
 const MENU_RE = /\boptions?\b|\balternativ(?:e|ely|es)\b|\byou\s+(?:could|might|may\s+want\s+to|can\s+also|may\s+also)\b|\bor\s+you\s+(?:might|could|can)\b|\bconsider(?:ing)?\b|\bone\s+(?:way|approach|choice)\b|\bother\s+(?:ways|choices|approaches)\b|\bon\s+the\s+other\s+hand\b|\beither\b[^.]*\bor\b/i;
 const LIST_RE = /^\s*(?:[-*•–]|\d+[.)]|\(\d+\))\s+\S/m;
 // Fallback phrasing: "If they refuse, ...", "failing that", "plan B", "backup". At most one, and only when the Decision has one.
-const FALLBACK_RE = /\bif\s+(?:they|he|she)\s+(?:refuses?|declines?|says?\s+no|won't|can't|cannot|doesn't|does\s+not|do\s+not|don't|will\s+not|is\s+unable|isn't\s+able)\b|\bfailing\s+that\b|\bplan\s+b\b|\b(?:back-?up|fall-?back)\b|\bfall\s+back\b/gi;
+const FALLBACK_RE = /\bif\s+(?:that|this|it)\s+(?:doesn't|does\s+not|didn't|did\s+not|fails|won't|don't)(?:\s+work)?\b|\bif\s+(?:they|he|she)\s+(?:refuses?|declines?|says?\s+no|won't|can't|cannot|doesn't|does\s+not|do\s+not|don't|will\s+not|is\s+unable|isn't\s+able)\b|\bfailing\s+that\b|\bplan\s+b\b|\b(?:back-?up|fall-?back)\b|\bfall\s+back\b/gi;
 // Claims that Neri (or anyone) already sent, paid, or applied something, or will. Neri only suggests.
 const CLAIM_RE = /\b(?:i|we)(?:'ve|\s+have)?\s+(?:already\s+|just\s+)?(?:sent|paid|wired|transferred|submitted|applied|approved|scheduled|booked)\b|\b(?:i|we)(?:'ll|\s+will)\s+(?:send|pay|wire|transfer|apply|submit)\b|\bon\s+its\s+way\b|\balready\s+sent\b/i;
 const ADVICE_RE = /\b(?:take\s+out\s+a\s+(?:bank\s+)?(?:loan|line\s+of\s+credit)|borrow(?:ing)?\s+(?:money|against|from)|(?:a|the)\s+(?:bank\s+)?loan\s+(?:would|could|to)|line\s+of\s+credit|invest(?:ing)?\s+(?:in|the|your)|put\s+(?:the\s+|your\s+)?cash\s+into|financing\s+(?:option|product|plan)|credit\s+card)\b/i;
@@ -295,6 +332,33 @@ function keyFactProblem(headline: string, d: Decision): string | undefined {
     : undefined;
 }
 
+// The headline must answer the question asked (d.lead) before anything else.
+function leadProblem(headline: string, d: Decision): string | undefined {
+  const l = d.lead;
+  if (!l) return undefined;
+  const has = (amount: number | undefined) =>
+    amount !== undefined && extractAmounts(headline, { currency: d.currency }).some((a) => amountMatches(a, [amount], headline));
+  if (l.kind === "short_before") {
+    if (!/^\W*(?:not\s+yet|no)\b/i.test(headline)) return 'the question was whether they can afford it: the headline must open with "Not yet" (or "No"), because cash is already below the safety line without it';
+    if (d.context.shortfall !== undefined && !has(d.context.shortfall)) return `the headline must say how far below the safety line cash already is (${money(d, d.context.shortfall)}) without it`;
+  }
+  if (l.kind === "effect" && !has(d.headlineFacts[0]?.amount)) {
+    return `the headline must lead with the effect of the what-if: where the lowest point lands (${d.headlineFacts[0]?.amount !== undefined ? money(d, d.headlineFacts[0].amount) : "see headlineFacts"})`;
+  }
+  if (l.kind === "timing" && l.timing) {
+    const n = Math.abs(l.timing.days);
+    const ok = l.timing.days === 0 ? /\bdue\s+date\b|\bon\s+time\b/i.test(headline) : new RegExp(`(?<![\\d.])${n}\\s+days?\\b`, "i").test(headline);
+    if (!ok) return `the headline must answer when they pay: state the typical lag (${l.timing.days === 0 ? "on the due date" : `${n} day${n === 1 ? "" : "s"} ${l.timing.days > 0 ? "late" : "early"}`}), then the open amount in the next sentence`;
+  }
+  if (l.kind === "tightest") {
+    if (!has(d.headlineFacts[0]?.amount)) return "the headline must name the tightest week and the cash amount at its lowest point";
+    if (l.weekStart && !extractDates(headline, { asOf: d.asOf }).some((x) => (x.alts ?? [x.date]).some((y) => y === l.weekStart || y === d.headlineFacts[0]?.date))) {
+      return `the headline must name the tightest week (it starts ${date(d, l.weekStart)}) or its date`;
+    }
+  }
+  return undefined;
+}
+
 // Everything wrong with the model's words, as plain sentences (they become the retry feedback).
 export function checkVoice(v: CfoVoice, d: Decision): string[] {
   const problems: string[] = [];
@@ -318,10 +382,12 @@ export function checkVoice(v: CfoVoice, d: Decision): string[] {
     problems.push(d.fallback ? "at most one fallback, stated once" : "there is no fallback in the facts: do not invent one");
   }
 
-  const stance = STANCE[d.verdict];
+  const lead = leadProblem(v.headline, d);
+  if (lead) problems.push(lead);
+  const stance = d.lead ? undefined : STANCE[d.verdict];
   if (stance && !stance.re.test(v.headline)) problems.push(`the headline must lead with the call: it should say "${stance.word}"`);
   if (v.whatWouldChange?.trim() && !d.whatWouldChange) problems.push("the facts name nothing that would change the call: leave whatWouldChange null");
-  const key = keyFactProblem(v.headline, d);
+  const key = d.lead?.kind === "effect" || d.lead?.kind === "tightest" ? undefined : keyFactProblem(v.headline, d);
   if (key) problems.push(key);
 
   const level = new RegExp(`\\b${d.conviction}\\s+confidence\\b`, "i");

@@ -76,7 +76,7 @@ describe("voice with the committed stand-in cache", () => {
     expect(modelVoiced.length).toBeGreaterThanOrEqual(5);
     for (const e of modelVoiced) {
       const entry = readCache(ASK_CACHE_DIR, voiceCacheKey(e.decision, base));
-      expect(entry?.source, e.id).toBe("stand-in");
+      expect(["stand-in", "live"], e.id).toContain(entry?.source);
     }
     expect(readdirSync(ASK_CACHE_DIR).filter((f) => f.endsWith(".json")).length).toBeGreaterThanOrEqual(modelVoiced.length);
   });
@@ -98,7 +98,7 @@ describe("voice with the committed stand-in cache", () => {
   it("makes the call in the headline, with at most one fallback and no menu", async () => {
     const a = await voice(harbor, cached());
     expect(a.headline).toBe("Yes, if Harbor and Hearth pays 40% up front by Dec 1.");
-    expect(a.text.match(/if they refuse/gi)).toHaveLength(1);
+    expect(a.text.match(/if that doesn.t work/gi)).toHaveLength(1);
     expect(a.text).not.toMatch(/options?|alternatively|you could/i);
     const w = await voice(byId("what-if-evergreen-january"), cached());
     expect(w.scenarioId).toBe("whatif-evergreen-2027-01-15");
@@ -315,7 +315,7 @@ describe("fallbackVoice", () => {
 
   it("states one fallback at most, the confidence in plain words, and the assumptions", () => {
     const v = fallbackVoice(harbor);
-    expect(v.why.match(/If they refuse/g)).toHaveLength(1);
+    expect(v.why.match(/If that doesn.t work/g)).toHaveLength(1);
     expect(v.why).toContain("Assumptions: linked costs unknown.");
     expect(v.convictionNote).toBe("Medium confidence: Harbor and Hearth has only 4 payments on record.");
     expect(v.nextStep).toBe("Ask Harbor and Hearth for 40% up front by Dec 1.");
@@ -332,10 +332,62 @@ describe("fallbackVoice", () => {
 });
 
 describe("fixtures", () => {
-  it("decisions.json parses and the cache files are stand-ins", () => {
+  it("decisions.json parses and the cache files are stand-ins or live", () => {
     expect(fx.entries.map((e) => e.decision.verdict).sort()).toEqual(["act_now", "act_now", "info", "on_track", "yes_if"]);
     for (const f of readdirSync(ASK_CACHE_DIR)) {
-      expect(JSON.parse(readFileSync(join(ASK_CACHE_DIR, f), "utf8")).source).toBe("stand-in");
+      expect(["stand-in", "live"]).toContain(JSON.parse(readFileSync(join(ASK_CACHE_DIR, f), "utf8")).source);
     }
+  });
+});
+
+describe("answer the question asked (decision.lead)", () => {
+  const voiceOf = (headline: string, d: Decision) => ({ ...fallbackVoice(d), headline });
+
+  it("afford, short without it: opens with Not yet and the shortfall, then the move; Act now alone fails", () => {
+    const d: Decision = { ...december, intent: "afford", lead: { kind: "short_before" } };
+    const v = fallbackVoice(d);
+    expect(v.headline).toMatch(/^Not yet: you're already \$\d[\d,]* below your safety line on Dec \d+ without it\. First, chase /);
+    expect(checkVoice(v, d)).toEqual([]);
+    expect(checkVoice(voiceOf("Act now: chase Evergreen Home by Dec 18.", d), d).join(" ")).toContain("Not yet");
+    expect(checkVoice(voiceOf("Not yet: chase Evergreen Home by Dec 18.", d), d).join(" ")).toContain("how far below the safety line");
+  });
+
+  it("what_if: opens with the effect on the lowest point", () => {
+    const d = byId("what-if-evergreen-january");
+    expect(d.lead?.kind).toBe("effect");
+    const v = fallbackVoice(d);
+    expect(v.headline).toMatch(/^If Evergreen Home pays on Jan 15, your lowest point falls to .\$33,500 on Jan 14, 2027\.$/);
+    expect(checkVoice(v, d)).toEqual([]);
+    expect(checkVoice(voiceOf("Ask Jaipur Textiles for 10 more days by Dec 12.", d), d).join(" ")).toContain("effect of the what-if");
+  });
+
+  it("status over a long window: names the week and the amount first", () => {
+    const d: Decision = { ...december, intent: "status", lead: { kind: "tightest", weekStart: "2026-12-21" }, allowed: { ...december.allowed, dates: [...december.allowed.dates, "2026-12-21"] } };
+    const v = fallbackVoice(d);
+    expect(v.headline).toMatch(/^Your tightest week starts Dec 21: cash bottoms out at .* on Dec \d+\.$/);
+    expect(checkVoice({ ...v, headline: "Act now: chase Evergreen Home by Dec 18." }, d).join(" ")).toContain("tightest week");
+    expect(checkVoice(v, d)).toEqual([]);
+  });
+
+  it("timing lookup: opens with the typical lag and the sample count, then the open amount", () => {
+    const d = byId("lookup-evergreen-lag");
+    const v = fallbackVoice(d);
+    expect(v.headline).toBe("Evergreen Home usually pays about 14 days late, based on 8 payments.");
+    expect(v.why).toContain("INV-1187 due: $28,000 on Dec 10");
+    expect(checkVoice(v, d)).toEqual([]);
+    expect(checkVoice(voiceOf("Evergreen Home owes you $28,000.", d), d).join(" ")).toContain("when they pay");
+    const rule = { ...d, lead: { ...d.lead!, timing: { days: 14, samples: 8, rule: true } } };
+    expect(fallbackVoice(rule).headline).toBe("Per your rule, Evergreen Home pays 14 days late.");
+  });
+
+  it("one by-date and one fallback phrase in the code-built voice, no ISO dates", () => {
+    const d: Decision = { ...december, recommendation: { ...december.recommendation!, action: "Chase Evergreen Home to pay INV-1187 by Dec 10", byDate: "2026-12-12" } };
+    const v = fallbackVoice(d);
+    expect(v.headline.match(/\bby\b/g)).toHaveLength(1);
+    expect(v.why.match(/if that doesn't work/gi)).toHaveLength(1);
+    expect(v.why).not.toMatch(/if they refuse/i);
+    expect(voiceText(v)).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    // Model words with both phrasings count as two fallbacks.
+    expect(checkVoice({ ...v, why: "If they refuse, ask X. If that doesn't work, ask Y." }, d).join(" ")).toContain("fallback");
   });
 });
