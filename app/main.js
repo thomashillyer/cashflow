@@ -751,7 +751,7 @@ function viewSettings() {
       <div class="seg control" role="group" aria-label="Appearance">${["auto", "light", "dark"].map((t) => `<button data-action="theme" data-t="${t}" aria-pressed="${theme === t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("")}</div></div>
     <h2 class="section-title" style="margin-top:32px">Rules from your notes</h2>
     <p class="section-note">Things you told Neri about how people pay and get paid. They shape every forecast.</p>
-    ${app.ctx.rules.filter((r) => r.state !== "dismissed").length ? app.ctx.rules.filter((r) => r.state !== "dismissed").map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q><div>${esc(app.ctx.parties.find((p) => p.id === r.scope.partyId)?.name ?? "Everyone")}: ${r.kind === "flexibility" ? `can move payments up to ${r.params.extraDays} days` : r.kind === "lag_offset" ? `pays about ${r.params.offsetDays} days late` : esc(r.kind)}${r.state === "confirmed" ? "" : " (waiting for your OK)"}</div></div>`).join("") : `<p>No rules yet.</p>`}
+    ${app.ctx.rules.filter((r) => r.state !== "dismissed").length ? app.ctx.rules.filter((r) => r.state !== "dismissed").map((r) => `<div class="rule-item"><q>${esc(r.fromNote)}</q><div>${esc(app.ctx.parties.find((p) => p.id === r.scope.partyId)?.name ?? "Everyone")}: ${r.kind === "flexibility" ? `can move payments up to ${r.params.extraDays} days` : r.kind === "lag_offset" ? `pays about ${r.params.offsetDays} days late` : esc(r.kind)}${r.state === "confirmed" ? "" : " (waiting for your OK)"}</div>${r.state === "proposed" ? `<div class="rule-actions"><button class="btn small primary" data-a="rule" data-id="${esc(r.id)}" data-d="confirm">Use this rule</button> <button class="btn small quiet" data-a="rule" data-id="${esc(r.id)}" data-d="dismiss">Dismiss</button></div>` : ""}</div>`).join("") : `<p>No rules yet.</p>`}
   </div>`;
 }
 
@@ -1412,6 +1412,14 @@ async function onClick(ev) {
     } else {
       toast("Dismissed", "The forecast stays as it was.");
     }
+    return;
+  }
+  if (a === "rule") {
+    const d = el.dataset.d;
+    await api.decideRule(id, d);
+    await refresh();
+    if (d === "confirm") toast("Rule saved", "Your forecast now uses it.");
+    else toast("Dismissed", "The forecast stays as it was.");
     return;
   }
   if (a === "note-filter") {

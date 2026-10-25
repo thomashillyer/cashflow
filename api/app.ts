@@ -39,7 +39,7 @@ export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusi
 const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
-const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals",
+const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals", "/rules",
   "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides"];
 
 const isApiPath = (url: string) => {
