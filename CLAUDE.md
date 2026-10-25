@@ -92,7 +92,7 @@ Five owners: Niru (data ingestion), Thomas (cashflow engine), SilverBeck (UI and
 
 ## Commands
 
-Node 22, TypeScript strict, vitest. `dev` and `demo` are added when the api/app lands.
+Node 22, TypeScript strict, vitest. API details: `api/README.md`.
 
 ```
 npm install
@@ -102,7 +102,9 @@ npm run setup:supabase # validate Supabase vars in .env + read-only connectivity
 npx supabase start     # local Postgres + API (Docker); `npx supabase status` for keys
 npx supabase db reset  # apply supabase/migrations/ locally
 npx supabase db push   # apply migrations to the linked shared project
-npm run dev        # api + app (not yet)
+npm run dev        # api + app on http://localhost:8787 (NERI_STORE=memory DEMO_MODE=1 for no database)
+npm start          # same, without watch (production)
+npm run seed:demo  # upsert the synthetic samples into Supabase (service role; idempotent)
 npm run demo       # demo profile + cached Claude responses (not yet)
 ```
 

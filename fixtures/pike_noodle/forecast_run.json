@@ -1,7 +1,7 @@
 {
-  "id": "run-base-16ba7e5df187",
+  "id": "run-base-9d7846440210",
   "asOf": "2026-11-16",
-  "inputsHash": "16ba7e5df1879be916066aeed8aa065fae0937dae432ee34e8ccf2834435e0c2",
+  "inputsHash": "9d784644021014de9dd5e0fac683ccabe6245e568e91e1dbf05e55c856795d62",
   "scenarioId": "base",
   "fxRates": {
     "USD": 1
@@ -1232,7 +1232,7 @@
     {
       "id": "evt-daily-sales-2026-11-16",
       "commitmentId": "daily-sales",
-      "legIndex": 0,
+      "legIndex": 20771,
       "date": "2026-11-16",
       "amount": 355327,
       "currency": "USD",
@@ -1250,7 +1250,7 @@
     {
       "id": "evt-daily-sales-2026-11-17",
       "commitmentId": "daily-sales",
-      "legIndex": 1,
+      "legIndex": 20772,
       "date": "2026-11-17",
       "amount": 276366,
       "currency": "USD",
@@ -1268,7 +1268,7 @@
     {
       "id": "evt-daily-sales-2026-11-18",
       "commitmentId": "daily-sales",
-      "legIndex": 2,
+      "legIndex": 20773,
       "date": "2026-11-18",
       "amount": 118442,
       "currency": "USD",
@@ -1320,7 +1320,7 @@
     {
       "id": "evt-daily-sales-2026-11-19",
       "commitmentId": "daily-sales",
-      "legIndex": 3,
+      "legIndex": 20774,
       "date": "2026-11-19",
       "amount": 138183,
       "currency": "USD",
@@ -1338,7 +1338,7 @@
     {
       "id": "evt-daily-sales-2026-11-20",
       "commitmentId": "daily-sales",
-      "legIndex": 4,
+      "legIndex": 20775,
       "date": "2026-11-20",
       "amount": 157923,
       "currency": "USD",
@@ -1392,7 +1392,7 @@
     {
       "id": "evt-daily-sales-2026-11-21",
       "commitmentId": "daily-sales",
-      "legIndex": 5,
+      "legIndex": 20776,
       "date": "2026-11-21",
       "amount": 197404,
       "currency": "USD",
@@ -1410,7 +1410,7 @@
     {
       "id": "evt-daily-sales-2026-11-22",
       "commitmentId": "daily-sales",
-      "legIndex": 6,
+      "legIndex": 20777,
       "date": "2026-11-22",
       "amount": 296106,
       "currency": "USD",
@@ -1428,7 +1428,7 @@
     {
       "id": "evt-daily-sales-2026-11-23",
       "commitmentId": "daily-sales",
-      "legIndex": 7,
+      "legIndex": 20778,
       "date": "2026-11-23",
       "amount": 355327,
       "currency": "USD",
@@ -1446,7 +1446,7 @@
     {
       "id": "evt-daily-sales-2026-11-24",
       "commitmentId": "daily-sales",
-      "legIndex": 8,
+      "legIndex": 20779,
       "date": "2026-11-24",
       "amount": 276366,
       "currency": "USD",
@@ -1464,7 +1464,7 @@
     {
       "id": "evt-daily-sales-2026-11-25",
       "commitmentId": "daily-sales",
-      "legIndex": 9,
+      "legIndex": 20780,
       "date": "2026-11-25",
       "amount": 118442,
       "currency": "USD",
@@ -1499,7 +1499,7 @@
     {
       "id": "evt-daily-sales-2026-11-26",
       "commitmentId": "daily-sales",
-      "legIndex": 10,
+      "legIndex": 20781,
       "date": "2026-11-26",
       "amount": 138183,
       "currency": "USD",
@@ -1517,7 +1517,7 @@
     {
       "id": "evt-daily-sales-2026-11-27",
       "commitmentId": "daily-sales",
-      "legIndex": 11,
+      "legIndex": 20782,
       "date": "2026-11-27",
       "amount": 157923,
       "currency": "USD",
@@ -1553,7 +1553,7 @@
     {
       "id": "evt-daily-sales-2026-11-28",
       "commitmentId": "daily-sales",
-      "legIndex": 12,
+      "legIndex": 20783,
       "date": "2026-11-28",
       "amount": 197404,
       "currency": "USD",
@@ -1571,7 +1571,7 @@
     {
       "id": "evt-daily-sales-2026-11-29",
       "commitmentId": "daily-sales",
-      "legIndex": 13,
+      "legIndex": 20784,
       "date": "2026-11-29",
       "amount": 296106,
       "currency": "USD",
@@ -1589,7 +1589,7 @@
     {
       "id": "evt-daily-sales-2026-11-30",
       "commitmentId": "daily-sales",
-      "legIndex": 14,
+      "legIndex": 20785,
       "date": "2026-11-30",
       "amount": 355327,
       "currency": "USD",
@@ -1607,7 +1607,7 @@
     {
       "id": "evt-daily-sales-2026-12-01",
       "commitmentId": "daily-sales",
-      "legIndex": 15,
+      "legIndex": 20786,
       "date": "2026-12-01",
       "amount": 276366,
       "currency": "USD",
@@ -1643,7 +1643,7 @@
     {
       "id": "evt-daily-sales-2026-12-02",
       "commitmentId": "daily-sales",
-      "legIndex": 16,
+      "legIndex": 20787,
       "date": "2026-12-02",
       "amount": 118442,
       "currency": "USD",
@@ -1695,7 +1695,7 @@
     {
       "id": "evt-daily-sales-2026-12-03",
       "commitmentId": "daily-sales",
-      "legIndex": 17,
+      "legIndex": 20788,
       "date": "2026-12-03",
       "amount": 138183,
       "currency": "USD",
@@ -1713,7 +1713,7 @@
     {
       "id": "evt-daily-sales-2026-12-04",
       "commitmentId": "daily-sales",
-      "legIndex": 18,
+      "legIndex": 20789,
       "date": "2026-12-04",
       "amount": 157923,
       "currency": "USD",
@@ -1767,7 +1767,7 @@
     {
       "id": "evt-daily-sales-2026-12-05",
       "commitmentId": "daily-sales",
-      "legIndex": 19,
+      "legIndex": 20790,
       "date": "2026-12-05",
       "amount": 197404,
       "currency": "USD",
@@ -1785,7 +1785,7 @@
     {
       "id": "evt-daily-sales-2026-12-06",
       "commitmentId": "daily-sales",
-      "legIndex": 20,
+      "legIndex": 20791,
       "date": "2026-12-06",
       "amount": 296106,
       "currency": "USD",
@@ -1803,7 +1803,7 @@
     {
       "id": "evt-daily-sales-2026-12-07",
       "commitmentId": "daily-sales",
-      "legIndex": 21,
+      "legIndex": 20792,
       "date": "2026-12-07",
       "amount": 355327,
       "currency": "USD",
@@ -1821,7 +1821,7 @@
     {
       "id": "evt-daily-sales-2026-12-08",
       "commitmentId": "daily-sales",
-      "legIndex": 22,
+      "legIndex": 20793,
       "date": "2026-12-08",
       "amount": 276366,
       "currency": "USD",
@@ -1839,7 +1839,7 @@
     {
       "id": "evt-daily-sales-2026-12-09",
       "commitmentId": "daily-sales",
-      "legIndex": 23,
+      "legIndex": 20794,
       "date": "2026-12-09",
       "amount": 118442,
       "currency": "USD",
@@ -1874,7 +1874,7 @@
     {
       "id": "evt-daily-sales-2026-12-10",
       "commitmentId": "daily-sales",
-      "legIndex": 24,
+      "legIndex": 20795,
       "date": "2026-12-10",
       "amount": 138183,
       "currency": "USD",
@@ -1892,7 +1892,7 @@
     {
       "id": "evt-daily-sales-2026-12-11",
       "commitmentId": "daily-sales",
-      "legIndex": 25,
+      "legIndex": 20796,
       "date": "2026-12-11",
       "amount": 157923,
       "currency": "USD",
@@ -1946,7 +1946,7 @@
     {
       "id": "evt-daily-sales-2026-12-12",
       "commitmentId": "daily-sales",
-      "legIndex": 26,
+      "legIndex": 20797,
       "date": "2026-12-12",
       "amount": 197404,
       "currency": "USD",
@@ -1964,7 +1964,7 @@
     {
       "id": "evt-daily-sales-2026-12-13",
       "commitmentId": "daily-sales",
-      "legIndex": 27,
+      "legIndex": 20798,
       "date": "2026-12-13",
       "amount": 296106,
       "currency": "USD",
@@ -1982,7 +1982,7 @@
     {
       "id": "evt-daily-sales-2026-12-14",
       "commitmentId": "daily-sales",
-      "legIndex": 28,
+      "legIndex": 20799,
       "date": "2026-12-14",
       "amount": 355327,
       "currency": "USD",
@@ -2000,7 +2000,7 @@
     {
       "id": "evt-daily-sales-2026-12-15",
       "commitmentId": "daily-sales",
-      "legIndex": 29,
+      "legIndex": 20800,
       "date": "2026-12-15",
       "amount": 276366,
       "currency": "USD",
@@ -2018,7 +2018,7 @@
     {
       "id": "evt-daily-sales-2026-12-16",
       "commitmentId": "daily-sales",
-      "legIndex": 30,
+      "legIndex": 20801,
       "date": "2026-12-16",
       "amount": 118442,
       "currency": "USD",
@@ -2070,7 +2070,7 @@
     {
       "id": "evt-daily-sales-2026-12-17",
       "commitmentId": "daily-sales",
-      "legIndex": 31,
+      "legIndex": 20802,
       "date": "2026-12-17",
       "amount": 138183,
       "currency": "USD",
@@ -2088,7 +2088,7 @@
     {
       "id": "evt-daily-sales-2026-12-18",
       "commitmentId": "daily-sales",
-      "legIndex": 32,
+      "legIndex": 20803,
       "date": "2026-12-18",
       "amount": 157923,
       "currency": "USD",
@@ -2142,7 +2142,7 @@
     {
       "id": "evt-daily-sales-2026-12-19",
       "commitmentId": "daily-sales",
-      "legIndex": 33,
+      "legIndex": 20804,
       "date": "2026-12-19",
       "amount": 197404,
       "currency": "USD",
@@ -2160,7 +2160,7 @@
     {
       "id": "evt-daily-sales-2026-12-20",
       "commitmentId": "daily-sales",
-      "legIndex": 34,
+      "legIndex": 20805,
       "date": "2026-12-20",
       "amount": 296106,
       "currency": "USD",
@@ -2196,7 +2196,7 @@
     {
       "id": "evt-daily-sales-2026-12-21",
       "commitmentId": "daily-sales",
-      "legIndex": 35,
+      "legIndex": 20806,
       "date": "2026-12-21",
       "amount": 355327,
       "currency": "USD",
@@ -2214,7 +2214,7 @@
     {
       "id": "evt-daily-sales-2026-12-22",
       "commitmentId": "daily-sales",
-      "legIndex": 36,
+      "legIndex": 20807,
       "date": "2026-12-22",
       "amount": 276366,
       "currency": "USD",
@@ -2232,7 +2232,7 @@
     {
       "id": "evt-daily-sales-2026-12-23",
       "commitmentId": "daily-sales",
-      "legIndex": 37,
+      "legIndex": 20808,
       "date": "2026-12-23",
       "amount": 118442,
       "currency": "USD",
@@ -2267,7 +2267,7 @@
     {
       "id": "evt-daily-sales-2026-12-24",
       "commitmentId": "daily-sales",
-      "legIndex": 38,
+      "legIndex": 20809,
       "date": "2026-12-24",
       "amount": 138183,
       "currency": "USD",
@@ -2285,7 +2285,7 @@
     {
       "id": "evt-daily-sales-2026-12-25",
       "commitmentId": "daily-sales",
-      "legIndex": 39,
+      "legIndex": 20810,
       "date": "2026-12-25",
       "amount": 157923,
       "currency": "USD",
@@ -2321,7 +2321,7 @@
     {
       "id": "evt-daily-sales-2026-12-26",
       "commitmentId": "daily-sales",
-      "legIndex": 40,
+      "legIndex": 20811,
       "date": "2026-12-26",
       "amount": 197404,
       "currency": "USD",
@@ -2339,7 +2339,7 @@
     {
       "id": "evt-daily-sales-2026-12-27",
       "commitmentId": "daily-sales",
-      "legIndex": 41,
+      "legIndex": 20812,
       "date": "2026-12-27",
       "amount": 296106,
       "currency": "USD",
@@ -2357,7 +2357,7 @@
     {
       "id": "evt-daily-sales-2026-12-28",
       "commitmentId": "daily-sales",
-      "legIndex": 42,
+      "legIndex": 20813,
       "date": "2026-12-28",
       "amount": 355327,
       "currency": "USD",
@@ -2375,7 +2375,7 @@
     {
       "id": "evt-daily-sales-2026-12-29",
       "commitmentId": "daily-sales",
-      "legIndex": 43,
+      "legIndex": 20814,
       "date": "2026-12-29",
       "amount": 276366,
       "currency": "USD",
@@ -2393,7 +2393,7 @@
     {
       "id": "evt-daily-sales-2026-12-30",
       "commitmentId": "daily-sales",
-      "legIndex": 44,
+      "legIndex": 20815,
       "date": "2026-12-30",
       "amount": 118442,
       "currency": "USD",
@@ -2445,7 +2445,7 @@
     {
       "id": "evt-daily-sales-2026-12-31",
       "commitmentId": "daily-sales",
-      "legIndex": 45,
+      "legIndex": 20816,
       "date": "2026-12-31",
       "amount": 138183,
       "currency": "USD",
@@ -2463,7 +2463,7 @@
     {
       "id": "evt-daily-sales-2027-01-01",
       "commitmentId": "daily-sales",
-      "legIndex": 46,
+      "legIndex": 20817,
       "date": "2027-01-01",
       "amount": 157923,
       "currency": "USD",
@@ -2517,7 +2517,7 @@
     {
       "id": "evt-daily-sales-2027-01-02",
       "commitmentId": "daily-sales",
-      "legIndex": 47,
+      "legIndex": 20818,
       "date": "2027-01-02",
       "amount": 197404,
       "currency": "USD",
@@ -2535,7 +2535,7 @@
     {
       "id": "evt-daily-sales-2027-01-03",
       "commitmentId": "daily-sales",
-      "legIndex": 48,
+      "legIndex": 20819,
       "date": "2027-01-03",
       "amount": 296106,
       "currency": "USD",
@@ -2553,7 +2553,7 @@
     {
       "id": "evt-daily-sales-2027-01-04",
       "commitmentId": "daily-sales",
-      "legIndex": 49,
+      "legIndex": 20820,
       "date": "2027-01-04",
       "amount": 355327,
       "currency": "USD",
@@ -2571,7 +2571,7 @@
     {
       "id": "evt-daily-sales-2027-01-05",
       "commitmentId": "daily-sales",
-      "legIndex": 50,
+      "legIndex": 20821,
       "date": "2027-01-05",
       "amount": 276366,
       "currency": "USD",
@@ -2589,7 +2589,7 @@
     {
       "id": "evt-daily-sales-2027-01-06",
       "commitmentId": "daily-sales",
-      "legIndex": 51,
+      "legIndex": 20822,
       "date": "2027-01-06",
       "amount": 118442,
       "currency": "USD",
@@ -2624,7 +2624,7 @@
     {
       "id": "evt-daily-sales-2027-01-07",
       "commitmentId": "daily-sales",
-      "legIndex": 52,
+      "legIndex": 20823,
       "date": "2027-01-07",
       "amount": 138183,
       "currency": "USD",
@@ -2642,7 +2642,7 @@
     {
       "id": "evt-daily-sales-2027-01-08",
       "commitmentId": "daily-sales",
-      "legIndex": 53,
+      "legIndex": 20824,
       "date": "2027-01-08",
       "amount": 157923,
       "currency": "USD",
@@ -2678,7 +2678,7 @@
     {
       "id": "evt-daily-sales-2027-01-09",
       "commitmentId": "daily-sales",
-      "legIndex": 54,
+      "legIndex": 20825,
       "date": "2027-01-09",
       "amount": 197404,
       "currency": "USD",
@@ -2696,7 +2696,7 @@
     {
       "id": "evt-daily-sales-2027-01-10",
       "commitmentId": "daily-sales",
-      "legIndex": 55,
+      "legIndex": 20826,
       "date": "2027-01-10",
       "amount": 296106,
       "currency": "USD",
@@ -2732,7 +2732,7 @@
     {
       "id": "evt-daily-sales-2027-01-11",
       "commitmentId": "daily-sales",
-      "legIndex": 56,
+      "legIndex": 20827,
       "date": "2027-01-11",
       "amount": 355327,
       "currency": "USD",
@@ -2750,7 +2750,7 @@
     {
       "id": "evt-daily-sales-2027-01-12",
       "commitmentId": "daily-sales",
-      "legIndex": 57,
+      "legIndex": 20828,
       "date": "2027-01-12",
       "amount": 276366,
       "currency": "USD",
@@ -2768,7 +2768,7 @@
     {
       "id": "evt-daily-sales-2027-01-13",
       "commitmentId": "daily-sales",
-      "legIndex": 58,
+      "legIndex": 20829,
       "date": "2027-01-13",
       "amount": 118442,
       "currency": "USD",
@@ -2838,7 +2838,7 @@
     {
       "id": "evt-daily-sales-2027-01-14",
       "commitmentId": "daily-sales",
-      "legIndex": 59,
+      "legIndex": 20830,
       "date": "2027-01-14",
       "amount": 138183,
       "currency": "USD",
@@ -2856,7 +2856,7 @@
     {
       "id": "evt-daily-sales-2027-01-15",
       "commitmentId": "daily-sales",
-      "legIndex": 60,
+      "legIndex": 20831,
       "date": "2027-01-15",
       "amount": 157923,
       "currency": "USD",
@@ -2910,7 +2910,7 @@
     {
       "id": "evt-daily-sales-2027-01-16",
       "commitmentId": "daily-sales",
-      "legIndex": 61,
+      "legIndex": 20832,
       "date": "2027-01-16",
       "amount": 197404,
       "currency": "USD",
@@ -2928,7 +2928,7 @@
     {
       "id": "evt-daily-sales-2027-01-17",
       "commitmentId": "daily-sales",
-      "legIndex": 62,
+      "legIndex": 20833,
       "date": "2027-01-17",
       "amount": 296106,
       "currency": "USD",
@@ -2946,7 +2946,7 @@
     {
       "id": "evt-daily-sales-2027-01-18",
       "commitmentId": "daily-sales",
-      "legIndex": 63,
+      "legIndex": 20834,
       "date": "2027-01-18",
       "amount": 355327,
       "currency": "USD",
@@ -2964,7 +2964,7 @@
     {
       "id": "evt-daily-sales-2027-01-19",
       "commitmentId": "daily-sales",
-      "legIndex": 64,
+      "legIndex": 20835,
       "date": "2027-01-19",
       "amount": 276366,
       "currency": "USD",
@@ -2982,7 +2982,7 @@
     {
       "id": "evt-daily-sales-2027-01-20",
       "commitmentId": "daily-sales",
-      "legIndex": 65,
+      "legIndex": 20836,
       "date": "2027-01-20",
       "amount": 118442,
       "currency": "USD",
@@ -3035,7 +3035,7 @@
     {
       "id": "evt-daily-sales-2027-01-21",
       "commitmentId": "daily-sales",
-      "legIndex": 66,
+      "legIndex": 20837,
       "date": "2027-01-21",
       "amount": 138183,
       "currency": "USD",
@@ -3053,7 +3053,7 @@
     {
       "id": "evt-daily-sales-2027-01-22",
       "commitmentId": "daily-sales",
-      "legIndex": 67,
+      "legIndex": 20838,
       "date": "2027-01-22",
       "amount": 157923,
       "currency": "USD",
@@ -3089,7 +3089,7 @@
     {
       "id": "evt-daily-sales-2027-01-23",
       "commitmentId": "daily-sales",
-      "legIndex": 68,
+      "legIndex": 20839,
       "date": "2027-01-23",
       "amount": 197404,
       "currency": "USD",
@@ -3107,7 +3107,7 @@
     {
       "id": "evt-daily-sales-2027-01-24",
       "commitmentId": "daily-sales",
-      "legIndex": 69,
+      "legIndex": 20840,
       "date": "2027-01-24",
       "amount": 296106,
       "currency": "USD",
@@ -3125,7 +3125,7 @@
     {
       "id": "evt-daily-sales-2027-01-25",
       "commitmentId": "daily-sales",
-      "legIndex": 70,
+      "legIndex": 20841,
       "date": "2027-01-25",
       "amount": 355327,
       "currency": "USD",
@@ -3143,7 +3143,7 @@
     {
       "id": "evt-daily-sales-2027-01-26",
       "commitmentId": "daily-sales",
-      "legIndex": 71,
+      "legIndex": 20842,
       "date": "2027-01-26",
       "amount": 276366,
       "currency": "USD",
@@ -3161,7 +3161,7 @@
     {
       "id": "evt-daily-sales-2027-01-27",
       "commitmentId": "daily-sales",
-      "legIndex": 72,
+      "legIndex": 20843,
       "date": "2027-01-27",
       "amount": 118442,
       "currency": "USD",
@@ -3213,7 +3213,7 @@
     {
       "id": "evt-daily-sales-2027-01-28",
       "commitmentId": "daily-sales",
-      "legIndex": 73,
+      "legIndex": 20844,
       "date": "2027-01-28",
       "amount": 138183,
       "currency": "USD",
@@ -3231,7 +3231,7 @@
     {
       "id": "evt-daily-sales-2027-01-29",
       "commitmentId": "daily-sales",
-      "legIndex": 74,
+      "legIndex": 20845,
       "date": "2027-01-29",
       "amount": 157923,
       "currency": "USD",
@@ -3267,7 +3267,7 @@
     {
       "id": "evt-daily-sales-2027-01-30",
       "commitmentId": "daily-sales",
-      "legIndex": 75,
+      "legIndex": 20846,
       "date": "2027-01-30",
       "amount": 197404,
       "currency": "USD",
@@ -3285,7 +3285,7 @@
     {
       "id": "evt-daily-sales-2027-01-31",
       "commitmentId": "daily-sales",
-      "legIndex": 76,
+      "legIndex": 20847,
       "date": "2027-01-31",
       "amount": 296106,
       "currency": "USD",
@@ -3303,7 +3303,7 @@
     {
       "id": "evt-daily-sales-2027-02-01",
       "commitmentId": "daily-sales",
-      "legIndex": 77,
+      "legIndex": 20848,
       "date": "2027-02-01",
       "amount": 355327,
       "currency": "USD",
@@ -3339,7 +3339,7 @@
     {
       "id": "evt-daily-sales-2027-02-02",
       "commitmentId": "daily-sales",
-      "legIndex": 78,
+      "legIndex": 20849,
       "date": "2027-02-02",
       "amount": 276366,
       "currency": "USD",
@@ -3357,7 +3357,7 @@
     {
       "id": "evt-daily-sales-2027-02-03",
       "commitmentId": "daily-sales",
-      "legIndex": 79,
+      "legIndex": 20850,
       "date": "2027-02-03",
       "amount": 118442,
       "currency": "USD",
@@ -3392,7 +3392,7 @@
     {
       "id": "evt-daily-sales-2027-02-04",
       "commitmentId": "daily-sales",
-      "legIndex": 80,
+      "legIndex": 20851,
       "date": "2027-02-04",
       "amount": 138183,
       "currency": "USD",
@@ -3410,7 +3410,7 @@
     {
       "id": "evt-daily-sales-2027-02-05",
       "commitmentId": "daily-sales",
-      "legIndex": 81,
+      "legIndex": 20852,
       "date": "2027-02-05",
       "amount": 157923,
       "currency": "USD",
@@ -3446,7 +3446,7 @@
     {
       "id": "evt-daily-sales-2027-02-06",
       "commitmentId": "daily-sales",
-      "legIndex": 82,
+      "legIndex": 20853,
       "date": "2027-02-06",
       "amount": 197404,
       "currency": "USD",
@@ -3464,7 +3464,7 @@
     {
       "id": "evt-daily-sales-2027-02-07",
       "commitmentId": "daily-sales",
-      "legIndex": 83,
+      "legIndex": 20854,
       "date": "2027-02-07",
       "amount": 296106,
       "currency": "USD",
@@ -3482,7 +3482,7 @@
     {
       "id": "evt-daily-sales-2027-02-08",
       "commitmentId": "daily-sales",
-      "legIndex": 84,
+      "legIndex": 20855,
       "date": "2027-02-08",
       "amount": 355327,
       "currency": "USD",
@@ -3500,7 +3500,7 @@
     {
       "id": "evt-daily-sales-2027-02-09",
       "commitmentId": "daily-sales",
-      "legIndex": 85,
+      "legIndex": 20856,
       "date": "2027-02-09",
       "amount": 276366,
       "currency": "USD",
@@ -3518,7 +3518,7 @@
     {
       "id": "evt-daily-sales-2027-02-10",
       "commitmentId": "daily-sales",
-      "legIndex": 86,
+      "legIndex": 20857,
       "date": "2027-02-10",
       "amount": 118442,
       "currency": "USD",
@@ -3570,7 +3570,7 @@
     {
       "id": "evt-daily-sales-2027-02-11",
       "commitmentId": "daily-sales",
-      "legIndex": 87,
+      "legIndex": 20858,
       "date": "2027-02-11",
       "amount": 138183,
       "currency": "USD",
@@ -3588,7 +3588,7 @@
     {
       "id": "evt-daily-sales-2027-02-12",
       "commitmentId": "daily-sales",
-      "legIndex": 88,
+      "legIndex": 20859,
       "date": "2027-02-12",
       "amount": 157923,
       "currency": "USD",
@@ -3624,7 +3624,7 @@
     {
       "id": "evt-daily-sales-2027-02-13",
       "commitmentId": "daily-sales",
-      "legIndex": 89,
+      "legIndex": 20860,
       "date": "2027-02-13",
       "amount": 197404,
       "currency": "USD",
@@ -3642,7 +3642,7 @@
     {
       "id": "evt-daily-sales-2027-02-14",
       "commitmentId": "daily-sales",
-      "legIndex": 90,
+      "legIndex": 20861,
       "date": "2027-02-14",
       "amount": 296106,
       "currency": "USD",

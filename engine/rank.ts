@@ -1,7 +1,7 @@
 // Turn warning Candidates into ranked WorkItems: "three things to do today" plus the full money list.
 // Source: docs/design/07-warnings-and-ranking.md.
 //
-//   score = value × 1 / (1 + d / 7) × confidence × relationship
+//   score = value × 1 / (1 + d / urgencyScaleDays) × confidence × relationship   (urgencyScaleDays: profile engine, default 7)
 //
 // value comes from re-simulating each lever (or dollars saved for a discount), never from Claude.
 // title/why here are code-built fallbacks; the Claude layer may rewrite them from the same numbers.
@@ -10,7 +10,7 @@ import type { Candidate, ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
 import type { CashEvent, Commitment, Lever, Records, WorkItem } from "../schema/records";
 import { diffDays } from "./dates";
-import { STATUS_CONFIDENCE } from "./expand";
+import { engineSettings } from "./settings";
 import { pendingEventsByCommitment, receivableShares, sumBase } from "./warnings";
 
 // The orchestrator binds the engine's simulate(records, profile, baseOverrides, levers, asOf, fxRates)
@@ -81,6 +81,12 @@ function describe(
   }
 
   if (c.warning === "deal_affordability") {
+    // Explain-only: a possible deal (no dollar figure, see warnings.ts) or one no upfront share can fix.
+    if (c.upfront && c.upfront.share < 1) {
+      return { title: `If you take ${ref}, ask ${named ?? "the customer"} for ${pct(c.upfront.share)} upfront`,
+        why: `At ${pct(c.upfront.currentShare)} upfront this quote would take cash below your safety line; `
+          + `${pct(c.upfront.share)} keeps it above.` };
+    }
     return { title: `${ref} would take cash below your safety line`,
       why: "Even paid fully upfront, cash stays below the line. Review the supplier terms before signing." };
   }
@@ -116,6 +122,7 @@ export function rank(
   prior: Pick<WorkItem, "id" | "state">[] = [],
 ): Brief {
   const pending = pendingEventsByCommitment(run);
+  const { urgencyScaleDays: urgency, statusConfidence: statusConf } = engineSettings(profile);
   const money = moneyFormatter(profile.baseCurrency);
   const priorState = new Map(prior.map((p) => [p.id, p.state]));
   const byId = new Map<string, WorkItem>();
@@ -141,11 +148,11 @@ export function rank(
     // A deal's confidence is its status's, as the engine assigns it: a possible deal has no main-line events,
     // and a likely deal's lag-shrunk later legs would understate a decision taken before signing.
     const confidence = c.upfront && commitment
-      ? (commitment.status === "possible" ? commitment.probability ?? STATUS_CONFIDENCE.possible : STATUS_CONFIDENCE[commitment.status])
+      ? (commitment.status === "possible" ? commitment.probability ?? statusConf.possible : statusConf[commitment.status])
       : events.length ? Math.min(...events.map((e) => e.confidence)) : 1;
     const rel = c.lever ? relationship(commitment?.partyId, records, profile) : 1;
     const d = Math.max(0, diffDays(c.neededBy, run.asOf));
-    const score = Math.round((value / (1 + d / 7)) * confidence * rel);
+    const score = Math.round((value / (1 + d / urgency)) * confidence * rel);
 
     const id = workItemId(c);
     const drafts = c.lever && c.lever.kind !== "pay_early";

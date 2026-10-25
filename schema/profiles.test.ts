@@ -76,6 +76,19 @@ describe.each(files)("profile %s", (file) => {
     } else expect(["deals", "retainers"]).toContain(m.kind);
   });
 
+  it("engine tunables, when set, are in range", () => {
+    const e = p.engine ?? {};
+    const unit = (x: number | undefined) => x === undefined || (x >= 0 && x <= 1);
+    const days = (x: number | undefined) => x === undefined || (Number.isInteger(x) && x > 0);
+    expect(Object.values(e.statusConfidence ?? {}).every(unit), "statusConfidence").toBe(true);
+    expect(unit(e.dailySalesConfidence) && unit(e.lag?.noHistoryConfidence), "confidences").toBe(true);
+    expect([e.salesHistoryDays, e.settlementMatchDays, e.staleFallbackDays, e.noSnapshotLookbackDays, e.deferDays, e.urgencyScaleDays, e.lag?.maxSamples].every(days), "day counts").toBe(true);
+    expect(e.lag?.iqrScaleDays === undefined || e.lag.iqrScaleDays > 0, "iqrScaleDays").toBe(true);
+    expect(e.affordabilityStep === undefined || (e.affordabilityStep > 0 && e.affordabilityStep <= 1), "affordabilityStep").toBe(true);
+    for (const a of e.lag?.laggedAnchors ?? []) expect(ANCHORS).toContain(a);
+    for (const t of e.lag?.laggedTypes ?? []) expect(TYPES).toContain(t);
+  });
+
   it("forecasts a minimal book with zero code changes", () => {
     const src = { system: "test", record: "x" };
     const records: Records = {
@@ -105,4 +118,21 @@ describe.each(files)("profile %s", (file) => {
     }
     expect(run.warnings.join(" ")).not.toMatch(/not scheduled/);
   });
+});
+
+// #121: both milestones_50_50 legs are client invoices (net 60 from order, net 60 from delivery), so both wait on the
+// client: with no payment history each lands defaultLagDays (15) after its offset date, and the basis says so.
+it("agency.json: both milestone legs get the client's lag", () => {
+  const p = JSON.parse(readFileSync(join(dir, "agency.json"), "utf8")) as Profile;
+  const src = { system: "test", record: "x" };
+  const records: Records = {
+    parties: [], events: [], signals: [], rules: [], settlements: [], evidence: [],
+    balances: [{ id: "bal", account: "main", amount: 0, currency: "USD", asOf: "2026-11-16", sourceRef: src }],
+    commitments: [{ id: "sow", type: "sales_deal", partyId: "client", amount: 2_000_000, currency: "USD", anchors: { order: "2026-10-20", delivery: "2026-11-01" }, status: "likely", sourceRef: src }],
+  };
+  const run = forecast(records, p, { id: "base", kind: "base", overrides: [] }, "2026-11-16", {});
+  const legs = run.events.filter((e) => e.commitmentId === "sow");
+  // order Oct 20 + 60 = Dec 19, + 15 = Jan 3; delivery Nov 1 + 60 = Dec 31, + 15 = Jan 15; $20,000 split 50/50
+  expect(legs.map((e) => `${e.legIndex}:${e.date}:${e.amount}`)).toEqual(["0:2027-01-03:1000000", "1:2027-01-15:1000000"]);
+  for (const e of legs) expect(e.basis).toMatch(/\+ 15 days \(profile default; no payment history\)/);
 });

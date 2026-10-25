@@ -321,3 +321,27 @@ Use the same `BriefContext` and the `WorkItem` loaded for `:id` from the same ru
 - **Never throws, never sends.** Checks: amounts, dates, percentages, day counts, and sample counts against `decision.allowed`; no menus (options, "you could", lists, a second fallback); the headline leads with the verdict and the recommendation's key fact; no sent/paid claims. One retry with feedback, then a code-built voice (`usedFallback: true`).
 - **`need_info`, `decline`, `proposed`** always use the code-built voice (no model call).
 - **Cache:** committed stand-ins in `fixtures/cascade_trade/ask/intent-cache` (from `scripts/make-voice-standins.ts`); `scripts/refresh-voice-cache.ts` replaces them with live output. Hand-built Decisions: `fixtures/cascade_trade/ask/decisions.json`.
+
+## Ask Neri: `askNeri(question, ctx)` and `POST /ask` (P4.22)
+
+`askNeri` in [`ai/ask/index.ts`](ask/index.ts) runs `readIntent` -> `decide` -> (for `proposed`, `ctx.persistProposal(p)` returns the id of the stored proposed Signal or Rule) -> `voice`, and never throws (a failure is a `decline` answer in plain words). It returns the `CfoAnswer` plus:
+
+- `scenario: { label, run }` for what_if and afford answers: an engine `ForecastRun` with the what-if applied (or the plan added), so the app redraws the chart. The app gets the run inline; it does not need to fetch by `scenarioId`.
+- `proposal: { kind: "plan", amount, date, note, direction, currency }` (amount in minor units) for a stated plan or an afford question about a plan: the app's "Add to forecast" shape, sent to `POST /plans`. For a stated plan it also carries the persisted `id` and `draft`. A stated rule keeps the contract shape `{ kind: "rule", rule, id }`. Without `persistProposal` the id is a placeholder (`ask-proposal-...`), not a stored record: always pass it in a server.
+- `via: "voice"`: `text` is the headline plus the next step only (the app reads it aloud); `why`, `convictionNote` and the rest stay on the answer for the screen.
+
+`handleAsk(body, ctx)` is the framework-free handler: it validates `{ question: string, via?: "text" | "voice" }` and returns `{ status, body }` (400 with a plain-words error for a bad body). **Mounting it (until `api/` has a `/ask` route):** after the route's auth and business resolution, load that business's `records`, `profile`, `asOf`, `fxRates`, `baseOverrides`, and the unresolved Review count, then
+
+```ts
+app.post("/ask", async (req, reply) => {
+  // auth + business resolution as the other routes do
+  const r = await handleAsk(req.body, {
+    records, profile, asOf, fxRates, baseOverrides, pendingReviewCount, business: { name },
+    mode: process.env.NERI_AI_MODE === "live" ? "live" : "cache_only",
+    persistProposal: (p) => store.insertProposedFromAsk(businessId, p), // plan -> Signal(owner, claim plan, proposed); rule -> Rule(proposed)
+  });
+  return reply.code(r.status).send(r.body);
+});
+```
+
+Eval: `fixtures/cascade_trade/ask/eval.json` (12 owner questions plus the injection guard) runs in `ai/ask/askNeri.test.ts`. `scripts/refresh-ask-cache.ts` re-records the intent and voice caches live for those questions.
