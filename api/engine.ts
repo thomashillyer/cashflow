@@ -93,9 +93,11 @@ export async function briefFor(store: Store, b: Business, mode: AiMode, now: () 
   const levers = three.filter((i) => i.state === "open" && i.lever).map((i) => i.lever!);
   let combined: BriefResult["combined"] = null;
   let after = run.lowPoint.amount;
+  let afterDate = run.lowPoint.date; // the gap and its date come from the same (simulated) run
   if (levers.length) {
     const sim = simulate(records, inputs.profile, overrides, levers, inputs.asOf, inputs.fxRates);
     after = sim.run.lowPoint.amount;
+    afterDate = sim.run.lowPoint.date;
     if (levers.length > 1) combined = { lowPointDelta: sim.lowPointDelta, lowPoint: sim.run.lowPoint };
   }
   // No opening balance yet (a new business before its first import): no gap to show.
@@ -104,7 +106,7 @@ export async function briefFor(store: Store, b: Business, mode: AiMode, now: () 
   const shortfall: BriefResult["shortfall"] = residual > 0
     ? {
         amount: residual,
-        title: `Even with these, you'd be ${fmtMoney(residual, currency)} under your line around ${fmtDate(run.lowPoint.date, inputs.asOf)}`,
+        title: `Even with these, you'd be ${fmtMoney(residual, currency)} under your line around ${fmtDate(afterDate, inputs.asOf)}`,
         why: "If chasing and timing can't close the rest, you could look at short-term working capital. Whether to borrow is your call; Neri only shows the gap and the dates.",
         partnerAction: { label: "See sample working-capital options", sample: true, disclosure: PARTNER_DISCLOSURE },
       }
