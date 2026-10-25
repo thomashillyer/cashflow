@@ -100,20 +100,35 @@ export const upsertIntakeCandidates = (db: SupabaseClient, b: string, r: IntakeC
 export const upsertChangeProposals = (db: SupabaseClient, b: string, r: ChangeProposal[]) =>
   upsert(db, "change_proposals", b, r);
 
+export type LoadedWorkItems = {
+  items: WorkItem[];
+  // ForecastRun.inputsHash of the run they were ranked from. Undefined when nothing was saved or the
+  // rows disagree; compare with the current run's inputsHash and re-rank when it differs.
+  inputsHash?: string;
+};
+
 // Work items (engine/rank.ts output), best first. Pass their id/state back to buildBrief as
 // `prior` so done and dismissed items stay that way across reruns.
-export async function loadWorkItems(db: SupabaseClient, businessId: string): Promise<WorkItem[]> {
+export async function loadWorkItems(db: SupabaseClient, businessId: string): Promise<LoadedWorkItems> {
   const { data, error } = await db.from("work_items").select("*").eq("business_id", businessId)
     .order("score", { ascending: false }).order("id");
   if (error) throw toStoreError(`load work items ${businessId}`, error);
-  return (data as Row[]).map((r) => fromRow<WorkItem>(r, "work_items"));
+  const rows = (data as Row[]).map((r) => fromRow<WorkItem & { inputsHash?: string }>(r, "work_items"));
+  const hashes = new Set(rows.map((r) => r.inputsHash));
+  return {
+    items: rows.map(({ inputsHash: _hash, ...item }) => item),
+    ...(hashes.size === 1 && rows[0]!.inputsHash ? { inputsHash: rows[0]!.inputsHash } : {}),
+  };
 }
 
-// Service-role only: save a fresh ranking. `state` is never written here: new rows take the column
-// default ('open') and existing rows keep theirs, so a recompute can't undo an owner's tick-off.
-// Open items the new ranking no longer produces are removed; done and dismissed items are kept.
-export async function saveWorkItems(db: SupabaseClient, businessId: string, items: WorkItem[]): Promise<void> {
-  await upsert(db, "work_items", businessId, items.map(({ state: _state, ...rest }) => rest));
+// Service-role only: save a fresh ranking from the run with `inputsHash`. `state` is never written
+// here: new rows take the column default ('open') and existing rows keep theirs, so a recompute can't
+// undo an owner's tick-off. Open items the new ranking no longer produces are removed; done and
+// dismissed items are kept and restamped, so every row names the run it was last checked against.
+export async function saveWorkItems(
+  db: SupabaseClient, businessId: string, items: WorkItem[], inputsHash: string,
+): Promise<void> {
+  await upsert(db, "work_items", businessId, items.map(({ state: _state, ...rest }) => ({ ...rest, inputsHash })));
   let stale = db.from("work_items").delete().eq("business_id", businessId).eq("state", "open");
   if (items.length) {
     const quoted = items.map((i) => `"${i.id.replace(/[\\"]/g, "\\$&")}"`);
@@ -121,6 +136,9 @@ export async function saveWorkItems(db: SupabaseClient, businessId: string, item
   }
   const { error } = await stale;
   if (error) throw toStoreError(`prune work items ${businessId}`, error);
+  const { error: stampError } = await db.from("work_items").update({ inputs_hash: inputsHash })
+    .eq("business_id", businessId);
+  if (stampError) throw toStoreError(`stamp work items ${businessId}`, stampError);
 }
 
 // Service-role only: the owner ticks an item off or dismisses it. Changes work-item state only;

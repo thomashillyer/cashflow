@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Commitment, WorkItem } from "../schema/records";
 import {
-  StoreError, confirmChangeProposal, loadRecords, saveWorkItems, setWorkItemState, upsertCommitments, upsertRecords,
+  StoreError, confirmChangeProposal, loadRecords, loadWorkItems, saveWorkItems, setWorkItemState, upsertCommitments, upsertRecords,
 } from "./records";
 
 const commitment: Commitment = {
@@ -87,7 +87,7 @@ describe("work items", () => {
   function chain(result: { data?: unknown; error: null }) {
     const calls: [string, unknown[]][] = [];
     const q: Record<string, unknown> = {};
-    for (const m of ["upsert", "delete", "update", "eq", "not", "select"]) {
+    for (const m of ["upsert", "delete", "update", "eq", "not", "select", "order"]) {
       q[m] = (...args: unknown[]) => { calls.push([m, args]); return q; };
     }
     q.then = (resolve: (v: unknown) => void) => resolve(result);
@@ -99,13 +99,28 @@ describe("work items", () => {
     confidence: 1, score: 1, evidenceRefs: [], actions: [{ kind: "mark_done" }], state: "open",
   };
 
-  it("saveWorkItems never writes state and escapes ids in the prune filter", async () => {
+  it("saveWorkItems never writes state, escapes ids in the prune filter, and stamps the run hash", async () => {
     const { q, calls } = chain({ error: null });
-    await saveWorkItems({ from: () => q } as unknown as SupabaseClient, "cascade_trade", [item]);
+    await saveWorkItems({ from: () => q } as unknown as SupabaseClient, "cascade_trade", [item], "hash-1");
     const upserted = calls.find(([m]) => m === "upsert")![1][0] as Record<string, unknown>[];
     expect(upserted[0]).not.toHaveProperty("state");
+    expect(upserted[0]).toMatchObject({ inputs_hash: "hash-1" });
     expect(calls).toContainEqual(["eq", ["state", "open"]]);
     expect(calls).toContainEqual(["not", ["id", "in", '("wi-x-chase-inv-\\"1\\"")']]);
+    expect(calls).toContainEqual(["update", [{ inputs_hash: "hash-1" }]]);
+  });
+
+  it("loadWorkItems returns the run hash only when every row agrees", async () => {
+    const row = { business_id: "b", id: "wi-1", warning: "w", title: "t", why: "", cash_effect: 1, needed_by: "2026-12-12",
+      confidence: 1, score: 1, evidence_refs: [], actions: [], state: "open", partner_action: null, lever: null };
+    const load = async (rows: object[]) =>
+      loadWorkItems({ from: () => chain({ data: rows, error: null }).q } as unknown as SupabaseClient, "b");
+    const same = await load([{ ...row, inputs_hash: "h1" }, { ...row, id: "wi-2", inputs_hash: "h1" }]);
+    expect(same.inputsHash).toBe("h1");
+    expect(same.items[0]).not.toHaveProperty("inputsHash");
+    expect((await load([{ ...row, inputs_hash: "h1" }, { ...row, id: "wi-2", inputs_hash: null }])).inputsHash)
+      .toBeUndefined();
+    expect((await load([])).inputsHash).toBeUndefined();
   });
 
   it("setWorkItemState throws NOT_FOUND when no row changed", async () => {
