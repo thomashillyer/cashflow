@@ -52,65 +52,118 @@ export function horizonEnd(profile: Profile, asOf: string): string {
   return addDays(mondayOf(asOf), profile.horizonWeeks * 7);
 }
 
+// How opening cash treats each stored actual. Pure; shared by forecast() and countedActualIds().
+export type OpeningCash = {
+  opening: number;
+  counted: Set<string>;   // actual ids whose cash is in the run: inside a snapshot, rolled into opening, or in the main line on/after asOf
+  excluded: Set<string>;  // actual ids kept out of the run entirely (tagged to an account with no snapshot)
+};
+
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
 // Opening cash, per account: latest start-of-day snapshot on/before asOf, plus that account's actuals dated
-// on/after the snapshot and before asOf. Actuals without `account` go to the only account when there is one;
-// with several accounts they roll forward from the latest snapshot date (the only window certainly not in any
-// snapshot), and any in the earlier window, which may belong to an older account, are flagged for review.
-function openingBalance(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: string[]): number {
+// on/after the snapshot and before asOf. Actuals without `account` go to the only account when there is one.
+// With several accounts they roll forward from the latest snapshot date; those in the window between the oldest
+// and latest snapshot may or may not be in a snapshot already, so outflows are counted (conservative) and inflows
+// left out, with a needs-review warning.
+// Actuals tagged to an account with no snapshot on/before asOf are left out of opening cash AND of the main line
+// (the account's starting balance is unknown, so its movements alone would mislead), with one warning per account
+// covering actuals on/after the oldest snapshot date (asOf - 90 days when there is no snapshot at all).
+export function openingCash(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: string[]): OpeningCash {
   const latest = new Map<string, Records["balances"][number]>();
   for (const b of records.balances) {
     if (b.asOf > asOf) continue;
     const cur = latest.get(b.account);
     if (!cur || b.asOf > cur.asOf) latest.set(b.account, b);
   }
-  if (latest.size === 0) {
-    warnings.push("No opening balance on or before the as-of date; the forecast starts from $0.00 and cannot be trusted.");
-    return 0;
-  }
+  const counted = new Set<string>();
+  const excluded = new Set<string>();
   let total = 0;
-  let snapDate = "";
-  let oldestSnap = "";
-  for (const b of latest.values()) {
+  let newest = "";
+  let oldest = "";
+  if (latest.size === 0) warnings.push("No opening balance on or before the as-of date; the forecast starts from $0.00 and cannot be trusted.");
+  const staleHours = profile.thresholds.staleAfterHours;
+  for (const b of [...latest.values()].sort((x, y) => (x.account < y.account ? -1 : 1))) {
     const base = toBase(b.amount, b.currency, profile, fx);
     if (base === undefined) warnings.push(`Balance for ${b.account} is in ${b.currency} with no FX rate; left out of opening cash.`);
     else total += base;
-    if (b.asOf > snapDate) snapDate = b.asOf;
-    if (oldestSnap === "" || b.asOf < oldestSnap) oldestSnap = b.asOf;
+    if (b.asOf > newest) newest = b.asOf;
+    if (oldest === "" || b.asOf < oldest) oldest = b.asOf;
+    if (staleHours !== undefined && diffDays(asOf, b.asOf) * 24 > staleHours) warnings.push(`Bank balance for ${b.account} is from ${b.asOf}, older than ${staleHours} hours; refresh before relying on this.`);
   }
-  const staleHours = profile.thresholds.staleAfterHours;
-  if (staleHours !== undefined && diffDays(asOf, snapDate) * 24 > staleHours) warnings.push(`Bank balance is from ${snapDate}, older than ${staleHours} hours; refresh before relying on this.`);
+  const windowStart = latest.size > 0 ? oldest : addDays(asOf, -90);
   const only = latest.size === 1 ? [...latest.keys()][0] : undefined;
-  let ambiguous = 0;
+  const signed = (e: CashEvent, base: number) => (e.direction === "in" ? base : -base);
+  const orphans = new Map<string, { n: number; net: number; noFx: number }>();
+  const amb = { n: 0, out: 0, inn: 0 };
   for (const e of records.events) {
-    if (e.date >= asOf) continue;
     const account = e.account ?? only;
-    let from: string;
-    if (account === undefined) {
-      if (e.date < snapDate && e.date >= oldestSnap) ambiguous++;
-      from = snapDate;
-    } else {
-      const snap = latest.get(account);
-      if (!snap) {
-        warnings.push(`Actual ${e.id} is tagged to account ${account}, which has no balance on or before the as-of date; left out of opening cash (needs review).`);
+    const base = toBase(e.amount, e.currency, profile, fx);
+    if (account !== undefined && !latest.has(account)) {
+      excluded.add(e.id);
+      if (e.date < windowStart) continue;
+      const o = orphans.get(account) ?? { n: 0, net: 0, noFx: 0 };
+      o.n++;
+      if (base === undefined) o.noFx++;
+      else o.net += signed(e, base);
+      orphans.set(account, o);
+      continue;
+    }
+    if (e.date >= asOf) {
+      if (base !== undefined) counted.add(e.id); // actualEvents() puts it in the main line (and warns when FX is missing)
+      continue;
+    }
+    if (latest.size === 0) continue; // no snapshot to roll onto
+    const from = account === undefined ? newest : latest.get(account)!.asOf;
+    if (e.date < (account === undefined ? oldest : from)) {
+      counted.add(e.id); // already inside its snapshot
+      continue;
+    }
+    if (base === undefined) {
+      warnings.push(`Actual ${e.id} is in ${e.currency} with no FX rate; left out of opening cash, which is understated or overstated by that amount (needs review).`);
+      continue;
+    }
+    if (e.date < from) {
+      // untagged, several accounts, between the oldest and latest snapshot
+      amb.n++;
+      if (e.direction === "in") {
+        amb.inn += base;
         continue;
       }
-      from = snap.asOf;
+      amb.out += base;
     }
-    if (e.date < from) continue;
-    const base = toBase(e.amount, e.currency, profile, fx);
-    if (base === undefined) warnings.push(`Actual ${e.id} is in ${e.currency} with no FX rate; left out of opening cash, which is understated or overstated by that amount (needs review).`);
-    else total += e.direction === "in" ? base : -base;
+    total += signed(e, base);
+    counted.add(e.id);
   }
-  if (ambiguous > 0) {
-    warnings.push(`${ambiguous} actual${ambiguous === 1 ? "" : "s"} with no account dated ${oldestSnap} to before ${snapDate}, between the account balance dates, could not be matched to an account and ${ambiguous === 1 ? "was" : "were"} left out of opening cash; tag ${ambiguous === 1 ? "it" : "them"} with an account (needs review).`);
+  const cur = profile.baseCurrency;
+  const netText = (net: number) => `net ${money(Math.abs(net), cur)} ${net >= 0 ? "in" : "out"}`;
+  if (amb.n > 0) {
+    warnings.push(
+      `${amb.n} ${plural(amb.n, "actual", "actuals")} with no account dated ${oldest} to before ${newest}, between the account balance dates, could not be matched to an account (${netText(amb.inn - amb.out)}); ` +
+        `to be safe, outflows (${money(amb.out, cur)}) are counted in opening cash and inflows (${money(amb.inn, cur)}) left out; tag ${plural(amb.n, "it", "them")} with an account (needs review).`,
+    );
   }
-  return total;
+  for (const [account, o] of [...orphans].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const fxNote = o.noFx > 0 ? `, ${o.noFx} with no FX rate not in that total` : "";
+    warnings.push(
+      `${o.n} ${plural(o.n, "actual", "actuals")} tagged to account ${account}, which has no balance on or before ${asOf} (${netText(o.net)}${fxNote}), ` +
+        `${plural(o.n, "is", "are")} left out of opening cash and the forecast; add a balance for ${account} (needs review).`,
+    );
+  }
+  return { opening: total, counted, excluded };
 }
 
-function actualEvents(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: string[]): CashEvent[] {
+// Ids of stored actuals whose cash the run actually counts (inside a snapshot, rolled into opening cash, or in the
+// main line on/after asOf). Actuals left out (ambiguous inflows, no-snapshot account, no FX rate) are not in it,
+// so they must not be treated as payment of an expected item.
+export function countedActualIds(records: Records, profile: Profile, asOf: string, fxRates: Record<string, number>): Set<string> {
+  return openingCash(records, profile, asOf, { [profile.baseCurrency]: 1, ...fxRates }, []).counted;
+}
+
+function actualEvents(records: Records, profile: Profile, asOf: string, fx: Record<string, number>, warnings: string[], excluded: Set<string>): CashEvent[] {
   const out: CashEvent[] = [];
   for (const e of records.events) {
-    if (e.date < asOf) continue;
+    if (e.date < asOf || excluded.has(e.id)) continue;
     const base = toBase(e.amount, e.currency, profile, fx);
     if (base === undefined) {
       warnings.push(`Actual ${e.id} is in ${e.currency} with no FX rate; excluded.`);
@@ -204,7 +257,8 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
   const warnings: string[] = [];
   const fx = { [profile.baseCurrency]: 1, ...fxRates };
 
-  const opening = openingBalance(records, profile, asOf, fx, warnings);
+  const cash = openingCash(records, profile, asOf, fx, warnings);
+  const opening = cash.opening;
   const expanded = expand(records, profile, asOf, end, fx);
   warnings.push(...expanded.warnings);
 
@@ -214,7 +268,7 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
     .filter((e) => e.direction === "out" && e.commitmentId && recurringIds.has(e.commitmentId) && e.date >= asOf && e.date < end)
     .reduce((a, e) => a + e.amountBase, 0);
 
-  const all = adjust([...expanded.events, ...actualEvents(records, profile, asOf, fx, warnings)], scenario, {
+  const all = adjust([...expanded.events, ...actualEvents(records, profile, asOf, fx, warnings, cash.excluded)], scenario, {
     records,
     profile,
     asOf,

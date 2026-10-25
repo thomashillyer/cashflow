@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CashEvent, Commitment, Records, Scenario, Settlement } from "../schema/records";
 import type { Profile } from "../schema/profile";
-import { forecast } from "./forecast";
+import { countedActualIds, forecast } from "./forecast";
 import { simulate } from "./simulate";
 import { partyLag } from "./lag";
 import { addDays, mondayOf } from "./dates";
@@ -159,17 +159,20 @@ describe("opening cash with several accounts", () => {
     expect(out.warnings.join(" ")).not.toMatch(/could not be matched/);
   });
 
-  it("unattributed actuals with several accounts roll from the latest snapshot and the ambiguous ones are flagged", () => {
+  it("untagged actuals between snapshot dates with several accounts: outflows counted, inflows left out, flagged", () => {
     const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-18"), snap("sav", $(1000), "2026-10-22")] };
     r.events = [
-      act("old", "2026-10-10", $(999)), // before every snapshot: not ambiguous
-      act("amb-1", "2026-10-19", $(20)),
-      act("amb-2", "2026-10-21", $(30)),
-      act("new", "2026-10-23", $(4)),
+      act("old", "2026-10-10", $(999)), // before every snapshot: already in them, not ambiguous
+      act("amb-in", "2026-10-19", $(20)),
+      act("amb-out", "2026-10-21", $(30), { direction: "out" }),
+      act("amb-in2", "2026-10-21", $(15)),
+      act("new", "2026-10-23", $(4)), // after the latest snapshot: rolled forward
     ];
     const out = run(r);
-    expect(out.openingBalance).toBe($(1104));
-    expect(out.warnings.join(" ")).toMatch(/2 actuals with no account dated 2026-10-18 to before 2026-10-22.*needs review/);
+    expect(out.openingBalance).toBe($(1100 - 30 + 4));
+    expect(out.warnings.join(" ")).toMatch(/3 actuals with no account dated 2026-10-18 to before 2026-10-22.*net \$5\.00 in.*outflows \(\$30\.00\) are counted.*inflows \(\$35\.00\) left out.*needs review/);
+    const ids = countedActualIds(r, profile, "2026-10-25", {});
+    expect([...ids].sort()).toEqual(["amb-out", "new", "old"]);
   });
 
   it("an actual with no FX rate in an account's roll-forward is left out with a warning", () => {
@@ -180,11 +183,46 @@ describe("opening cash with several accounts", () => {
     expect(out.warnings.join(" ")).toMatch(/Actual eur-1 is in EUR with no FX rate; left out of opening cash/);
   });
 
-  it("an actual tagged to an account with no snapshot is left out with a warning", () => {
-    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20")], events: [act("x", "2026-10-22", $(10), { account: "card" })] };
+  it("actuals tagged to an account with no snapshot are left out of opening and the main line, one warning per account", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20")] };
+    r.events = [
+      act("card-old", "2026-10-01", $(500), { account: "card", direction: "out" }), // before the oldest snapshot: ignored
+      act("card-1", "2026-10-22", $(10), { account: "card", direction: "out" }),
+      act("card-2", "2026-10-23", $(4), { account: "card" }),
+      act("card-3", "2026-10-27", $(20), { account: "card", direction: "out" }), // after asOf: also out of the main line
+    ];
     const out = run(r);
     expect(out.openingBalance).toBe($(100));
-    expect(out.warnings.join(" ")).toMatch(/Actual x is tagged to account card, which has no balance/);
+    expect(out.events.some((e) => e.id.startsWith("card"))).toBe(false);
+    const w = out.warnings.filter((x) => /account card/.test(x));
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^3 actuals tagged to account card, which has no balance on or before 2026-10-25 \(net \$26\.00 out\).*needs review/);
+    expect(countedActualIds(r, profile, "2026-10-25", {}).size).toBe(0);
+  });
+
+  it("with no snapshot at all, tagged actuals from the last 90 days are reported", () => {
+    const r = { ...empty(), events: [act("a", "2026-07-01", $(1), { account: "chk" }), act("b", "2026-10-01", $(2), { account: "chk" })] };
+    expect(run(r).warnings.join(" ")).toMatch(/1 actual tagged to account chk.*net \$2\.00 in/);
+  });
+
+  it("stale balances are checked per account", () => {
+    const r = { ...empty(), balances: [snap("checking", $(100), "2026-10-24"), snap("savings", $(100), "2026-09-01")] };
+    const w = forecast(r, { ...profile, thresholds: { ...profile.thresholds, staleAfterHours: 48 } }, base, "2026-10-25", {}).warnings;
+    expect(w.filter((x) => /older than 48 hours/.test(x))).toEqual(["Bank balance for savings is from 2026-09-01, older than 48 hours; refresh before relying on this."]);
+  });
+
+  it("countedActualIds: in-snapshot, rolled and main-line actuals count; no-FX and orphan ones do not", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20")] };
+    r.events = [
+      act("in-snap", "2026-10-19", $(5000), { account: "chk", direction: "out" }),
+      act("rolled", "2026-10-21", $(5000), { account: "chk", direction: "out" }),
+      act("no-fx", "2026-10-21", $(5000), { account: "chk", direction: "out", currency: "EUR" }),
+      act("orphan", "2026-10-21", $(5000), { account: "card", direction: "out" }),
+      act("future", "2026-10-26", $(5000), { direction: "out" }),
+      act("future-no-fx", "2026-10-26", $(5000), { direction: "out", currency: "EUR" }),
+    ];
+    expect([...countedActualIds(r, profile, "2026-10-25", {})].sort()).toEqual(["future", "in-snap", "rolled"]);
+    expect(countedActualIds(r, profile, "2026-10-25", { EUR: 1.1 }).has("no-fx")).toBe(true);
   });
 });
 
