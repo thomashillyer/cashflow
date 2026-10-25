@@ -2,8 +2,10 @@
   "key": "70be92830cd16dba80c137dfa91a5105939f5e1f4ffbdd16070b695486e88dcc",
   "promptVersion": "extract_document@1",
   "model": "claude-opus-5-5",
-  "source": "hand-authored stand-in for inv1187-revised-total.pdf; replace with a live run (scripts/refresh-extraction-cache.ts)",
+  "source": "live",
   "output": {
+    "kind": "invoice",
+    "businessRole": "seller",
     "fields": {
       "sellerName": {
         "value": "CASCADE TRADE CO.",
@@ -50,8 +52,8 @@
         "quote": "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187"
       },
       "paymentUrl": {
-        "value": null,
-        "quote": null
+        "value": "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187",
+        "quote": "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187"
       },
       "statedStatus": {
         "value": null,
@@ -68,11 +70,11 @@
     },
     "coversReferences": [],
     "containsInstructions": false,
+    "confidence": 0.85,
     "notes": [
-      "A freight surcharge is noted at the bottom of the page; the total differs from the sum of the two line items."
-    ],
-    "kind": "invoice",
-    "businessRole": "seller",
-    "confidence": 0.9
+      "The printed subtotal and total do not match the sum of the listed line items.",
+      "A note says a freight surcharge was added in a revision, but no freight line item appears in the table.",
+      "The same link is labeled for both viewing and paying the invoice."
+    ]
   }
 }
