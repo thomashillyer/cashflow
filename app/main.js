@@ -3,7 +3,7 @@ import { currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
 import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
-import { icon, logo } from "./ui/icons.js";
+import { icon, logo, logoLarge } from "./ui/icons.js";
 import { speak, listen, canSpeak, canListen, speakable, spokenMoney } from "./ui/speech.js";
 import { addDays, dayDate, esc, greeting, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
 
@@ -270,7 +270,6 @@ function viewToday() {
   return `
   <div class="home">
     <section class="home-top">
-      <p class="hello">${greeting(new Date().getHours())}, ${esc(ownerName())}</p>
       <h1 class="headline">${esc(s.headline)}</h1>
       <p class="subhead">${esc(s.sub)}</p>
       ${s.take ? `<p class="take"><span class="sunmark" aria-hidden="true"></span>${esc(s.take)}</p>` : ""}
@@ -311,15 +310,12 @@ function homeCard(i, k, n) {
   const ref = i.evidenceRefs?.[0];
   const draft = i.actions.some((a) => a.kind === "draft_email");
   return `
-  <li class="card ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}">
-    <div class="card-top">
-      <span class="card-n">${k + 1} of ${n}</span>
-      <span class="card-by">${done ? "Done" : `Act by ${shortDate(i.neededBy)}`}</span>
-    </div>
+  <li class="card ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}" aria-label="Thing ${k + 1} of ${n}">
     <p class="card-effect"><b>${money(i.cashEffect, { signed: true })}</b><span>${i.warning === "early_pay_discount" ? "saved" : "to your low point"}</span></p>
     <h3 class="card-title">${esc(i.title)}</h3>
     <p class="card-why">${esc(i.why)}</p>
     <div class="card-actions">
+      ${done ? "" : `<span class="card-by">Act by <b>${shortDate(i.neededBy)}</b></span>`}
       ${draft && !done ? `<button class="btn small primary" data-action="draft" data-id="${esc(i.id)}">${icon.mail}Draft email</button>` : ""}
       <button class="btn small ${done ? "" : "quiet"}" data-action="done" data-id="${esc(i.id)}" aria-pressed="${done}">${icon.check}${done ? "Done" : "Mark done"}</button>
       ${ref ? `<button class="src" data-action="record" data-id="${esc(ref)}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
@@ -731,6 +727,7 @@ function viewWelcome() {
   if (su.step === "code") {
     return `
     <div class="portal-wrap">
+      <div class="portal-mark">${logoLarge}</div>
       <h1 class="portal-title">Check your email</h1>
       <p class="portal-sub">We sent a 6-digit code to <b>${esc(su.email)}</b>.</p>
       <form class="portal-form" data-submit="verify" novalidate>
@@ -747,6 +744,7 @@ function viewWelcome() {
   }
   return `
   <div class="portal-wrap">
+    <div class="portal-mark">${logoLarge}</div>
     <h1 class="portal-title">Your CFO, in your pocket.</h1>
     <p class="portal-sub">Neri reads your books, bank and messages, and every morning tells you where cash is headed and what to do about it.</p>
     <form class="portal-form" data-submit="signup" novalidate>
@@ -795,7 +793,7 @@ function lockScreen() {
   el.className = "lock";
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", "Neri is locked");
-  el.innerHTML = `<div class="lock-card">${logo}<h2>Locked</h2><p>Your numbers are hidden after ${Math.round(LOCK_MS / 60000)} minutes away.</p><button class="btn primary big" data-action="unlock">Unlock</button></div>`;
+  el.innerHTML = `<div class="lock-card">${logoLarge}<h2>Locked</h2><p>Your numbers are hidden after ${Math.round(LOCK_MS / 60000)} minutes away.</p><button class="btn primary big" data-action="unlock">Unlock</button></div>`;
   document.body.append(el);
   document.body.classList.add("locked");
 }
@@ -1052,7 +1050,7 @@ function renderDrive() {
   // parts: [0]=headline, [1]=count, [2..]=items
   const itemSpeaking = (n) => app.speakingIndex === n + 2;
   el.innerHTML = masked(`
-    <div class="drive-top"><span>${dayDate(app.ctx.business.asOf)}</span><button data-action="drive-close">Done</button></div>
+    <div class="drive-top"><span class="drive-brand">${logo}${dayDate(app.ctx.business.asOf)}</span><button data-action="drive-close">Done</button></div>
     <div class="drive-body">
       <p class="drive-line">${esc(s.headline)}</p>
       <ol class="drive-list">${open.map((i, n) => `<li class="${itemSpeaking(n) ? "speaking" : ""}"><span>${n + 1}</span>${esc(i.title.replace(/\s*\([A-Z]+-[\w-]+\)/, ""))}</li>`).join("")}</ol>
