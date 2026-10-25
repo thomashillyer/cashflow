@@ -310,12 +310,12 @@ function homeCard(i, k, n) {
   const ref = i.evidenceRefs?.[0];
   const draft = i.actions.some((a) => a.kind === "draft_email");
   return `
-  <li class="card ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}">
+  <li class="card ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}" aria-label="Thing ${k + 1} of ${n}">
     <p class="card-effect"><b>${money(i.cashEffect, { signed: true })}</b><span>${i.warning === "early_pay_discount" ? "saved" : "to your low point"}</span></p>
     <h3 class="card-title">${esc(i.title)}</h3>
     <p class="card-why">${esc(i.why)}</p>
     <div class="card-actions">
-      <span class="card-by">${done ? "Done" : `Act by <b>${shortDate(i.neededBy)}</b>`}</span>
+      ${done ? "" : `<span class="card-by">Act by <b>${shortDate(i.neededBy)}</b></span>`}
       ${draft && !done ? `<button class="btn small primary" data-action="draft" data-id="${esc(i.id)}">${icon.mail}Draft email</button>` : ""}
       <button class="btn small ${done ? "" : "quiet"}" data-action="done" data-id="${esc(i.id)}" aria-pressed="${done}">${icon.check}${done ? "Done" : "Mark done"}</button>
       ${ref ? `<button class="src" data-action="record" data-id="${esc(ref)}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
