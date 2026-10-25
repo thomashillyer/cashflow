@@ -158,6 +158,166 @@ describe("legs, partial payments, overlap", () => {
   });
 });
 
+describe("settlements, linked overlap, and currency (#45 #63 #64 #67)", () => {
+  const payIn = (id: string, date: string, amount: number, currency = "USD"): CashEvent => ({ id, commitmentId: "inv", legIndex: 0, date, amount, currency, amountBase: amount, direction: "in", status: "actual", confidence: 1, basis: "bank", sourceRef: src });
+  const settle = (amount: number, o: Partial<Settlement> = {}): Settlement => ({ id: "set-1", commitmentId: "inv", amount, currency: "USD", date: "2026-10-24", sourceRef: src, ...o }); // default: before the Oct 25 snapshot
+  const sumOf = (run: ReturnType<typeof forecast>, id: string) => run.events.filter((e) => e.commitmentId === id).reduce((a, e) => a + e.amount, 0);
+
+  it("TECHNICAL_PLAN 6: $100 opening + $20 actual + $30 expected = $150 with outstanding unset", () => {
+    const r = empty();
+    r.balances = [bal($(100))];
+    r.commitments = [com("inv", { type: "invoice", amount: $(50), settlement: "partial", anchors: { due: "2026-10-27" } })];
+    r.settlements = [settle($(20), { date: "2026-10-26" })];
+    r.events = [payIn("bank-1", "2026-10-26", $(20))];
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    expect(closing(run, "2026-10-28")).toBe($(150));
+    expect(run.events.filter((e) => e.commitmentId === "inv" && e.status !== "actual").map((e) => e.amount)).toEqual([$(30)]);
+    expect(run.warnings.join(" ")).not.toMatch(/partially paid|not seen in the bank/);
+  });
+
+  it("a settlement after the snapshot with no bank line keeps the money expected and asks for reconciliation", () => {
+    const r = empty();
+    r.balances = [bal($(100))];
+    r.commitments = [com("inv", { type: "invoice", amount: $(50), settlement: "partial", anchors: { due: "2026-10-27" } })];
+    r.settlements = [settle($(20), { date: "2026-10-26" })];
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    expect(closing(run, "2026-10-28")).toBe($(150)); // $100 + $50 still expected, the $20 is not lost
+    expect(run.warnings.join(" ")).toMatch(/payment of \$20\.00 recorded on 2026-10-26 but not seen in the bank; still forecast as expected \(needs reconciliation\)/);
+  });
+
+  it("a settlement before the snapshot is inside opening cash and reduces what is expected", () => {
+    const r = empty();
+    r.balances = [bal($(100))];
+    r.commitments = [com("inv", { type: "invoice", amount: $(50), settlement: "partial", anchors: { due: "2026-10-27" } })];
+    r.settlements = [settle($(20), { date: "2026-10-24" })];
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    expect(closing(run, "2026-10-28")).toBe($(130));
+    expect(run.warnings.join(" ")).not.toMatch(/not seen in the bank/);
+  });
+
+  it("settlements beyond what outstanding reflects warn of a possible double count", () => {
+    const r = { ...empty(), balances: [bal(0)], commitments: [com("inv", { type: "invoice", amount: $(50), outstanding: $(40), anchors: { due: "2026-10-27" } })], settlements: [settle($(20))] };
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    expect(sumOf(run, "inv")).toBe($(40));
+    expect(run.warnings.join(" ")).toMatch(/settlements \(\$20\.00\) exceed what outstanding reflects \(\$10\.00\); possible double count/);
+  });
+
+  it("a settlement in another currency is not deducted, and says so", () => {
+    const r = { ...empty(), balances: [bal(0)], commitments: [com("inv", { type: "invoice", amount: $(50), anchors: { due: "2026-10-27" } })], settlements: [settle($(20), { currency: "EUR" })] };
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    expect(sumOf(run, "inv")).toBe($(50));
+    expect(run.warnings.join(" ")).toMatch(/settlement set-1 is in EUR/);
+  });
+
+  it("warns when the settlement status contradicts what is outstanding", () => {
+    const w = (c: Partial<Commitment>, settlements: Settlement[] = []) =>
+      forecast({ ...empty(), balances: [bal(0)], commitments: [com("inv", { type: "invoice", amount: $(50), anchors: { due: "2026-10-27" }, ...c })], settlements }, profile, base, "2026-10-25", {}).warnings.join(" ");
+    expect(w({ settlement: "partial" })).toMatch(/marked partially paid but nothing is recorded as paid/);
+    expect(w({ settlement: "partial", outstanding: $(50) })).toMatch(/marked partially paid/);
+    expect(w({ settlement: "paid", outstanding: $(10) })).toMatch(/marked paid but \$10\.00 is still outstanding/);
+    expect(w({ settlement: "open" }, [settle($(20))])).toMatch(/marked open but \$20\.00 is already paid/);
+    expect(w({ settlement: "open", outstanding: $(30) })).toMatch(/marked open/);
+    expect(w({ settlement: "paid" })).not.toMatch(/marked paid/); // books often mark paid without a Settlement row
+    expect(w({ settlement: "open" })).not.toMatch(/marked open/);
+  });
+
+  it("an actual with no FX rate between snapshot and as-of is left out of opening cash with a warning", () => {
+    const r = { ...empty(), balances: [bal($(100), "2026-10-20")], events: [payIn("eur-1", "2026-10-22", $(10), "EUR"), payIn("usd-1", "2026-10-22", $(5))] };
+    const run = forecast(r, profile, base, "2026-10-25", {});
+    expect(run.openingBalance).toBe($(105));
+    expect(run.warnings.join(" ")).toMatch(/Actual eur-1 is in EUR with no FX rate; left out of opening cash/);
+  });
+
+  it("a linked invoice in another currency does not offset the PO", () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [
+      com("po", { type: "purchase_order", patternId: "split_50_50", amount: $(10000), linkedCommitmentIds: ["bill-eur"], anchors: { order: "2026-10-26", ship: "2026-11-10" } }),
+      com("bill-eur", { type: "bill", currency: "EUR", amount: $(4000), anchors: { due: "2026-11-02" } }),
+    ];
+    const run = forecast(r, profile, base, "2026-10-25", { EUR: 1.1 });
+    expect(sumOf(run, "po")).toBe($(10000));
+    expect(run.warnings.join(" ")).toMatch(/linked bill-eur is in EUR, not USD; not offset/);
+  });
+
+  // Leg allocation for linked invoices (#45). PO legs: 30% at order (Oct 26), 70% at ship (Nov 10).
+  const p3070: Profile = {
+    ...profile,
+    paymentPatterns: [
+      { id: "s30_70", appliesTo: "purchase_order", isDefault: true, legs: [{ share: 0.3, anchor: "order", offsetDays: 0, direction: "out" }, { share: 0.7, anchor: "ship", offsetDays: 0, direction: "out" }] },
+      { id: "freight", appliesTo: "purchase_order", legs: [{ share: 1, anchor: "ship", offsetDays: -7, direction: "out" }] },
+      { id: "adv", appliesTo: "sales_deal", isDefault: true, legs: [{ share: 0.3, anchor: "order", offsetDays: 0, direction: "in" }, { share: 0.7, anchor: "delivery", offsetDays: 0, direction: "in" }], linkedCosts: [{ patternId: "s30_70", share: 0.55 }, { patternId: "freight", share: 0.1 }] },
+    ],
+  };
+  const po = (o: Partial<Commitment> = {}) => com("po", { type: "purchase_order", amount: $(10000), linkedCommitmentIds: ["bill"], anchors: { order: "2026-10-26", ship: "2026-11-10" }, ...o });
+  const legsOf = (run: ReturnType<typeof forecast>, id: string) => run.events.filter((e) => e.commitmentId === id).map((e) => [e.date, e.amount]);
+  const runP = (cs: Commitment[], extra: Partial<Records> = {}) => forecast({ ...empty(), balances: [bal(0)], commitments: cs, ...extra }, p3070, base, "2026-10-25", {});
+
+  it("a deposit bill dated before shipment replaces only the deposit leg", () => {
+    const run = runP([po(), com("bill", { type: "bill", amount: $(3000), anchors: { due: "2026-10-28" } })]);
+    expect(legsOf(run, "po")).toEqual([["2026-11-10", $(7000)]]);
+  });
+
+  it("a balance bill dated at shipment replaces the shipment leg, not the unpaid deposit", () => {
+    const run = runP([po(), com("bill", { type: "bill", amount: $(7000), anchors: { due: "2026-11-10" } })]);
+    expect(legsOf(run, "po")).toEqual([["2026-10-26", $(3000)]]);
+  });
+
+  it("a bill dated before every leg, or undated, consumes the latest leg first and keeps the deposit", () => {
+    const early = runP([po(), com("bill", { type: "bill", amount: $(5000), anchors: { invoice: "2026-10-01" } })]);
+    expect(legsOf(early, "po")).toEqual([["2026-10-26", $(3000)], ["2026-11-10", $(2000)]]);
+    const undated = runP([po(), com("bill", { type: "bill", amount: $(7000), anchors: {} })]);
+    expect(legsOf(undated, "po")).toEqual([["2026-10-26", $(3000)]]);
+  });
+
+  it("a PO whose outstanding already reflects its linked bill is not reduced twice", () => {
+    // reconcile (or an import) lowered outstanding to $70 for the $30 bill; total supplier outflow stays $100
+    const run = runP([po({ amount: $(100), outstanding: $(70) }), com("bill", { type: "bill", amount: $(30), anchors: { due: "2026-10-26" } })]);
+    expect(sumOf(run, "po") + sumOf(run, "bill")).toBe($(100));
+    expect(legsOf(run, "po")).toEqual([["2026-11-10", $(70)]]);
+    expect(run.warnings.join(" ")).not.toMatch(/marked open|double count/);
+    const open = runP([po({ amount: $(100), outstanding: $(70), settlement: "open" }), com("bill", { type: "bill", amount: $(30), anchors: { due: "2026-10-26" } })]);
+    expect(open.warnings.join(" ")).not.toMatch(/marked open/);
+  });
+
+  it("a paid deposit plus a balance bill leaves nothing on the PO (outstanding derived from the settlement)", () => {
+    const run = runP([po(), com("bill", { type: "bill", amount: $(7000), anchors: { due: "2026-11-10" } })], { settlements: [settle($(3000), { commitmentId: "po", legIndex: 0 })] });
+    expect(legsOf(run, "po")).toEqual([]);
+  });
+
+  it("a billed leg with an unresolved anchor is only reached by the remainder", () => {
+    // no order date: the deposit leg cannot be scheduled, so the bill dated at shipment consumes the shipment leg
+    const run = runP([po({ anchors: { ship: "2026-11-10" } }), com("bill", { type: "bill", amount: $(7000), anchors: { due: "2026-11-10" } })]);
+    expect(legsOf(run, "po")).toEqual([]);
+    expect(run.warnings.join(" ")).toMatch(/no order date for leg 1/);
+  });
+
+  const deal = (o: Partial<Commitment> = {}) => com("deal", { type: "sales_deal", status: "likely", amount: $(100000), anchors: { order: "2026-10-26", ship: "2026-11-10", delivery: "2026-11-30" }, ...o });
+  const costs = (run: ReturnType<typeof forecast>) => {
+    const out: Record<string, number> = {};
+    for (const e of run.events) if (e.commitmentId?.startsWith("deal~")) out[e.commitmentId] = (out[e.commitmentId] ?? 0) + e.amount;
+    return out;
+  };
+
+  it("#63: a deal linked to its goods PO keeps the freight cost", () => {
+    const goods = com("po1", { type: "purchase_order", patternId: "s30_70", amount: $(55000), anchors: { order: "2026-10-26", ship: "2026-11-10" } });
+    const run = runP([deal({ linkedCommitmentIds: ["po1"] }), goods]);
+    expect(costs(run)).toEqual({ "deal~freight": $(10000) });
+    expect(sumOf(run, "po1")).toBe($(55000));
+  });
+
+  it("#63: a linked PO with no patternId covers the cost of its default pattern only", () => {
+    const goods = com("po1", { type: "purchase_order", amount: $(55000), anchors: { order: "2026-10-26", ship: "2026-11-10" } });
+    expect(costs(runP([deal({ linkedCommitmentIds: ["po1"] }), goods]))).toEqual({ "deal~freight": $(10000) });
+  });
+
+  it("a customer deposit does not shrink the supplier costs of the deal", () => {
+    const run = runP([deal()], { settlements: [settle($(30000), { commitmentId: "deal" })] });
+    expect(costs(run)).toEqual({ "deal~s30_70": $(55000), "deal~freight": $(10000) });
+    expect(sumOf(run, "deal")).toBe($(70000));
+  });
+});
+
 describe("payment lag", () => {
   const paid = (n: number, late: number): { commitments: Commitment[]; settlements: Settlement[] } => {
     const commitments: Commitment[] = [];
