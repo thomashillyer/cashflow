@@ -7,7 +7,7 @@ const slug = (s: string): string =>
   s.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 
 // Lossy slugs (INV/1187 vs INV-1187) get a short hash of the raw value so distinct records never share an id.
-const segment = (value: string): string => {
+export const segment = (value: string): string => {
   const normalized = slug(value);
   if (!normalized) return normalized;
   return normalized === value ? normalized : `${normalized}~${sha256Hex(value).slice(0, 16)}`;
