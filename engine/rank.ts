@@ -19,7 +19,7 @@ import { pendingEventsByCommitment, receivableShares, sumBase } from "./warnings
 export type SimulateLevers = (levers: Lever[]) => { lowPointDelta: number };
 
 export type Brief = {
-  today: WorkItem[];   // at most three open lever items above profile.thresholds.rankFloor; never padded
+  today: WorkItem[];   // at most three lever items above profile.thresholds.rankFloor, done ones kept ticked off; never padded
   all: WorkItem[];     // everything, best first
 };
 
@@ -175,8 +175,10 @@ export function rank(
   }
 
   const all = [...byId.values()].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  // A done item stays on today's list, ticked off: done records the owner's follow-up, not that cash
+  // arrived, so the forecast and this ranking are unchanged. Dismissed items leave the list.
   const today = all
-    .filter((w) => w.state === "open" && w.lever && w.score >= profile.thresholds.rankFloor)
+    .filter((w) => w.state !== "dismissed" && w.lever && w.score >= profile.thresholds.rankFloor)
     .slice(0, 3);
   return { today, all };
 }

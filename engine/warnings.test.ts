@@ -251,11 +251,16 @@ describe("rank", () => {
       .toBe("About $24,000 stays free for 2 weeks from Nov 2.");
   });
 
-  it("keeps completed items done across reruns", () => {
+  it("keeps completed items done across reruns, ticked off on today's list; dismissed ones leave it", () => {
     const again = rank(candidates, run, records, profile, simulator(run, records),
       [{ id: "wi-projected_cash_gap-chase-inv-104", state: "done" }]);
-    expect(again.today.map((w) => w.id)).toEqual(["wi-projected_cash_gap-defer-bill-0042"]);
-    expect(again.all.find((w) => w.id === "wi-projected_cash_gap-chase-inv-104")?.state).toBe("done");
+    expect(again.today.map((w) => [w.id, w.state])).toEqual([
+      ["wi-projected_cash_gap-chase-inv-104", "done"],
+      ["wi-projected_cash_gap-defer-bill-0042", "open"],
+    ]);
+    const dismissed = rank(candidates, run, records, profile, simulator(run, records),
+      [{ id: "wi-projected_cash_gap-chase-inv-104", state: "dismissed" }]);
+    expect(dismissed.today.map((w) => w.id)).toEqual(["wi-projected_cash_gap-defer-bill-0042"]);
   });
 
   it("formats amounts in the profile's base currency and keeps the idle item id stable", () => {
