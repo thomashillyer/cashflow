@@ -1009,9 +1009,9 @@ const KINDS = [
 ];
 const SUGGESTED = {
   trading: ["zoho_books", "quickbooks", "bank_feed", "zoho_crm", "m365", "whatsapp"],
-  restaurant: ["quickbooks", "bank_feed", "square", "toast", "gusto", "google"],
-  services: ["quickbooks", "xero", "bank_feed", "hubspot", "gusto", "google"],
-  other: ["quickbooks", "bank_feed", "google"],
+  restaurant: ["quickbooks", "bank_feed", "square", "toast", "gusto"],
+  services: ["quickbooks", "xero", "bank_feed", "hubspot", "gusto"],
+  other: ["quickbooks", "bank_feed"],
 };
 function viewSetup() {
   const st = app.setup;
