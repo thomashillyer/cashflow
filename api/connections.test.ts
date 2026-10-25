@@ -62,13 +62,13 @@ describe("tenant-bound Outlook review intake", () => {
     expect((await store.load(other.id)).records.evidence).toEqual([]);
   });
 
-  it("uses only the fixed Microsoft token host and bounds real adapter reads to ten messages", async () => {
+  it("uses only the fixed Microsoft token host and bounds real adapter reads to fifty messages", async () => {
     const { store, business } = await setup();
     const fetch = vi.fn<typeof globalThis.fetch>(async (raw) => {
       const url = new URL(String(raw));
       if (url.hostname === "login.microsoftonline.com") return new Response(JSON.stringify({ access_token: "ms-private-token", expires_in: 3600 }));
       expect(url.origin).toBe("https://graph.microsoft.com");
-      expect(url.searchParams.get("$top")).toBe("10");
+      expect(url.searchParams.get("$top")).toBe("50");
       return new Response(JSON.stringify({ value: [{ id: "m1", internetMessageId: "one", subject: "Invoice update", body: { content: "Please check the invoice." }, from: { emailAddress: { address: "supplier@example.com" } }, receivedDateTime: now().toISOString(), hasAttachments: false }], "@odata.nextLink": "https://graph.microsoft.com/private-next-page" }));
     });
     const service = buildConnectionService(microsoft, { fetch, ingest: readEmail });
@@ -78,6 +78,37 @@ describe("tenant-bound Outlook review intake", () => {
     expect(fetch.mock.calls[0]?.[1]).toMatchObject({ redirect: "error" });
     expect(JSON.stringify(result)).not.toMatch(/ms-private-token|fake-ms-secret|owner@example.com/);
     expect(result.counts.messages).toBe(1);
+  });
+
+  it.each([1, 15])("finds financial mail after ten unrelated messages and processes at most ten (%i eligible)", async (eligible) => {
+    const { store, business } = await setup();
+    const message = (id: string, financial: boolean) => ({ id, internetMessageId: id,
+      subject: financial ? `Invoice ${id}` : "Weekly team update", body: { content: financial ? "Please review the invoice." : "The team meeting is on Thursday." },
+      from: { emailAddress: { address: "sender@example.com" } }, receivedDateTime: now().toISOString(), hasAttachments: false });
+    // A provider that returns too many rows or a next-page link must not expand the scan.
+    const messages = [
+      ...Array.from({ length: 10 }, (_, i) => message(`noise-${i}`, false)),
+      ...Array.from({ length: eligible }, (_, i) => message(`financial-${i}`, true)),
+      ...Array.from({ length: 40 - eligible }, (_, i) => message(`filler-${i}`, false)),
+      message("outside-scan", true),
+    ];
+    const fetch = vi.fn<typeof globalThis.fetch>(async (raw) => {
+      const url = new URL(String(raw));
+      if (url.hostname === "login.microsoftonline.com") return new Response(JSON.stringify({ access_token: "test-token", expires_in: 3600 }));
+      expect(url.origin).toBe("https://graph.microsoft.com");
+      expect(url.pathname).toMatch(/\/messages$/);
+      return new Response(JSON.stringify({ value: messages, "@odata.nextLink": "https://graph.microsoft.com/v1.0/next-page" }));
+    });
+    const ingest = vi.fn(readEmail);
+    const service = buildConnectionService(microsoft, { fetch, ingest });
+    const result = await service.sync(business, store, now, "outlook");
+    expect(ingest).toHaveBeenCalledTimes(Math.min(eligible, 10));
+    expect(ingest.mock.calls[0]?.[0]).toMatchObject({ kind: "email", raw: expect.stringContaining("Subject: Invoice financial-0") });
+    expect(ingest.mock.calls.every(([input]) => input.kind === "email" && !input.raw.includes("outside-scan"))).toBe(true);
+    expect(result.counts.messages).toBe(Math.min(eligible, 10));
+    expect((await store.load(business.id)).records.evidence).toHaveLength(Math.min(eligible, 10));
+    expect(fetch).toHaveBeenCalledTimes(2); // Token + one Graph page, with no paging.
+    expect(new URL(String(fetch.mock.calls[1]?.[0])).searchParams.get("$top")).toBe("50");
   });
 
   it("reports per-message failure while retaining successful pending intake", async () => {
