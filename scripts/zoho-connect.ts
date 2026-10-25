@@ -19,9 +19,12 @@ const PORT = 8790;
 const REDIRECT = `http://localhost:${PORT}/oauth/zoho/callback`;
 const region = new URL(need("ZOHO_API_DOMAIN")).hostname.replace(/^www\.zohoapis\./, "");
 const accounts = `https://accounts.zoho.${region}/oauth/v2`;
-const SCOPES = [
+// Books (incl. banking for opening cash) and CRM in one consent, so one refresh token covers both. Override with
+// ZOHO_SCOPES (comma-separated), for example the Books set alone if CRM is not enabled for the account.
+const SCOPES = process.env.ZOHO_SCOPES ?? [
   "ZohoBooks.invoices.READ", "ZohoBooks.bills.READ", "ZohoBooks.contacts.READ",
   "ZohoBooks.customerpayments.READ", "ZohoBooks.vendorpayments.READ", "ZohoBooks.purchaseorders.READ", "ZohoBooks.settings.READ", "ZohoBooks.banking.READ",
+  "ZohoCRM.modules.READ", "ZohoCRM.settings.modules.READ",
 ].join(",");
 const state = randomBytes(16).toString("hex");
 
