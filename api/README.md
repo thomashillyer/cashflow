@@ -11,7 +11,7 @@ npm run dev                   # http://localhost:8787 (API + app), reloads on ch
 npm start                     # same, without watch (production)
 ```
 
-No database? `NERI_STORE=memory DEMO_MODE=1 npm run dev` runs on the fixtures in memory (lost on restart), no sign-in needed. Good for a laptop demo.
+No database? `NODE_ENV=development NERI_STORE=memory DEMO_MODE=1 npm run dev` runs on the fixtures in memory (lost on restart), no sign-in needed. Good for a laptop demo.
 
 Tests: `npx vitest run api` (Fastify `inject()`, in-memory store, no network, no key).
 
