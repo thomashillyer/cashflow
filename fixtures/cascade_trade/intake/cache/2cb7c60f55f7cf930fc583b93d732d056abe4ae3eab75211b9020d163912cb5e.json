@@ -1,0 +1,76 @@
+{
+  "key": "2cb7c60f55f7cf930fc583b93d732d056abe4ae3eab75211b9020d163912cb5e",
+  "promptVersion": "extract_document@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in for harbor-po-552.pdf; replace with a live run (scripts/refresh-extraction-cache.ts)",
+  "output": {
+    "fields": {
+      "sellerName": {
+        "value": "Cascade Trade Co.",
+        "quote": "Vendor: Cascade Trade Co."
+      },
+      "buyerName": {
+        "value": "HARBOR AND HEARTH",
+        "quote": "HARBOR AND HEARTH"
+      },
+      "reference": {
+        "value": "HH-PO-552",
+        "quote": "PURCHASE ORDER HH-PO-552"
+      },
+      "poReference": {
+        "value": null,
+        "quote": null
+      },
+      "amount": {
+        "value": "10,000.00",
+        "quote": "PO TOTAL (USD) 10,000.00"
+      },
+      "outstanding": {
+        "value": null,
+        "quote": null
+      },
+      "currency": {
+        "value": "USD",
+        "quote": "PO TOTAL (USD)"
+      },
+      "issueDate": {
+        "value": "November 2, 2026",
+        "quote": "PO date: November 2, 2026"
+      },
+      "dueDate": {
+        "value": null,
+        "quote": null
+      },
+      "terms": {
+        "value": "Net 30 from each invoice",
+        "quote": "Payment terms: Net 30 from each invoice"
+      },
+      "invoiceUrl": {
+        "value": null,
+        "quote": null
+      },
+      "paymentUrl": {
+        "value": null,
+        "quote": null
+      },
+      "statedStatus": {
+        "value": "Accepted",
+        "quote": "Status: Accepted"
+      },
+      "paidAmount": {
+        "value": null,
+        "quote": null
+      },
+      "paidDate": {
+        "value": null,
+        "quote": null
+      }
+    },
+    "coversReferences": [],
+    "containsInstructions": false,
+    "notes": [],
+    "kind": "purchase_order",
+    "businessRole": "seller",
+    "confidence": 0.95
+  }
+}
