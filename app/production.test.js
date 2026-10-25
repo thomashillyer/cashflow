@@ -171,6 +171,25 @@ describe("production uses the owner's data", () => {
     expect(html).not.toContain("Nothing to review");
   });
 
+  it("names an imported message by its subject and sender, and folds read-but-nothing-to-apply messages into one list", () => {
+    const html = screen(`app.reviewDocs = { storeRevision: 4, proposals: [
+      { proposal: { id: 'quote', action: 'review', ops: [], conflicts: [], reasons: [] }, candidate: { kind: 'none', extraction: 'ok', fields: {} }, evidence: [{ receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'q-1@x.example', subject: 'Quote for paper bags', from: 'Maria Santos <maria@harborfoods.example>' } }], notes: ['A price quotation, not an invoice.'] },
+      { proposal: { id: 'half', action: 'review', ops: [], conflicts: [], reasons: ['Missing amount'] }, candidate: { kind: 'invoice', extraction: 'partial', fields: {} }, evidence: [{ receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'h-1@x.example', subject: 'Invoice 77 from Acme', from: 'Acme Accounts <accounts@acme.example>' } }], notes: [] }
+    ] }; viewReview()`);
+    // The half-read invoice still asks for help, titled by its subject with the sender under it, never its message id.
+    expect(html).toContain("Invoice 77 from Acme");
+    expect(html).toContain("From Acme Accounts &lt;accounts@acme.example&gt;");
+    expect(html).toContain("needs more information");
+    expect(html).not.toContain("h-1@x.example");
+    // The read-and-nothing-to-apply quote sits in one collapsed list with its sender and the reason in plain words.
+    expect(html).toContain("1 message read, nothing to apply");
+    expect(html).toContain("Quote for paper bags");
+    expect(html).toContain("maria@harborfoods.example");
+    expect(html).toContain("A price quotation, not an invoice.");
+    expect(html).not.toContain("q-1@x.example");
+    expect(html).not.toContain("Nothing to review");
+  });
+
   it("describes setup choices as preferences without simulated OAuth or success", () => {
     const html = screen("app.signup.name = 'Owner Co'; app.setup.picked.add('zoho_books'); viewSetup()");
     expect(html).toContain("Your choices are preferences");

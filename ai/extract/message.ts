@@ -154,6 +154,14 @@ const PHONE_RE = /^\+?[\d\s().-]{7,}$/;
 // ---------------------------------------------------------------------------
 // Email
 
+// One line of display text from a header value: no control characters, bounded. Undefined when nothing is left.
+const oneLine = (v: string | undefined, max: number): string | undefined => {
+  const t = (v ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  return t === "" ? undefined : t;
+};
+const displayFrom = (name: string | undefined, email: string | undefined): string | undefined =>
+  oneLine(name && email ? `${name} <${email}>` : email ?? name, 200);
+
 export function parseEmail(raw: string, opts: ParseOptions): MessageBundle {
   const src = raw.replace(/\r\n/g, "\n");
   const split = src.search(/\n[ \t]*\n/);
@@ -185,7 +193,7 @@ export function parseEmail(raw: string, opts: ParseOptions): MessageBundle {
   const messageId = headers["message-id"]?.replace(/[<>]/g, "") || opts.evidenceId;
   const parent: Evidence = {
     id: opts.evidenceId, channel: "email", format: "text", receivedAt, extraction: "ok",
-    sourceRef: { system: "email", record: messageId },
+    sourceRef: { system: "email", record: messageId, ...(oneLine(headers.subject, 200) ? { subject: oneLine(headers.subject, 200)! } : {}), ...(displayFrom(name, email) ? { from: displayFrom(name, email)! } : {}) },
   };
   const attachments = (headers["x-attachments"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const links = extractLinks(body);
@@ -234,7 +242,7 @@ export function parseWhatsApp(raw: string, opts: ParseOptions): MessageBundle {
   const parent: Evidence = {
     id: opts.evidenceId, channel: "whatsapp", format: "text", receivedAt,
     extraction: messages.length ? "ok" : "partial",
-    sourceRef: { system: "whatsapp", record: opts.evidenceId },
+    sourceRef: { system: "whatsapp", record: opts.evidenceId, ...(only ? { from: oneLine(only, 120)! } : {}) },
   };
   const links = extractLinks(text);
   return { parent, children: buildChildren(parent, [], links), text, sender, messages, links };

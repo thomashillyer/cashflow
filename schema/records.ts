@@ -12,6 +12,9 @@ export type SourceRef = {
   record: string;            // id in that system: invoice number, bank line hash, message id
   url?: string;              // deep link when the system has one
   excerpt?: { start: number; end: number; text?: string };  // span in a message, for signals; keep the words
+  // For a message: what the owner recognises it by in Review (display only; never part of the record key).
+  subject?: string;          // the email subject
+  from?: string;             // who sent it: "Name <address>" or the name or number
 };
 
 export type Party = {

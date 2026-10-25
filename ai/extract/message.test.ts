@@ -14,7 +14,19 @@ describe("parseEmail", () => {
     expect(b.sender).toEqual({ name: "Dana Whitfield", email: "accounts@evergreenhome.example" });
     expect(b.parent.receivedAt).toBe("2026-11-27T00:42:10.000Z");
     expect(b.parent).toMatchObject({ channel: "email", format: "text", extraction: "ok" });
-    expect(b.parent.sourceRef).toEqual({ system: "email", record: "evg-20261126-1642@evergreenhome.example" });
+    // The owner recognises a message by who sent it and what it says, not by its message id.
+    expect(b.parent.sourceRef).toEqual({
+      system: "email", record: "evg-20261126-1642@evergreenhome.example",
+      subject: "RE: Invoice INV-1187 from Cascade Trade Co.", from: "Dana Whitfield <accounts@evergreenhome.example>",
+    });
+  });
+
+  it("keeps the subject and sender on one clean line, bounded, and leaves them out when absent", () => {
+    const long = parseEmail(`From: "Evil\r\nBcc: x" <a@b.example>\nSubject: ${"x".repeat(400)}\nMessage-ID: <m1@b.example>\n\nbody`, { evidenceId: "ev-1", receivedAt: "2026-11-01T00:00:00Z" });
+    expect(long.parent.sourceRef.subject).toHaveLength(200);
+    expect(long.parent.sourceRef.from).not.toMatch(/[\r\n]/);
+    const bare = parseEmail("Invoice: INV-1203 for $4,000", { evidenceId: "ev-2", receivedAt: "2026-11-01T00:00:00Z" });
+    expect(bare.parent.sourceRef).toEqual({ system: "email", record: "ev-2" });
   });
 
   it("bundles one attachment, an invoice link, and a payment link as child evidence", () => {
