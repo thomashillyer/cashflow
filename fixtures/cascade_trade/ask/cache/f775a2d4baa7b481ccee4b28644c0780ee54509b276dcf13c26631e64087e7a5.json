@@ -2,12 +2,12 @@
   "key": "f775a2d4baa7b481ccee4b28644c0780ee54509b276dcf13c26631e64087e7a5",
   "promptVersion": "cfo_voice@2",
   "model": "claude-opus-5-5",
-  "source": "stand-in",
+  "source": "live",
   "output": {
-    "headline": "You're on track.",
-    "why": "Your lowest cash point is $113,000 on Nov 27, against a safety line of $35,000.",
+    "headline": "You're on track: your cash stays well above your $35,000 safety line, with the tightest day at $113,000 on Nov 27.",
+    "why": "Your lowest point in the forecast is $113,000 on Nov 27. That is comfortably above your $35,000 safety line, so no move is needed right now.",
     "nextStep": null,
-    "convictionNote": "High confidence: The call does not rest on when a customer pays.",
+    "convictionNote": "High confidence: the call does not depend on when any customer pays.",
     "whatWouldChange": null
   }
 }

@@ -2,12 +2,12 @@
   "key": "bea0f79ed426d3d1cdcef423833ee8a61a5254074c7c45f71c451c637be4d9d9",
   "promptVersion": "cfo_voice@2",
   "model": "claude-opus-5-5",
-  "source": "stand-in",
+  "source": "live",
   "output": {
-    "headline": "Open amount you owe Jaipur Textiles: $24,000.",
-    "why": "Next expected: $12,000 on Dec 1; days the forecast assumes, days after the due date: 20 days; payments on record: 0; default lag: 20 days. Assumptions: There is no payment history for Jaipur Textiles; the forecast uses the profile default of 20 days.",
+    "headline": "You owe Jaipur Textiles $24,000 in total, and the next $12,000 is expected to go out on Dec 1.",
+    "why": "There is no payment history with Jaipur Textiles, so the forecast uses your default timing of 20 days after the due date. That is where the Dec 1 date for the $12,000 payment comes from. The rest of the $24,000 is still open after that.",
     "nextStep": null,
-    "convictionNote": "High confidence: The call does not rest on when a customer pays.",
+    "convictionNote": "High confidence: this answer comes straight from your open bills and does not depend on when a customer pays.",
     "whatWouldChange": null
   }
 }

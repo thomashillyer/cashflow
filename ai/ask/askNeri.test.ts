@@ -82,7 +82,9 @@ describe("askNeri behavior", () => {
     const a = await askNeri("What if Evergreen pays in early January?", ctx);
     const d = await decisionFor("What if Evergreen pays in early January?");
     expect(a.scenario!.run.lowPoint.amount).toBe(d.headlineFacts[0]!.amount);
-    expect(a.text).toContain("With this, your lowest cash point");
+    // live or code-built wording; either way the headline states the with-what-if low point
+    const low = Math.abs(d.headlineFacts[0]!.amount!) / 100;
+    expect(a.text.replace(/[,\u2212-]/g, "")).toContain(String(low));
   });
 
   it("via voice keeps the spoken text to the headline and the next step", async () => {
