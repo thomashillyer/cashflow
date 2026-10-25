@@ -5,7 +5,7 @@ import type { Lever, Records } from "../../schema/records";
 import { forecast } from "../../engine/forecast";
 import { simulate } from "../../engine/simulate";
 import type { Deps } from "../app";
-import { briefFor, runInputs } from "../engine";
+import { briefFor, loadForRun, runInputs, savedScenario } from "../engine";
 import { businessOf, HttpError } from "../http";
 import type { Business } from "../store";
 
@@ -60,9 +60,10 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const b = businessOf(req);
     const scenario = String((req.query as Record<string, unknown>).scenario ?? "base");
     if (!SCENARIOS.has(scenario)) throw new HttpError(400, "INVALID_ARGUMENT", "Pick the base or stress view.", { fieldIssues: [{ field: "scenario", issue: "base or stress" }] });
-    const { records } = await deps.store.load(b.id);
+    const { records, overrides } = await loadForRun(deps.store, b.id);
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
-    return forecast(records, profile, { id: scenario, kind: scenario as "base" | "stress", overrides: [] }, asOf, fxRates);
+    // Stress runs on the same saved overrides as base; forecast() adds the stress delays.
+    return forecast(records, profile, savedScenario(overrides, scenario as "base" | "stress"), asOf, fxRates);
   });
 
   // What-if: body { levers: Lever[] }. Returns the run with the levers and the low-point change.
@@ -70,14 +71,14 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const b = businessOf(req);
     const levers = (req.body as { levers?: unknown } | undefined)?.levers;
     if (!Array.isArray(levers) || levers.length > 20) throw new HttpError(400, "INVALID_ARGUMENT", "Send up to 20 levers to try.");
-    const { records } = await deps.store.load(b.id);
+    const { records, overrides } = await loadForRun(deps.store, b.id);
     for (const l of levers as Lever[]) {
       if (!l || typeof l !== "object" || !records.commitments.some((c) => c.id === l.commitmentId)) {
         throw new HttpError(400, "INVALID_ARGUMENT", "One of those changes points at a record we don't have.");
       }
     }
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
-    const sim = simulate(records, profile, [], levers as Lever[], asOf, fxRates);
+    const sim = simulate(records, profile, overrides, levers as Lever[], asOf, fxRates);
     return { run: sim.run, lowPointDelta: sim.lowPointDelta, freeCashDelta: sim.freeCashDelta };
   });
 
@@ -85,11 +86,11 @@ export const readRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.get("/records/:id", async (req) => {
     const b = businessOf(req);
     const { id } = req.params as { id: string };
-    const { records } = await deps.store.load(b.id);
+    const { records, overrides } = await loadForRun(deps.store, b.id);
     const c = records.commitments.find((x) => x.id === id);
     if (!c) throw new HttpError(404, "NOT_FOUND", "That record isn't in your books any more.");
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
-    const run = forecast(records, profile, { id: "base", kind: "base", overrides: [] }, asOf, fxRates);
+    const run = forecast(records, profile, savedScenario(overrides), asOf, fxRates);
     const signals = records.signals.filter((s) => s.commitmentId === id);
     const msgSignal = signals.find((s) => s.sourceRef.excerpt?.text);
     const ev = msgSignal ? records.evidence.find((e) => e.id === msgSignal.sourceRef.record || e.sourceRef.record === msgSignal.sourceRef.record) : undefined;

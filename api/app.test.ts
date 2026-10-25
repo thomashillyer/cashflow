@@ -305,3 +305,158 @@ describe("import -> review -> confirm (INV-1187)", () => {
     expect((await app.inject({ method: "POST", url: "/import/paste", headers: OTHER, payload: { text: "  " } })).statusCode).toBe(400);
   });
 });
+
+describe("saved owner overrides (#40)", () => {
+  beforeEach(() => setup());
+
+  const H = (id: string) => ({ ...OWNER, "x-neri-business": id });
+  const leg = (run: { events: { commitmentId?: string; status: string; date: string; amount: number }[] }) =>
+    run.events.filter((e) => e.commitmentId === "inv-INV-1187" && e.status !== "actual");
+  const target = { commitmentId: "inv-INV-1187" };
+  const rev = async (id: string) => (await store.load(id)).storeRevision;
+
+  it("a saved override changes base and stress, simulate and brief; survives a re-import; is deletable", async () => {
+    const id = await privateBusiness();
+    const base0 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    const stress0 = (await app.inject({ method: "GET", url: "/forecast?scenario=stress", headers: H(id) })).json();
+    expect(leg(base0).length).toBeGreaterThan(0);
+
+    const put = await app.inject({ method: "PUT", url: "/overrides/ov-1187", headers: H(id), payload: {
+      target, change: { exclude: true }, origin: "lever", expectedRevision: await rev(id),
+    } });
+    expect(put.statusCode).toBe(200);
+    expect(put.json()).toMatchObject({ override: { id: "ov-1187", origin: "owner" }, created: true });
+    const rev1 = put.json().storeRevision as number;
+    expect(rev1).toBe(await rev(id));
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: H(id) })).json()).toEqual({ overrides: [put.json().override], storeRevision: rev1 });
+
+    const base1 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    const stress1 = (await app.inject({ method: "GET", url: "/forecast?scenario=stress", headers: H(id) })).json();
+    expect(leg(base1)).toHaveLength(0);
+    expect(leg(stress1)).toHaveLength(0);
+    expect(base1.inputsHash).not.toBe(base0.inputsHash);
+    expect(stress1.inputsHash).not.toBe(stress0.inputsHash);
+    const brief = (await app.inject({ method: "GET", url: "/brief", headers: H(id) })).json();
+    expect(brief.run.inputsHash).toBe(base1.inputsHash);
+    expect(brief.storeRevision).toBe(rev1);
+    const sim = (await app.inject({ method: "POST", url: "/simulate", headers: H(id), payload: { levers: [] } })).json();
+    expect(sim.run.lowPoint).toEqual(base1.lowPoint);
+
+    // Re-import: the same records upserted again (as a refresh would) keep the override.
+    await store.upsertRecords(id, loadSample("cascade_trade")!.records);
+    const base2 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    expect(leg(base2)).toHaveLength(0);
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+
+    // Update in place (same id); a write without, or with an old, expectedRevision is refused.
+    const shifted = await app.inject({ method: "PUT", url: "/overrides/ov-1187", headers: H(id), payload: { target, change: { shiftDays: 14 }, expectedRevision: await rev(id) } });
+    expect(shifted.json()).toMatchObject({ created: false, override: { change: { shiftDays: 14 } } });
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+    expect((await app.inject({ method: "PUT", url: "/overrides/ov-x", headers: H(id), payload: { target, change: { exclude: true } } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "DELETE", url: "/overrides/ov-1187", headers: H(id) })).statusCode).toBe(400);
+    const stale = await app.inject({ method: "DELETE", url: `/overrides/ov-1187?expectedRevision=${rev1}`, headers: H(id) });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toMatchObject({ error: { code: "STALE_REVIEW" }, revision: await rev(id) });
+
+    const del = await app.inject({ method: "DELETE", url: "/overrides/ov-1187", headers: { ...H(id), "content-type": "application/json" }, payload: { expectedRevision: await rev(id) } });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toMatchObject({ id: "ov-1187", deleted: true });
+    expect(del.json().storeRevision).toBeGreaterThan(shifted.json().storeRevision);
+    const base3 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    expect(leg(base3)).toEqual(leg(base0));
+    expect((await app.inject({ method: "DELETE", url: `/overrides/ov-1187?expectedRevision=${await rev(id)}`, headers: H(id) })).statusCode).toBe(404);
+  });
+
+  it("concurrent writes from the same revision: one 200, one 409, nothing lost", async () => {
+    const id = await privateBusiness();
+    const r0 = await rev(id);
+    const put = (ovId: string, expectedRevision: number) => app.inject({ method: "PUT", url: `/overrides/${ovId}`, headers: H(id), payload: { target, change: { shiftDays: 7 }, expectedRevision } });
+    const [a, b] = await Promise.all([put("ov-a", r0), put("ov-b", r0)]);
+    expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
+    const [won, lost] = a.statusCode === 200 ? [a, b] : [b, a];
+    expect(lost.json().error.code).toBe("STALE_REVIEW");
+    expect((await store.loadOverrides(id)).map((o) => o.id)).toEqual([won.json().override.id]);
+    // The loser reloads and retries: both are kept.
+    const loserId = won.json().override.id === "ov-a" ? "ov-b" : "ov-a";
+    expect((await put(loserId, lost.json().revision)).statusCode).toBe(200);
+    expect((await store.loadOverrides(id)).map((o) => o.id).sort()).toEqual(["ov-a", "ov-b"]);
+  });
+
+  it("a failed save is a 500 and leaves the old list intact", async () => {
+    class FailingStore extends MemoryStore {
+      failSave = false;
+      override async saveOverrides(id: string, list: Parameters<MemoryStore["saveOverrides"]>[1]) {
+        if (this.failSave) throw new Error("db down");
+        return super.saveOverrides(id, list);
+      }
+    }
+    const failing = new FailingStore();
+    const s = loadSample("cascade_trade")!;
+    const id = await failing.createBusiness({ name: "Acme Imports", profile: s.profile, isSynthetic: false, ownerUserId: "u-owner" });
+    await failing.upsertRecords(id, s.records);
+    const kept = [{ id: "ov-1", target, change: { exclude: true as const }, origin: "owner" as const }];
+    await failing.saveOverrides(id, kept);
+    const fapp = await buildApp({ store: failing, verify, now: () => new Date("2026-11-16T17:00:00Z") });
+    failing.failSave = true;
+    const put = await fapp.inject({ method: "PUT", url: "/overrides/ov-2", headers: H(id), payload: { target, change: { shiftDays: 3 }, expectedRevision: (await failing.load(id)).storeRevision } });
+    expect(put.statusCode).toBe(500);
+    expect(put.json().error.code).toBe("INTERNAL");
+    const del = await fapp.inject({ method: "DELETE", url: `/overrides/ov-1?expectedRevision=${(await failing.load(id)).storeRevision}`, headers: H(id) });
+    expect(del.statusCode).toBe(500);
+    expect(await failing.loadOverrides(id)).toEqual(kept);
+  });
+
+  it("rejects bad input: unknown keys, non-integer amounts, bad dates, unknown targets, bad ids", async () => {
+    const id = await privateBusiness();
+    const expectedRevision = await rev(id);
+    const put = (ovId: string, payload: object) => app.inject({ method: "PUT", url: `/overrides/${ovId}`, headers: H(id), payload: { expectedRevision, ...payload } });
+    for (const payload of [
+      { target, change: { amount: 12.5 } },
+      { target, change: { amount: -100 } },
+      { target, change: { date: "2026-02-30" } },
+      { target, change: { date: "next week" } },
+      { target, change: { pay: true } },
+      { target, change: {} },
+      { target, change: { date: "2026-12-01", shiftDays: 3 } },
+      { target: { commitmentId: "inv-INV-1187", leg: 1 }, change: { exclude: true } },
+      { target, change: { exclude: true }, sendTo: "bank" },
+      { change: { exclude: true } },
+      { target: { commitmentId: "nope" }, change: { exclude: true } },
+    ]) {
+      const res = await put("ov-bad", payload);
+      expect(res.statusCode, JSON.stringify(payload)).toBe(400);
+      expect(res.json().error.code).toBe("INVALID_ARGUMENT");
+    }
+    expect((await put("bad%20id!", { target, change: { exclude: true } })).statusCode).toBe(400);
+    expect(await store.loadOverrides(id)).toEqual([]);
+    expect(await rev(id)).toBe(expectedRevision);
+  });
+
+  it("shared samples are read-only: anonymous demo callers and signed-in users get 403", async () => {
+    await setup({ demoMode: true });
+    const before = (await app.inject({ method: "GET", url: "/forecast", headers: OTHER })).json();
+    const expectedRevision = await rev("cascade_trade");
+    for (const headers of [{}, OTHER, OWNER] as Record<string, string>[]) {
+      const put = await app.inject({ method: "PUT", url: "/overrides/ov-1", headers, payload: { target, change: { exclude: true }, expectedRevision } });
+      expect(put.statusCode).toBe(403);
+      expect(put.json().error.code).toBe("FORBIDDEN");
+      expect((await app.inject({ method: "DELETE", url: `/overrides/ov-1?expectedRevision=${expectedRevision}`, headers })).statusCode).toBe(403);
+      expect((await app.inject({ method: "GET", url: "/overrides", headers })).json()).toEqual({ overrides: [], storeRevision: expectedRevision });
+    }
+    expect(await store.loadOverrides("cascade_trade")).toEqual([]);
+    expect(await rev("cascade_trade")).toBe(expectedRevision);
+    expect((await app.inject({ method: "GET", url: "/forecast" })).json().inputsHash).toBe(before.inputsHash);
+  });
+
+  it("non-members are refused", async () => {
+    const id = await privateBusiness();
+    await store.saveOverrides(id, [{ id: "ov-1", target, change: { exclude: true }, origin: "owner" }]);
+    const other = { ...OTHER, "x-neri-business": id };
+    const expectedRevision = await rev(id);
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: other })).statusCode).toBe(404);
+    expect((await app.inject({ method: "PUT", url: "/overrides/ov-2", headers: other, payload: { target, change: { exclude: true }, expectedRevision } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "DELETE", url: `/overrides/ov-1?expectedRevision=${expectedRevision}`, headers: other })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: { "x-neri-business": id } })).statusCode).toBe(401);
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+  });
+});

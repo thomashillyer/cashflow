@@ -63,10 +63,15 @@ Errors are `{ error: { code, message, fieldIssues, retryable }, revision? }`; `m
 | `PATCH /notes/:id` | Correct the reading (`amount`, `date`, `direction`, `status`, `probability`, `partyId`, `kind`) | `Thought` |
 | `POST /notes/:id/add\|keep\|remove` | `add` writes an owner Signal (date change on the named invoice, or a plan) | `{ id, state, ... }` |
 | `POST /plans` | Owner confirmed an Ask Neri plan: `{ amount, date, note, direction?, status?, probability?, partyId? }` | `{ id, signal, storeRevision }` |
+| `GET /overrides` | The owner's saved overrides (base scenario) | `{ overrides: Override[], storeRevision }` |
+| `PUT /overrides/:id` | Create or update one saved override: `{ target: { commitmentId, legIndex? }, change: { date? \| shiftDays?, amount?, exclude? }, originId?, expectedRevision }`. `origin` is always `owner`. `expectedRevision` is required (`400` without it); the revision is compared-and-bumped first, so of two writes from the same revision one gets `409 STALE_REVIEW` (with the current `revision`) and must reload. Unknown keys, non-integer or negative amounts, bad dates and unknown commitments are `400`. Samples are shared and read-only: `403` | `{ override, created, storeRevision }` |
+| `DELETE /overrides/:id` | Remove one; `?expectedRevision=` (or body) required, same `409`/`403` rules; unknown id `404` | `{ id, deleted, storeRevision }` |
 | `POST /work-items/:id/draft` | `draftMessage`; `{ channel?: "email" \| "message" \| "whatsapp" }` | `{ to, subject, body, channel, links, usedFallback }` (text only) |
 | `POST /work-items/:id/approve` | Marks the item done (never "sent" or "paid") | `{ id, state }` |
 | `POST /demo/reset` | Reseed the synthetic samples (`{ business? }`) | `{ reset }` |
 | `POST /ask` | Ask Neri (`handleAsk`, ai/ask): `{ question, via?: "text" \| "voice" }`; a stated plan or rule is stored as a proposed owner Signal or Rule | `{ text, headline, verdict, ..., scenario?: { label, run }, proposal?: { kind: "plan", amount, date, note } }` |
+
+Saved overrides live in the `scenarios` row `(business_id, 'base')`, apart from the imported records: `upsertRecords` and re-imports never touch them (a demo reset deletes them with the sample). Every base and stress `GET /forecast`, `POST /simulate`, `GET /brief`, `GET /records/:id`, Review pricing, note pricing and `POST /ask` run on them; stress is the same overrides with the stress delays added. An override only changes a forecast line; it never sends, pays or moves money. If saving the list fails after the revision bump, the route returns `500` and the old list stays (the bump only causes one extra recompute).
 
 Owner notes and plans go in as **applied** owner Signals: the owner's own words, confirmed by the owner's click. Messages from anyone else stay `proposed` until the owner applies them in Review.
 

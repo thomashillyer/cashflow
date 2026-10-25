@@ -8,7 +8,7 @@ import { join } from "node:path";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Profile } from "../../schema/profile";
 import type { Deps } from "../app";
-import { runInputs } from "../engine";
+import { loadForRun, runInputs } from "../engine";
 import { businessOf, HttpError, isIsoDate, minorUnits, userOf } from "../http";
 import type { Business, StoredProfile, Thought, ThoughtReading } from "../store";
 import { ownerSignal, priceThought, readThought } from "../thoughts";
@@ -96,9 +96,9 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   // ---- owner notes -----------------------------------------------------------------------
   const view = async (b: Business, thoughts: Thought[]) => {
-    const { records } = await deps.store.load(b.id);
+    const { records, overrides } = await loadForRun(deps.store, b.id);
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
-    return thoughts.map((t) => ({ ...t, effect: t.state === "new" ? priceThought(t, records, profile, asOf, fxRates) : null }));
+    return thoughts.map((t) => ({ ...t, effect: t.state === "new" ? priceThought(t, records, profile, asOf, fxRates, overrides) : null }));
   };
   const saveThoughts = (b: Business, thoughts: Thought[]) =>
     deps.store.saveProfile(b.id, { ...b.profile, account: { ...b.profile.account, thoughts: thoughts.slice(0, 200) } });
