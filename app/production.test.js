@@ -119,6 +119,45 @@ describe("production uses the owner's data", () => {
     expect(html).not.toContain("Teams chats");
   });
 
+  it("greys out unavailable sources and keeps imports separate from working sync", () => {
+    const html = screen("viewSources()", { connections: [{ id: "zoho_books", available: true, state: "waiting" }] });
+    const card = (id) => html.split(`data-connector="${id}">`)[1].split("</button>")[0];
+    for (const id of ["quickbooks", "zoho_crm", "whatsapp", "sharepoint", "bank_feed", "slack"]) {
+      expect(html).toContain(`class="conn is-unavailable" data-connector="${id}"`);
+      expect(card(id)).toContain('<button class="btn" disabled>Not available yet');
+      expect(card(id)).not.toContain('data-action="connect"');
+      expect(card(id)).not.toContain('data-action="connection-sync"');
+    }
+    expect(html).toContain('data-action="connection-sync" data-id="zoho_books"');
+    expect(card("bank_csv")).toContain('data-action="connect" data-id="bank_csv">Upload an export');
+    expect(html).toContain('data-change="upload"');
+    expect(html).toContain('data-submit="source-paste"');
+  });
+
+  it("enables Gmail only when the server reports it available and never promises Calendar", () => {
+    const unavailable = screen("viewSources()", { connections: [{ id: "google", available: false, state: "waiting" }] });
+    expect(unavailable).toContain('class="conn is-unavailable" data-connector="google"');
+    expect(unavailable).not.toContain('data-action="connection-sync" data-id="google"');
+    const available = screen("viewSources()", { connections: [{ id: "google", available: true, state: "waiting" }] });
+    expect(available).toContain('data-action="connection-sync" data-id="google"');
+    expect(available).toContain('data-connector="google"');
+    expect(available).toContain('<b>Gmail</b>');
+    expect(available).not.toContain("Google Calendar");
+  });
+
+  it("disables planned setup choices and ignores attempts to select them", async () => {
+    const html = screen("app.setup.picked.add('quickbooks'); viewSetup()");
+    for (const id of ["quickbooks", "whatsapp", "sharepoint", "bank_feed"]) {
+      expect(html).toMatch(new RegExp(`class="app-tile [^"]*is-unavailable" data-action="pick" data-id="${id}" aria-pressed="false" disabled`));
+    }
+    expect(html).toContain("Greyed-out connectors are still being built");
+    const picked = await screen(`render = () => {}; (async () => {
+      await onClick({ target: { closest: () => ({ dataset: { action: 'pick', id: 'slack' } }) } });
+      return [...app.setup.picked];
+    })()`);
+    expect(picked).toEqual([]);
+  });
+
   it("shows real imported proposals and permits confirmation only for resolved operations", () => {
     const html = screen(`app.reviewDocs = { storeRevision: 4, proposals: [
       { proposal: { id: 'resolved', action: 'create', ops: [{}], conflicts: [], reasons: ['Reference matched'] }, candidate: { fields: { reference: { state: 'found', value: 'INV-7' }, amount: { state: 'found', value: 2000 } } }, evidence: [], notes: [] },
