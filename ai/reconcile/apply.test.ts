@@ -215,6 +215,29 @@ describe("settlements and Commitment.outstanding (#97)", () => {
     expect(inv(pay(r, 7000).records)).toMatchObject({ outstanding: 0, settlement: "paid" });
   });
 
+  it("overpayment is floored at zero with a review warning", () => {
+    const out = pay(withInvoice({ outstanding: f(5000) }), 7000);
+    expect(out.warnings.join(" ")).toMatch(/exceeds the 5000 outstanding/);
+  });
+
+  it("does not decrement an outstanding the importer already lowered (would hide a double count or mark it paid)", () => {
+    const r = withInvoice({ outstanding: f(3000) }); // 2000 of 5000 already paid per the source
+    const out = pay(r, 3000);
+    expect(inv(out.records)).toMatchObject({ outstanding: 3000, settlement: "open" });
+    expect(out.warnings.join(" ")).toMatch(/already below the invoice total/);
+  });
+
+  it("a payment on/after the latest balance snapshot with no bank line leaves outstanding for the engine's boundary", () => {
+    const r = withInvoice({ outstanding: f(5000) });
+    const p = propose(payment(), r, ctx);
+    const op = p.ops[0]!;
+    if (op.op !== "createSettlement") throw new Error("expected createSettlement");
+    const later: ChangeProposal = { ...p, ops: [{ ...op, settlement: { ...op.settlement, date: ASOF } }] };
+    const out = applyProposal(r, later, opts);
+    expect(inv(out.records)).toMatchObject({ outstanding: 5000, settlement: "open" });
+    expect(out.warnings.join(" ")).toMatch(/not yet in the bank/);
+  });
+
   it("an unset outstanding stays unset and so does settlement state", () => {
     const out = pay(withInvoice());
     expect(inv(out.records).outstanding).toBeUndefined();

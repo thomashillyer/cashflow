@@ -41,7 +41,7 @@ function setField(c: Commitment, change: CommitmentFieldChange): void {
   }
 }
 
-export function applyProposal(records: Records, proposal: ChangeProposal, _opts: { now: string }): ApplyResult {
+export function applyProposal(records: Records, proposal: ChangeProposal, opts: { now: string }): ApplyResult {
   if (proposal.state !== "proposed") {
     throw new ApplyError("NOT_PROPOSED", `Proposal ${proposal.id} is ${proposal.state}.`);
   }
@@ -166,10 +166,25 @@ export function applyProposal(records: Records, proposal: ChangeProposal, _opts:
           warnings.push(`Payment recorded for ${s.commitmentId}; the remaining amount is derived from settlements.`);
         } else if (s.currency !== target.currency) {
           warnings.push(`Payment in ${s.currency} recorded for ${s.commitmentId}, which is in ${target.currency}; outstanding left unchanged (needs review).`);
+        } else if (
+          // Same rule as the engine's unset path: a payment on/after the latest balance snapshot with no bank line yet
+          // is not in opening cash, so it stays expected until the bank shows it.
+          s.date >= latestSnapshot(next, opts.now) && !next.events.some((e) => e.commitmentId === target.id)
+        ) {
+          warnings.push(`Payment recorded for ${s.commitmentId} dated ${s.date}, after the latest balance and not yet in the bank; outstanding left unchanged until it appears (needs reconciliation).`);
+        } else if (
+          // An importer may already have lowered outstanding for this payment; decrementing again would hide a
+          // double count (the engine's own warning would go quiet) or wrongly mark the invoice paid.
+          target.outstanding + priorSettled(next, target, id) < target.amount
+        ) {
+          warnings.push(`Payment recorded for ${s.commitmentId}, but its outstanding amount is already below the invoice total; left unchanged. Check whether this payment is already in the books (needs review).`);
         } else {
           // Outstanding is authoritative in the engine, so keep it consistent with the payment. Idempotent: a repeat
           // of the same settlement returned above. A confirmed settlement is identified payment evidence, so this is
           // the one place settlement state moves.
+          if (s.amount > target.outstanding) {
+            warnings.push(`Payment of ${s.amount} exceeds the ${target.outstanding} outstanding on ${s.commitmentId}; outstanding set to 0 (needs review).`);
+          }
           target.outstanding = Math.max(0, target.outstanding - s.amount);
           if (target.settlement !== "cancelled" && target.settlement !== "credited") {
             target.settlement = target.outstanding === 0 ? "paid" : "partial";
@@ -181,6 +196,21 @@ export function applyProposal(records: Records, proposal: ChangeProposal, _opts:
       }
     }
   }
+}
+
+// Latest balance snapshot on or before `now` (YYYY-MM-DD); "" when there is none (then nothing counts as after it).
+function latestSnapshot(records: Records, now: string): string {
+  const today = now.slice(0, 10);
+  let snap = "";
+  for (const b of records.balances) if (b.asOf <= today && b.asOf > snap) snap = b.asOf;
+  return snap || "9999-99-99";
+}
+
+// Same-currency settlements already recorded for the commitment, not counting the one just added (`excludeId`).
+function priorSettled(records: Records, c: Commitment, excludeId: string): number {
+  return records.settlements
+    .filter((x) => x.commitmentId === c.id && x.currency === c.currency && x.id !== excludeId)
+    .reduce((a, x) => a + x.amount, 0);
 }
 
 function firstCreatedTemp(p: ChangeProposal): string {
