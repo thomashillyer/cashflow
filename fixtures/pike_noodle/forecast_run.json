@@ -1,0 +1,3419 @@
+{
+  "id": "run-base-e86b42177c4e",
+  "asOf": "2026-11-16",
+  "inputsHash": "e86b42177c4ee6ce9dda6457e782efc5795dac36311a8a673d4f0954d3ccb61e",
+  "scenarioId": "base",
+  "fxRates": {
+    "USD": 1
+  },
+  "openingBalance": 2200000,
+  "safetyLine": 1926154,
+  "days": [
+    {
+      "date": "2026-11-16",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 2318442,
+      "eventIds": [
+        "evt-daily-sales-2026-11-16"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 2456625,
+      "eventIds": [
+        "evt-daily-sales-2026-11-17"
+      ]
+    },
+    {
+      "date": "2026-11-18",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 2614548,
+      "eventIds": [
+        "evt-daily-sales-2026-11-18"
+      ]
+    },
+    {
+      "date": "2026-11-19",
+      "inflow": 197404,
+      "outflow": 380000,
+      "closing": 2431952,
+      "eventIds": [
+        "evt-bill-FP-4400-0",
+        "evt-daily-sales-2026-11-19"
+      ]
+    },
+    {
+      "date": "2026-11-20",
+      "inflow": 296106,
+      "outflow": 990000,
+      "closing": 1738058,
+      "eventIds": [
+        "evt-daily-sales-2026-11-20",
+        "evt-rec-payroll-0",
+        "evt-rec-sales-tax-0"
+      ]
+    },
+    {
+      "date": "2026-11-21",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 2093385,
+      "eventIds": [
+        "evt-daily-sales-2026-11-21"
+      ]
+    },
+    {
+      "date": "2026-11-22",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 2369751,
+      "eventIds": [
+        "evt-daily-sales-2026-11-22"
+      ]
+    },
+    {
+      "date": "2026-11-23",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 2488193,
+      "eventIds": [
+        "evt-daily-sales-2026-11-23"
+      ]
+    },
+    {
+      "date": "2026-11-24",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 2626376,
+      "eventIds": [
+        "evt-daily-sales-2026-11-24"
+      ]
+    },
+    {
+      "date": "2026-11-25",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 2784299,
+      "eventIds": [
+        "evt-daily-sales-2026-11-25"
+      ]
+    },
+    {
+      "date": "2026-11-26",
+      "inflow": 197404,
+      "outflow": 260000,
+      "closing": 2721703,
+      "eventIds": [
+        "evt-bill-NW-4401-0",
+        "evt-daily-sales-2026-11-26"
+      ]
+    },
+    {
+      "date": "2026-11-27",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 2267809,
+      "eventIds": [
+        "evt-daily-sales-2026-11-27",
+        "evt-rec-payroll-1"
+      ]
+    },
+    {
+      "date": "2026-11-28",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 2623136,
+      "eventIds": [
+        "evt-daily-sales-2026-11-28"
+      ]
+    },
+    {
+      "date": "2026-11-29",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 2899502,
+      "eventIds": [
+        "evt-daily-sales-2026-11-29"
+      ]
+    },
+    {
+      "date": "2026-11-30",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 3017944,
+      "eventIds": [
+        "evt-daily-sales-2026-11-30"
+      ]
+    },
+    {
+      "date": "2026-12-01",
+      "inflow": 138183,
+      "outflow": 550000,
+      "closing": 2606127,
+      "eventIds": [
+        "evt-daily-sales-2026-12-01",
+        "evt-rec-rent-0"
+      ]
+    },
+    {
+      "date": "2026-12-02",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 2764050,
+      "eventIds": [
+        "evt-daily-sales-2026-12-02"
+      ]
+    },
+    {
+      "date": "2026-12-03",
+      "inflow": 197404,
+      "outflow": 400000,
+      "closing": 2561454,
+      "eventIds": [
+        "evt-bill-FP-4402-0",
+        "evt-daily-sales-2026-12-03"
+      ]
+    },
+    {
+      "date": "2026-12-04",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 2107560,
+      "eventIds": [
+        "evt-daily-sales-2026-12-04",
+        "evt-rec-payroll-2"
+      ]
+    },
+    {
+      "date": "2026-12-05",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 2462887,
+      "eventIds": [
+        "evt-daily-sales-2026-12-05"
+      ]
+    },
+    {
+      "date": "2026-12-06",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 2739253,
+      "eventIds": [
+        "evt-daily-sales-2026-12-06"
+      ]
+    },
+    {
+      "date": "2026-12-07",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 2857695,
+      "eventIds": [
+        "evt-daily-sales-2026-12-07"
+      ]
+    },
+    {
+      "date": "2026-12-08",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 2995878,
+      "eventIds": [
+        "evt-daily-sales-2026-12-08"
+      ]
+    },
+    {
+      "date": "2026-12-09",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 3153801,
+      "eventIds": [
+        "evt-daily-sales-2026-12-09"
+      ]
+    },
+    {
+      "date": "2026-12-10",
+      "inflow": 197404,
+      "outflow": 410000,
+      "closing": 2941205,
+      "eventIds": [
+        "evt-bill-FP-4403-0",
+        "evt-daily-sales-2026-12-10"
+      ]
+    },
+    {
+      "date": "2026-12-11",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 2487311,
+      "eventIds": [
+        "evt-daily-sales-2026-12-11",
+        "evt-rec-payroll-3"
+      ]
+    },
+    {
+      "date": "2026-12-12",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 2842638,
+      "eventIds": [
+        "evt-daily-sales-2026-12-12"
+      ]
+    },
+    {
+      "date": "2026-12-13",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 3119004,
+      "eventIds": [
+        "evt-daily-sales-2026-12-13"
+      ]
+    },
+    {
+      "date": "2026-12-14",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 3237446,
+      "eventIds": [
+        "evt-daily-sales-2026-12-14"
+      ]
+    },
+    {
+      "date": "2026-12-15",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 3375629,
+      "eventIds": [
+        "evt-daily-sales-2026-12-15"
+      ]
+    },
+    {
+      "date": "2026-12-16",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 3533552,
+      "eventIds": [
+        "evt-daily-sales-2026-12-16"
+      ]
+    },
+    {
+      "date": "2026-12-17",
+      "inflow": 197404,
+      "outflow": 260000,
+      "closing": 3470956,
+      "eventIds": [
+        "evt-bill-NW-4404-0",
+        "evt-daily-sales-2026-12-17"
+      ]
+    },
+    {
+      "date": "2026-12-18",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 3017062,
+      "eventIds": [
+        "evt-daily-sales-2026-12-18",
+        "evt-rec-payroll-4"
+      ]
+    },
+    {
+      "date": "2026-12-19",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 3372389,
+      "eventIds": [
+        "evt-daily-sales-2026-12-19"
+      ]
+    },
+    {
+      "date": "2026-12-20",
+      "inflow": 276366,
+      "outflow": 240000,
+      "closing": 3408755,
+      "eventIds": [
+        "evt-daily-sales-2026-12-20",
+        "evt-rec-sales-tax-1"
+      ]
+    },
+    {
+      "date": "2026-12-21",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 3527197,
+      "eventIds": [
+        "evt-daily-sales-2026-12-21"
+      ]
+    },
+    {
+      "date": "2026-12-22",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 3665380,
+      "eventIds": [
+        "evt-daily-sales-2026-12-22"
+      ]
+    },
+    {
+      "date": "2026-12-23",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 3823303,
+      "eventIds": [
+        "evt-daily-sales-2026-12-23"
+      ]
+    },
+    {
+      "date": "2026-12-24",
+      "inflow": 197404,
+      "outflow": 390000,
+      "closing": 3630707,
+      "eventIds": [
+        "evt-bill-FP-4405-0",
+        "evt-daily-sales-2026-12-24"
+      ]
+    },
+    {
+      "date": "2026-12-25",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 3176813,
+      "eventIds": [
+        "evt-daily-sales-2026-12-25",
+        "evt-rec-payroll-5"
+      ]
+    },
+    {
+      "date": "2026-12-26",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 3532140,
+      "eventIds": [
+        "evt-daily-sales-2026-12-26"
+      ]
+    },
+    {
+      "date": "2026-12-27",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 3808506,
+      "eventIds": [
+        "evt-daily-sales-2026-12-27"
+      ]
+    },
+    {
+      "date": "2026-12-28",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 3926948,
+      "eventIds": [
+        "evt-daily-sales-2026-12-28"
+      ]
+    },
+    {
+      "date": "2026-12-29",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 4065131,
+      "eventIds": [
+        "evt-daily-sales-2026-12-29"
+      ]
+    },
+    {
+      "date": "2026-12-30",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 4223054,
+      "eventIds": [
+        "evt-daily-sales-2026-12-30"
+      ]
+    },
+    {
+      "date": "2026-12-31",
+      "inflow": 197404,
+      "outflow": 400000,
+      "closing": 4020458,
+      "eventIds": [
+        "evt-bill-FP-4406-0",
+        "evt-daily-sales-2026-12-31"
+      ]
+    },
+    {
+      "date": "2027-01-01",
+      "inflow": 296106,
+      "outflow": 1300000,
+      "closing": 3016564,
+      "eventIds": [
+        "evt-daily-sales-2027-01-01",
+        "evt-rec-payroll-6",
+        "evt-rec-rent-1"
+      ]
+    },
+    {
+      "date": "2027-01-02",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 3371891,
+      "eventIds": [
+        "evt-daily-sales-2027-01-02"
+      ]
+    },
+    {
+      "date": "2027-01-03",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 3648257,
+      "eventIds": [
+        "evt-daily-sales-2027-01-03"
+      ]
+    },
+    {
+      "date": "2027-01-04",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 3766699,
+      "eventIds": [
+        "evt-daily-sales-2027-01-04"
+      ]
+    },
+    {
+      "date": "2027-01-05",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 3904882,
+      "eventIds": [
+        "evt-daily-sales-2027-01-05"
+      ]
+    },
+    {
+      "date": "2027-01-06",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 4062805,
+      "eventIds": [
+        "evt-daily-sales-2027-01-06"
+      ]
+    },
+    {
+      "date": "2027-01-07",
+      "inflow": 197404,
+      "outflow": 260000,
+      "closing": 4000209,
+      "eventIds": [
+        "evt-bill-NW-4407-0",
+        "evt-daily-sales-2027-01-07"
+      ]
+    },
+    {
+      "date": "2027-01-08",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 3546315,
+      "eventIds": [
+        "evt-daily-sales-2027-01-08",
+        "evt-rec-payroll-7"
+      ]
+    },
+    {
+      "date": "2027-01-09",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 3901642,
+      "eventIds": [
+        "evt-daily-sales-2027-01-09"
+      ]
+    },
+    {
+      "date": "2027-01-10",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 4178008,
+      "eventIds": [
+        "evt-daily-sales-2027-01-10"
+      ]
+    },
+    {
+      "date": "2027-01-11",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 4296450,
+      "eventIds": [
+        "evt-daily-sales-2027-01-11"
+      ]
+    },
+    {
+      "date": "2027-01-12",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 4434633,
+      "eventIds": [
+        "evt-daily-sales-2027-01-12"
+      ]
+    },
+    {
+      "date": "2027-01-13",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 4592556,
+      "eventIds": [
+        "evt-daily-sales-2027-01-13"
+      ]
+    },
+    {
+      "date": "2027-01-14",
+      "inflow": 197404,
+      "outflow": 380000,
+      "closing": 4409960,
+      "eventIds": [
+        "evt-bill-FP-4408-0",
+        "evt-daily-sales-2027-01-14"
+      ]
+    },
+    {
+      "date": "2027-01-15",
+      "inflow": 296106,
+      "outflow": 1150000,
+      "closing": 3556066,
+      "eventIds": [
+        "evt-daily-sales-2027-01-15",
+        "evt-rec-est-tax-0",
+        "evt-rec-payroll-8"
+      ]
+    },
+    {
+      "date": "2027-01-16",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 3911393,
+      "eventIds": [
+        "evt-daily-sales-2027-01-16"
+      ]
+    },
+    {
+      "date": "2027-01-17",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 4187759,
+      "eventIds": [
+        "evt-daily-sales-2027-01-17"
+      ]
+    },
+    {
+      "date": "2027-01-18",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 4306201,
+      "eventIds": [
+        "evt-daily-sales-2027-01-18"
+      ]
+    },
+    {
+      "date": "2027-01-19",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 4444384,
+      "eventIds": [
+        "evt-daily-sales-2027-01-19"
+      ]
+    },
+    {
+      "date": "2027-01-20",
+      "inflow": 157923,
+      "outflow": 240000,
+      "closing": 4362307,
+      "eventIds": [
+        "evt-daily-sales-2027-01-20",
+        "evt-rec-sales-tax-2"
+      ]
+    },
+    {
+      "date": "2027-01-21",
+      "inflow": 197404,
+      "outflow": 390000,
+      "closing": 4169711,
+      "eventIds": [
+        "evt-bill-FP-4409-0",
+        "evt-daily-sales-2027-01-21"
+      ]
+    },
+    {
+      "date": "2027-01-22",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 3715817,
+      "eventIds": [
+        "evt-daily-sales-2027-01-22",
+        "evt-rec-payroll-9"
+      ]
+    },
+    {
+      "date": "2027-01-23",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 4071144,
+      "eventIds": [
+        "evt-daily-sales-2027-01-23"
+      ]
+    },
+    {
+      "date": "2027-01-24",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 4347510,
+      "eventIds": [
+        "evt-daily-sales-2027-01-24"
+      ]
+    },
+    {
+      "date": "2027-01-25",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 4465952,
+      "eventIds": [
+        "evt-daily-sales-2027-01-25"
+      ]
+    },
+    {
+      "date": "2027-01-26",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 4604135,
+      "eventIds": [
+        "evt-daily-sales-2027-01-26"
+      ]
+    },
+    {
+      "date": "2027-01-27",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 4762058,
+      "eventIds": [
+        "evt-daily-sales-2027-01-27"
+      ]
+    },
+    {
+      "date": "2027-01-28",
+      "inflow": 197404,
+      "outflow": 260000,
+      "closing": 4699462,
+      "eventIds": [
+        "evt-bill-NW-4410-0",
+        "evt-daily-sales-2027-01-28"
+      ]
+    },
+    {
+      "date": "2027-01-29",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 4245568,
+      "eventIds": [
+        "evt-daily-sales-2027-01-29",
+        "evt-rec-payroll-10"
+      ]
+    },
+    {
+      "date": "2027-01-30",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 4600895,
+      "eventIds": [
+        "evt-daily-sales-2027-01-30"
+      ]
+    },
+    {
+      "date": "2027-01-31",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 4877261,
+      "eventIds": [
+        "evt-daily-sales-2027-01-31"
+      ]
+    },
+    {
+      "date": "2027-02-01",
+      "inflow": 118442,
+      "outflow": 550000,
+      "closing": 4445703,
+      "eventIds": [
+        "evt-daily-sales-2027-02-01",
+        "evt-rec-rent-2"
+      ]
+    },
+    {
+      "date": "2027-02-02",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 4583886,
+      "eventIds": [
+        "evt-daily-sales-2027-02-02"
+      ]
+    },
+    {
+      "date": "2027-02-03",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 4741809,
+      "eventIds": [
+        "evt-daily-sales-2027-02-03"
+      ]
+    },
+    {
+      "date": "2027-02-04",
+      "inflow": 197404,
+      "outflow": 410000,
+      "closing": 4529213,
+      "eventIds": [
+        "evt-bill-FP-4411-0",
+        "evt-daily-sales-2027-02-04"
+      ]
+    },
+    {
+      "date": "2027-02-05",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 4075319,
+      "eventIds": [
+        "evt-daily-sales-2027-02-05",
+        "evt-rec-payroll-11"
+      ]
+    },
+    {
+      "date": "2027-02-06",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 4430646,
+      "eventIds": [
+        "evt-daily-sales-2027-02-06"
+      ]
+    },
+    {
+      "date": "2027-02-07",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 4707012,
+      "eventIds": [
+        "evt-daily-sales-2027-02-07"
+      ]
+    },
+    {
+      "date": "2027-02-08",
+      "inflow": 118442,
+      "outflow": 0,
+      "closing": 4825454,
+      "eventIds": [
+        "evt-daily-sales-2027-02-08"
+      ]
+    },
+    {
+      "date": "2027-02-09",
+      "inflow": 138183,
+      "outflow": 0,
+      "closing": 4963637,
+      "eventIds": [
+        "evt-daily-sales-2027-02-09"
+      ]
+    },
+    {
+      "date": "2027-02-10",
+      "inflow": 157923,
+      "outflow": 0,
+      "closing": 5121560,
+      "eventIds": [
+        "evt-daily-sales-2027-02-10"
+      ]
+    },
+    {
+      "date": "2027-02-11",
+      "inflow": 197404,
+      "outflow": 380000,
+      "closing": 4938964,
+      "eventIds": [
+        "evt-bill-FP-4412-0",
+        "evt-daily-sales-2027-02-11"
+      ]
+    },
+    {
+      "date": "2027-02-12",
+      "inflow": 296106,
+      "outflow": 750000,
+      "closing": 4485070,
+      "eventIds": [
+        "evt-daily-sales-2027-02-12",
+        "evt-rec-payroll-12"
+      ]
+    },
+    {
+      "date": "2027-02-13",
+      "inflow": 355327,
+      "outflow": 0,
+      "closing": 4840397,
+      "eventIds": [
+        "evt-daily-sales-2027-02-13"
+      ]
+    },
+    {
+      "date": "2027-02-14",
+      "inflow": 276366,
+      "outflow": 0,
+      "closing": 5116763,
+      "eventIds": [
+        "evt-daily-sales-2027-02-14"
+      ]
+    }
+  ],
+  "weeks": [
+    {
+      "start": "2026-11-16",
+      "inflow": 1539751,
+      "outflow": 1370000,
+      "closing": 2369751,
+      "minClosing": 1738058,
+      "pipelineClosing": 2369751,
+      "eventIds": [
+        "evt-daily-sales-2026-11-16",
+        "evt-daily-sales-2026-11-17",
+        "evt-daily-sales-2026-11-18",
+        "evt-bill-FP-4400-0",
+        "evt-daily-sales-2026-11-19",
+        "evt-daily-sales-2026-11-20",
+        "evt-rec-payroll-0",
+        "evt-rec-sales-tax-0",
+        "evt-daily-sales-2026-11-21",
+        "evt-daily-sales-2026-11-22"
+      ]
+    },
+    {
+      "start": "2026-11-23",
+      "inflow": 1539751,
+      "outflow": 1010000,
+      "closing": 2899502,
+      "minClosing": 2267809,
+      "pipelineClosing": 2899502,
+      "eventIds": [
+        "evt-daily-sales-2026-11-23",
+        "evt-daily-sales-2026-11-24",
+        "evt-daily-sales-2026-11-25",
+        "evt-bill-NW-4401-0",
+        "evt-daily-sales-2026-11-26",
+        "evt-daily-sales-2026-11-27",
+        "evt-rec-payroll-1",
+        "evt-daily-sales-2026-11-28",
+        "evt-daily-sales-2026-11-29"
+      ]
+    },
+    {
+      "start": "2026-11-30",
+      "inflow": 1539751,
+      "outflow": 1700000,
+      "closing": 2739253,
+      "minClosing": 2107560,
+      "pipelineClosing": 2739253,
+      "eventIds": [
+        "evt-daily-sales-2026-11-30",
+        "evt-daily-sales-2026-12-01",
+        "evt-rec-rent-0",
+        "evt-daily-sales-2026-12-02",
+        "evt-bill-FP-4402-0",
+        "evt-daily-sales-2026-12-03",
+        "evt-daily-sales-2026-12-04",
+        "evt-rec-payroll-2",
+        "evt-daily-sales-2026-12-05",
+        "evt-daily-sales-2026-12-06"
+      ]
+    },
+    {
+      "start": "2026-12-07",
+      "inflow": 1539751,
+      "outflow": 1160000,
+      "closing": 3119004,
+      "minClosing": 2487311,
+      "pipelineClosing": 3119004,
+      "eventIds": [
+        "evt-daily-sales-2026-12-07",
+        "evt-daily-sales-2026-12-08",
+        "evt-daily-sales-2026-12-09",
+        "evt-bill-FP-4403-0",
+        "evt-daily-sales-2026-12-10",
+        "evt-daily-sales-2026-12-11",
+        "evt-rec-payroll-3",
+        "evt-daily-sales-2026-12-12",
+        "evt-daily-sales-2026-12-13"
+      ]
+    },
+    {
+      "start": "2026-12-14",
+      "inflow": 1539751,
+      "outflow": 1250000,
+      "closing": 3408755,
+      "minClosing": 3017062,
+      "pipelineClosing": 3408755,
+      "eventIds": [
+        "evt-daily-sales-2026-12-14",
+        "evt-daily-sales-2026-12-15",
+        "evt-daily-sales-2026-12-16",
+        "evt-bill-NW-4404-0",
+        "evt-daily-sales-2026-12-17",
+        "evt-daily-sales-2026-12-18",
+        "evt-rec-payroll-4",
+        "evt-daily-sales-2026-12-19",
+        "evt-daily-sales-2026-12-20",
+        "evt-rec-sales-tax-1"
+      ]
+    },
+    {
+      "start": "2026-12-21",
+      "inflow": 1539751,
+      "outflow": 1140000,
+      "closing": 3808506,
+      "minClosing": 3176813,
+      "pipelineClosing": 3808506,
+      "eventIds": [
+        "evt-daily-sales-2026-12-21",
+        "evt-daily-sales-2026-12-22",
+        "evt-daily-sales-2026-12-23",
+        "evt-bill-FP-4405-0",
+        "evt-daily-sales-2026-12-24",
+        "evt-daily-sales-2026-12-25",
+        "evt-rec-payroll-5",
+        "evt-daily-sales-2026-12-26",
+        "evt-daily-sales-2026-12-27"
+      ]
+    },
+    {
+      "start": "2026-12-28",
+      "inflow": 1539751,
+      "outflow": 1700000,
+      "closing": 3648257,
+      "minClosing": 3016564,
+      "pipelineClosing": 3648257,
+      "eventIds": [
+        "evt-daily-sales-2026-12-28",
+        "evt-daily-sales-2026-12-29",
+        "evt-daily-sales-2026-12-30",
+        "evt-bill-FP-4406-0",
+        "evt-daily-sales-2026-12-31",
+        "evt-daily-sales-2027-01-01",
+        "evt-rec-payroll-6",
+        "evt-rec-rent-1",
+        "evt-daily-sales-2027-01-02",
+        "evt-daily-sales-2027-01-03"
+      ]
+    },
+    {
+      "start": "2027-01-04",
+      "inflow": 1539751,
+      "outflow": 1010000,
+      "closing": 4178008,
+      "minClosing": 3546315,
+      "pipelineClosing": 4178008,
+      "eventIds": [
+        "evt-daily-sales-2027-01-04",
+        "evt-daily-sales-2027-01-05",
+        "evt-daily-sales-2027-01-06",
+        "evt-bill-NW-4407-0",
+        "evt-daily-sales-2027-01-07",
+        "evt-daily-sales-2027-01-08",
+        "evt-rec-payroll-7",
+        "evt-daily-sales-2027-01-09",
+        "evt-daily-sales-2027-01-10"
+      ]
+    },
+    {
+      "start": "2027-01-11",
+      "inflow": 1539751,
+      "outflow": 1530000,
+      "closing": 4187759,
+      "minClosing": 3556066,
+      "pipelineClosing": 4187759,
+      "eventIds": [
+        "evt-daily-sales-2027-01-11",
+        "evt-daily-sales-2027-01-12",
+        "evt-daily-sales-2027-01-13",
+        "evt-bill-FP-4408-0",
+        "evt-daily-sales-2027-01-14",
+        "evt-daily-sales-2027-01-15",
+        "evt-rec-est-tax-0",
+        "evt-rec-payroll-8",
+        "evt-daily-sales-2027-01-16",
+        "evt-daily-sales-2027-01-17"
+      ]
+    },
+    {
+      "start": "2027-01-18",
+      "inflow": 1539751,
+      "outflow": 1380000,
+      "closing": 4347510,
+      "minClosing": 3715817,
+      "pipelineClosing": 4347510,
+      "eventIds": [
+        "evt-daily-sales-2027-01-18",
+        "evt-daily-sales-2027-01-19",
+        "evt-daily-sales-2027-01-20",
+        "evt-rec-sales-tax-2",
+        "evt-bill-FP-4409-0",
+        "evt-daily-sales-2027-01-21",
+        "evt-daily-sales-2027-01-22",
+        "evt-rec-payroll-9",
+        "evt-daily-sales-2027-01-23",
+        "evt-daily-sales-2027-01-24"
+      ]
+    },
+    {
+      "start": "2027-01-25",
+      "inflow": 1539751,
+      "outflow": 1010000,
+      "closing": 4877261,
+      "minClosing": 4245568,
+      "pipelineClosing": 4877261,
+      "eventIds": [
+        "evt-daily-sales-2027-01-25",
+        "evt-daily-sales-2027-01-26",
+        "evt-daily-sales-2027-01-27",
+        "evt-bill-NW-4410-0",
+        "evt-daily-sales-2027-01-28",
+        "evt-daily-sales-2027-01-29",
+        "evt-rec-payroll-10",
+        "evt-daily-sales-2027-01-30",
+        "evt-daily-sales-2027-01-31"
+      ]
+    },
+    {
+      "start": "2027-02-01",
+      "inflow": 1539751,
+      "outflow": 1710000,
+      "closing": 4707012,
+      "minClosing": 4075319,
+      "pipelineClosing": 4707012,
+      "eventIds": [
+        "evt-daily-sales-2027-02-01",
+        "evt-rec-rent-2",
+        "evt-daily-sales-2027-02-02",
+        "evt-daily-sales-2027-02-03",
+        "evt-bill-FP-4411-0",
+        "evt-daily-sales-2027-02-04",
+        "evt-daily-sales-2027-02-05",
+        "evt-rec-payroll-11",
+        "evt-daily-sales-2027-02-06",
+        "evt-daily-sales-2027-02-07"
+      ]
+    },
+    {
+      "start": "2027-02-08",
+      "inflow": 1539751,
+      "outflow": 1130000,
+      "closing": 5116763,
+      "minClosing": 4485070,
+      "pipelineClosing": 5116763,
+      "eventIds": [
+        "evt-daily-sales-2027-02-08",
+        "evt-daily-sales-2027-02-09",
+        "evt-daily-sales-2027-02-10",
+        "evt-bill-FP-4412-0",
+        "evt-daily-sales-2027-02-11",
+        "evt-daily-sales-2027-02-12",
+        "evt-rec-payroll-12",
+        "evt-daily-sales-2027-02-13",
+        "evt-daily-sales-2027-02-14"
+      ]
+    }
+  ],
+  "lowPoint": {
+    "week": "2026-11-16",
+    "date": "2026-11-20",
+    "amount": 1738058
+  },
+  "firstBelowSafety": "2026-11-20",
+  "weeksBelowSafety": [
+    "2026-11-16"
+  ],
+  "freeCash": [
+    {
+      "week": "2026-11-16",
+      "amount": -188096,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-11-23",
+      "amount": 181406,
+      "weeksFree": 12
+    },
+    {
+      "week": "2026-11-30",
+      "amount": 181406,
+      "weeksFree": 11
+    },
+    {
+      "week": "2026-12-07",
+      "amount": 561157,
+      "weeksFree": 10
+    },
+    {
+      "week": "2026-12-14",
+      "amount": 1090410,
+      "weeksFree": 9
+    },
+    {
+      "week": "2026-12-21",
+      "amount": 1090410,
+      "weeksFree": 8
+    },
+    {
+      "week": "2026-12-28",
+      "amount": 1090410,
+      "weeksFree": 7
+    },
+    {
+      "week": "2027-01-04",
+      "amount": 1620161,
+      "weeksFree": 6
+    },
+    {
+      "week": "2027-01-11",
+      "amount": 1629912,
+      "weeksFree": 5
+    },
+    {
+      "week": "2027-01-18",
+      "amount": 1789663,
+      "weeksFree": 4
+    },
+    {
+      "week": "2027-01-25",
+      "amount": 2149165,
+      "weeksFree": 3
+    },
+    {
+      "week": "2027-02-01",
+      "amount": 2149165,
+      "weeksFree": 2
+    },
+    {
+      "week": "2027-02-08",
+      "amount": 2558916,
+      "weeksFree": 1
+    }
+  ],
+  "warnings": [],
+  "events": [
+    {
+      "id": "evt-daily-sales-2026-11-16",
+      "commitmentId": "daily-sales",
+      "legIndex": 0,
+      "date": "2026-11-16",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-17",
+      "commitmentId": "daily-sales",
+      "legIndex": 1,
+      "date": "2026-11-17",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-18",
+      "commitmentId": "daily-sales",
+      "legIndex": 2,
+      "date": "2026-11-18",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4400-0",
+      "commitmentId": "bill-FP-4400",
+      "legIndex": 0,
+      "date": "2026-11-19",
+      "amount": 380000,
+      "currency": "USD",
+      "amountBase": 380000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-11-19",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4400"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-19",
+      "commitmentId": "daily-sales",
+      "legIndex": 3,
+      "date": "2026-11-19",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-20",
+      "commitmentId": "daily-sales",
+      "legIndex": 4,
+      "date": "2026-11-20",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-0",
+      "commitmentId": "rec-payroll",
+      "legIndex": 0,
+      "date": "2026-11-20",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-rec-sales-tax-0",
+      "commitmentId": "rec-sales-tax",
+      "legIndex": 0,
+      "date": "2026-11-20",
+      "amount": 240000,
+      "currency": "USD",
+      "amountBase": 240000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Sales tax, from 2026-11-20",
+      "category": "tax",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-sales-tax"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-21",
+      "commitmentId": "daily-sales",
+      "legIndex": 5,
+      "date": "2026-11-21",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-22",
+      "commitmentId": "daily-sales",
+      "legIndex": 6,
+      "date": "2026-11-22",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-23",
+      "commitmentId": "daily-sales",
+      "legIndex": 7,
+      "date": "2026-11-23",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-24",
+      "commitmentId": "daily-sales",
+      "legIndex": 8,
+      "date": "2026-11-24",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-25",
+      "commitmentId": "daily-sales",
+      "legIndex": 9,
+      "date": "2026-11-25",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-NW-4401-0",
+      "commitmentId": "bill-NW-4401",
+      "legIndex": 0,
+      "date": "2026-11-26",
+      "amount": 260000,
+      "currency": "USD",
+      "amountBase": 260000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-11-26",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4401"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-26",
+      "commitmentId": "daily-sales",
+      "legIndex": 10,
+      "date": "2026-11-26",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-27",
+      "commitmentId": "daily-sales",
+      "legIndex": 11,
+      "date": "2026-11-27",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-1",
+      "commitmentId": "rec-payroll",
+      "legIndex": 1,
+      "date": "2026-11-27",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-28",
+      "commitmentId": "daily-sales",
+      "legIndex": 12,
+      "date": "2026-11-28",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-29",
+      "commitmentId": "daily-sales",
+      "legIndex": 13,
+      "date": "2026-11-29",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-11-30",
+      "commitmentId": "daily-sales",
+      "legIndex": 14,
+      "date": "2026-11-30",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-01",
+      "commitmentId": "daily-sales",
+      "legIndex": 15,
+      "date": "2026-12-01",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-rent-0",
+      "commitmentId": "rec-rent",
+      "legIndex": 0,
+      "date": "2026-12-01",
+      "amount": 550000,
+      "currency": "USD",
+      "amountBase": 550000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "category": "rent",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-rent"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-02",
+      "commitmentId": "daily-sales",
+      "legIndex": 16,
+      "date": "2026-12-02",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4402-0",
+      "commitmentId": "bill-FP-4402",
+      "legIndex": 0,
+      "date": "2026-12-03",
+      "amount": 400000,
+      "currency": "USD",
+      "amountBase": 400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-12-03",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4402"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-03",
+      "commitmentId": "daily-sales",
+      "legIndex": 17,
+      "date": "2026-12-03",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-04",
+      "commitmentId": "daily-sales",
+      "legIndex": 18,
+      "date": "2026-12-04",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-2",
+      "commitmentId": "rec-payroll",
+      "legIndex": 2,
+      "date": "2026-12-04",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-05",
+      "commitmentId": "daily-sales",
+      "legIndex": 19,
+      "date": "2026-12-05",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-06",
+      "commitmentId": "daily-sales",
+      "legIndex": 20,
+      "date": "2026-12-06",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-07",
+      "commitmentId": "daily-sales",
+      "legIndex": 21,
+      "date": "2026-12-07",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-08",
+      "commitmentId": "daily-sales",
+      "legIndex": 22,
+      "date": "2026-12-08",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-09",
+      "commitmentId": "daily-sales",
+      "legIndex": 23,
+      "date": "2026-12-09",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4403-0",
+      "commitmentId": "bill-FP-4403",
+      "legIndex": 0,
+      "date": "2026-12-10",
+      "amount": 410000,
+      "currency": "USD",
+      "amountBase": 410000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-12-10",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4403"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-10",
+      "commitmentId": "daily-sales",
+      "legIndex": 24,
+      "date": "2026-12-10",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-11",
+      "commitmentId": "daily-sales",
+      "legIndex": 25,
+      "date": "2026-12-11",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-3",
+      "commitmentId": "rec-payroll",
+      "legIndex": 3,
+      "date": "2026-12-11",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-12",
+      "commitmentId": "daily-sales",
+      "legIndex": 26,
+      "date": "2026-12-12",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-13",
+      "commitmentId": "daily-sales",
+      "legIndex": 27,
+      "date": "2026-12-13",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-14",
+      "commitmentId": "daily-sales",
+      "legIndex": 28,
+      "date": "2026-12-14",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-15",
+      "commitmentId": "daily-sales",
+      "legIndex": 29,
+      "date": "2026-12-15",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-16",
+      "commitmentId": "daily-sales",
+      "legIndex": 30,
+      "date": "2026-12-16",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-NW-4404-0",
+      "commitmentId": "bill-NW-4404",
+      "legIndex": 0,
+      "date": "2026-12-17",
+      "amount": 260000,
+      "currency": "USD",
+      "amountBase": 260000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-12-17",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4404"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-17",
+      "commitmentId": "daily-sales",
+      "legIndex": 31,
+      "date": "2026-12-17",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-18",
+      "commitmentId": "daily-sales",
+      "legIndex": 32,
+      "date": "2026-12-18",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-4",
+      "commitmentId": "rec-payroll",
+      "legIndex": 4,
+      "date": "2026-12-18",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-19",
+      "commitmentId": "daily-sales",
+      "legIndex": 33,
+      "date": "2026-12-19",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-20",
+      "commitmentId": "daily-sales",
+      "legIndex": 34,
+      "date": "2026-12-20",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-sales-tax-1",
+      "commitmentId": "rec-sales-tax",
+      "legIndex": 1,
+      "date": "2026-12-20",
+      "amount": 240000,
+      "currency": "USD",
+      "amountBase": 240000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Sales tax, from 2026-11-20",
+      "category": "tax",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-sales-tax"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-21",
+      "commitmentId": "daily-sales",
+      "legIndex": 35,
+      "date": "2026-12-21",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-22",
+      "commitmentId": "daily-sales",
+      "legIndex": 36,
+      "date": "2026-12-22",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-23",
+      "commitmentId": "daily-sales",
+      "legIndex": 37,
+      "date": "2026-12-23",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4405-0",
+      "commitmentId": "bill-FP-4405",
+      "legIndex": 0,
+      "date": "2026-12-24",
+      "amount": 390000,
+      "currency": "USD",
+      "amountBase": 390000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-12-24",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4405"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-24",
+      "commitmentId": "daily-sales",
+      "legIndex": 38,
+      "date": "2026-12-24",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-25",
+      "commitmentId": "daily-sales",
+      "legIndex": 39,
+      "date": "2026-12-25",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-5",
+      "commitmentId": "rec-payroll",
+      "legIndex": 5,
+      "date": "2026-12-25",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-26",
+      "commitmentId": "daily-sales",
+      "legIndex": 40,
+      "date": "2026-12-26",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-27",
+      "commitmentId": "daily-sales",
+      "legIndex": 41,
+      "date": "2026-12-27",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-28",
+      "commitmentId": "daily-sales",
+      "legIndex": 42,
+      "date": "2026-12-28",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-29",
+      "commitmentId": "daily-sales",
+      "legIndex": 43,
+      "date": "2026-12-29",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-30",
+      "commitmentId": "daily-sales",
+      "legIndex": 44,
+      "date": "2026-12-30",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4406-0",
+      "commitmentId": "bill-FP-4406",
+      "legIndex": 0,
+      "date": "2026-12-31",
+      "amount": 400000,
+      "currency": "USD",
+      "amountBase": 400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-12-31",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4406"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2026-12-31",
+      "commitmentId": "daily-sales",
+      "legIndex": 45,
+      "date": "2026-12-31",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-01",
+      "commitmentId": "daily-sales",
+      "legIndex": 46,
+      "date": "2027-01-01",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-6",
+      "commitmentId": "rec-payroll",
+      "legIndex": 6,
+      "date": "2027-01-01",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-rec-rent-1",
+      "commitmentId": "rec-rent",
+      "legIndex": 1,
+      "date": "2027-01-01",
+      "amount": 550000,
+      "currency": "USD",
+      "amountBase": 550000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "category": "rent",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-rent"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-02",
+      "commitmentId": "daily-sales",
+      "legIndex": 47,
+      "date": "2027-01-02",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-03",
+      "commitmentId": "daily-sales",
+      "legIndex": 48,
+      "date": "2027-01-03",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-04",
+      "commitmentId": "daily-sales",
+      "legIndex": 49,
+      "date": "2027-01-04",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-05",
+      "commitmentId": "daily-sales",
+      "legIndex": 50,
+      "date": "2027-01-05",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-06",
+      "commitmentId": "daily-sales",
+      "legIndex": 51,
+      "date": "2027-01-06",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-NW-4407-0",
+      "commitmentId": "bill-NW-4407",
+      "legIndex": 0,
+      "date": "2027-01-07",
+      "amount": 260000,
+      "currency": "USD",
+      "amountBase": 260000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-01-07",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4407"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-07",
+      "commitmentId": "daily-sales",
+      "legIndex": 52,
+      "date": "2027-01-07",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-08",
+      "commitmentId": "daily-sales",
+      "legIndex": 53,
+      "date": "2027-01-08",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-7",
+      "commitmentId": "rec-payroll",
+      "legIndex": 7,
+      "date": "2027-01-08",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-09",
+      "commitmentId": "daily-sales",
+      "legIndex": 54,
+      "date": "2027-01-09",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-10",
+      "commitmentId": "daily-sales",
+      "legIndex": 55,
+      "date": "2027-01-10",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-11",
+      "commitmentId": "daily-sales",
+      "legIndex": 56,
+      "date": "2027-01-11",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-12",
+      "commitmentId": "daily-sales",
+      "legIndex": 57,
+      "date": "2027-01-12",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-13",
+      "commitmentId": "daily-sales",
+      "legIndex": 58,
+      "date": "2027-01-13",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4408-0",
+      "commitmentId": "bill-FP-4408",
+      "legIndex": 0,
+      "date": "2027-01-14",
+      "amount": 380000,
+      "currency": "USD",
+      "amountBase": 380000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-01-14",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4408"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-14",
+      "commitmentId": "daily-sales",
+      "legIndex": 59,
+      "date": "2027-01-14",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-15",
+      "commitmentId": "daily-sales",
+      "legIndex": 60,
+      "date": "2027-01-15",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-est-tax-0",
+      "commitmentId": "rec-est-tax",
+      "legIndex": 0,
+      "date": "2027-01-15",
+      "amount": 400000,
+      "currency": "USD",
+      "amountBase": 400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring quarterly: Quarterly estimated taxes, from 2027-01-15",
+      "category": "tax",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-est-tax"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-8",
+      "commitmentId": "rec-payroll",
+      "legIndex": 8,
+      "date": "2027-01-15",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-16",
+      "commitmentId": "daily-sales",
+      "legIndex": 61,
+      "date": "2027-01-16",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-17",
+      "commitmentId": "daily-sales",
+      "legIndex": 62,
+      "date": "2027-01-17",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-18",
+      "commitmentId": "daily-sales",
+      "legIndex": 63,
+      "date": "2027-01-18",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-19",
+      "commitmentId": "daily-sales",
+      "legIndex": 64,
+      "date": "2027-01-19",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-20",
+      "commitmentId": "daily-sales",
+      "legIndex": 65,
+      "date": "2027-01-20",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-sales-tax-2",
+      "commitmentId": "rec-sales-tax",
+      "legIndex": 2,
+      "date": "2027-01-20",
+      "amount": 240000,
+      "currency": "USD",
+      "amountBase": 240000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Sales tax, from 2026-11-20",
+      "category": "tax",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-sales-tax"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4409-0",
+      "commitmentId": "bill-FP-4409",
+      "legIndex": 0,
+      "date": "2027-01-21",
+      "amount": 390000,
+      "currency": "USD",
+      "amountBase": 390000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-01-21",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4409"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-21",
+      "commitmentId": "daily-sales",
+      "legIndex": 66,
+      "date": "2027-01-21",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-22",
+      "commitmentId": "daily-sales",
+      "legIndex": 67,
+      "date": "2027-01-22",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-9",
+      "commitmentId": "rec-payroll",
+      "legIndex": 9,
+      "date": "2027-01-22",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-23",
+      "commitmentId": "daily-sales",
+      "legIndex": 68,
+      "date": "2027-01-23",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-24",
+      "commitmentId": "daily-sales",
+      "legIndex": 69,
+      "date": "2027-01-24",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-25",
+      "commitmentId": "daily-sales",
+      "legIndex": 70,
+      "date": "2027-01-25",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-26",
+      "commitmentId": "daily-sales",
+      "legIndex": 71,
+      "date": "2027-01-26",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-27",
+      "commitmentId": "daily-sales",
+      "legIndex": 72,
+      "date": "2027-01-27",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-NW-4410-0",
+      "commitmentId": "bill-NW-4410",
+      "legIndex": 0,
+      "date": "2027-01-28",
+      "amount": 260000,
+      "currency": "USD",
+      "amountBase": 260000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-01-28",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4410"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-28",
+      "commitmentId": "daily-sales",
+      "legIndex": 73,
+      "date": "2027-01-28",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-29",
+      "commitmentId": "daily-sales",
+      "legIndex": 74,
+      "date": "2027-01-29",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-10",
+      "commitmentId": "rec-payroll",
+      "legIndex": 10,
+      "date": "2027-01-29",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-30",
+      "commitmentId": "daily-sales",
+      "legIndex": 75,
+      "date": "2027-01-30",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-01-31",
+      "commitmentId": "daily-sales",
+      "legIndex": 76,
+      "date": "2027-01-31",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-01",
+      "commitmentId": "daily-sales",
+      "legIndex": 77,
+      "date": "2027-02-01",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-rent-2",
+      "commitmentId": "rec-rent",
+      "legIndex": 2,
+      "date": "2027-02-01",
+      "amount": 550000,
+      "currency": "USD",
+      "amountBase": 550000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "category": "rent",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-rent"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-02",
+      "commitmentId": "daily-sales",
+      "legIndex": 78,
+      "date": "2027-02-02",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-03",
+      "commitmentId": "daily-sales",
+      "legIndex": 79,
+      "date": "2027-02-03",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4411-0",
+      "commitmentId": "bill-FP-4411",
+      "legIndex": 0,
+      "date": "2027-02-04",
+      "amount": 410000,
+      "currency": "USD",
+      "amountBase": 410000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-02-04",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4411"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-04",
+      "commitmentId": "daily-sales",
+      "legIndex": 80,
+      "date": "2027-02-04",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-05",
+      "commitmentId": "daily-sales",
+      "legIndex": 81,
+      "date": "2027-02-05",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-11",
+      "commitmentId": "rec-payroll",
+      "legIndex": 11,
+      "date": "2027-02-05",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-06",
+      "commitmentId": "daily-sales",
+      "legIndex": 82,
+      "date": "2027-02-06",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-07",
+      "commitmentId": "daily-sales",
+      "legIndex": 83,
+      "date": "2027-02-07",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-08",
+      "commitmentId": "daily-sales",
+      "legIndex": 84,
+      "date": "2027-02-08",
+      "amount": 118442,
+      "currency": "USD",
+      "amountBase": 118442,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-09",
+      "commitmentId": "daily-sales",
+      "legIndex": 85,
+      "date": "2027-02-09",
+      "amount": 138183,
+      "currency": "USD",
+      "amountBase": 138183,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-10",
+      "commitmentId": "daily-sales",
+      "legIndex": 86,
+      "date": "2027-02-10",
+      "amount": 157923,
+      "currency": "USD",
+      "amountBase": 157923,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-bill-FP-4412-0",
+      "commitmentId": "bill-FP-4412",
+      "legIndex": 0,
+      "date": "2027-02-11",
+      "amount": 380000,
+      "currency": "USD",
+      "amountBase": 380000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-02-11",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4412"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-11",
+      "commitmentId": "daily-sales",
+      "legIndex": 87,
+      "date": "2027-02-11",
+      "amount": 197404,
+      "currency": "USD",
+      "amountBase": 197404,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-12",
+      "commitmentId": "daily-sales",
+      "legIndex": 88,
+      "date": "2027-02-12",
+      "amount": 296106,
+      "currency": "USD",
+      "amountBase": 296106,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-12",
+      "commitmentId": "rec-payroll",
+      "legIndex": 12,
+      "date": "2027-02-12",
+      "amount": 750000,
+      "currency": "USD",
+      "amountBase": 750000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring weekly: Payroll, from 2026-11-20",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-13",
+      "commitmentId": "daily-sales",
+      "legIndex": 89,
+      "date": "2027-02-13",
+      "amount": 355327,
+      "currency": "USD",
+      "amountBase": 355327,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-daily-sales-2027-02-14",
+      "commitmentId": "daily-sales",
+      "legIndex": 90,
+      "date": "2027-02-14",
+      "amount": 276366,
+      "currency": "USD",
+      "amountBase": 276366,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.6,
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "category": "sales",
+      "sourceRef": {
+        "system": "profile",
+        "record": "revenueModel.dailySales"
+      }
+    }
+  ]
+}

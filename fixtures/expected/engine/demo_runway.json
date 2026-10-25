@@ -1,0 +1,12 @@
+{
+  "note": "Hand-calculated in docs/HACKATHON_PLAN.md. Amounts are cents.",
+  "checks": [
+    { "name": "base falls to -$5,000 on Oct 29", "scenario": "base", "day": "2026-10-29", "closing": -500000 },
+    { "name": "base is $29,000 after payroll on Nov 1", "scenario": "base", "day": "2026-11-01", "closing": 2900000 },
+    { "name": "supplier rescheduled to Nov 4: $49,000 on Nov 1", "scenario": "base", "overrides": [{ "id": "ov-bill", "target": { "commitmentId": "bill-supplier" }, "change": { "date": "2026-11-04" }, "origin": "owner" }], "day": "2026-11-01", "closing": 4900000 },
+    { "name": "supplier rescheduled to Nov 4: $29,000 on Nov 4", "scenario": "base", "overrides": [{ "id": "ov-bill", "target": { "commitmentId": "bill-supplier" }, "change": { "date": "2026-11-04" }, "origin": "owner" }], "day": "2026-11-04", "closing": 2900000 },
+    { "name": "stress: -$3,000 on Nov 1", "scenario": "stress", "overrides": [{ "id": "ov-bill", "target": { "commitmentId": "bill-supplier" }, "change": { "date": "2026-11-04" }, "origin": "owner" }], "day": "2026-11-01", "closing": -300000 },
+    { "name": "stress: -$23,000 on Nov 4", "scenario": "stress", "overrides": [{ "id": "ov-bill", "target": { "commitmentId": "bill-supplier" }, "change": { "date": "2026-11-04" }, "origin": "owner" }], "day": "2026-11-04", "closing": -2300000 }
+  ],
+  "lowPoint": { "scenario": "base", "date": "2026-10-29", "amount": -500000, "tolerance": 0 }
+}

@@ -1,0 +1,1319 @@
+{
+  "id": "run-base-4c3b0c31431c",
+  "asOf": "2026-11-16",
+  "inputsHash": "4c3b0c31431c31926b8fc93c04f03fb421a58adb301870a918dc453a467c1887",
+  "scenarioId": "base",
+  "fxRates": {
+    "USD": 1,
+    "INR": 0.012
+  },
+  "openingBalance": 14500000,
+  "safetyLine": 3500000,
+  "days": [
+    {
+      "date": "2026-11-16",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 14500000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-17",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 14500000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-18",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 14500000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-19",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 14500000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-20",
+      "inflow": 0,
+      "outflow": 1800000,
+      "closing": 12700000,
+      "eventIds": [
+        "evt-po-PO-2291-0"
+      ]
+    },
+    {
+      "date": "2026-11-21",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12700000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-22",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12700000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-23",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12700000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-24",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12700000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-25",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12700000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-26",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12700000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-27",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 11300000,
+      "eventIds": [
+        "evt-rec-payroll-1"
+      ]
+    },
+    {
+      "date": "2026-11-28",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11300000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-29",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11300000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-11-30",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11300000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-01",
+      "inflow": 0,
+      "outflow": 1850000,
+      "closing": 9450000,
+      "eventIds": [
+        "evt-po-PO-2302-0",
+        "evt-rec-rent-0"
+      ]
+    },
+    {
+      "date": "2026-12-02",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-03",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-04",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-05",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-06",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-07",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-08",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-09",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-10",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-11",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 8050000,
+      "eventIds": [
+        "evt-rec-payroll-2"
+      ]
+    },
+    {
+      "date": "2026-12-12",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 8050000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-13",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 8050000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-14",
+      "inflow": 0,
+      "outflow": 4200000,
+      "closing": 3850000,
+      "eventIds": [
+        "evt-po-PO-2291-1"
+      ]
+    },
+    {
+      "date": "2026-12-15",
+      "inflow": 0,
+      "outflow": 2100000,
+      "closing": 1750000,
+      "eventIds": [
+        "evt-po-PO-2302-1",
+        "evt-rec-est-tax-0"
+      ]
+    },
+    {
+      "date": "2026-12-16",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1750000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-17",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1750000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-18",
+      "inflow": 0,
+      "outflow": 900000,
+      "closing": 850000,
+      "eventIds": [
+        "evt-bill-duties-2291-0"
+      ]
+    },
+    {
+      "date": "2026-12-19",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 850000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-20",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 850000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-21",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 850000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-22",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 850000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-23",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 850000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-24",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 850000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-25",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": -550000,
+      "eventIds": [
+        "evt-rec-payroll-3"
+      ]
+    },
+    {
+      "date": "2026-12-26",
+      "inflow": 2800000,
+      "outflow": 0,
+      "closing": 2250000,
+      "eventIds": [
+        "evt-inv-INV-1187-0"
+      ]
+    },
+    {
+      "date": "2026-12-27",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2250000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-28",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2250000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-29",
+      "inflow": 1200000,
+      "outflow": 0,
+      "closing": 3450000,
+      "eventIds": [
+        "evt-inv-INV-1203-0"
+      ]
+    },
+    {
+      "date": "2026-12-30",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 3450000,
+      "eventIds": []
+    },
+    {
+      "date": "2026-12-31",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 3450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-01",
+      "inflow": 0,
+      "outflow": 650000,
+      "closing": 2800000,
+      "eventIds": [
+        "evt-rec-rent-1"
+      ]
+    },
+    {
+      "date": "2027-01-02",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2800000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-03",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2800000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-04",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2800000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-05",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2800000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-06",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2800000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-07",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 2800000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-08",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 1400000,
+      "eventIds": [
+        "evt-rec-payroll-4"
+      ]
+    },
+    {
+      "date": "2027-01-09",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1400000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-10",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1400000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-11",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 1400000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-12",
+      "inflow": 11500000,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": [
+        "evt-inv-INV-1215-0"
+      ]
+    },
+    {
+      "date": "2027-01-13",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-14",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-15",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-16",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-17",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-18",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-19",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-20",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-21",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 12900000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-22",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 11500000,
+      "eventIds": [
+        "evt-rec-payroll-5"
+      ]
+    },
+    {
+      "date": "2027-01-23",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-24",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-25",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-26",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-27",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-28",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-29",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-30",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-01-31",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-01",
+      "inflow": 0,
+      "outflow": 650000,
+      "closing": 10850000,
+      "eventIds": [
+        "evt-rec-rent-2"
+      ]
+    },
+    {
+      "date": "2027-02-02",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 10850000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-03",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 10850000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-04",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 10850000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-05",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 9450000,
+      "eventIds": [
+        "evt-rec-payroll-6"
+      ]
+    },
+    {
+      "date": "2027-02-06",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-07",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-08",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-09",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-10",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-11",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-12",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-13",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    },
+    {
+      "date": "2027-02-14",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "eventIds": []
+    }
+  ],
+  "weeks": [
+    {
+      "start": "2026-11-16",
+      "inflow": 0,
+      "outflow": 1800000,
+      "closing": 12700000,
+      "minClosing": 12700000,
+      "pipelineClosing": 12700000,
+      "eventIds": [
+        "evt-po-PO-2291-0"
+      ]
+    },
+    {
+      "start": "2026-11-23",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 11300000,
+      "minClosing": 11300000,
+      "pipelineClosing": 11300000,
+      "eventIds": [
+        "evt-rec-payroll-1"
+      ]
+    },
+    {
+      "start": "2026-11-30",
+      "inflow": 0,
+      "outflow": 1850000,
+      "closing": 9450000,
+      "minClosing": 9450000,
+      "pipelineClosing": 9774000,
+      "eventIds": [
+        "evt-po-PO-2302-0",
+        "evt-rec-rent-0"
+      ]
+    },
+    {
+      "start": "2026-12-07",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 8050000,
+      "minClosing": 8050000,
+      "pipelineClosing": 8374000,
+      "eventIds": [
+        "evt-rec-payroll-2"
+      ]
+    },
+    {
+      "start": "2026-12-14",
+      "inflow": 0,
+      "outflow": 7200000,
+      "closing": 850000,
+      "minClosing": 850000,
+      "pipelineClosing": 1174000,
+      "eventIds": [
+        "evt-po-PO-2291-1",
+        "evt-po-PO-2302-1",
+        "evt-rec-est-tax-0",
+        "evt-bill-duties-2291-0"
+      ]
+    },
+    {
+      "start": "2026-12-21",
+      "inflow": 2800000,
+      "outflow": 1400000,
+      "closing": 2250000,
+      "minClosing": -550000,
+      "pipelineClosing": 2574000,
+      "eventIds": [
+        "evt-rec-payroll-3",
+        "evt-inv-INV-1187-0"
+      ]
+    },
+    {
+      "start": "2026-12-28",
+      "inflow": 1200000,
+      "outflow": 650000,
+      "closing": 2800000,
+      "minClosing": 2250000,
+      "pipelineClosing": 3124000,
+      "eventIds": [
+        "evt-inv-INV-1203-0",
+        "evt-rec-rent-1"
+      ]
+    },
+    {
+      "start": "2027-01-04",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 1400000,
+      "minClosing": 1400000,
+      "pipelineClosing": 800000,
+      "eventIds": [
+        "evt-rec-payroll-4"
+      ]
+    },
+    {
+      "start": "2027-01-11",
+      "inflow": 11500000,
+      "outflow": 0,
+      "closing": 12900000,
+      "minClosing": 1400000,
+      "pipelineClosing": 12300000,
+      "eventIds": [
+        "evt-inv-INV-1215-0"
+      ]
+    },
+    {
+      "start": "2027-01-18",
+      "inflow": 0,
+      "outflow": 1400000,
+      "closing": 11500000,
+      "minClosing": 11500000,
+      "pipelineClosing": 10900000,
+      "eventIds": [
+        "evt-rec-payroll-5"
+      ]
+    },
+    {
+      "start": "2027-01-25",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 11500000,
+      "minClosing": 11500000,
+      "pipelineClosing": 10660000,
+      "eventIds": []
+    },
+    {
+      "start": "2027-02-01",
+      "inflow": 0,
+      "outflow": 2050000,
+      "closing": 9450000,
+      "minClosing": 9450000,
+      "pipelineClosing": 8610000,
+      "eventIds": [
+        "evt-rec-rent-2",
+        "evt-rec-payroll-6"
+      ]
+    },
+    {
+      "start": "2027-02-08",
+      "inflow": 0,
+      "outflow": 0,
+      "closing": 9450000,
+      "minClosing": 9450000,
+      "pipelineClosing": 8610000,
+      "eventIds": []
+    }
+  ],
+  "lowPoint": {
+    "week": "2026-12-21",
+    "date": "2026-12-25",
+    "amount": -550000
+  },
+  "firstBelowSafety": "2026-12-15",
+  "firstNegative": "2026-12-25",
+  "weeksBelowSafety": [
+    "2026-12-14",
+    "2026-12-21",
+    "2026-12-28",
+    "2027-01-04",
+    "2027-01-11"
+  ],
+  "freeCash": [
+    {
+      "week": "2026-11-16",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-11-23",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-11-30",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-12-07",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-12-14",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-12-21",
+      "amount": -4050000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2026-12-28",
+      "amount": -2100000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2027-01-04",
+      "amount": -2100000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2027-01-11",
+      "amount": -2100000,
+      "weeksFree": 0
+    },
+    {
+      "week": "2027-01-18",
+      "amount": 5950000,
+      "weeksFree": 4
+    },
+    {
+      "week": "2027-01-25",
+      "amount": 5950000,
+      "weeksFree": 3
+    },
+    {
+      "week": "2027-02-01",
+      "amount": 5950000,
+      "weeksFree": 2
+    },
+    {
+      "week": "2027-02-08",
+      "amount": 5950000,
+      "weeksFree": 1
+    }
+  ],
+  "warnings": [],
+  "events": [
+    {
+      "id": "evt-po-PO-2291-0",
+      "commitmentId": "po-PO-2291",
+      "legIndex": 0,
+      "date": "2026-11-20",
+      "amount": 1800000,
+      "currency": "USD",
+      "amountBase": 1800000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "order 2026-11-20",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2291.pdf"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-1",
+      "commitmentId": "rec-payroll",
+      "legIndex": 1,
+      "date": "2026-11-27",
+      "amount": 1400000,
+      "currency": "USD",
+      "amountBase": 1400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-po-PO-2302-0",
+      "commitmentId": "po-PO-2302",
+      "legIndex": 0,
+      "date": "2026-12-01",
+      "amount": 100000000,
+      "currency": "INR",
+      "amountBase": 1200000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "order 2026-12-01",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2302.xlsx"
+      }
+    },
+    {
+      "id": "evt-rec-rent-0",
+      "commitmentId": "rec-rent",
+      "legIndex": 0,
+      "date": "2026-12-01",
+      "amount": 650000,
+      "currency": "USD",
+      "amountBase": 650000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "category": "rent",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-rent"
+      }
+    },
+    {
+      "id": "evt-rfq-harbor-spring-0",
+      "commitmentId": "rfq-harbor-spring",
+      "legIndex": 0,
+      "date": "2026-12-05",
+      "amount": 1800000,
+      "currency": "USD",
+      "amountBase": 1800000,
+      "direction": "in",
+      "status": "possible",
+      "confidence": 0.4,
+      "basis": "order 2026-12-05",
+      "sourceRef": {
+        "system": "email",
+        "record": "rfq-77"
+      }
+    },
+    {
+      "id": "evt-rfq-harbor-spring~supplier_30_70-0",
+      "commitmentId": "rfq-harbor-spring~supplier_30_70",
+      "legIndex": 0,
+      "date": "2026-12-05",
+      "amount": 990000,
+      "currency": "USD",
+      "amountBase": 990000,
+      "direction": "out",
+      "status": "possible",
+      "confidence": 0.4,
+      "basis": "order 2026-12-05",
+      "sourceRef": {
+        "system": "email",
+        "record": "rfq-77"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-2",
+      "commitmentId": "rec-payroll",
+      "legIndex": 2,
+      "date": "2026-12-11",
+      "amount": 1400000,
+      "currency": "USD",
+      "amountBase": 1400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-po-PO-2291-1",
+      "commitmentId": "po-PO-2291",
+      "legIndex": 1,
+      "date": "2026-12-14",
+      "amount": 4200000,
+      "currency": "USD",
+      "amountBase": 4200000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "ship 2026-12-14",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2291.pdf"
+      }
+    },
+    {
+      "id": "evt-po-PO-2302-1",
+      "commitmentId": "po-PO-2302",
+      "legIndex": 1,
+      "date": "2026-12-15",
+      "amount": 100000000,
+      "currency": "INR",
+      "amountBase": 1200000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "ship 2026-12-15",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2302.xlsx"
+      }
+    },
+    {
+      "id": "evt-rec-est-tax-0",
+      "commitmentId": "rec-est-tax",
+      "legIndex": 0,
+      "date": "2026-12-15",
+      "amount": 900000,
+      "currency": "USD",
+      "amountBase": 900000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring quarterly: Quarterly estimated taxes, from 2026-12-15",
+      "category": "tax",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-est-tax"
+      }
+    },
+    {
+      "id": "evt-bill-duties-2291-0",
+      "commitmentId": "bill-duties-2291",
+      "legIndex": 0,
+      "date": "2026-12-18",
+      "amount": 900000,
+      "currency": "USD",
+      "amountBase": 900000,
+      "direction": "out",
+      "status": "likely",
+      "confidence": 0.7,
+      "basis": "due 2026-12-18",
+      "category": "duties",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2291.pdf"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-3",
+      "commitmentId": "rec-payroll",
+      "legIndex": 3,
+      "date": "2026-12-25",
+      "amount": 1400000,
+      "currency": "USD",
+      "amountBase": 1400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-inv-INV-1187-0",
+      "commitmentId": "inv-INV-1187",
+      "legIndex": 0,
+      "date": "2026-12-26",
+      "amount": 2800000,
+      "currency": "USD",
+      "amountBase": 2800000,
+      "direction": "in",
+      "status": "committed",
+      "confidence": 0.6342771982116245,
+      "basis": "due 2026-12-10 + 16 days (median 14 of last 8 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1187"
+      }
+    },
+    {
+      "id": "evt-inv-INV-1203-0",
+      "commitmentId": "inv-INV-1203",
+      "legIndex": 0,
+      "date": "2026-12-29",
+      "amount": 1200000,
+      "currency": "USD",
+      "amountBase": 1200000,
+      "direction": "in",
+      "status": "committed",
+      "confidence": 0.5333333333333333,
+      "basis": "due 2026-12-20 + 9 days (median 0 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1203"
+      }
+    },
+    {
+      "id": "evt-rec-rent-1",
+      "commitmentId": "rec-rent",
+      "legIndex": 1,
+      "date": "2027-01-01",
+      "amount": 650000,
+      "currency": "USD",
+      "amountBase": 650000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "category": "rent",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-rent"
+      }
+    },
+    {
+      "id": "evt-rfq-harbor-spring~supplier_30_70-1",
+      "commitmentId": "rfq-harbor-spring~supplier_30_70",
+      "legIndex": 1,
+      "date": "2027-01-04",
+      "amount": 2310000,
+      "currency": "USD",
+      "amountBase": 2310000,
+      "direction": "out",
+      "status": "possible",
+      "confidence": 0.4,
+      "basis": "ship 2027-01-04 [ship estimated = order + 30d production]",
+      "sourceRef": {
+        "system": "email",
+        "record": "rfq-77"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-4",
+      "commitmentId": "rec-payroll",
+      "legIndex": 4,
+      "date": "2027-01-08",
+      "amount": 1400000,
+      "currency": "USD",
+      "amountBase": 1400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-inv-INV-1215-0",
+      "commitmentId": "inv-INV-1215",
+      "legIndex": 0,
+      "date": "2027-01-12",
+      "amount": 11500000,
+      "currency": "USD",
+      "amountBase": 11500000,
+      "direction": "in",
+      "status": "committed",
+      "confidence": 0.6670846394984326,
+      "basis": "due 2027-01-12 + 0 days (median -7 of last 8 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1215"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-5",
+      "commitmentId": "rec-payroll",
+      "legIndex": 5,
+      "date": "2027-01-22",
+      "amount": 1400000,
+      "currency": "USD",
+      "amountBase": 1400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-rfq-harbor-spring~freight_and_duties-0",
+      "commitmentId": "rfq-harbor-spring~freight_and_duties",
+      "legIndex": 0,
+      "date": "2027-01-25",
+      "amount": 600000,
+      "currency": "USD",
+      "amountBase": 600000,
+      "direction": "out",
+      "status": "possible",
+      "confidence": 0.4,
+      "basis": "delivery 2027-02-01 + -7 days",
+      "sourceRef": {
+        "system": "email",
+        "record": "rfq-77"
+      }
+    },
+    {
+      "id": "evt-rec-rent-2",
+      "commitmentId": "rec-rent",
+      "legIndex": 2,
+      "date": "2027-02-01",
+      "amount": 650000,
+      "currency": "USD",
+      "amountBase": 650000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring monthly: Rent, from 2026-12-01",
+      "category": "rent",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-rent"
+      }
+    },
+    {
+      "id": "evt-rec-payroll-6",
+      "commitmentId": "rec-payroll",
+      "legIndex": 6,
+      "date": "2027-02-05",
+      "amount": 1400000,
+      "currency": "USD",
+      "amountBase": 1400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "recurring biweekly: Payroll, from 2026-11-13",
+      "category": "payroll",
+      "sourceRef": {
+        "system": "profile",
+        "record": "rec-payroll"
+      }
+    },
+    {
+      "id": "evt-rfq-harbor-spring-1",
+      "commitmentId": "rfq-harbor-spring",
+      "legIndex": 1,
+      "date": "2027-04-11",
+      "amount": 4200000,
+      "currency": "USD",
+      "amountBase": 4200000,
+      "direction": "in",
+      "status": "possible",
+      "confidence": 0.22456140350877193,
+      "basis": "delivery 2027-02-01 + 60 days + 9 days (median 0 of last 4 payments, shrunk toward default 20 with k=3; rounded to nearest day)",
+      "sourceRef": {
+        "system": "email",
+        "record": "rfq-77"
+      }
+    }
+  ]
+}
