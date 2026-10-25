@@ -11,6 +11,7 @@ import type { CommitmentDraft, Records } from "../../schema/records";
 import { forecast } from "../../engine/forecast";
 import { checkText } from "../number_check";
 import { decide, type DecideContext } from "./decide";
+import { askDraftId } from "./intent";
 
 const records: Records = JSON.parse(readFileSync("fixtures/cascade_trade/records.json", "utf8"));
 const profile: Profile = JSON.parse(readFileSync("profiles/trading.json", "utf8"));
@@ -27,7 +28,7 @@ const rawOf = (kind: AskIntent["kind"], o: Partial<AskIntentRaw> = {}): AskInten
 });
 const intent = (kind: AskIntent["kind"], o: Partial<Omit<AskIntent, "raw">> & { raw?: Partial<AskIntentRaw> } = {}): AskIntent => {
   const { raw, ...rest } = o;
-  return { kind, question: `question for ${kind} ${JSON.stringify(rest)}`, raw: rawOf(kind, raw), unresolved: [], ...rest };
+  return { kind, question: `question for ${kind} ${JSON.stringify(rest)}`, raw: rawOf(kind, { ...(rest.date ? { datePhrase: "on that date" } : {}), ...raw }), unresolved: [], ...rest };
 };
 const withBalance = (amount: number, asOfDate?: string): Records => ({
   ...records,
@@ -109,9 +110,9 @@ describe("afford, inbound deal (smallestUpfrontShare)", () => {
     const d = run(intent("afford", { draft, date: "2026-12-05" }), { profile: heavyProfile, records: withBalance($(300000)) });
     const c = d.scenarioInputs!.commitments![0]!;
     expect(c).toMatchObject({ type: "sales_deal", direction: "in", status: "likely", anchors: { order: "2026-12-05" }, currency: "USD" });
-    expect(c.id).toMatch(/^ask-draft-[0-9a-f]{10}$/);
+    expect(c.id).toMatch(/^ask-draft-[0-9a-f]{12}$/);
     expect(c.patternId).toBeUndefined();
-    expect(d.assumptions).toContain("Linked costs are unknown; only the profile's default terms for an order are assumed.");
+    expect(d.assumptions).toContain("Linked costs unknown.");
     expect(d.verdict).toBe("yes_if");
     // No customer is named, so there is no payment history behind the timing: low conviction.
     expect(d.conviction).toBe("low");
@@ -159,7 +160,7 @@ describe("afford, outbound plan", () => {
     const inr: CommitmentDraft = { ...draft, amount: 3_333_333_33, currency: "INR" };
     const d = run(intent("afford", { draft: inr, date: "2026-12-15" }), { records: withBalance($(300000)) });
     expect(d.scenarioInputs!.commitments![0]!.amount).toBe(Math.round(3_333_333_33 * 0.012));
-    expect(d.assumptions).toContain("Converted INR to USD at the current rate.");
+    expect(d.assumptions).toContain("Amount stated in INR, not USD; converted at the run's rate.");
     const unknown = run(intent("afford", { draft: { ...draft, currency: "CHF" } }));
     expect(unknown.verdict).toBe("need_info");
   });
@@ -252,7 +253,7 @@ describe("what_if", () => {
     const d = run(intent("what_if", { draft, date: "2026-12-01" }), { records: withBalance($(300000)) });
     const item = d.scenarioInputs!.recurring![0]!;
     expect(item).toMatchObject({ amount: $(12000), direction: "out", cadence: "monthly", anchor: "2026-12-01" });
-    expect(item.id).toMatch(/^ask-draft-[0-9a-f]{10}$/);
+    expect(item.id).toMatch(/^ask-draft-[0-9a-f]{12}$/);
     expect(d.scenarioInputs!.commitments).toBeUndefined();
     expect(d.scenario!.overrides).toEqual([]); // a hypothetical never goes into overrides
     const base = forecast(withBalance($(300000)), profile, { id: "base", kind: "base", overrides: [] }, asOf, fxRates);
@@ -264,6 +265,26 @@ describe("what_if", () => {
   it("need_info when neither a party nor an item and a date are given", () => {
     const d = run(intent("what_if", { partyId: "party-evergreen-home" }));
     expect(d.verdict).toBe("need_info");
+  });
+});
+
+describe("what_if, hire cadence", () => {
+  const hire = (category?: string): CommitmentDraft => ({
+    type: "recurring", direction: "out", amount: $(12000), currency: "USD", anchors: { due: "2026-12-01" }, status: "committed", ...(category ? { category } : {}),
+  });
+  it("turns the cadence encoded in the draft category into the recurring item, monthly by default", () => {
+    const q = run(intent("what_if", { draft: hire("cadence:quarterly"), date: "2026-12-01", question: "hire q" }), { records: withBalance($(300000)) });
+    expect(q.scenarioInputs!.recurring![0]).toMatchObject({ cadence: "quarterly", startDate: "2026-12-01", anchor: "2026-12-01" });
+    expect(q.scenarioInputs!.recurring![0]!.id).toBe(askDraftId("hire q"));
+    const m = run(intent("what_if", { draft: hire(), date: "2026-12-01", question: "hire m" }), { records: withBalance($(300000)) });
+    expect(m.scenarioInputs!.recurring![0]!.cadence).toBe("monthly");
+  });
+
+  it("a draft whose date the intent step defaulted says so and caps conviction", () => {
+    const i = intent("afford", { draft: outPlan($(40000), "2026-12-16"), date: "2026-12-16", raw: { datePhrase: null } });
+    const d = run({ ...i, raw: { ...i.raw, datePhrase: null } }, { records: withBalance($(300000)) });
+    expect(d.assumptions).toEqual(["No date given; assumed Dec 16, 30 days out."]);
+    expect(d.conviction).toBe("medium");
   });
 });
 
@@ -444,7 +465,8 @@ describe("conviction", () => {
   it("caps: a vague date caps at medium", () => {
     const d = run(intent("afford", { draft: outPlan($(40000), "2026-12-15"), date: "2026-12-15", dateVague: "mid December" }), { records: withBalance($(300000)) });
     expect(d.conviction).toBe("medium");
-    expect(d.assumptions).toContain('Assumed 2026-12-15 for "mid December".');
+    expect(d.assumptions).toEqual(['Assumed Dec 15 for "mid December".']);
+    expect(d.allowed.dates).toContain("2026-12-15");
   });
 
   it("caps: two caps (stale balance and a vague date) drop to low", () => {

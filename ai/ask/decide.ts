@@ -24,6 +24,7 @@ import { confirmedLagRule, lagSamples, partyLag } from "../../engine/lag";
 import { commitmentDirection, isOpen, pendingEventsByCommitment } from "../../engine/warnings";
 import { extractFigures } from "../number_check";
 import { fmtMoney } from "../money";
+import { askDraftId, draftCadence, intentAssumptions } from "./intent";
 
 export type DecideContext = {
   records: Records;
@@ -471,7 +472,7 @@ function runFixGap(intent: AskIntent, ctx: DecideContext, window: Window | undef
   if (!minDay(gap.run, win)) {
     return needInfo(intent, ctx, `Which dates should I look at? I can only see through ${horizonEnd(ctx.profile, ctx.asOf)}`, "The dates asked about are outside the forecast.");
   }
-  const assumptions = baseAssumptions(intent, f);
+  const assumptions = baseAssumptions(intent, ctx, f);
   const verdict: Decision["verdict"] = gap.below ? "act_now" : "on_track";
   const { rec, fb } = moveParts(f, world, gap);
   const path = gap.below ? pathForMove(world, gap) : pathForOnTrack(world, gap.run, gap.low);
@@ -504,11 +505,17 @@ function runFixGap(intent: AskIntent, ctx: DecideContext, window: Window | undef
   });
 }
 
-function baseAssumptions(intent: AskIntent, f: Figures, assumedDate?: string): string[] {
-  const out: string[] = [];
-  const phrase = intent.dateVague;
-  const date = assumedDate ?? intent.date;
-  if (phrase !== undefined && date) out.push(`Assumed ${f.d(date)} for ${/\d/.test(phrase) ? "a vague date" : `"${phrase}"`}.`);
+// What the intent step assumed on the owner's behalf (currency, vague or default date, linked costs, cadence),
+// reused as written. Those strings carry the owner's own figures, so what they state is registered as allowed.
+function baseAssumptions(intent: AskIntent, ctx: DecideContext, f: Figures): string[] {
+  const out = intentAssumptions(intent, { profile: ctx.profile, asOf: ctx.asOf }).map((s) => `${s.charAt(0).toUpperCase()}${s.slice(1)}.`);
+  const figs = extractFigures(out.join(" "), { currency: ctx.profile.baseCurrency, asOf: ctx.asOf });
+  for (const a of figs.amounts) if (Number.isFinite(a.minor)) f.amounts.add(a.minor);
+  for (const d of figs.dates) f.dates.add(d.date);
+  if (intent.date) f.dates.add(intent.date);
+  const text = out.join(" ");
+  for (const m of text.matchAll(/(?<![\d,.$])(\d+)%/g)) f.pct("stated percent", Number(m[1]));
+  for (const m of text.matchAll(/(?<![\d,.$])(\d+) (?:more |extra )?days?\b/g)) f.days("stated days", Number(m[1]));
   if (intent.raw.containsInstructions) out.push("The question contained an instruction; it was ignored and only the question was answered.");
   return out;
 }
@@ -532,7 +539,7 @@ function draftBase(ctx: DecideContext, intent: AskIntent): number | undefined {
 
 function syntheticCommitment(ctx: DecideContext, intent: AskIntent, kind: "deal" | "plan", date: string, amountBase: number): Commitment {
   const draft = intent.draft!;
-  const id = `${SYNTHETIC_PREFIX}${hash10(intent.question)}`;
+  const id = askDraftId(intent.question);
   const partyId = draft.partyId ?? intent.partyId;
   const common = {
     id,
@@ -553,18 +560,15 @@ function withCommitment(records: Records, c: Commitment): Records {
 }
 
 // An assumed date caps conviction: given by the resolver as vague, or defaulted here. "" = vague with no date.
+// The intent step also defaults a draft's missing date (no date phrase), which is an assumption too.
 function assumedOf(intent: AskIntent, dateAssumed: string | undefined): string | undefined {
-  return dateAssumed ?? (intent.dateVague !== undefined ? intent.date ?? "" : undefined);
-}
-
-function currencyAssumptions(ctx: DecideContext, intent: AskIntent, assumptions: string[]) {
-  const d = intent.draft;
-  if (d && d.currency !== ctx.profile.baseCurrency) assumptions.push(`Converted ${d.currency} to ${ctx.profile.baseCurrency} at the current rate.`);
+  const defaulted = !!intent.draft && !!intent.date && !intent.raw.datePhrase;
+  return dateAssumed ?? (intent.dateVague !== undefined || defaulted ? intent.date ?? "" : undefined);
 }
 
 function runAfford(intent: AskIntent, ctx: DecideContext): Decision {
   const f = new Figures(ctx.profile.baseCurrency);
-  const assumptions = baseAssumptions(intent, f);
+  const assumptions = baseAssumptions(intent, ctx, f);
   const records = ctx.records;
   const existing = intent.commitmentId ? records.commitments.find((c) => c.id === intent.commitmentId) : undefined;
   if (intent.commitmentId && !existing && !intent.draft) {
@@ -584,11 +588,9 @@ function runAfford(intent: AskIntent, ctx: DecideContext): Decision {
     const before = assumptions.length;
     date = resolveDate(intent, ctx, f, assumptions);
     if (assumptions.length > before) dateAssumed = date;
-    currencyAssumptions(ctx, intent, assumptions);
     const dir = intent.draft!.direction ?? (intent.draft!.type === "sales_deal" ? "in" : "out");
     target = syntheticCommitment(ctx, intent, dir === "in" ? "deal" : "plan", date, base);
     synthetic = true;
-    if (dir === "in") assumptions.push("Linked costs are unknown; only the profile's default terms for an order are assumed.");
   }
 
   const dir = dirOf(target);
@@ -815,7 +817,7 @@ function affordDeal(
 
 function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
   const f = new Figures(ctx.profile.baseCurrency);
-  const assumptions = baseAssumptions(intent, f);
+  const assumptions = baseAssumptions(intent, ctx, f);
   const baseOverrides = ctx.baseOverrides ?? [];
   const baseWorldV = baseWorld(ctx);
   const baseRun = forecast(ctx.records, ctx.profile, { id: "base", kind: "base", overrides: baseOverrides }, ctx.asOf, ctx.fxRates);
@@ -835,24 +837,20 @@ function runWhatIf(intent: AskIntent, ctx: DecideContext): Decision {
     const before = assumptions.length;
     const date = resolveDate(intent, ctx, f, assumptions);
     if (assumptions.length > before) dateAssumed = date;
-    currencyAssumptions(ctx, intent, assumptions);
     if (draft.type === "recurring") {
-      const id = `${SYNTHETIC_PREFIX}${tag}`;
       const item: Profile["recurring"][number] = {
-        id, name: "New fixed cost", amount: base, direction: draft.direction ?? "out", cadence: "monthly",
-        anchor: date, startDate: date, category: draft.category ?? "fixed cost",
+        id: askDraftId(intent.question), name: "New fixed cost", amount: base, direction: draft.direction ?? "out",
+        cadence: draftCadence(draft) ?? "monthly", anchor: date, startDate: date, category: "fixed cost",
       };
       world = { ...world, profile: { ...ctx.profile, recurring: [...ctx.profile.recurring, item] } };
       scenarioInputs = { recurring: [item] };
-      assumptions.push(`Assumed a monthly cost of ${f.m(base)} starting ${f.d(date)}.`);
-      extraFact = { label: "Monthly cost", amount: base, date };
+      extraFact = { label: `Recurring cost (${item.cadence})`, amount: base, date };
     } else {
       const dir = draft.direction ?? (draft.type === "sales_deal" ? "in" : "out");
       const c = syntheticCommitment(ctx, intent, dir === "in" ? "deal" : "plan", date, base);
       world = { ...world, records: withCommitment(ctx.records, c) };
       scenarioInputs = { commitments: [c] };
       changedIds = [c.id];
-      if (dir === "in") assumptions.push("Linked costs are unknown; only the profile's default terms for an order are assumed.");
       extraFact = { label: dir === "in" ? "Order amount" : "Planned payment", amount: base, date };
     }
   } else {
@@ -938,7 +936,7 @@ function runLookup(intent: AskIntent, ctx: DecideContext): Decision {
   const party = records.parties.find((p) => p.id === partyId);
   if (!party) return needInfo(intent, ctx, "Which customer or supplier do you mean?", "No party was identified.");
   const run = forecast(records, profile, { id: "base", kind: "base", overrides: world.overrides }, ctx.asOf, ctx.fxRates);
-  const assumptions = baseAssumptions(intent, f);
+  const assumptions = baseAssumptions(intent, ctx, f);
 
   const samples = lagSamples(records, party.id);
   const lag = partyLag(records, profile, party.id);
@@ -991,7 +989,7 @@ function runLookup(intent: AskIntent, ctx: DecideContext): Decision {
 function runTell(intent: AskIntent, ctx: DecideContext): Decision {
   const f = new Figures(ctx.profile.baseCurrency);
   const { records } = ctx;
-  const assumptions = baseAssumptions(intent, f);
+  const assumptions = baseAssumptions(intent, ctx, f);
   const world = baseWorld(ctx);
   const base = { ...skeleton(intent, ctx), verdict: "proposed" as const, context: {} as Decision["context"] };
 
@@ -1029,7 +1027,6 @@ function runTell(intent: AskIntent, ctx: DecideContext): Decision {
   const before = assumptions.length;
   const date = resolveDate(intent, ctx, f, assumptions);
   const dateAssumed = assumptions.length > before ? date : undefined;
-  currencyAssumptions(ctx, intent, assumptions);
   const dir = draft.direction ?? (draft.type === "sales_deal" ? "in" : "out");
   const conv = convict(ctx, f, world, { events: [], timingPartyIds: [] }, assumedOf(intent, dateAssumed));
   const proposed = { ...draft, anchors: Object.keys(draft.anchors).length ? draft.anchors : { due: date } };
