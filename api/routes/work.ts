@@ -6,7 +6,7 @@ import type { Party } from "../../schema/records";
 import { draftMessage } from "../../ai/brief";
 import type { Deps } from "../app";
 import { compute } from "../engine";
-import { businessOf, HttpError } from "../http";
+import { storeFor, businessOf, HttpError } from "../http";
 
 // Where the owner would send it, from the party's contacts. Customers' payables desk for a chase,
 // suppliers' receivables desk for a deferral; empty when we have no contact.
@@ -30,7 +30,7 @@ export const workRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const b = businessOf(req);
     const { id } = req.params as { id: string };
     const asked = (req.body as { channel?: unknown } | undefined)?.channel;
-    const c = await compute(deps.store, b, deps.aiMode, deps.now);
+    const c = await compute(storeFor(req), b, deps.aiMode, deps.now);
     const item = c.brief.all.find((i) => i.id === id);
     if (!item) throw new HttpError(404, "NOT_FOUND", "That item isn't on your list any more. Reload Today.");
     const want = asked === "message" || asked === "whatsapp" ? "message" : asked === "email" ? "email" : undefined;
@@ -47,9 +47,9 @@ export const workRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.post("/work-items/:id/approve", async (req) => {
     const b = businessOf(req);
     const { id } = req.params as { id: string };
-    const c = await compute(deps.store, b, deps.aiMode, deps.now);   // makes sure the ranking is saved
+    const c = await compute(storeFor(req), b, deps.aiMode, deps.now);   // makes sure the ranking is saved
     if (!c.brief.all.some((i) => i.id === id)) throw new HttpError(404, "NOT_FOUND", "That item isn't on your list any more. Reload Today.");
-    await deps.store.setWorkItemState(b.id, id, "done");
+    await storeFor(req).setWorkItemState(b.id, id, "done");
     return { id, state: "done" };
   });
 };

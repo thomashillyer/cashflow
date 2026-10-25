@@ -49,7 +49,7 @@ const app = await buildApp({
   ...(demoMode || (env.SUPABASE_URL && env.SUPABASE_ANON_KEY)
     ? { appConfig: { supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY } }
     : {}),
-  allowReset: demoMode || env.NERI_ALLOW_RESET === "1",
+  allowReset: env.NERI_ALLOW_RESET === "1",
   logger: true,
   ...(schemaStatus ? { schemaStatus } : {}),
 });

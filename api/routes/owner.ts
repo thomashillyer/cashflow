@@ -9,7 +9,7 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { Profile } from "../../schema/profile";
 import type { Deps } from "../app";
 import { loadForRun, runInputs } from "../engine";
-import { businessOf, HttpError, isIsoDate, minorUnits, userOf } from "../http";
+import { storeFor, businessOf, HttpError, isIsoDate, minorUnits, userOf } from "../http";
 import type { Business, StoredProfile, Thought, ThoughtReading } from "../store";
 import { ownerSignal, priceThought, readThought } from "../thoughts";
 import { refreshPending } from "./review";
@@ -63,14 +63,14 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       account: { owner: ownerNameFrom(email), email, kind, connections, ownerUserId: user.id, createdAt },
     };
     // One business per owner for now: setting up again updates it (notes and import notes are kept).
-    const existing = await deps.store.findUserBusiness(user.id);
+    const existing = await storeFor(req).findUserBusiness(user.id);
     let businessId: string;
     if (existing) {
-      const b = await deps.store.getBusiness(existing);
-      await deps.store.saveProfile(existing, { ...profile, account: { ...b?.profile.account, ...profile.account } }, name);
+      const b = await storeFor(req).getBusiness(existing);
+      await storeFor(req).saveProfile(existing, { ...profile, account: { ...b?.profile.account, ...profile.account } }, name);
       businessId = existing;
     } else {
-      businessId = await deps.store.createBusiness({ name, profile, isSynthetic: false, ownerUserId: user.id });
+      businessId = await storeFor(req).createBusiness({ name, profile, isSynthetic: false, ownerUserId: user.id });
     }
     return {
       businessId, email, owner: profile.account!.owner, businessName: name, kind, sandbox: SAMPLE_FOR[kind] ?? "cascade_trade",
@@ -86,8 +86,8 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (body.safetyLine !== undefined) next.safetyLine = safetyLineFrom(body.safetyLine);
     if (typeof body.owner === "string") next.account = { ...next.account, owner: body.owner.slice(0, 80) };
     if (typeof body.timezone === "string" && /^[A-Za-z_]+(\/[A-Za-z_+-]+)*$/.test(body.timezone)) next.account = { ...next.account, timezone: body.timezone };
-    await deps.store.saveProfile(b.id, next);
-    const storeRevision = await deps.store.bumpRevision(b.id);
+    await storeFor(req).saveProfile(b.id, next);
+    const storeRevision = await storeFor(req).bumpRevision(b.id);
     const { account: _a, ...profile } = next;
     return { profile, storeRevision };
   };
@@ -95,13 +95,13 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   app.put("/profile", updateProfile);
 
   // ---- owner notes -----------------------------------------------------------------------
-  const view = async (b: Business, thoughts: Thought[]) => {
-    const { records, overrides } = await loadForRun(deps.store, b.id);
+  const view = async (req: FastifyRequest, b: Business, thoughts: Thought[]) => {
+    const { records, overrides } = await loadForRun(storeFor(req), b.id);
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
     return thoughts.map((t) => ({ ...t, effect: t.state === "new" ? priceThought(t, records, profile, asOf, fxRates, overrides) : null }));
   };
-  const saveThoughts = (b: Business, thoughts: Thought[]) =>
-    deps.store.saveProfile(b.id, { ...b.profile, account: { ...b.profile.account, thoughts: thoughts.slice(0, 200) } });
+  const saveThoughts = (req: FastifyRequest, b: Business, thoughts: Thought[]) =>
+    storeFor(req).saveProfile(b.id, { ...b.profile, account: { ...b.profile.account, thoughts: thoughts.slice(0, 200) } });
   const findThought = (b: Business, id: string) => {
     const t = (b.profile.account?.thoughts ?? []).find((x) => x.id === id);
     if (!t) throw new HttpError(404, "NOT_FOUND", "That note isn't here any more.");
@@ -110,7 +110,7 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
 
   app.get("/notes", async (req) => {
     const b = businessOf(req);
-    return view(b, b.profile.account?.thoughts ?? []);
+    return view(req, b, b.profile.account?.thoughts ?? []);
   });
 
   app.post("/notes", async (req) => {
@@ -118,14 +118,14 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const body = (req.body ?? {}) as { text?: unknown; via?: unknown };
     const text = typeof body.text === "string" ? body.text.trim() : "";
     if (!text || text.length > 2000) throw new HttpError(400, "INVALID_ARGUMENT", "Type or say the note first (up to 2000 characters).", { fieldIssues: [{ field: "text", issue: "required" }] });
-    const { records } = await deps.store.load(b.id);
+    const { records } = await storeFor(req).load(b.id);
     const { asOf } = runInputs(b, deps.now);
     const t: Thought = {
       id: `th-${randomUUID().slice(0, 8)}`, text, via: body.via === "voice" ? "voice" : "typed", createdAt: nowIso(), state: "new",
       reading: readThought(text, records, asOf),
     };
-    await saveThoughts(b, [t, ...(b.profile.account?.thoughts ?? [])]);
-    return (await view(b, [t]))[0];
+    await saveThoughts(req, b, [t, ...(b.profile.account?.thoughts ?? [])]);
+    return (await view(req, b, [t]))[0];
   });
 
   // Owner corrects the reading: { amount?, date?, direction?, status?, probability?, partyId?, kind? }.
@@ -146,8 +146,8 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     }
     r.missing = r.missing.filter((m) => (m === "amount" ? r.amount == null : m === "date" ? r.date == null : true));
     const next = { ...t, reading: r };
-    await saveThoughts(b, (b.profile.account?.thoughts ?? []).map((x) => (x.id === t.id ? next : x)));
-    return (await view(b, [next]))[0];
+    await saveThoughts(req, b, (b.profile.account?.thoughts ?? []).map((x) => (x.id === t.id ? next : x)));
+    return (await view(req, b, [next]))[0];
   });
 
   app.post("/notes/:id/:decision", async (req) => {
@@ -156,11 +156,11 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const t = findThought(b, id);
     const thoughts = b.profile.account?.thoughts ?? [];
     if (decision === "remove") {
-      await saveThoughts(b, thoughts.filter((x) => x.id !== id));
+      await saveThoughts(req, b, thoughts.filter((x) => x.id !== id));
       return { id, state: "removed" };
     }
     if (decision === "keep") {
-      await saveThoughts(b, thoughts.map((x) => (x.id === id ? { ...x, state: "kept" as const } : x)));
+      await saveThoughts(req, b, thoughts.map((x) => (x.id === id ? { ...x, state: "kept" as const } : x)));
       return { id, state: "kept" };
     }
     if (decision !== "add") throw new HttpError(404, "NOT_FOUND", "Add, keep or remove.");
@@ -170,10 +170,10 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     // The owner's own words, confirmed by the owner: the signal is applied, not waiting in Review.
     const signal = ownerSignal(`sig-${t.id}`, t, t.reading, profile, "applied");
     if (!signal) throw new HttpError(422, "MISSING_FIELDS", "Add the amount and date first.");
-    const revision = await deps.store.upsertRecords(b.id, { signals: [signal] });
-    await saveThoughts(b, thoughts.map((x) => (x.id === id ? { ...x, state: "added" as const } : x)));
-    const { records } = await deps.store.load(b.id);
-    await refreshPending(deps.store, b.id, records, revision, nowIso());
+    const revision = await storeFor(req).upsertRecords(b.id, { signals: [signal] });
+    await saveThoughts(req, b, thoughts.map((x) => (x.id === id ? { ...x, state: "added" as const } : x)));
+    const { records } = await storeFor(req).load(b.id);
+    await refreshPending(storeFor(req), b.id, records, revision, nowIso());
     return { id, state: "added", signalId: signal.id, storeRevision: revision };
   });
 
@@ -187,15 +187,15 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const direction = p.direction === "in" ? "in" : "out";
     const status = p.status === "possible" ? "possible" : "likely";
     const probability = typeof p.probability === "number" && p.probability >= 0 && p.probability <= 1 ? p.probability : undefined;
-    const { records } = await deps.store.load(b.id);
+    const { records } = await storeFor(req).load(b.id);
     const partyId = typeof p.partyId === "string" && records.parties.some((x) => x.id === p.partyId) ? p.partyId : undefined;
     const id = `plan-${randomUUID().slice(0, 8)}`;
     const { profile } = runInputs(b, deps.now);
     const signal = ownerSignal(id, { text: note, createdAt: nowIso() }, {
       date: p.date, amount, direction, status, ...(probability !== undefined ? { probability } : {}), ...(partyId ? { partyId } : {}),
     }, profile, "applied")!;
-    const revision = await deps.store.upsertRecords(b.id, { signals: [signal] });
-    await refreshPending(deps.store, b.id, { ...records, signals: [...records.signals, signal] }, revision, nowIso());
+    const revision = await storeFor(req).upsertRecords(b.id, { signals: [signal] });
+    await refreshPending(storeFor(req), b.id, { ...records, signals: [...records.signals, signal] }, revision, nowIso());
     return { id: signal.id, signal, storeRevision: revision };
   });
 };

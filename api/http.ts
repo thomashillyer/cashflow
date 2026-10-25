@@ -2,7 +2,7 @@
 // { error: { code, message, fieldIssues, retryable }, revision? }. Messages tell the owner the next step.
 
 import type { FastifyReply, FastifyRequest } from "fastify";
-import type { Business } from "./store";
+import type { Business, Store } from "./store";
 
 export class HttpError extends Error {
   constructor(
@@ -34,7 +34,14 @@ export function sendError(reply: FastifyReply, err: unknown): FastifyReply {
 export type User = { id: string; email?: string };
 
 // Set by the auth hook on every route except /health.
-export type NeriRequest = FastifyRequest & { user?: User; business?: Business };
+export type NeriRequest = FastifyRequest & { user?: User; business?: Business; store?: Store; sandboxed?: boolean; visitorId?: string };
+
+// The store this request reads and writes: the real one, or the visitor's demo sandbox (api/sandbox.ts).
+export function storeFor(req: FastifyRequest): Store {
+  const s = (req as NeriRequest).store;
+  if (!s) throw new HttpError(500, "INTERNAL", "Something went wrong on our side. Try again in a minute.", { retryable: true });
+  return s;
+}
 
 export function businessOf(req: FastifyRequest): Business {
   const b = (req as NeriRequest).business;

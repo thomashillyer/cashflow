@@ -781,3 +781,73 @@ describe("atomic, idempotent decisions (#191)", () => {
     expect((await store.listProposals("cascade_trade")).find((p) => p.id === id)!.state).toBe("dismissed");
   });
 });
+
+describe("demo sandbox (#173, #153)", () => {
+  const A = { "x-neri-visitor": "visitor-aaaaaaaaaaaaaaaa" };
+  const B = { "x-neri-visitor": "visitor-bbbbbbbbbbbbbbbb" };
+  beforeEach(() => setup({ demoMode: true }));
+
+  const review = async (headers: Record<string, string>) => (await app.inject({ method: "GET", url: "/review", headers })).json() as { signal: { id: string } }[];
+
+  it("a visitor's applied signal is theirs alone; the real store and other visitors still see it proposed", async () => {
+    const before = await review({});
+    expect(before.length).toBeGreaterThan(0);
+    const id = before[0]!.signal.id;
+    const applied = await app.inject({ method: "POST", url: `/signals/${id}/apply`, headers: A });
+    expect(applied.statusCode).toBe(200);
+    expect(await review(A)).toHaveLength(before.length - 1);   // A's later reads see A's change
+    expect(await review(B)).toHaveLength(before.length);
+    expect(await review({})).toHaveLength(before.length);
+    const real = (await store.load("cascade_trade")).records.signals.find((s) => s.id === id);
+    expect(real?.state).toBe("proposed");
+  });
+
+  it("a visitor's notes stay in their copy", async () => {
+    const note = await app.inject({ method: "POST", url: "/notes", headers: A, payload: { text: "Maybe buy a forklift for $9,000 next month" } });
+    expect(note.statusCode).toBeLessThan(300);
+    expect((await app.inject({ method: "GET", url: "/notes", headers: A })).json()).toHaveLength(1);
+    expect((await app.inject({ method: "GET", url: "/notes", headers: B })).json()).toHaveLength(0);
+    expect((await store.getBusiness("cascade_trade"))!.profile.account?.thoughts ?? []).toHaveLength(0);
+  });
+
+  it("reset with a visitor id restores only that visitor", async () => {
+    const id = (await review({}))[0]!.signal.id;
+    await app.inject({ method: "POST", url: `/signals/${id}/apply`, headers: A });
+    await app.inject({ method: "POST", url: `/signals/${id}/apply`, headers: B });
+    const reset = await app.inject({ method: "POST", url: "/demo/reset", headers: A });
+    expect(reset.statusCode).toBe(200);
+    expect((await review(A)).some((r) => r.signal.id === id)).toBe(true);
+    expect((await review(B)).some((r) => r.signal.id === id)).toBe(false);
+  });
+
+  it("anonymous writes without a visitor id are 403; reads still work", async () => {
+    const id = (await review({}))[0]!.signal.id;
+    const w = await app.inject({ method: "POST", url: `/signals/${id}/apply` });
+    expect(w.statusCode).toBe(403);
+    expect(w.json().error.message).toBe("The sample is shared. Reload the page to get your own copy.");
+    expect((await app.inject({ method: "GET", url: "/brief" })).statusCode).toBe(200);
+    expect((await store.load("cascade_trade")).records.signals.find((s) => s.id === id)?.state).toBe("proposed");
+  });
+
+  it("reset without a visitor id is 403 unless the server allows it", async () => {
+    const locked = await buildApp({ store, verify, demoMode: true, allowReset: false });
+    expect((await locked.inject({ method: "POST", url: "/demo/reset" })).statusCode).toBe(403);
+    await locked.close();
+  });
+
+  it("evicts least recently used past the cap and expires idle sandboxes", async () => {
+    const { SandboxStore } = await import("./sandbox");
+    let t = 0;
+    const sb = new SandboxStore({ now: () => t, max: 2, ttlMs: 1000 });
+    const biz = (await store.getBusiness("cascade_trade"))!;
+    const a = await sb.storeFor("a".repeat(16), biz, store);
+    await sb.storeFor("b".repeat(16), biz, store);
+    expect(await sb.storeFor("a".repeat(16), biz, store)).toBe(a);   // touch a: b is now the oldest
+    await sb.storeFor("c".repeat(16), biz, store);
+    expect(sb.size).toBe(2);
+    expect(await sb.storeFor("a".repeat(16), biz, store)).toBe(a);   // a survived, b was evicted
+    t = 5000;
+    expect(sb.size).toBe(0);
+    expect(await sb.storeFor("a".repeat(16), biz, store)).not.toBe(a);
+  });
+});
