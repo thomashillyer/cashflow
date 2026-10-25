@@ -1,0 +1,69 @@
+// Event -> source record. Not every CashEvent.commitmentId names a row in records.commitments; the engine also emits
+// synthetic ids, and this resolver is the one place that knows them:
+//   - "<commitmentId>"            a stored commitment
+//   - "sig-<signalId>"            a commitment created by an applied new_commitment/plan signal
+//   - "<profile recurring id>"    a profile.recurring item (sourceRef system "profile")
+//   - "daily-sales"               the profile's daily-sales revenue model (sourceRef system "profile"), built from actual sales
+//   - "<parentId>~<patternId>"    a sales deal's virtual linked cost (profile payment pattern linkedCosts)
+//   - absent                      an actual bank line, which is its own source
+// Pure. Docs: docs/design/05-forecast-engine.md.
+
+import type { CashEvent, Commitment, Records } from "../schema/records";
+import type { Profile } from "../schema/profile";
+import { addDays } from "./dates";
+
+export type RecurringItem = Profile["recurring"][number];
+
+export type EventSource =
+  | { kind: "commitment"; commitment: Commitment }
+  | { kind: "profile_recurring"; item: RecurringItem }
+  | { kind: "daily_sales"; historyEventIds: string[] }
+  | { kind: "linked_cost"; parentCommitment: Commitment; patternId: string }
+  | { kind: "actual"; event: CashEvent }
+  | { kind: "unresolved" };
+
+export const DAILY_SALES_ID = "daily-sales";
+// Must match SALES_HISTORY_DAYS in engine/expand.ts.
+const SALES_HISTORY_DAYS = 28;
+
+function findCommitment(id: string, records: Records): Commitment | undefined {
+  const stored = records.commitments.find((c) => c.id === id);
+  if (stored) return stored;
+  if (!id.startsWith("sig-")) return undefined;
+  const s = records.signals.find((x) => `sig-${x.id}` === id && x.state === "applied");
+  if (!s || (s.claim.kind !== "new_commitment" && s.claim.kind !== "plan")) return undefined;
+  return { ...s.claim.draft, id, sourceRef: s.claim.draft.sourceRef ?? s.sourceRef };
+}
+
+// `asOf` narrows daily-sales history to the window the engine averaged (the 28 days before asOf); without it,
+// every actual sales receipt dated before the event is returned.
+export function resolveEventSource(event: CashEvent, records: Records, profile: Profile, asOf?: string): EventSource {
+  const id = event.commitmentId;
+  if (id !== undefined) {
+    const c = findCommitment(id, records);
+    if (c) return { kind: "commitment", commitment: c };
+
+    const cut = id.lastIndexOf("~");
+    if (cut > 0) {
+      const parent = findCommitment(id.slice(0, cut), records);
+      const patternId = id.slice(cut + 1);
+      if (parent && profile.paymentPatterns.some((p) => p.id === patternId)) return { kind: "linked_cost", parentCommitment: parent, patternId };
+    }
+
+    if (event.sourceRef.system === "profile") {
+      const item = profile.recurring.find((r) => r.id === id);
+      if (item) return { kind: "profile_recurring", item };
+      if (id === DAILY_SALES_ID && profile.revenueModel.kind === "dailySales") {
+        const from = asOf ? addDays(asOf, -SALES_HISTORY_DAYS) : "";
+        const to = asOf ?? event.date;
+        const historyEventIds = records.events
+          .filter((e) => e.direction === "in" && e.category === "sales" && e.date >= from && e.date < to)
+          .map((e) => e.id);
+        return { kind: "daily_sales", historyEventIds };
+      }
+    }
+  }
+  const stored = records.events.find((e) => e.id === event.id);
+  if (stored && event.status === "actual") return { kind: "actual", event: stored };
+  return { kind: "unresolved" };
+}
