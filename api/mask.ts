@@ -12,7 +12,6 @@
 // inside an owner note or a CRM text) is not masked. Check a real account's screens before showing them.
 
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { nameTokens } from "../ai/reconcile/parties";
 import type { Party } from "../schema/records";
 import type { Deps } from "./app";
 import { businessOf, HttpError, type NeriRequest } from "./http";
@@ -25,8 +24,11 @@ const GENERIC = new Set(["packaging", "supply", "supplies", "trading", "trade", 
 const SEP = "[\\s\\-_.&]+";
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const letters = (i: number): string => (i >= 26 ? letters(Math.floor(i / 26) - 1) : "") + String.fromCharCode(65 + (i % 26));
+// Company-form words dropped to get the name people actually write ("Carry Well Packaging" for "... Pvt Ltd").
+const SUFFIXES = new Set(["llc", "inc", "incorporated", "co", "company", "corp", "corporation", "ltd", "limited", "plc", "gmbh", "pvt", "private", "the", "and", "ag", "sa", "bv", "srl", "sarl", "oy", "ab", "pte", "pty", "llp", "lp"]);
 const words = (s: string) => s.normalize("NFKC").split(new RegExp(SEP)).filter(Boolean);
 const norm = (s: string) => words(s).join(" ").toLowerCase();
+const core = (name: string) => words(name).filter((w) => !SUFFIXES.has(w.toLowerCase()));   // Unicode-safe, unlike nameTokens
 
 // Whole-word boundaries that understand letters beyond ASCII ("Müller").
 const BEFORE = "(?<![\\p{L}\\p{N}])";
@@ -49,17 +51,17 @@ export function buildMask(
   const entries: { phrase: string; to: string }[] = [];
 
   const firstOwners = new Map<string, number>();
-  for (const p of sorted) { const w = nameTokens(p.name)[0]; if (w) firstOwners.set(w, (firstOwners.get(w) ?? 0) + 1); }
+  for (const p of sorted) { const w = core(p.name)[0]?.toLowerCase(); if (w) firstOwners.set(w, (firstOwners.get(w) ?? 0) + 1); }
   const firstWords: { word: string; to: string }[] = [];
 
   for (const p of sorted) {
     const own = Object.hasOwn(explicit, p.name) ? explicit[p.name]! : `${LABEL[p.kind] ?? "Party"} ${letters((counters[p.kind] = (counters[p.kind] ?? -1) + 1))}`;
-    for (const n of new Set([p.name, ...(p.aliases ?? []), nameTokens(p.name).join(" ")])) if (n.trim().length > 1) entries.push({ phrase: n, to: own });
+    for (const n of new Set([p.name, ...(p.aliases ?? []), core(p.name).join(" ")])) if (n.trim().length > 1) entries.push({ phrase: n, to: own });
     // A distinctive capitalised first word ("Carry" for "Carry Well Packaging"), only when it is unique among
     // parties and not an everyday word, so ordinary words in labels and warnings are left alone.
-    const toks = nameTokens(p.name);
-    const first = words(p.name).find((w) => w.toLowerCase() === toks[0]);
-    if (first && toks.length > 1 && first.length >= 5 && /^\p{Lu}/u.test(first) && !GENERIC.has(first.toLowerCase()) && firstOwners.get(toks[0]!) === 1) firstWords.push({ word: first, to: own });
+    const toks = core(p.name);
+    const first = toks[0];
+    if (first && toks.length > 1 && first.length >= 5 && /^\p{Lu}/u.test(first) && !GENERIC.has(first.toLowerCase()) && firstOwners.get(first.toLowerCase()) === 1) firstWords.push({ word: first, to: own });
   }
   for (const n of [business.name, ...(business.aliases ?? [])]) if (n.trim().length > 1) entries.push({ phrase: n, to: "Your business" });
   if (business.owner && business.owner.trim().length > 2) entries.push({ phrase: business.owner, to: "Owner" });
