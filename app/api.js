@@ -30,7 +30,7 @@ async function loadPreview(id) {
 
 // ---- account (multi-tenant sign-up) ------------------------------------------------
 // Preview keeps the account in this browser only. Live mode uses the API's auth routes
-// (business-email sign-in with a link or code; Supabase auth behind the API).
+// (email and password go directly to Supabase; the API sees only session tokens).
 const ACCOUNT_KEY = "neri.account";
 function readAccount() {
   try {
@@ -178,7 +178,7 @@ async function http(path, init) {
     await auth.signOut().catch(() => {});
     writeAccount(null);
     location.hash = "#/welcome";
-    throw new Error("Your session ended. Ask for a new sign-in email.");
+    throw new Error("Your session ended. Sign in again with your email and password.");
   }
   if (!res.ok) {
     // The API words its errors for the owner: { error: { code, message, fieldIssues, retryable } }.
@@ -193,6 +193,14 @@ async function http(path, init) {
 
 const live = {
   mode: "live",
+  async createAccount(email, password) {
+    if (!auth.authConfigured) throw new Error("Sign-in isn't configured on this server yet.");
+    return auth.createAccount(email, password);
+  },
+  async signIn(email, password) {
+    if (!auth.authConfigured) throw new Error("Sign-in isn't configured on this server yet.");
+    return auth.signIn(email, password);
+  },
   account() {
     return readAccount() ?? memAccount;
   },
@@ -304,4 +312,4 @@ const live = {
 };
 
 export const api = API_BASE ? live : preview;
-export const authLive = auth.authConfigured;
+export const authLive = Boolean(API_BASE && auth.authConfigured);

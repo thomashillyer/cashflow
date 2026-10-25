@@ -1,5 +1,5 @@
-// Sign-in for real businesses: Supabase Auth, passwordless. The owner opens an email link (or enters
-// a code when the project's template includes one); every API call carries the resulting session.
+// Sign-in for real businesses: Supabase Auth with email and password. Email confirmations are
+// disabled for this demo; every API call still carries the owner's authenticated session.
 // Row-level security in the database decides which business that session can see (see
 // supabase/migrations/*_tenant_access.sql). Nothing here holds a secret: the anon key is public by design,
 // and it can only read what row-level security allows.
@@ -31,7 +31,42 @@ async function sb() {
   return client;
 }
 
-/** Send the project's sign-in email. The default template contains a magic link. */
+function passwordError(error) {
+  if (error?.code === "invalid_credentials") return "Email or password didn't match. Try again.";
+  if (error?.code === "user_already_exists" || error?.code === "email_exists") return "This email already has an account. Choose Sign in instead. If you previously used email links, ask the Neri team for help.";
+  if (error?.code === "weak_password") return "Choose a stronger password with at least 8 characters.";
+  if (error?.code === "email_not_confirmed") return "This account needs help signing in. Contact the Neri team, or use a sample business.";
+  if (error?.code === "over_request_rate_limit" || error?.status === 429) return "Too many sign-in attempts. Wait a few minutes and try again.";
+  if (error?.code === "email_address_invalid" || error?.code === "validation_failed") return "Check the email address and try again.";
+  return "Sign-in didn't go through. Try again in a moment.";
+}
+
+function checkCredentials(email, password, creating = false) {
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Enter your work email, like you@yourbusiness.com.");
+  if (!password) throw new Error("Enter your password.");
+  if (creating && password.length < 8) throw new Error("Use at least 8 characters for your password.");
+}
+
+/** Passwords go directly to Supabase; Neri never stores them in its account or business data. */
+export async function createAccount(email, password) {
+  checkCredentials(email, password, true);
+  const c = await sb();
+  const { data, error } = await c.auth.signUp({ email, password });
+  if (error) throw new Error(passwordError(error));
+  if (!data?.session) throw new Error("Account sign-in isn't ready. Contact the Neri team, or try signing in.");
+  return data.session;
+}
+
+export async function signIn(email, password) {
+  checkCredentials(email, password);
+  const c = await sb();
+  const { data, error } = await c.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(passwordError(error));
+  if (!data?.session) throw new Error("Sign-in didn't go through. Try again in a moment.");
+  return data.session;
+}
+
+/** Legacy email sign-in remains compatible with links already sent before password accounts. */
 export async function sendCode(email) {
   const c = await sb();
   // No redirect override: Supabase uses its configured Site URL, also for the built-in sender.
