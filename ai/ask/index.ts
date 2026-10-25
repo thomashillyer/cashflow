@@ -34,6 +34,7 @@ export type AskContext = {
   client?: Anthropic;
   // Cache directories for the two Claude steps; default: the live cache then the committed demo caches.
   cacheDirs?: { intent?: string; voice?: string };
+  liveModel?: string;     // model for a live call on a cache miss (default ASK_LIVE_MODEL)
   via?: "text" | "voice";
   // Persists a proposed owner Signal (plan) or Rule and returns its id.
   persistProposal?: (proposal: NonNullable<Decision["proposal"]>) => Promise<string>;
@@ -115,6 +116,7 @@ export async function askNeri(question: string, ctx: AskContext): Promise<AskRes
     const intent = await readIntent(question, {
       records: ctx.records, profile: ctx.profile, asOf: ctx.asOf, mode: ctx.mode,
       ...(ctx.client ? { client: ctx.client } : {}), ...(ctx.cacheDirs?.intent ? { cacheDir: ctx.cacheDirs.intent } : {}),
+      ...(ctx.liveModel ? { liveModel: ctx.liveModel } : {}),
     });
     const decision = decide(intent, {
       records: ctx.records, profile: ctx.profile, asOf: ctx.asOf, fxRates: ctx.fxRates,
@@ -128,6 +130,7 @@ export async function askNeri(question: string, ctx: AskContext): Promise<AskRes
     const answer = await voice(decision, {
       profile: ctx.profile, business: ctx.business, mode: ctx.mode,
       ...(ctx.client ? { client: ctx.client } : {}), ...(ctx.cacheDirs?.voice ? { cacheDir: ctx.cacheDirs.voice } : {}),
+      ...(ctx.liveModel ? { liveModel: ctx.liveModel } : {}),
       ...(proposalId ? { proposalId } : {}),
     });
 

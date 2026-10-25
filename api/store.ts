@@ -37,7 +37,7 @@ export type Account = {
   timezone?: string;
   kind?: string;                       // starter profile the owner picked
   aliases?: string[];                  // other names the business goes by (intake matching)
-  connections?: { id: string; name: string; state: "ok" | "waiting" | "error" }[];
+  connections?: { id: string; name: string; state: "ok" | "waiting" | "error"; message?: string; syncedAt?: string }[];
   ownerUserId?: string;                // Supabase auth user id of the owner (membership fallback)
   asOf?: string;                       // fixed "today" for synthetic samples; real businesses use the clock
   fxRates?: Record<string, number>;
@@ -45,6 +45,8 @@ export type Account = {
   createdAt?: string;
   thoughts?: Thought[];                // owner notes (parked thoughts)
   intakeNotes?: IntakeNote[];          // import notes Review needs (e.g. "owner must confirm the date")
+  maskNames?: boolean;                 // mask party names and contact details in every API response (api/mask.ts)
+  maskAliases?: Record<string, string>; // real name -> stage name; the rest get Customer A, Supplier A, ...
 };
 
 export type StoredProfile = Profile & { account?: Account };
@@ -88,6 +90,8 @@ export interface Store {
   load(id: string): Promise<{ records: Records; storeRevision: number }>;
   // Idempotent upserts of whole records, then a revision bump. Returns the new revision.
   upsertRecords(id: string, records: Partial<Records>): Promise<number>;
+  // Remove cash events by id (a corrected re-import replaces the events of the earlier read of the same file). Bumps the revision.
+  deleteEvents(id: string, eventIds: string[]): Promise<number>;
   // "Code computes, the DB commits": the route computes the change, then this writes the records, the
   // proposal states and the stored response in one atomic step, only while the revision is still
   // `expectedRevision`, and bumps the revision. The idempotency key is checked first, so a replay
@@ -199,6 +203,12 @@ export class MemoryStore implements Store {
   async upsertRecords(id: string, records: Partial<Records>): Promise<number> {
     const b = this.need(id);
     this.writeRecords(b, records);
+    return ++b.storeRevision;
+  }
+  async deleteEvents(id: string, eventIds: string[]): Promise<number> {
+    const b = this.need(id);
+    const drop = new Set(eventIds);
+    b.records.events = b.records.events.filter((e) => !drop.has(e.id));
     return ++b.storeRevision;
   }
   private writeRecords(b: MemBiz, records: Partial<Records>): void {

@@ -21,7 +21,7 @@ import type { ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
 import type { Commitment, Lever, Party, Records, WorkItem } from "../schema/records";
 import { BRIEF_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "./cache";
-import { BRIEF_MODEL, BRIEF_PROMPT_VERSION, DRAFT_MODEL, DRAFT_PROMPT_VERSION } from "./config";
+import { BRIEF_MODEL, BRIEF_PROMPT_VERSION, DRAFT_MODEL, DRAFT_PROMPT_VERSION, anthropicOptions } from "./config";
 import { toBase } from "../engine/expand";
 import { fmtDate } from "./labels";
 import { fmtMoney, fmtWithBase } from "./money";
@@ -403,7 +403,7 @@ export async function callStructured<T>(
   client: Anthropic | undefined, model: string, system: string, turns: Turn[], schema: z.ZodType<T>, effort: "low" | "medium",
 ): Promise<{ output: T } | { problem: string }> {
   try {
-    client ??= new Anthropic(); // configured from ANTHROPIC_API_KEY
+    client ??= new Anthropic(anthropicOptions()); // configured from ANTHROPIC_API_KEY
     const res = await client.messages.create(
       {
         model,

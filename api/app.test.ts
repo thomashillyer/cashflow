@@ -784,10 +784,10 @@ describe("atomic, idempotent decisions (#191)", () => {
 
 describe("bank statement import (/import/bank)", () => {
   beforeEach(() => setup());
-  const stmt = readFileSync(join(import.meta.dirname, "../fixtures/bank/statement-signed.csv"));
+  const stmt = readFileSync(join(import.meta.dirname, "../fixtures/bank/statement-signed-clean.csv"));
   const post = (adapter: string, payload: Record<string, unknown>, headers: Record<string, string> = OTHER) =>
     app.inject({ method: "POST", url: `/import/${adapter}`, headers, payload });
-  const payload = { base64: stmt.toString("base64"), fileName: "statement-signed.csv" };
+  const payload = { base64: stmt.toString("base64"), fileName: "statement-signed.csv" };   // the clean variant: no unreadable rows, so a balance is taken
 
   it("a statement becomes bank history and today's balance, with diagnostics and recurring proposals, and changes no commitment", async () => {
     const before = await store.load("cascade_trade");
@@ -795,7 +795,7 @@ describe("bank statement import (/import/bank)", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body).toMatchObject({ repeat: false, written: true, unallocated: 17, preview: { events: 17, balances: 1, recurring: 2 } });
-    expect(body.diagnostics).toMatchObject({ rowsRead: 20, rowsImported: 17, rowsRejected: 3, source: "bank_csv" });
+    expect(body.diagnostics).toMatchObject({ rowsRead: 17, rowsImported: 17, rowsRejected: 0, source: "bank_csv" });
     for (const e of body.diagnostics.errors) expect(e.nextStep).not.toBe("");
     expect(body.balance).toMatchObject({ amount: 5387200, asOf: "2026-10-24", account: "bank" });
     expect(body.recurring.map((p: { cadence: string }) => p.cadence).sort()).toEqual(["biweekly", "monthly"]);
@@ -834,7 +834,7 @@ describe("bank statement import (/import/bank)", () => {
     const mid = await store.load("cascade_trade");
     const again = (await post("bank", { ...payload, fileName: "renamed.csv" })).json();
     expect(again).toMatchObject({ repeat: true, written: false, repeatOf: expect.stringMatching(/^ev-bank_csv-/), preview: { events: 0, balances: 0, recurring: 0 } });
-    expect(again.diagnostics).toMatchObject({ rowsImported: 0, rowsDuplicate: 20 });
+    expect(again.diagnostics).toMatchObject({ rowsImported: 0, rowsDuplicate: 17 });
     const end = await store.load("cascade_trade");
     expect(end.records.events).toHaveLength(mid.records.events.length);
     expect(end.storeRevision).toBe(mid.storeRevision);
@@ -881,6 +881,28 @@ describe("bank statement import (/import/bank)", () => {
     expect((await store.load("cascade_trade")).records.events.some((e) => e.sourceRef.system === "bank_csv")).toBe(false);
   });
 
+  it("a statement that runs up to today still sets today's cash, and today's lines (already inside that balance) are left out", async () => {
+    const text = "Date,Description,Amount,Balance\n2026-11-14,SHOP,-10.00,990.00\n2026-11-16,SHOP,-10.00,980.00\n";
+    const res = (await post("bank", { text, fileName: "today.csv", currency: "USD" })).json();
+    expect(res.balance).toMatchObject({ amount: 98000, asOf: "2026-11-16" });
+    expect(res.preview).toMatchObject({ events: 1, balances: 1 });
+    expect(res.diagnostics.warnings.join(" ")).toMatch(/runs up to today.*left out 1 line dated today/);
+    const { records } = await store.load("cascade_trade");
+    expect(records.events.filter((e) => e.sourceRef.system === "bank_csv").map((e) => e.date)).toEqual(["2026-11-14"]);
+    expect(records.balances.find((b) => b.sourceRef.system === "bank_csv")).toMatchObject({ asOf: "2026-11-16" });
+  });
+
+  it("a corrected re-import (day-first dates) replaces the earlier read of the same file instead of adding to it", async () => {
+    const text = "Date,Description,Amount,Balance\n03/04/2026,RENT HARBOR,-1000.00,9000.00\n05/04/2026,PAYROLL NORTHWIND,-2000.00,7000.00\n";
+    const bankEvents = async () => (await store.load("cascade_trade")).records.events.filter((e) => e.sourceRef.system === "bank_csv");
+    await post("bank", { text, fileName: "s.csv", currency: "USD" });
+    const first = (await bankEvents()).map((e) => e.date).sort();
+    expect(first).toEqual(["2026-03-04", "2026-05-04"]);
+    const fixed = (await post("bank", { text, fileName: "s.csv", currency: "USD", dayFirst: true })).json();
+    expect(fixed.repeat).toBe(false);
+    expect((await bankEvents()).map((e) => e.date).sort()).toEqual(["2026-04-03", "2026-04-05"]);   // no ghost March/May lines
+  });
+
   it("is refused for anonymous visitors of the public demo, like every other import", async () => {
     await setup({ demoMode: true });
     expect((await app.inject({ method: "POST", url: "/import/bank", payload })).statusCode).toBe(401);
@@ -889,6 +911,180 @@ describe("bank statement import (/import/bank)", () => {
   it("a signed-in visitor on the public demo's shared sample cannot publish a statement either", async () => {
     await setup({ demoMode: true });
     expect((await post("bank", payload)).statusCode).toBe(403);
+  });
+});
+
+describe("original files behind evidence (#155)", () => {
+  type Blobs = import("./blobs").Blobs;
+  let blobs: import("./blobs").MemoryBlobs & { puts: number };
+  let id: string;
+  const csv = readFileSync(join(import.meta.dirname, "../fixtures/cascade_trade/intake/files/ar-aging.csv"));
+  const NOW = () => new Date("2026-11-16T17:00:00Z");
+  const H = () => ({ ...OWNER, "x-neri-business": id });
+  const upload = (url: string, payload: Record<string, unknown>) => app.inject({ method: "POST", url, headers: H(), payload });
+  const original = (evidenceId: string, headers: Record<string, string> = H()) => app.inject({ method: "GET", url: `/evidence/${encodeURIComponent(evidenceId)}/original`, headers });
+  const evidenceOf = async (file: string) => (await store.load(id)).records.evidence.find((e) => e.fileName === file)!;
+
+  async function rebuild(b: Blobs = blobs) {
+    app = await buildApp({ store, verify, demoMode: false, allowReset: true, blobs: b, now: NOW });
+  }
+
+  beforeEach(async () => {
+    await setup();
+    const { MemoryBlobs } = await import("./blobs");
+    class Counting extends MemoryBlobs {
+      puts = 0;
+      override async putOriginal(...a: Parameters<Blobs["putOriginal"]>) { this.puts++; return super.putOriginal(a[0], a[1]); }
+    }
+    blobs = new Counting() as typeof blobs;
+    id = await privateBusiness();
+    await rebuild();
+  });
+
+  it("a repeat import retries an original that failed to save the first time", async () => {
+    const real = blobs.putOriginal.bind(blobs);
+    let fail = true;
+    blobs.putOriginal = async (...a: Parameters<Blobs["putOriginal"]>) => { if (fail) throw new Error("storage down"); return real(...a); };
+    const payload = { base64: csv.toString("base64"), fileName: "ar-aging.csv" };
+    const first = (await upload("/import/upload", payload)).json();
+    expect(first.notes.some((n: { text: string }) => /original could not be saved/.test(n.text))).toBe(true);
+    expect((await evidenceOf("ar-aging.csv")).storageKey).toBeUndefined();
+    fail = false;
+    const again = (await upload("/import/upload", payload)).json();
+    expect(again.repeat).toBe(true);
+    const ev = await evidenceOf("ar-aging.csv");
+    expect(ev.storageKey).toMatch(/ar-aging\.csv$/);
+    expect((await original(ev.id)).statusCode).toBe(200);
+  });
+
+  it("an original in a shared sample business is not downloadable by a signed-in user who is not a member", async () => {
+    const { records } = await store.load("cascade_trade");
+    await store.upsertRecords("cascade_trade", { ...records, evidence: [...records.evidence, { id: "ev-shared", channel: "upload", format: "csv", receivedAt: "2026-10-25T00:00:00Z", extraction: "ok", fileName: "x.csv", storageKey: "cascade_trade/evidence/" + "a".repeat(64) + "-x.csv", sourceRef: { system: "generic_file", record: "x.csv" } }] });
+    await blobs.putOriginal("cascade_trade", { bytes: new TextEncoder().encode("a,b"), fileName: "x.csv", mime: "text/csv", hash: "a".repeat(64) });
+    const r = await original("ev-shared", { ...OTHER, "x-neri-business": "cascade_trade" });
+    expect(r.statusCode).toBe(404);
+  });
+
+  it("a CSV upload keeps its original; the owner downloads the same bytes as a safe attachment", async () => {
+    const res = await upload("/import/upload", { base64: csv.toString("base64"), fileName: "ar-aging.csv" });
+    expect(res.statusCode).toBe(200);
+    const ev = await evidenceOf("ar-aging.csv");
+    expect(ev.storageKey).toMatch(new RegExp(`^${id}/evidence/[0-9a-f]{64}-ar-aging\\.csv$`));
+    expect(ev.mime).toBe("text/csv");
+    expect(res.json().evidence.find((e: { fileName?: string }) => e.fileName === "ar-aging.csv").storageKey).toBe(ev.storageKey);
+
+    const dl = await original(ev.id);
+    expect(dl.statusCode).toBe(200);
+    expect(dl.rawPayload.equals(csv)).toBe(true);
+    expect(dl.headers["content-type"]).toBe("text/csv");
+    expect(dl.headers["content-disposition"]).toBe('attachment; filename="ar-aging.csv"');
+    expect(dl.headers["x-content-type-options"]).toBe("nosniff");
+    expect(dl.headers["content-security-policy"]).toContain("sandbox");
+    expect(dl.headers["cache-control"]).toContain("no-store");
+  });
+
+  it("pasted text is kept as a .txt original", async () => {
+    const text = "Hi, we will pay INV-1187 on Nov 20.";
+    const res = await upload("/import/paste", { text, receivedAt: "2026-11-16T16:00:00Z" });
+    expect(res.statusCode).toBe(200);
+    const ev = res.json().evidence.find((e: { parentId?: string; channel: string }) => !e.parentId && e.channel !== "url");
+    expect(ev.storageKey).toMatch(/-pasted\.txt$/);
+    expect((await original(ev.id)).body).toBe(text);
+  });
+
+  it("the same bytes twice is one object, and a repeat upload does not touch storage again", async () => {
+    const payload = { base64: csv.toString("base64"), fileName: "ar-aging.csv" };
+    await upload("/import/sheet", payload);
+    expect(blobs.puts).toBe(1);
+    const again = await upload("/import/sheet", { ...payload, fileName: "renamed.csv" });
+    expect(again.json().repeat).toBe(true);
+    expect(blobs.puts).toBe(1);
+    expect(blobs.objects.size).toBe(1);
+  });
+
+  it("odd client file names never reach the key or the download header", async () => {
+    await upload("/import/upload", { base64: csv.toString("base64"), fileName: "../../etc/passwd.csv" });
+    const ev = (await store.load(id)).records.evidence.find((e) => e.storageKey)!;
+    expect(ev.storageKey).toMatch(new RegExp(`^${id}/evidence/[0-9a-f]{64}-passwd\\.csv$`));
+    expect(ev.storageKey).not.toContain("..");
+    const dl = await original(ev.id);
+    expect(dl.headers["content-disposition"]).toBe('attachment; filename="passwd.csv"');
+  });
+
+  it("a storage failure does not fail the import: details are kept, no storageKey, and the owner is told", async () => {
+    await rebuild({ putOriginal: async () => { throw new Error("storage down"); }, getOriginal: async () => null });
+    const res = await upload("/import/upload", { base64: csv.toString("base64"), fileName: "ar-aging.csv" });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.candidates.length).toBe(4);
+    expect(body.diagnostics).toMatchObject({ rowsRead: 5, rowsImported: 3 });
+    expect(body.notes.map((n: { text: string }) => n.text)).toContain("The original could not be saved; the extracted details were kept.");
+    const ev = await evidenceOf("ar-aging.csv");
+    expect(ev.storageKey).toBeUndefined();
+    expect((await original(ev.id)).statusCode).toBe(404);
+  });
+
+  it("an attachment inside a WhatsApp zip gets its own original next to the zip", async () => {
+    const z = new JSZip();
+    z.file("_chat.txt", "[11/28/26, 9:14:02 AM] Dana: <attached: ar.csv>\n");
+    z.file("ar.csv", csv);
+    const zip = await z.generateAsync({ type: "nodebuffer" });
+    const res = await upload("/import/whatsapp", { base64: zip.toString("base64"), fileName: "chat.zip" });
+    expect(res.statusCode).toBe(200);
+    const keyed = (await store.load(id)).records.evidence.filter((e) => e.storageKey);
+    expect(keyed.map((e) => e.storageKey!.replace(/^.*\/evidence\/[0-9a-f]{64}-/, "")).sort()).toEqual(["ar.csv", "chat.zip"]);
+    expect(blobs.objects.size).toBe(2);
+    const child = keyed.find((e) => e.storageKey!.endsWith("-ar.csv"))!;
+    expect((await original(child.id)).rawPayload.equals(csv)).toBe(true);
+  });
+
+  it("a stored page is served as an octet-stream attachment, never as html or svg", async () => {
+    const { sha256Hex } = await import("../adapters/core/hash");
+    for (const [file, mime] of [["evil.html", "text/html"], ["evil.svg", "image/svg+xml"], ["x.bin", "application/x-sh"]] as const) {
+      const bytes = new TextEncoder().encode(`<script>alert("${file}")</script>`);
+      const key = await blobs.putOriginal(id, { bytes, fileName: file, mime, hash: sha256Hex(bytes) });
+      await store.saveIntake(id, { evidence: [{ id: `ev-${file}`, channel: "upload", format: "html", receivedAt: "2026-11-16T16:00:00Z", fileName: file, mime, storageKey: key, extraction: "ok", sourceRef: { system: "generic_file", record: file } }], candidates: [], proposals: [], signals: [] });
+      const dl = await original(`ev-${file}`);
+      expect(dl.statusCode).toBe(200);
+      expect(dl.headers["content-type"]).toBe("application/octet-stream");
+      expect(dl.headers["content-disposition"]).toContain("attachment");
+      expect(dl.headers["x-content-type-options"]).toBe("nosniff");
+    }
+  });
+
+  it("only members can open it: not another user, not a key from another business, not anonymous", async () => {
+    await upload("/import/upload", { base64: csv.toString("base64"), fileName: "ar-aging.csv" });
+    const ev = await evidenceOf("ar-aging.csv");
+    // A signed-in user who is not a member of this business: same 404 as a business that does not exist.
+    expect((await original(ev.id, { ...OTHER, "x-neri-business": id })).statusCode).toBe(404);
+    // Evidence in the shared sample that points at this business's key: the key is not that business's own, so nothing is served.
+    await store.saveIntake("cascade_trade", { evidence: [{ id: "ev-stolen", channel: "upload", format: "csv", receivedAt: "2026-11-16T16:00:00Z", fileName: "x.csv", mime: "text/csv", storageKey: ev.storageKey!, extraction: "ok", sourceRef: { system: "generic_file", record: "x" } }], candidates: [], proposals: [], signals: [] });
+    expect((await original("ev-stolen", OTHER)).statusCode).toBe(404);
+    // No token: refused, even where the demo serves public samples.
+    const demo = await buildApp({ store, verify, demoMode: true, blobs, now: NOW });
+    expect((await demo.inject({ method: "GET", url: `/evidence/${encodeURIComponent(ev.id)}/original` })).statusCode).toBe(401);
+    expect((await app.inject({ method: "GET", url: `/evidence/${encodeURIComponent(ev.id)}/original` })).statusCode).toBe(401);
+    await demo.close();
+  });
+
+  it("unknown evidence, evidence with no original, and absurd ids are all a plain 404", async () => {
+    await store.saveIntake(id, { evidence: [{ id: "ev-none", channel: "upload", format: "csv", receivedAt: "2026-11-16T16:00:00Z", extraction: "ok", sourceRef: { system: "generic_file", record: "none" } }], candidates: [], proposals: [], signals: [] });
+    for (const evidenceId of ["nope", "ev-none", "../../etc/passwd", "%00"]) {
+      const res = await original(evidenceId);
+      expect(res.statusCode, evidenceId).toBe(404);
+      expect(res.json().error.message).toMatch(/original/i);
+    }
+    // Fastify refuses a very long path parameter before the route runs (414); either way nothing is served.
+    expect([404, 414]).toContain((await original("x".repeat(400))).statusCode);
+  });
+
+  it("a storage outage on download is a retryable 503, not a crash", async () => {
+    await upload("/import/upload", { base64: csv.toString("base64"), fileName: "ar-aging.csv" });
+    const ev = await evidenceOf("ar-aging.csv");
+    await rebuild({ putOriginal: blobs.putOriginal.bind(blobs), getOriginal: async () => { throw new Error("storage down"); } });
+    const res = await original(ev.id);
+    expect(res.statusCode).toBe(503);
+    expect(res.json().error).toMatchObject({ code: "STORAGE_UNAVAILABLE", retryable: true });
   });
 });
 

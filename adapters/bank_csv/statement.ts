@@ -117,6 +117,7 @@ function parseRows(sheet: SheetContent, columns: BankMapping, headerRow: number,
   let zeroSkipped = 0;
   let ambiguousDates = 0;
   let rowsRead = 0;
+  const rejected: (string | null)[] = [];   // the date of each row that could not be read (null: no readable date)
   for (let r = headerRow; r < sheet.rows.length; r++) {
     const cells = sheet.rows[r] ?? [];
     if (cells.every((c) => text(c) === "")) continue;
@@ -126,7 +127,9 @@ function parseRows(sheet: SheetContent, columns: BankMapping, headerRow: number,
     const dateText = text(dateCell);
     if (dateText === "" && SUMMARY_ROW.test(description)) { summarySkipped++; continue; }   // "Opening balance", "Total": not a transaction
     rowsRead++;
+    let rowDate: string | null = null;
     const fail = (code: RowError["code"], message: string, nextStep: string, column?: string, raw?: string) => {
+      if (code !== "unmapped_column") rejected.push(rowDate);
       errors.push({ row, sheet: sheet.sheet, code, message, nextStep, ...(column ? { column } : {}), ...(raw ? { raw } : {}) });
     };
 
@@ -138,6 +141,7 @@ function parseRows(sheet: SheetContent, columns: BankMapping, headerRow: number,
       const p = parseDate(dateText, opts.dayFirst === undefined ? {} : { dayFirst: opts.dayFirst });
       if (p) { date = p.date; if (p.ambiguous) ambiguousDates++; }
     }
+    rowDate = date ?? null;
     if (!date) { fail("invalid_date", `Row ${row}: "${dateText.slice(0, 40)}" is not a date Neri can read, so it was not imported.`, "Write the date like 2026-10-25 in the file, or tell Neri which column holds the date.", "date", dateText.slice(0, 60)); continue; }
 
     // Currency
@@ -168,12 +172,14 @@ function parseRows(sheet: SheetContent, columns: BankMapping, headerRow: number,
     const line: Line = { row, date, signed, currency, description };
     if (columns.balance !== undefined) {
       const b = text(cells[columns.balance]);
-      const pb = b === "" ? undefined : parseAmount(b, currency);
-      if (pb === undefined) line.balanceUnreadable = true; else line.balance = pb;
+      // "1,200.00 DR" / "OD" is overdrawn: parseAmount drops letters, so the sign is read here.
+      const overdrawn = /\b(DR|OD)\.?\s*$/i.test(b);
+      const pb = b === "" ? undefined : parseAmount(b.replace(/\b(DR|CR|OD)\.?\s*$/i, "").trim(), currency);
+      if (pb === undefined) line.balanceUnreadable = true; else line.balance = overdrawn ? -Math.abs(pb) : pb;
     }
     lines.push(line);
   }
-  return { lines, errors, summarySkipped, zeroSkipped, ambiguousDates, rowsRead };
+  return { lines, errors, rejected, summarySkipped, zeroSkipped, ambiguousDates, rowsRead };
 }
 
 // The running balance after the newest day's last line, or undefined when that is not unambiguous.
@@ -287,7 +293,7 @@ export async function importBankStatement(
     events.push({
       id: eventId, legIndex: 0, date: l.date, amount, currency: l.currency, amountBase: amount, direction, status: "actual", confidence: 1,
       basis: `bank line ${l.date}${l.description ? `: ${l.description}` : ""} (${direction === "out" ? "-" : "+"}${fmtMoney(amount, l.currency)}); not matched to an invoice or bill`,
-      account, sourceRef: { system: "bank_csv", record: hash16 },
+      account, sourceRef: { system: "bank_csv", record: `${hash.slice(0, 12)}:${hash16}` },   // file tag first: a corrected re-import can find and replace this file's earlier events
     });
     bankLines.push({ eventId, row: l.row, date: l.date, amount, direction, currency: l.currency, description: l.description });
   }
@@ -295,10 +301,17 @@ export async function importBankStatement(
   // Balance: only when the newest row's balance is unambiguous.
   const balances: BalanceSnapshot[] = [];
   const warnings: string[] = [];
-  const nb = columns.balance !== undefined ? newestBalance(parsed.lines) : undefined;
+  // A running balance already includes every earlier movement, so an unreadable row only matters when it could be as
+  // new as the balance (or has no readable date, so nobody can tell). Then a balance taken from the rows that did
+  // read could be off by exactly that amount: take none, and say so.
+  const candidate = columns.balance !== undefined ? newestBalance(parsed.lines) : undefined;
+  const unreadRows = candidate ? parsed.rejected.filter((d) => d === null || d >= candidate.date).length : 0;
+  const nb = unreadRows === 0 ? candidate : undefined;
   if (nb) {
     const asOf = addDaysUtc(nb.date, 1);   // end-of-day balance -> start of the next day (see the header comment)
     balances.push({ id: `bal-bank-${account.replace(/[^A-Za-z0-9._-]+/g, "-")}-${asOf}`, account, amount: nb.amount, currency: nb.currency, asOf, sourceRef: { system: "bank_csv", record: `${account}:${nb.date}` } });
+  } else if (events.length > 0 && unreadRows > 0 && columns.balance !== undefined) {
+    warnings.push(`Neri did not set your current cash from this statement: ${unreadRows} row${unreadRows === 1 ? "" : "s"} could not be read, so a balance taken from the rest could be wrong. Fix ${unreadRows === 1 ? "that row" : "those rows"} and import again, or enter your current bank balance yourself.`);
   } else if (events.length > 0) {
     warnings.push(columns.balance === undefined
       ? "This statement has no running-balance column, so Neri cannot set your current cash from it. Enter your current bank balance yourself."
@@ -315,7 +328,8 @@ export async function importBankStatement(
   }
 
   const recurring = proposeRecurring(bankLines);
-  if (events.length > 0) warnings.push(`${events.length} bank line${events.length === 1 ? " is" : "s are"} not linked to any invoice or bill. Neri does not guess which invoice a payment settles, so they stay as plain bank activity.`);
+  if (events.length > 0) warnings.push(`${events.length} bank line${events.length === 1 ? " is" : "s are"} not linked to any invoice or bill. Neri does not guess which invoice a payment settles, so they stay as plain bank activity. If an open invoice was paid in this statement, mark it paid in your books or it is forecast again.`);
+  if (columns.currency === undefined && events.length > 0) warnings.push(`This statement has no currency column, so amounts were read as ${opts.currency}. If it is in another currency, import it again and say which.`);
   if (recurring.length > 0) warnings.push(`${recurring.length} payment${recurring.length === 1 ? " looks" : "s look"} regular. Confirm ${recurring.length === 1 ? "it" : "them"} before ${recurring.length === 1 ? "it is" : "they are"} added to the forecast.`);
   if (parsed.summarySkipped) warnings.push(`${parsed.summarySkipped} summary row${parsed.summarySkipped === 1 ? "" : "s"} (opening balance, totals) skipped.`);
   if (parsed.zeroSkipped) warnings.push(`${parsed.zeroSkipped} zero-amount line${parsed.zeroSkipped === 1 ? "" : "s"} skipped; they move no cash.`);

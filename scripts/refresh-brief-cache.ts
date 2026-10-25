@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BRIEF_CACHE_DIR, readCache, writeCache } from "../ai/cache";
 import { briefCacheKey, draftCacheKey, draftMessage, writeBrief } from "../ai/brief";
-import { BRIEF_MODEL, BRIEF_PROMPT_VERSION, DRAFT_MODEL, DRAFT_PROMPT_VERSION } from "../ai/config";
+import { BRIEF_MODEL, BRIEF_PROMPT_VERSION, DRAFT_MODEL, DRAFT_PROMPT_VERSION, anthropicOptions } from "../ai/config";
 import { loadBriefFixture } from "./brief-fixture";
 
 if (!process.env.ANTHROPIC_API_KEY) {
@@ -20,7 +20,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 }
 
 const fx = loadBriefFixture();
-const client = new Anthropic();
+const client = new Anthropic(anthropicOptions());
 // Live calls write into a scratch directory first; only validated entries are copied over the demo cache.
 const scratch = mkdtempSync(join(tmpdir(), "neri-brief-"));
 const ctx = { ...fx, mode: "live" as const, client, cacheDir: scratch };

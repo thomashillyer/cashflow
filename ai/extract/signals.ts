@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { z } from "zod/v4";
 import type { Commitment, Records, Signal, SignalClaim } from "../../schema/records";
 import { cacheKey, DEFAULT_CACHE_DIR, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
-import { EXTRACTION_MODEL, SIGNAL_PROMPT_VERSION } from "../config";
+import { EXTRACTION_MODEL, SIGNAL_PROMPT_VERSION, anthropicOptions } from "../config";
 import { locateQuote, parseAmount, parseDate } from "../normalize";
 import { humanizeId } from "../labels";
 import { resolveParty, type PartyHint } from "../reconcile/parties";
@@ -242,7 +242,7 @@ export async function callSignalModel(
   client: Anthropic | undefined, content: string, model: string,
 ): Promise<{ output: SignalExtraction } | { problem: string }> {
   try {
-    client ??= new Anthropic(); // configured from ANTHROPIC_API_KEY
+    client ??= new Anthropic(anthropicOptions()); // configured from ANTHROPIC_API_KEY
     const res = await client.messages.create(
       {
         model,

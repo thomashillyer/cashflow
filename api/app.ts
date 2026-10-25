@@ -7,14 +7,22 @@ import { join } from "node:path";
 import Fastify, { LogController, type FastifyInstance, type FastifyRequest } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { HttpError, sendError, type NeriRequest, type User } from "./http";
+import type Anthropic from "@anthropic-ai/sdk";
+import { AskLiveGuard, type AskLiveOptions } from "./ask-live";
 import type { AiMode } from "./engine";
 import type { Store } from "./store";
+import { MemoryBlobs, type Blobs } from "./blobs";
+import { evidenceRoutes } from "./routes/evidence";
 import { readRoutes } from "./routes/read";
 import { reviewRoutes } from "./routes/review";
 import { ownerRoutes } from "./routes/owner";
 import { workRoutes } from "./routes/work";
 import { demoRoutes } from "./routes/demo";
 import { overrideRoutes } from "./routes/overrides";
+import { sourceRoutes } from "./routes/sources";
+import type { Fetch } from "../adapters/connector";
+import type { SourceAccessFn } from "./sourceAccess";
+import { installMask, maskRoutes } from "./mask";
 import { SandboxStore, VISITOR_HEADER, VISITOR_ID } from "./sandbox";
 import { isBehind, type SchemaStatus, type SchemaStatusFn } from "./schema-status";
 
@@ -23,11 +31,17 @@ export type Verifier = (token: string) => Promise<User | null>;
 
 export type AppOptions = {
   store: Store;
+  blobs?: Blobs;                   // originals behind Evidence.storageKey; in memory when omitted
   verify: Verifier;
   demoMode?: boolean;              // DEMO_MODE=1: unauthenticated requests may use synthetic businesses
   defaultBusiness?: string;        // sample opened when the caller has no business of their own
-  aiMode?: AiMode;
-  staticDir?: string;              // serve the app (same origin) when present
+  aiMode?: AiMode;                 // brief, drafts and document intake
+  askMode?: AiMode;                // POST /ask only; default: aiMode
+  askClient?: Anthropic;           // tests inject a stub; live Ask otherwise builds a client from ANTHROPIC_API_KEY
+  askLive?: AskLiveOptions;        // timeout and hourly cap for live Ask (NERI_ASK_LIVE_MAX_PER_HOUR)
+  askCacheDirs?: { intent?: string; voice?: string }; // tests point the live cache at a temp dir
+  askModel?: string;               // model for live Ask calls on a cache miss (NERI_ASK_MODEL); default ASK_LIVE_MODEL
+  staticDir?: string;             // serve the app (same origin) when present
   // Public values for the served app/config.js (the anon key is public by design; never the service-role key).
   appConfig?: { supabaseUrl?: string; supabaseAnonKey?: string };
   now?: () => Date;
@@ -35,11 +49,19 @@ export type AppOptions = {
   logger?: boolean | { stream: NodeJS.WritableStream }; // tests pass a stream to capture log lines
   sandboxes?: SandboxStore;        // tests inject one to control the clock and limits
   schemaStatus?: SchemaStatusFn;   // GET /ready: repo vs database migration version (Supabase store only)
+  sourceAccess?: SourceAccessFn;   // per-business tokens for Zoho / Outlook pulls (api/sourceAccess.ts); none = "not connected"
+  sourceFetch?: Fetch;             // tests inject a fake provider
 };
 
-export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">> & {
+export type Deps = Required<Pick<AppOptions, "store" | "blobs" | "demoMode" | "defaultBusiness" | "aiMode" | "askMode" | "now" | "allowReset">> & {
+  askGuard: AskLiveGuard;
+  askClient?: Anthropic;
+  askCacheDirs?: { intent?: string; voice?: string };
+  askModel?: string;
   schemaStatus?: SchemaStatusFn;
   sandboxes: SandboxStore;         // per-visitor copies of the synthetic samples (demo mode)
+  sourceAccess?: SourceAccessFn;   // tokens for Zoho / Outlook pulls (api/sourceAccess.ts); none = "not connected"
+  sourceFetch?: Fetch;
 };
 
 const READY_CACHE_MS = 30_000;
@@ -63,7 +85,7 @@ const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals", "/rules",
-  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides"];
+  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides", "/sources", "/evidence"];
 
 const isApiPath = (url: string) => {
   const path = url.split("?")[0]!;
@@ -88,13 +110,21 @@ const BUSINESS_ID = /^[A-Za-z0-9_-]{1,64}$/;
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const deps: Deps = {
     store: opts.store,
+    blobs: opts.blobs ?? new MemoryBlobs(),
     demoMode: opts.demoMode ?? false,
     defaultBusiness: opts.defaultBusiness ?? "cascade_trade",
     aiMode: opts.aiMode ?? "cache_only",
+    askMode: opts.askMode ?? opts.aiMode ?? "cache_only",
+    askGuard: new AskLiveGuard(opts.askLive),
+    ...(opts.askClient ? { askClient: opts.askClient } : {}),
+    ...(opts.askCacheDirs ? { askCacheDirs: opts.askCacheDirs } : {}),
+    ...(opts.askModel ? { askModel: opts.askModel } : {}),
     now: opts.now ?? (() => new Date()),
     allowReset: opts.allowReset ?? false,
     sandboxes: opts.sandboxes ?? new SandboxStore(),
     ...(opts.schemaStatus ? { schemaStatus: opts.schemaStatus } : {}),
+    ...(opts.sourceAccess ? { sourceAccess: opts.sourceAccess } : {}),
+    ...(opts.sourceFetch ? { sourceFetch: opts.sourceFetch } : {}),
   };
   // disableRequestLogging: the onResponse hook below writes the one structured line per request.
   const app = Fastify({ logger: opts.logger ?? false, logController: new LogController({ disableRequestLogging: true }), bodyLimit: 12 * 1024 * 1024 });
@@ -123,7 +153,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   });
 
   // Liveness only: Fly health-checks this. It must stay 200 while the process is up, whatever the database says.
-  app.get("/health", async () => ({ ok: true, demoMode: deps.demoMode, aiMode: deps.aiMode }));
+  app.get("/health", async () => ({ ok: true, demoMode: deps.demoMode, aiMode: deps.aiMode, askMode: deps.askMode }));
 
   // Readiness: is the database migrated to what this code expects? Cached ~30s.
   let cached: { at: number; status: SchemaStatus | null } | undefined;
@@ -151,7 +181,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       r.user = user;
     } else if (!deps.demoMode) {
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to see your numbers.");
-    } else if (req.url.startsWith("/import")) {
+    } else if (req.url.startsWith("/import") || req.url.startsWith("/sources")) {
       // Demo samples are shared and public: anonymous uploads would publish the file to every visitor.
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to upload your own files. The sample already has its documents.");
     }
@@ -189,6 +219,10 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(workRoutes(deps));
   await app.register(demoRoutes(deps));
   await app.register(overrideRoutes(deps));
+  await app.register(sourceRoutes(deps));
+  await app.register(evidenceRoutes(deps));
+  await app.register(maskRoutes(deps));
+  installMask(app, deps);
 
   if (opts.staticDir && existsSync(opts.staticDir)) {
     // The committed app/config.js stays empty (the static preview publishes it). When this server serves the app,

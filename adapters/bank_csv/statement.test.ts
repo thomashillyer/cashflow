@@ -50,12 +50,12 @@ describe("bank statement: signed amount layout", () => {
   });
 
   it("sets today's cash from the newest running balance, dated the day after the newest line", async () => {
-    const r = await run("statement-signed.csv");
+    const r = await run("statement-signed-clean.csv");
     expect(r.balances).toEqual([expect.objectContaining({ amount: 5387200, currency: "USD", account: "bank", asOf: "2026-10-24" })]);
   });
 
   it("opening cash in the engine equals the statement balance: the last day's lines are not counted twice", async () => {
-    const r = await run("statement-signed.csv");
+    const r = await run("statement-signed-clean.csv");
     const profile = JSON.parse(readFileSync(join(root, "profiles/trading.json"), "utf8")) as Profile;
     const records = { parties: [], commitments: [], events: r.events, signals: [], rules: [], settlements: [], balances: r.balances, evidence: [] } as Records;
     const notes = new Notes();
@@ -244,5 +244,44 @@ describe("bank statement: other inputs", () => {
     expect(broken.readable).toBe(false);
     expect(broken.evidence.extraction).toBe("unreadable");
     expect(broken.diagnostics.errors[0]!.message).toMatch(/could not be opened/);
+  });
+});
+
+describe("bank statement: balance safety", () => {
+  const head = "Date,Description,Amount,Balance\n";
+
+  it("takes no balance when an unreadable row has no date, or is as new as the balance, and says what to do", async () => {
+    const noDate = await csv(head + "2026-10-20,SHOP,-10.00,990.00\n13/45/2026,CORRUPT,-5.00,985.00\n2026-10-22,SHOP,-10.00,980.00\n");
+    expect(noDate.balances).toEqual([]);
+    expect(noDate.diagnostics.warnings.join(" ")).toMatch(/did not set your current cash.*could not be read.*enter your current bank balance/);
+    const newestBad = await csv(head + "2026-10-20,SHOP,-10.00,990.00\n2026-10-23,SHOP,abc,980.00\n");
+    expect(newestBad.balances).toEqual([]);
+  });
+
+  it("an older unreadable row does not stop the balance: a running balance already includes it", async () => {
+    const r = await csv(head + "2026-10-10,SHOP,abc,1000.00\n2026-10-20,SHOP,-10.00,990.00\n2026-10-22,SHOP,-10.00,980.00\n");
+    expect(r.balances).toEqual([expect.objectContaining({ amount: 98000, asOf: "2026-10-23" })]);
+    expect(r.diagnostics.errors.map((e) => e.code)).toEqual(["invalid_amount"]);
+  });
+
+  it("a balance written with DR or OD is negative, CR is positive", async () => {
+    const dr = await csv(head + "2026-10-22,SHOP,-10.00,1200.00 DR\n");
+    expect(dr.balances[0]!.amount).toBe(-120000);
+    const od = await csv(head + "2026-10-22,SHOP,-10.00,50.00 OD\n");
+    expect(od.balances[0]!.amount).toBe(-5000);
+    const cr = await csv(head + "2026-10-22,SHOP,10.00,300.00 CR\n");
+    expect(cr.balances[0]!.amount).toBe(30000);
+  });
+
+  it("says when amounts were read as the default currency, and warns that paid invoices must be marked paid", async () => {
+    const r = await csv(head + "2026-10-22,SHOP,-10.00,980.00\n");
+    const w = r.diagnostics.warnings.join(" ");
+    expect(w).toMatch(/no currency column, so amounts were read as USD/);
+    expect(w).toMatch(/mark it paid in your books or it is forecast again/);
+  });
+
+  it("tags every event with its file so a corrected re-import can replace that file's events", async () => {
+    const r = await csv(head + "2026-10-22,SHOP,-10.00,980.00\n");
+    expect(r.events[0]!.sourceRef.record).toMatch(/^[0-9a-f]{12}:[0-9a-f]{16}$/);
   });
 });

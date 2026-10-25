@@ -21,7 +21,7 @@ import type { Commitment, CommitmentDraft, Records, Rule } from "../../schema/re
 import { INTENT_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
 import { fmtDate } from "../brief";
 import { humanizeId } from "../labels";
-import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../config";
+import { ASK_LIVE_MODEL, INTENT_MODEL, INTENT_PROMPT_VERSION, anthropicOptions } from "../config";
 import { parseAmount } from "../normalize";
 import { resolveDatePhrase } from "../extract/signals";
 import { nameSimilarity, resolveParty } from "../reconcile/parties";
@@ -82,7 +82,7 @@ export async function callIntentModel(
   client: Anthropic | undefined, content: string, model: string,
 ): Promise<{ output: AskIntentRaw } | { problem: string }> {
   try {
-    client ??= new Anthropic(); // configured from ANTHROPIC_API_KEY
+    client ??= new Anthropic(anthropicOptions()); // configured from ANTHROPIC_API_KEY
     const res = await client.messages.create(
       {
         model,
@@ -541,7 +541,8 @@ export type ReadIntentContext = ResolveIntentContext & {
   // Read and write directory. Default: reads LIVE_CACHE_DIR (gitignored) then the committed demo cache
   // (INTENT_CACHE_DIR); live results are written to LIVE_CACHE_DIR, never to the fixtures.
   cacheDir?: string;
-  model?: string;
+  model?: string;              // the recorded model the cache lookup is keyed on (default INTENT_MODEL)
+  liveModel?: string;          // the model a live call on a miss uses (default ASK_LIVE_MODEL); its answer is stored under its own key
 };
 
 // A phrase the model reports must be words the owner wrote.
@@ -569,24 +570,29 @@ export async function readIntent(question: string, ctx: ReadIntentContext): Prom
     if (question.length > MAX_QUESTION_CHARS) return unreadable(question, "That question is too long. Ask it in a sentence or two.");
     const model = ctx.model ?? INTENT_MODEL;
     const content = intentContent(question);
+    const liveModel = ctx.liveModel ?? ASK_LIVE_MODEL;
     const key = intentCacheKey(question, model);
+    const liveKey = intentCacheKey(question, liveModel); // where a live answer is stored; read back too
     const writeDir = ctx.cacheDir ?? LIVE_CACHE_DIR;
     const readDirs = ctx.cacheDir ? [ctx.cacheDir] : [LIVE_CACHE_DIR, INTENT_CACHE_DIR];
 
     let raw: AskIntentRaw | undefined;
-    for (const dir of readDirs) {
-      const hit = readCache(dir, key);
-      const parsed = hit ? AskIntentRawSchema.safeParse(hit.output) : undefined;
-      if (parsed?.success) { raw = parsed.data; break; }
-      // A cache entry that no longer fits the schema is a miss.
+    for (const k of new Set([key, liveKey])) {
+      for (const dir of readDirs) {
+        const hit = readCache(dir, k);
+        const parsed = hit ? AskIntentRawSchema.safeParse(hit.output) : undefined;
+        if (parsed?.success) { raw = parsed.data; break; }
+        // A cache entry that no longer fits the schema is a miss.
+      }
+      if (raw) break;
     }
     if (!raw) {
       if (ctx.mode === "cache_only") return unreadable(question, "I can't read that question right now (demo mode has no saved answer for it). Try one of the example questions.");
-      const result = await callIntentModel(ctx.client, content, model);
+      const result = await callIntentModel(ctx.client, content, liveModel);
       if ("problem" in result) return unreadable(question, `I couldn't read that question: ${result.problem}. Try asking it again.`);
       raw = result.output;
       try {
-        writeCache(writeDir, { key, promptVersion: INTENT_PROMPT_VERSION, model, source: "live", output: raw });
+        writeCache(writeDir, { key: liveKey, promptVersion: INTENT_PROMPT_VERSION, model: liveModel, source: "live", output: raw });
       } catch {
         // A failed cache write must not lose a good reading.
       }

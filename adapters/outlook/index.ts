@@ -7,6 +7,7 @@
 
 import type { Attachment, IntakeInput } from "../../ai/intake";
 import type { SheetContent } from "../../ai/extract/sheet";
+import type { Evidence } from "../../schema/records";
 import { ConnectorFailure, type Fetch, type PullResult, type TokenProvider } from "../connector";
 import { summarize, type ImportDiagnostics, type RowError } from "../core/diagnostics";
 import { childEvidenceId, recordEvidenceId } from "../core/ids";
@@ -21,6 +22,7 @@ export type OutlookPullInput = {
   knownDomains?: string[];            // sender domains of known customers and suppliers
   mailbox?: string;                   // read this user's mail (app-only token); default: the signed-in user
   fetch?: Fetch;
+  existingEvidence?: Evidence[];      // messages already read are skipped: no second extraction, no repeated cost
 };
 
 export type OutlookPull = {
@@ -62,12 +64,16 @@ async function pull(input: OutlookPullInput): Promise<OutlookPull> {
   const warnings: string[] = [];
   const inputs: OutlookPull["inputs"] = [];
   let skipped = 0;
+  let alreadyRead = 0;
+  const have = new Set((input.existingEvidence ?? []).map((e) => e.id));
   if (truncated) warnings.push(`Only the newest ${records.length} messages were read; narrow the date range to see older ones.`);
 
   for (const [i, m] of records.entries()) {
     const id = str(m.id);
     if (!id) continue;
     const row = i + 1;
+    // Already read on an earlier pull (the evidence id comes from the message id, which survives folder moves).
+    if (have.has(recordEvidenceId("email", str(m.internetMessageId) ?? id))) { alreadyRead++; continue; }
     const subject = oneLine(str(m.subject) ?? "(no subject)");
     const body = str((m.body as { content?: string } | undefined)?.content) ?? "";
     const from = sender(m);
@@ -145,7 +151,7 @@ async function pull(input: OutlookPullInput): Promise<OutlookPull> {
     inputs,
     diagnostics: summarize({
       evidenceId: "outlook", source: "email", startedAt: input.now, rowsRead: records.length - skipped,
-      rowsImported: inputs.length, rowsDuplicate: 0, errors, warnings, syncedAt: input.now,
+      rowsImported: inputs.length, rowsDuplicate: alreadyRead, errors, warnings, syncedAt: input.now,
       ...(str(records[0]?.receivedDateTime) ? { newestRecordAt: str(records[0]?.receivedDateTime)! } : {}),
     }),
   };

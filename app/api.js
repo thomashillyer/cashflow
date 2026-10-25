@@ -149,6 +149,10 @@ const preview = {
   async uploadFile() {
     return { preview: true };
   },
+  // Preview has no live sources: connecting is simulated, so there is nothing to pull.
+  async pullSource() {
+    return null;
+  },
   // Parked thoughts (owner notes). Neri proposes a reading; owner confirms before it touches cash.
   async notes() {
     return engine.thoughts();
@@ -169,6 +173,11 @@ const preview = {
 // that sample instead of its default. A signed-in owner's own business comes from their session, so a
 // non-sample account sends no header.
 let openedBiz = null;
+// "Hide names" (Settings): ask the server to mask names and contact details, so real ones never reach this page.
+function maskHeader() {
+  try { return localStorage.getItem("neri.mask") === "1" ? { "x-neri-mask": "1" } : {}; } catch { return {}; }
+}
+
 function businessHeader() {
   const acc = readAccount() ?? memAccount;
   return openedBiz && (!acc || acc.sample) ? { "X-Neri-Business": openedBiz } : {};
@@ -193,7 +202,7 @@ function visitor() {
 
 async function http(path, init) {
   const token = await auth.accessToken().catch(() => null);
-  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader(), "X-Neri-Visitor": visitor() };
+  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader(), ...maskHeader(), "X-Neri-Visitor": visitor() };
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (res.status === 401) {
     await auth.signOut().catch(() => {});
@@ -320,6 +329,10 @@ const live = {
     let bin = "";
     for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
     return http("/import/upload", { method: "POST", body: JSON.stringify({ fileName: file.name, base64: btoa(bin) }) });
+  },
+  // Read a connected app (Zoho Books, Zoho CRM, Microsoft 365) into this business. Read-only on the app's side.
+  async pullSource(id) {
+    return http(`/sources/${encodeURIComponent(id)}/pull`, { method: "POST", body: "{}" });
   },
   async setSafetyLine(cents) {
     return http("/profile", { method: "PUT", body: JSON.stringify({ safetyLine: { kind: "fixed", amount: cents } }) });

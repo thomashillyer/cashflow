@@ -4,6 +4,7 @@
 // for the owner. Called from the /import/:adapter handler in review.ts for adapter "bank".
 
 import type { BankMapping } from "../../adapters/bank_csv";
+import { sha256Hex } from "../../adapters/core/hash";
 import { prepareBankImport } from "../../adapters/prepare";
 import { HttpError } from "../http";
 import type { Business, Store } from "../store";
@@ -22,7 +23,7 @@ function bankMapping(v: unknown): BankMapping | undefined {
 }
 
 // `store` is the request's own view (storeFor(req)): on the public demo a visitor's statement goes to their private copy.
-export async function importBank(store: Pick<Store, "load" | "upsertRecords">, b: Business, body: Record<string, unknown>, now: string) {
+export async function importBank(store: Pick<Store, "load" | "upsertRecords" | "deleteEvents">, b: Business, body: Record<string, unknown>, now: string) {
   const text = typeof body.text === "string" ? body.text : undefined;
   const fileName = typeof body.fileName === "string" && body.fileName.trim() !== "" ? body.fileName.slice(0, 200) : "statement.csv";
   let bytes: Uint8Array;
@@ -52,29 +53,52 @@ export async function importBank(store: Pick<Store, "load" | "upsertRecords">, b
   });
   if (!prep.ok) throw new HttpError(422, "UNREADABLE", `${prep.message} ${prep.nextStep}`);
   const { bank } = prep;
-  const summary = { events: bank.events.length, balances: bank.balances.length, recurring: bank.recurring.length };
+  const today = now.slice(0, 10);
+  let events = bank.events;
+  let balances = bank.balances;
+  const notes: string[] = [];
+  // A statement that runs up to today has an end-of-day balance dated tomorrow (start of day), and the forecast starts
+  // today, so it would be ignored. Use it as today's opening cash; lines dated today are already inside that balance.
+  const snap = balances[0];
+  if (snap && snap.asOf > today) {
+    balances = [{ ...snap, id: snap.id.replace(snap.asOf, today), asOf: today }];
+    const inside = events.filter((e) => e.date >= today).length;
+    events = events.filter((e) => e.date < today);
+    notes.push(`This statement runs up to today, so its balance already includes today's activity. Neri used it as today's opening cash${inside ? ` and left out ${inside} line${inside === 1 ? "" : "s"} dated today, which are already inside that balance` : ""}.`);
+  }
+  const summary = { events: events.length, balances: balances.length, recurring: bank.recurring.length };
 
   if (prep.repeat) {
     return { repeat: true, repeatOf: prep.evidenceId, written: false, storeRevision, diagnostics: bank.diagnostics, mapping: bank.mapping, recurring: [], unallocated: 0, balance: null, preview: { events: 0, balances: 0, recurring: 0 } };
   }
   // Nothing readable (wrong columns, every row rejected): write nothing, so the file is not remembered as imported
   // and the owner can fix the mapping and send it again.
-  if (bank.events.length === 0 && bank.balances.length === 0) {
+  if (events.length === 0 && balances.length === 0) {
     return { repeat: false, written: false, storeRevision, diagnostics: bank.diagnostics, mapping: bank.mapping, recurring: [], unallocated: 0, balance: null, preview: summary };
   }
   // Events and balance first, the evidence (which carries the file hash that makes a later upload a repeat) last:
   // a failure partway through leaves the file importable again. All ids are stable, so a re-run upserts.
-  await store.upsertRecords(b.id, { events: bank.events, balances: bank.balances });
+  // A corrected re-import (a different date order, column or sign) gives the same lines new ids. Replace this file's
+  // earlier events instead of adding to them, or every line would be counted twice. Deleted first: if the write
+  // below fails the evidence is not saved, the file is not remembered as imported, and a retry rebuilds everything.
+  if (retry) {
+    const tag = `${sha256Hex(bytes).slice(0, 12)}:`;
+    const keep = new Set(events.map((e) => e.id));
+    const old = records.events.filter((e) => e.sourceRef.system === "bank_csv" && e.sourceRef.record.startsWith(tag) && !keep.has(e.id)).map((e) => e.id);
+    if (old.length) await store.deleteEvents(b.id, old);
+  }
+  await store.upsertRecords(b.id, { events, balances });
   const revision = await store.upsertRecords(b.id, { evidence: [bank.evidence] });
   // The engine adds the latest balance of every account. A balance already on file under another name would be
   // counted on top of this one, so say so while the owner can still fix it (import again with the account's name).
-  const savedAs = bank.balances[0]?.account;
+  const savedAs = balances[0]?.account;
   const others = [...new Set(records.balances.map((x) => x.account))].filter((a) => a !== savedAs);
+  const withNotes = notes.length ? { ...bank.diagnostics, warnings: [...bank.diagnostics.warnings, ...notes] } : bank.diagnostics;
   const diagnostics = savedAs && others.length > 0
-    ? { ...bank.diagnostics, warnings: [...bank.diagnostics.warnings, `Your books already have a balance for ${others.map((a) => `"${a}"`).join(", ")}. This statement was saved as the account "${savedAs}", so both balances are added together. If they are the same account, import the statement again and give that account's name.`] }
-    : bank.diagnostics;
+    ? { ...withNotes, warnings: [...withNotes.warnings, `Your books already have a balance for ${others.map((a) => `"${a}"`).join(", ")}. This statement was saved as the account "${savedAs}", so both balances are added together. If they are the same account, import the statement again and give that account's name.`] }
+    : withNotes;
   return {
     repeat: false, written: true, storeRevision: revision, evidence: bank.evidence, diagnostics, mapping: bank.mapping,
-    recurring: bank.recurring, unallocated: bank.unallocated, balance: bank.balances[0] ?? null, preview: summary,
+    recurring: bank.recurring, unallocated: events.length, balance: balances[0] ?? null, preview: summary,
   };
 }
