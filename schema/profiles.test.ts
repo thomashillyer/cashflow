@@ -7,6 +7,9 @@ import type { Anchor, Profile } from "./profile";
 import type { CommitmentType, Records, Scenario } from "./records";
 import { forecast } from "../engine/forecast";
 import { diffDays } from "../engine/dates";
+import { smallestUpfrontShare } from "../engine/affordability";
+import { legGetsLag } from "../engine/expand";
+import { engineSettings } from "../engine/settings";
 
 const dir = join(import.meta.dirname, "..", "profiles");
 const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
@@ -46,6 +49,7 @@ describe.each(files)("profile %s", (file) => {
         expect(Number.isInteger(l.offsetDays), pat.id).toBe(true);
         expect(["in", "out"], pat.id).toContain(l.direction);
         if (l.anchor === "weekday") expect([0, 1, 2, 3, 4, 5, 6], `${pat.id} weekday`).toContain(l.weekday);
+        if (l.lagged !== undefined) expect(typeof l.lagged, `${pat.id} lagged`).toBe("boolean");
       }
       for (const lc of pat.linkedCosts ?? []) {
         expect(ids, `${pat.id} linked cost`).toContain(lc.patternId);
@@ -135,4 +139,73 @@ it("agency.json: both milestone legs get the client's lag", () => {
   // order Oct 20 + 60 = Dec 19, + 15 = Jan 3; delivery Nov 1 + 60 = Dec 31, + 15 = Jan 15; $20,000 split 50/50
   expect(legs.map((e) => `${e.legIndex}:${e.date}:${e.amount}`)).toEqual(["0:2027-01-03:1000000", "1:2027-01-15:1000000"]);
   for (const e of legs) expect(e.basis).toMatch(/\+ 15 days \(profile default; no payment history\)/);
+});
+
+// #137: a leg's own `lagged` flag decides whether it gets the party's lag, overriding engine.lag.laggedAnchors and
+// laggedTypes for that leg only. No payment history, so a lagged leg lands defaultLagDays after its offset date.
+describe("per-leg lagged flag", () => {
+  const src = { system: "test", record: "x" };
+  const agency = () => JSON.parse(readFileSync(join(dir, "agency.json"), "utf8")) as Profile;
+  const deal = (anchors: Record<string, string>, patternId: string): Records => ({
+    parties: [], events: [], signals: [], rules: [], settlements: [], evidence: [],
+    balances: [{ id: "bal", account: "main", amount: 0, currency: "USD", asOf: "2026-11-16", sourceRef: src }],
+    commitments: [{ id: "d", type: "sales_deal", partyId: "client", amount: 1_000_000, currency: "USD", anchors, status: "likely", patternId, sourceRef: src }],
+  });
+  const withPattern = (p: Profile, legs: Profile["paymentPatterns"][number]["legs"]): Profile => ({
+    ...p, paymentPatterns: [...p.paymentPatterns, { id: "t", appliesTo: "sales_deal", legs }],
+  });
+  const dates = (r: Records, p: Profile) =>
+    forecast(r, p, { id: "base", kind: "base", overrides: [] }, "2026-11-16", {}).events.filter((e) => e.commitmentId === "d").map((e) => e.date);
+
+  it("agency no longer lags order legs profile-wide", () => {
+    expect(agency().engine?.lag?.laggedAnchors).toBeUndefined();
+  });
+
+  it("lagged: true on a non-lagged anchor gets the lag", () => {
+    const p = withPattern(agency(), [{ share: 1, anchor: "order", offsetDays: 0, direction: "in", lagged: true }]);
+    expect(dates(deal({ order: "2026-11-20" }, "t"), p)).toEqual(["2026-12-05"]);
+  });
+
+  it("lagged: false on a lagged anchor does not", () => {
+    const p = withPattern(agency(), [{ share: 1, anchor: "delivery", offsetDays: 30, direction: "in", lagged: false }]);
+    expect(dates(deal({ delivery: "2026-11-20" }, "t"), p)).toEqual(["2026-12-20"]);
+  });
+
+  it("an agency order-day deposit leg without the flag is not lagged and stays upfront", () => {
+    const legs = [
+      { share: 0.3, anchor: "order" as const, offsetDays: 0, direction: "in" as const },
+      { share: 0.7, anchor: "delivery" as const, offsetDays: 60, direction: "in" as const, lagged: true },
+    ];
+    const p = withPattern(agency(), legs);
+    const r = deal({ order: "2026-11-20", delivery: "2026-12-01" }, "t");
+    expect(dates(r, p)).toEqual(["2026-11-20", "2027-02-14"]);
+    expect(smallestUpfrontShare(r, p, [], "d", "2026-11-16", {}).upfrontLegs).toEqual([0]);
+    // The same order-day leg flagged lagged waits on the client, so it is not money in hand at signing.
+    const q = withPattern(agency(), [{ ...legs[0]!, lagged: true }, legs[1]!]);
+    expect(dates(r, q)).toEqual(["2026-12-05", "2027-02-14"]);
+    expect(smallestUpfrontShare(r, q, [], "d", "2026-11-16", {}).note).toMatch(/no deposit leg/);
+  });
+});
+
+describe("lagged flag stored with the wrong type (review of #137)", () => {
+  it("a non-boolean lagged is ignored and flagged; lagged on a payment is flagged", () => {
+    const base = JSON.parse(readFileSync(join(import.meta.dirname, "..", "profiles", "trading.json"), "utf8"));
+    const profile = {
+      ...base,
+      paymentPatterns: [
+        ...base.paymentPatterns,
+        { id: "bad_flag", appliesTo: "plan", legs: [{ share: 1, anchor: "due", offsetDays: 0, direction: "in", lagged: "false" }] },
+        { id: "flag_on_payment", appliesTo: "plan", legs: [{ share: 1, anchor: "due", offsetDays: 0, direction: "out", lagged: true }] },
+      ],
+    };
+    const leg = profile.paymentPatterns.at(-2).legs[0];
+    const c = { id: "x", type: "invoice", amount: 100, currency: "USD", anchors: { due: "2026-11-02" }, status: "committed", sourceRef: { system: "t", record: "x" } };
+    // the string "false" is not honored as true: falls back to the lists (invoice + due anchor -> lagged by default)
+    expect(legGetsLag({ ...leg, anchor: "order" }, c as never, engineSettings(profile))).toBe(false);
+    const empty = { parties: [], commitments: [], events: [], signals: [], rules: [], settlements: [], balances: [{ id: "b", account: "a", amount: 0, currency: "USD", asOf: "2026-10-26", sourceRef: { system: "t", record: "b" } }], evidence: [] };
+    const run = forecast(empty as never, profile, { id: "base", kind: "base", overrides: [] }, "2026-10-26", {});
+    const msgs = (run.review?.reasons ?? []).filter((r) => r.code === "invalid_profile").map((r) => r.message).join(" ");
+    expect(msgs).toMatch(/bad_flag leg 1: lagged must be true or false/);
+    expect(msgs).toMatch(/flag_on_payment leg 1: lagged applies only to money coming in/);
+  });
 });

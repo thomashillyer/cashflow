@@ -3,7 +3,7 @@
 // Pure: no I/O, no clock (asOf is an input), no randomness. Integer cents with exact remainder allocation.
 //
 // One definition of "share" throughout: for a share X, the deal's upfront legs (inflow legs anchored to `order`
-// with offsetDays <= 0, i.e. the deposit) total X of the deal's open inflow amount, and the remainder is spread over
+// with offsetDays <= 0 that do not wait on the customer's lag, i.e. the deposit) total X of the deal's open inflow amount, and the remainder is spread over
 // the other inflow legs in proportion to their current amounts. Leg dates never change. X = current share is
 // exactly the base run.
 
@@ -12,6 +12,7 @@ import type { Profile } from "../schema/profile";
 import type { ForecastRun } from "../schema/forecast";
 import { forecast } from "./forecast";
 import { ENGINE_DEFAULTS, engineSettings } from "./settings";
+import { legGetsLag } from "./expand";
 
 // Default of profile engine.affordabilityStep; opts.step wins over the profile.
 export const DEFAULT_SHARE_STEP = ENGINE_DEFAULTS.affordabilityStep;
@@ -45,9 +46,12 @@ function pattern(c: Commitment, profile: Profile) {
   return profile.paymentPatterns.find((p) => p.appliesTo === c.type && p.isDefault);
 }
 
-// Pattern leg indexes that count as upfront: inflow legs due on or before the order date.
+// Pattern leg indexes that count as upfront: inflow legs due on or before the order date. A leg that gets the
+// customer's lag (its own `lagged: true`, or order in engine.lag.laggedAnchors) lands after the order date, so it is
+// not money in hand at signing and is not upfront; with the default lists no order-day leg is lagged.
 function patternUpfrontLegs(deal: Commitment, profile: Profile): number[] {
-  return (pattern(deal, profile)?.legs ?? []).flatMap((l, i) => (l.direction === "in" && l.anchor === "order" && l.offsetDays <= 0 ? [i] : []));
+  const tun = engineSettings(profile);
+  return (pattern(deal, profile)?.legs ?? []).flatMap((l, i) => (l.direction === "in" && l.anchor === "order" && l.offsetDays <= 0 && !legGetsLag(l, deal, tun) ? [i] : []));
 }
 
 // Split `total` over `weights` in proportion, floor each part and put the exact remainder on the last.

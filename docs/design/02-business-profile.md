@@ -35,6 +35,7 @@ Every pattern is a list of legs: a share of the total, an anchor date, an offset
 
 - **Anchors are a fixed set:** `order`, `ship`, `delivery`, `invoice`, `due`, `month_end`, `weekday`. The engine stays generic because it only understands these.
 - **`month_end`** is the last day of the calendar month of the invoice date (else due, order, delivery); `offsetDays` counts from it, so "net 30 EOM" is `{ anchor: "month_end", offsetDays: 30 }`. **`weekday`** needs a leg `weekday` (0 = Monday .. 6 = Sunday) and resolves to the first such day on/after the invoice date (else order, else due), plus `offsetDays`; without `weekday` the leg is not scheduled and warns.
+- **`lagged`** (optional, per leg): `true` gives this inflow leg the customer's payment lag, `false` never does; it overrides `engine.lag.laggedAnchors`/`laggedTypes` for that leg only. Omit it to use those lists. A lagged order-day leg is not treated as upfront by the affordability search.
 - **Card settlement:** `revenueModel.settleLagDays` (dailySales, default 0) lands each day's sales that many days after the sale.
 - **`linkedCosts`** lets a sales deal pull in its supplier payments. That is how "can I afford this order?" works for any business that buys before it sells.
 - **Lead times** (`leadTimes.transitDays`, `leadTimes.productionDays`) let the engine estimate a missing anchor (for example, delivery = ship + transit).
@@ -76,7 +77,7 @@ type Profile = {
 type PaymentPattern = {
   id: string;
   appliesTo: "invoice" | "bill" | "sales_deal" | "purchase_order" | "recurring" | "plan";
-  legs: { share: number; anchor: Anchor; offsetDays: number; direction: "in" | "out" }[];
+  legs: { share: number; anchor: Anchor; offsetDays: number; direction: "in" | "out"; weekday?: number; lagged?: boolean }[];
   linkedCosts?: string[];
 };
 
@@ -106,7 +107,7 @@ Every number the engine uses that depends on the business reads from the profile
 | `affordabilityStep` | Grid step of the "smallest upfront share" search for a deal | 0.05 |
 | `urgencyScaleDays` | Ranking decay: `score = value / (1 + daysUntilNeeded / urgencyScaleDays) × confidence × relationship` | 7 |
 
-Kept as engine constants (math, not business choices): `actual` confidence 1 and owner-rule lag confidence 1, median and quartiles (0.25/0.75) in the lag model, round-half-up of lag days, the basis-point grid of the affordability search, and the three items of "three things to do today". `restaurant.json` shows `salesHistoryDays` and `dailySalesConfidence` explicitly. `agency.json` adds `order` to `lag.laggedAnchors`: both `milestones_50_50` legs are client invoices on net-60 terms (the first billed at order, the second at delivery), so both wait on the client and get the client's lag. `trading.json` and `contractor.json` keep the default list, because their order-day legs are upfront deposits paid before work starts. The other fields use the defaults.
+Kept as engine constants (math, not business choices): `actual` confidence 1 and owner-rule lag confidence 1, median and quartiles (0.25/0.75) in the lag model, round-half-up of lag days, the basis-point grid of the affordability search, and the three items of "three things to do today". `restaurant.json` shows `salesHistoryDays` and `dailySalesConfidence` explicitly. `agency.json` marks both `milestones_50_50` legs `lagged: true`: they are client invoices on net-60 terms (the first billed at order, the second at delivery), so both wait on the client and get the client's lag, while any order-day deposit leg stays unlagged and upfront under the default `lag.laggedAnchors`. The other fields use the defaults.
 
 ## Starter templates to ship
 
