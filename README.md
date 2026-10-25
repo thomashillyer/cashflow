@@ -12,6 +12,7 @@ This repository contains the design and contributor checklists. The application 
 4. Integrate at 1:00, freeze features at 3:00, submit by 5:30 ([timeline](docs/design/11-plan-demo-risks.md)).
 5. Run the app and API: [`api/README.md`](api/README.md) (`npm run dev`, http://localhost:8787).
 6. Wiring the AI modules into routes (api/app and integration lanes): [`ai/README.md`](ai/README.md), with a runnable example in [`ai/integration.example.test.ts`](ai/integration.example.test.ts).
+7. Rehearse the [five-minute demo script](docs/DEMO_SCRIPT.md): new user onboarding, then a returning owner's review, forecast, and drafted-action workflow, with setup and reset instructions.
 
 ## Five roles
 
