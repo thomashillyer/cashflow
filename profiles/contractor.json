@@ -9,12 +9,17 @@
   "safetyLine": { "kind": "weeksOfFixedCosts", "weeks": 3 },
   "paymentPatterns": [
     {
-      "id": "progress_billing_retainage_10",
+      "id": "invoice_due",
       "appliesTo": "invoice",
       "isDefault": true,
+      "legs": [{ "share": 1, "anchor": "due", "offsetDays": 0, "direction": "in" }]
+    },
+    {
+      "id": "progress_billing_retainage_10",
+      "appliesTo": "invoice",
       "legs": [
         { "share": 0.9, "anchor": "due", "offsetDays": 0, "direction": "in" },
-        { "share": 0.1, "anchor": "delivery", "offsetDays": 60, "direction": "in" }
+        { "share": 0.1, "anchor": "due", "offsetDays": 60, "direction": "in" }
       ]
     },
     {
@@ -29,10 +34,10 @@
       "linkedCosts": [{ "patternId": "job_materials_net30", "share": 0.4 }]
     },
     {
-      "id": "materials_net30",
+      "id": "materials_bill_due",
       "appliesTo": "bill",
       "isDefault": true,
-      "legs": [{ "share": 1, "anchor": "invoice", "offsetDays": 30, "direction": "out" }]
+      "legs": [{ "share": 1, "anchor": "due", "offsetDays": 0, "direction": "out" }]
     },
     {
       "id": "job_materials_net30",

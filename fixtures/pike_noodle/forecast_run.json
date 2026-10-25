@@ -1,7 +1,7 @@
 {
-  "id": "run-base-1dc5f0dc47dc",
+  "id": "run-base-c7d54c2c83fd",
   "asOf": "2026-11-16",
-  "inputsHash": "1dc5f0dc47dc2fb92bf15d6ea4ae77467068b360a4d87f55f9c8c48492f6a269",
+  "inputsHash": "c7d54c2c83fd6098a6e44fad1e15030d6dd539c22a73649362c7c4f19a7d8b55",
   "scenarioId": "base",
   "fxRates": {
     "USD": 1
@@ -11,36 +11,36 @@
   "days": [
     {
       "date": "2026-11-16",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 2318442,
+      "closing": 2555327,
       "eventIds": [
         "evt-daily-sales-2026-11-16"
       ]
     },
     {
       "date": "2026-11-17",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 2456625,
+      "closing": 2831693,
       "eventIds": [
         "evt-daily-sales-2026-11-17"
       ]
     },
     {
       "date": "2026-11-18",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 2614548,
+      "closing": 2950135,
       "eventIds": [
         "evt-daily-sales-2026-11-18"
       ]
     },
     {
       "date": "2026-11-19",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 530000,
-      "closing": 2281952,
+      "closing": 2558318,
       "eventIds": [
         "evt-bill-FP-4400-0",
         "evt-bill-NW-4400-0",
@@ -49,9 +49,9 @@
     },
     {
       "date": "2026-11-20",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 990000,
-      "closing": 1588058,
+      "closing": 1726241,
       "eventIds": [
         "evt-daily-sales-2026-11-20",
         "evt-rec-payroll-0",
@@ -60,16 +60,16 @@
     },
     {
       "date": "2026-11-21",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 1943385,
+      "closing": 1923645,
       "eventIds": [
         "evt-daily-sales-2026-11-21"
       ]
     },
     {
       "date": "2026-11-22",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 2219751,
       "eventIds": [
@@ -78,36 +78,36 @@
     },
     {
       "date": "2026-11-23",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 2338193,
+      "closing": 2575078,
       "eventIds": [
         "evt-daily-sales-2026-11-23"
       ]
     },
     {
       "date": "2026-11-24",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 2476376,
+      "closing": 2851444,
       "eventIds": [
         "evt-daily-sales-2026-11-24"
       ]
     },
     {
       "date": "2026-11-25",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 2634299,
+      "closing": 2969886,
       "eventIds": [
         "evt-daily-sales-2026-11-25"
       ]
     },
     {
       "date": "2026-11-26",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 390000,
-      "closing": 2441703,
+      "closing": 2718069,
       "eventIds": [
         "evt-bill-FP-4401-0",
         "evt-daily-sales-2026-11-26"
@@ -115,9 +115,9 @@
     },
     {
       "date": "2026-11-27",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 750000,
-      "closing": 1987809,
+      "closing": 2125992,
       "eventIds": [
         "evt-daily-sales-2026-11-27",
         "evt-rec-payroll-1"
@@ -125,16 +125,16 @@
     },
     {
       "date": "2026-11-28",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 2343136,
+      "closing": 2323396,
       "eventIds": [
         "evt-daily-sales-2026-11-28"
       ]
     },
     {
       "date": "2026-11-29",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 2619502,
       "eventIds": [
@@ -143,18 +143,18 @@
     },
     {
       "date": "2026-11-30",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 2737944,
+      "closing": 2974829,
       "eventIds": [
         "evt-daily-sales-2026-11-30"
       ]
     },
     {
       "date": "2026-12-01",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 550000,
-      "closing": 2326127,
+      "closing": 2701195,
       "eventIds": [
         "evt-daily-sales-2026-12-01",
         "evt-rec-rent-0"
@@ -162,18 +162,18 @@
     },
     {
       "date": "2026-12-02",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 2484050,
+      "closing": 2819637,
       "eventIds": [
         "evt-daily-sales-2026-12-02"
       ]
     },
     {
       "date": "2026-12-03",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 550000,
-      "closing": 2131454,
+      "closing": 2407820,
       "eventIds": [
         "evt-bill-FP-4402-0",
         "evt-bill-NW-4402-0",
@@ -182,9 +182,9 @@
     },
     {
       "date": "2026-12-04",
-      "inflow": 496106,
+      "inflow": 357923,
       "outflow": 750000,
-      "closing": 1877560,
+      "closing": 2015743,
       "eventIds": [
         "evt-daily-sales-2026-12-04",
         "evt-plan-catering-2026-12-04-0",
@@ -193,16 +193,16 @@
     },
     {
       "date": "2026-12-05",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 2232887,
+      "closing": 2213147,
       "eventIds": [
         "evt-daily-sales-2026-12-05"
       ]
     },
     {
       "date": "2026-12-06",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 2509253,
       "eventIds": [
@@ -211,36 +211,36 @@
     },
     {
       "date": "2026-12-07",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 2627695,
+      "closing": 2864580,
       "eventIds": [
         "evt-daily-sales-2026-12-07"
       ]
     },
     {
       "date": "2026-12-08",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 2765878,
+      "closing": 3140946,
       "eventIds": [
         "evt-daily-sales-2026-12-08"
       ]
     },
     {
       "date": "2026-12-09",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 2923801,
+      "closing": 3259388,
       "eventIds": [
         "evt-daily-sales-2026-12-09"
       ]
     },
     {
       "date": "2026-12-10",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 410000,
-      "closing": 2711205,
+      "closing": 2987571,
       "eventIds": [
         "evt-bill-FP-4403-0",
         "evt-daily-sales-2026-12-10"
@@ -248,9 +248,9 @@
     },
     {
       "date": "2026-12-11",
-      "inflow": 646106,
+      "inflow": 507923,
       "outflow": 750000,
-      "closing": 2607311,
+      "closing": 2745494,
       "eventIds": [
         "evt-daily-sales-2026-12-11",
         "evt-plan-catering-2026-12-11-0",
@@ -259,16 +259,16 @@
     },
     {
       "date": "2026-12-12",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 2962638,
+      "closing": 2942898,
       "eventIds": [
         "evt-daily-sales-2026-12-12"
       ]
     },
     {
       "date": "2026-12-13",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 3239004,
       "eventIds": [
@@ -277,36 +277,36 @@
     },
     {
       "date": "2026-12-14",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 3357446,
+      "closing": 3594331,
       "eventIds": [
         "evt-daily-sales-2026-12-14"
       ]
     },
     {
       "date": "2026-12-15",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 3495629,
+      "closing": 3870697,
       "eventIds": [
         "evt-daily-sales-2026-12-15"
       ]
     },
     {
       "date": "2026-12-16",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 3653552,
+      "closing": 3989139,
       "eventIds": [
         "evt-daily-sales-2026-12-16"
       ]
     },
     {
       "date": "2026-12-17",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 530000,
-      "closing": 3320956,
+      "closing": 3597322,
       "eventIds": [
         "evt-bill-FP-4404-0",
         "evt-bill-NW-4404-0",
@@ -315,9 +315,9 @@
     },
     {
       "date": "2026-12-18",
-      "inflow": 546106,
+      "inflow": 407923,
       "outflow": 750000,
-      "closing": 3117062,
+      "closing": 3255245,
       "eventIds": [
         "evt-daily-sales-2026-12-18",
         "evt-plan-catering-2026-12-18-0",
@@ -326,16 +326,16 @@
     },
     {
       "date": "2026-12-19",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 3472389,
+      "closing": 3452649,
       "eventIds": [
         "evt-daily-sales-2026-12-19"
       ]
     },
     {
       "date": "2026-12-20",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 240000,
       "closing": 3508755,
       "eventIds": [
@@ -345,36 +345,36 @@
     },
     {
       "date": "2026-12-21",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 3627197,
+      "closing": 3864082,
       "eventIds": [
         "evt-daily-sales-2026-12-21"
       ]
     },
     {
       "date": "2026-12-22",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 3765380,
+      "closing": 4140448,
       "eventIds": [
         "evt-daily-sales-2026-12-22"
       ]
     },
     {
       "date": "2026-12-23",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 3923303,
+      "closing": 4258890,
       "eventIds": [
         "evt-daily-sales-2026-12-23"
       ]
     },
     {
       "date": "2026-12-24",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 390000,
-      "closing": 3730707,
+      "closing": 4007073,
       "eventIds": [
         "evt-bill-FP-4405-0",
         "evt-daily-sales-2026-12-24"
@@ -382,9 +382,9 @@
     },
     {
       "date": "2026-12-25",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 750000,
-      "closing": 3276813,
+      "closing": 3414996,
       "eventIds": [
         "evt-daily-sales-2026-12-25",
         "evt-rec-payroll-5"
@@ -392,16 +392,16 @@
     },
     {
       "date": "2026-12-26",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 3632140,
+      "closing": 3612400,
       "eventIds": [
         "evt-daily-sales-2026-12-26"
       ]
     },
     {
       "date": "2026-12-27",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 3908506,
       "eventIds": [
@@ -410,36 +410,36 @@
     },
     {
       "date": "2026-12-28",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 4026948,
+      "closing": 4263833,
       "eventIds": [
         "evt-daily-sales-2026-12-28"
       ]
     },
     {
       "date": "2026-12-29",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 4165131,
+      "closing": 4540199,
       "eventIds": [
         "evt-daily-sales-2026-12-29"
       ]
     },
     {
       "date": "2026-12-30",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 4323054,
+      "closing": 4658641,
       "eventIds": [
         "evt-daily-sales-2026-12-30"
       ]
     },
     {
       "date": "2026-12-31",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 550000,
-      "closing": 3970458,
+      "closing": 4246824,
       "eventIds": [
         "evt-bill-FP-4406-0",
         "evt-bill-NW-4406-0",
@@ -448,9 +448,9 @@
     },
     {
       "date": "2027-01-01",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 1300000,
-      "closing": 2966564,
+      "closing": 3104747,
       "eventIds": [
         "evt-daily-sales-2027-01-01",
         "evt-rec-payroll-6",
@@ -459,16 +459,16 @@
     },
     {
       "date": "2027-01-02",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 3321891,
+      "closing": 3302151,
       "eventIds": [
         "evt-daily-sales-2027-01-02"
       ]
     },
     {
       "date": "2027-01-03",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 3598257,
       "eventIds": [
@@ -477,36 +477,36 @@
     },
     {
       "date": "2027-01-04",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 3716699,
+      "closing": 3953584,
       "eventIds": [
         "evt-daily-sales-2027-01-04"
       ]
     },
     {
       "date": "2027-01-05",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 3854882,
+      "closing": 4229950,
       "eventIds": [
         "evt-daily-sales-2027-01-05"
       ]
     },
     {
       "date": "2027-01-06",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 4012805,
+      "closing": 4348392,
       "eventIds": [
         "evt-daily-sales-2027-01-06"
       ]
     },
     {
       "date": "2027-01-07",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 410000,
-      "closing": 3800209,
+      "closing": 4076575,
       "eventIds": [
         "evt-bill-FP-4407-0",
         "evt-daily-sales-2027-01-07"
@@ -514,9 +514,9 @@
     },
     {
       "date": "2027-01-08",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 750000,
-      "closing": 3346315,
+      "closing": 3484498,
       "eventIds": [
         "evt-daily-sales-2027-01-08",
         "evt-rec-payroll-7"
@@ -524,16 +524,16 @@
     },
     {
       "date": "2027-01-09",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 3701642,
+      "closing": 3681902,
       "eventIds": [
         "evt-daily-sales-2027-01-09"
       ]
     },
     {
       "date": "2027-01-10",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 3978008,
       "eventIds": [
@@ -542,9 +542,9 @@
     },
     {
       "date": "2027-01-11",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 250000,
-      "closing": 3846450,
+      "closing": 4083335,
       "eventIds": [
         "evt-bill-WSLCB-2027-0",
         "evt-daily-sales-2027-01-11"
@@ -552,27 +552,27 @@
     },
     {
       "date": "2027-01-12",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 3984633,
+      "closing": 4359701,
       "eventIds": [
         "evt-daily-sales-2027-01-12"
       ]
     },
     {
       "date": "2027-01-13",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 4142556,
+      "closing": 4478143,
       "eventIds": [
         "evt-daily-sales-2027-01-13"
       ]
     },
     {
       "date": "2027-01-14",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 2330000,
-      "closing": 2009960,
+      "closing": 2286326,
       "eventIds": [
         "evt-bill-FP-4408-0",
         "evt-bill-NW-4408-0",
@@ -582,9 +582,9 @@
     },
     {
       "date": "2027-01-15",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 1150000,
-      "closing": 1156066,
+      "closing": 1294249,
       "eventIds": [
         "evt-daily-sales-2027-01-15",
         "evt-rec-est-tax-0",
@@ -593,16 +593,16 @@
     },
     {
       "date": "2027-01-16",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 1511393,
+      "closing": 1491653,
       "eventIds": [
         "evt-daily-sales-2027-01-16"
       ]
     },
     {
       "date": "2027-01-17",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 1787759,
       "eventIds": [
@@ -611,27 +611,27 @@
     },
     {
       "date": "2027-01-18",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 1906201,
+      "closing": 2143086,
       "eventIds": [
         "evt-daily-sales-2027-01-18"
       ]
     },
     {
       "date": "2027-01-19",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 2044384,
+      "closing": 2419452,
       "eventIds": [
         "evt-daily-sales-2027-01-19"
       ]
     },
     {
       "date": "2027-01-20",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 240000,
-      "closing": 1962307,
+      "closing": 2297894,
       "eventIds": [
         "evt-daily-sales-2027-01-20",
         "evt-rec-sales-tax-2"
@@ -639,9 +639,9 @@
     },
     {
       "date": "2027-01-21",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 390000,
-      "closing": 1769711,
+      "closing": 2046077,
       "eventIds": [
         "evt-bill-FP-4409-0",
         "evt-daily-sales-2027-01-21"
@@ -649,9 +649,9 @@
     },
     {
       "date": "2027-01-22",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 750000,
-      "closing": 1315817,
+      "closing": 1454000,
       "eventIds": [
         "evt-daily-sales-2027-01-22",
         "evt-rec-payroll-9"
@@ -659,16 +659,16 @@
     },
     {
       "date": "2027-01-23",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 1671144,
+      "closing": 1651404,
       "eventIds": [
         "evt-daily-sales-2027-01-23"
       ]
     },
     {
       "date": "2027-01-24",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 1947510,
       "eventIds": [
@@ -677,36 +677,36 @@
     },
     {
       "date": "2027-01-25",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 2065952,
+      "closing": 2302837,
       "eventIds": [
         "evt-daily-sales-2027-01-25"
       ]
     },
     {
       "date": "2027-01-26",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 2204135,
+      "closing": 2579203,
       "eventIds": [
         "evt-daily-sales-2027-01-26"
       ]
     },
     {
       "date": "2027-01-27",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 2362058,
+      "closing": 2697645,
       "eventIds": [
         "evt-daily-sales-2027-01-27"
       ]
     },
     {
       "date": "2027-01-28",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 550000,
-      "closing": 2009462,
+      "closing": 2285828,
       "eventIds": [
         "evt-bill-FP-4410-0",
         "evt-bill-NW-4410-0",
@@ -715,9 +715,9 @@
     },
     {
       "date": "2027-01-29",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 750000,
-      "closing": 1555568,
+      "closing": 1693751,
       "eventIds": [
         "evt-daily-sales-2027-01-29",
         "evt-rec-payroll-10"
@@ -725,16 +725,16 @@
     },
     {
       "date": "2027-01-30",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 1910895,
+      "closing": 1891155,
       "eventIds": [
         "evt-daily-sales-2027-01-30"
       ]
     },
     {
       "date": "2027-01-31",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 2187261,
       "eventIds": [
@@ -743,9 +743,9 @@
     },
     {
       "date": "2027-02-01",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 550000,
-      "closing": 1755703,
+      "closing": 1992588,
       "eventIds": [
         "evt-daily-sales-2027-02-01",
         "evt-rec-rent-2"
@@ -753,27 +753,27 @@
     },
     {
       "date": "2027-02-02",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 1893886,
+      "closing": 2268954,
       "eventIds": [
         "evt-daily-sales-2027-02-02"
       ]
     },
     {
       "date": "2027-02-03",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 2051809,
+      "closing": 2387396,
       "eventIds": [
         "evt-daily-sales-2027-02-03"
       ]
     },
     {
       "date": "2027-02-04",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 410000,
-      "closing": 1839213,
+      "closing": 2115579,
       "eventIds": [
         "evt-bill-FP-4411-0",
         "evt-daily-sales-2027-02-04"
@@ -781,9 +781,9 @@
     },
     {
       "date": "2027-02-05",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 750000,
-      "closing": 1385319,
+      "closing": 1523502,
       "eventIds": [
         "evt-daily-sales-2027-02-05",
         "evt-rec-payroll-11"
@@ -791,16 +791,16 @@
     },
     {
       "date": "2027-02-06",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 1740646,
+      "closing": 1720906,
       "eventIds": [
         "evt-daily-sales-2027-02-06"
       ]
     },
     {
       "date": "2027-02-07",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 2017012,
       "eventIds": [
@@ -809,36 +809,36 @@
     },
     {
       "date": "2027-02-08",
-      "inflow": 118442,
+      "inflow": 355327,
       "outflow": 0,
-      "closing": 2135454,
+      "closing": 2372339,
       "eventIds": [
         "evt-daily-sales-2027-02-08"
       ]
     },
     {
       "date": "2027-02-09",
-      "inflow": 138183,
+      "inflow": 276366,
       "outflow": 0,
-      "closing": 2273637,
+      "closing": 2648705,
       "eventIds": [
         "evt-daily-sales-2027-02-09"
       ]
     },
     {
       "date": "2027-02-10",
-      "inflow": 157923,
+      "inflow": 118442,
       "outflow": 0,
-      "closing": 2431560,
+      "closing": 2767147,
       "eventIds": [
         "evt-daily-sales-2027-02-10"
       ]
     },
     {
       "date": "2027-02-11",
-      "inflow": 197404,
+      "inflow": 138183,
       "outflow": 530000,
-      "closing": 2098964,
+      "closing": 2375330,
       "eventIds": [
         "evt-bill-FP-4412-0",
         "evt-bill-NW-4412-0",
@@ -847,9 +847,9 @@
     },
     {
       "date": "2027-02-12",
-      "inflow": 296106,
+      "inflow": 157923,
       "outflow": 750000,
-      "closing": 1645070,
+      "closing": 1783253,
       "eventIds": [
         "evt-daily-sales-2027-02-12",
         "evt-rec-payroll-12"
@@ -857,16 +857,16 @@
     },
     {
       "date": "2027-02-13",
-      "inflow": 355327,
+      "inflow": 197404,
       "outflow": 0,
-      "closing": 2000397,
+      "closing": 1980657,
       "eventIds": [
         "evt-daily-sales-2027-02-13"
       ]
     },
     {
       "date": "2027-02-14",
-      "inflow": 276366,
+      "inflow": 296106,
       "outflow": 0,
       "closing": 2276763,
       "eventIds": [
@@ -880,7 +880,7 @@
       "inflow": 1539751,
       "outflow": 1520000,
       "closing": 2219751,
-      "minClosing": 1588058,
+      "minClosing": 1726241,
       "pipelineClosing": 2219751,
       "eventIds": [
         "evt-daily-sales-2026-11-16",
@@ -901,7 +901,7 @@
       "inflow": 1539751,
       "outflow": 1140000,
       "closing": 2619502,
-      "minClosing": 1987809,
+      "minClosing": 2125992,
       "pipelineClosing": 2619502,
       "eventIds": [
         "evt-daily-sales-2026-11-23",
@@ -920,7 +920,7 @@
       "inflow": 1739751,
       "outflow": 1850000,
       "closing": 2509253,
-      "minClosing": 1877560,
+      "minClosing": 2015743,
       "pipelineClosing": 2509253,
       "eventIds": [
         "evt-daily-sales-2026-11-30",
@@ -942,7 +942,7 @@
       "inflow": 1889751,
       "outflow": 1160000,
       "closing": 3239004,
-      "minClosing": 2607311,
+      "minClosing": 2745494,
       "pipelineClosing": 3239004,
       "eventIds": [
         "evt-daily-sales-2026-12-07",
@@ -962,7 +962,7 @@
       "inflow": 1789751,
       "outflow": 1520000,
       "closing": 3508755,
-      "minClosing": 3117062,
+      "minClosing": 3255245,
       "pipelineClosing": 3508755,
       "eventIds": [
         "evt-daily-sales-2026-12-14",
@@ -984,7 +984,7 @@
       "inflow": 1539751,
       "outflow": 1140000,
       "closing": 3908506,
-      "minClosing": 3276813,
+      "minClosing": 3414996,
       "pipelineClosing": 3908506,
       "eventIds": [
         "evt-daily-sales-2026-12-21",
@@ -1003,7 +1003,7 @@
       "inflow": 1539751,
       "outflow": 1850000,
       "closing": 3598257,
-      "minClosing": 2966564,
+      "minClosing": 3104747,
       "pipelineClosing": 3598257,
       "eventIds": [
         "evt-daily-sales-2026-12-28",
@@ -1024,7 +1024,7 @@
       "inflow": 1539751,
       "outflow": 1160000,
       "closing": 3978008,
-      "minClosing": 3346315,
+      "minClosing": 3484498,
       "pipelineClosing": 3978008,
       "eventIds": [
         "evt-daily-sales-2027-01-04",
@@ -1043,7 +1043,7 @@
       "inflow": 1539751,
       "outflow": 3730000,
       "closing": 1787759,
-      "minClosing": 1156066,
+      "minClosing": 1294249,
       "pipelineClosing": 1787759,
       "eventIds": [
         "evt-bill-WSLCB-2027-0",
@@ -1066,7 +1066,7 @@
       "inflow": 1539751,
       "outflow": 1380000,
       "closing": 1947510,
-      "minClosing": 1315817,
+      "minClosing": 1454000,
       "pipelineClosing": 1947510,
       "eventIds": [
         "evt-daily-sales-2027-01-18",
@@ -1086,7 +1086,7 @@
       "inflow": 1539751,
       "outflow": 1300000,
       "closing": 2187261,
-      "minClosing": 1555568,
+      "minClosing": 1693751,
       "pipelineClosing": 2187261,
       "eventIds": [
         "evt-daily-sales-2027-01-25",
@@ -1106,7 +1106,7 @@
       "inflow": 1539751,
       "outflow": 1710000,
       "closing": 2017012,
-      "minClosing": 1385319,
+      "minClosing": 1523502,
       "pipelineClosing": 2017012,
       "eventIds": [
         "evt-daily-sales-2027-02-01",
@@ -1126,7 +1126,7 @@
       "inflow": 1539751,
       "outflow": 1280000,
       "closing": 2276763,
-      "minClosing": 1645070,
+      "minClosing": 1783253,
       "pipelineClosing": 2276763,
       "eventIds": [
         "evt-daily-sales-2027-02-08",
@@ -1145,12 +1145,11 @@
   "lowPoint": {
     "week": "2027-01-11",
     "date": "2027-01-15",
-    "amount": 1156066
+    "amount": 1294249
   },
   "firstBelowSafety": "2026-11-20",
   "weeksBelowSafety": [
     "2026-11-16",
-    "2026-11-30",
     "2027-01-11",
     "2027-01-18",
     "2027-01-25",
@@ -1160,67 +1159,67 @@
   "freeCash": [
     {
       "week": "2026-11-16",
-      "amount": -338096,
+      "amount": -199913,
       "weeksFree": 0
     },
     {
       "week": "2026-11-23",
-      "amount": -48594,
-      "weeksFree": 0
+      "amount": 89589,
+      "weeksFree": 1
     },
     {
       "week": "2026-11-30",
-      "amount": -770088,
+      "amount": -631905,
       "weeksFree": 0
     },
     {
       "week": "2026-12-07",
-      "amount": -770088,
+      "amount": -631905,
       "weeksFree": 0
     },
     {
       "week": "2026-12-14",
-      "amount": -770088,
+      "amount": -631905,
       "weeksFree": 0
     },
     {
       "week": "2026-12-21",
-      "amount": -770088,
+      "amount": -631905,
       "weeksFree": 0
     },
     {
       "week": "2026-12-28",
-      "amount": -770088,
+      "amount": -631905,
       "weeksFree": 0
     },
     {
       "week": "2027-01-04",
-      "amount": -770088,
+      "amount": -631905,
       "weeksFree": 0
     },
     {
       "week": "2027-01-11",
-      "amount": -770088,
+      "amount": -631905,
       "weeksFree": 0
     },
     {
       "week": "2027-01-18",
-      "amount": -610337,
+      "amount": -472154,
       "weeksFree": 0
     },
     {
       "week": "2027-01-25",
-      "amount": -540835,
+      "amount": -402652,
       "weeksFree": 0
     },
     {
       "week": "2027-02-01",
-      "amount": -540835,
+      "amount": -402652,
       "weeksFree": 0
     },
     {
       "week": "2027-02-08",
-      "amount": -281084,
+      "amount": -142901,
       "weeksFree": 0
     }
   ],
@@ -1231,13 +1230,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 0,
       "date": "2026-11-16",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2026-11-14 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1249,13 +1248,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 1,
       "date": "2026-11-17",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2026-11-15 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1267,13 +1266,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 2,
       "date": "2026-11-18",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2026-11-16 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1319,13 +1318,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 3,
       "date": "2026-11-19",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2026-11-17 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1337,13 +1336,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 4,
       "date": "2026-11-20",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2026-11-18 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1391,13 +1390,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 5,
       "date": "2026-11-21",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2026-11-19 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1409,13 +1408,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 6,
       "date": "2026-11-22",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2026-11-20 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1427,13 +1426,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 7,
       "date": "2026-11-23",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2026-11-21 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1445,13 +1444,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 8,
       "date": "2026-11-24",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2026-11-22 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1463,13 +1462,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 9,
       "date": "2026-11-25",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2026-11-23 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1498,13 +1497,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 10,
       "date": "2026-11-26",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2026-11-24 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1516,13 +1515,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 11,
       "date": "2026-11-27",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2026-11-25 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1552,13 +1551,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 12,
       "date": "2026-11-28",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2026-11-26 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1570,13 +1569,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 13,
       "date": "2026-11-29",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2026-11-27 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1588,13 +1587,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 14,
       "date": "2026-11-30",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2026-11-28 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1606,13 +1605,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 15,
       "date": "2026-12-01",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2026-11-29 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1642,13 +1641,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 16,
       "date": "2026-12-02",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2026-11-30 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1694,13 +1693,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 17,
       "date": "2026-12-03",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2026-12-01 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1712,13 +1711,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 18,
       "date": "2026-12-04",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2026-12-02 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1766,13 +1765,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 19,
       "date": "2026-12-05",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2026-12-03 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1784,13 +1783,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 20,
       "date": "2026-12-06",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2026-12-04 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1802,13 +1801,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 21,
       "date": "2026-12-07",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2026-12-05 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1820,13 +1819,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 22,
       "date": "2026-12-08",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2026-12-06 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1838,13 +1837,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 23,
       "date": "2026-12-09",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2026-12-07 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1873,13 +1872,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 24,
       "date": "2026-12-10",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2026-12-08 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1891,13 +1890,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 25,
       "date": "2026-12-11",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2026-12-09 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1945,13 +1944,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 26,
       "date": "2026-12-12",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2026-12-10 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1963,13 +1962,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 27,
       "date": "2026-12-13",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2026-12-11 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1981,13 +1980,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 28,
       "date": "2026-12-14",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2026-12-12 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -1999,13 +1998,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 29,
       "date": "2026-12-15",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2026-12-13 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2017,13 +2016,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 30,
       "date": "2026-12-16",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2026-12-14 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2069,13 +2068,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 31,
       "date": "2026-12-17",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2026-12-15 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2087,13 +2086,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 32,
       "date": "2026-12-18",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2026-12-16 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2141,13 +2140,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 33,
       "date": "2026-12-19",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2026-12-17 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2159,13 +2158,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 34,
       "date": "2026-12-20",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2026-12-18 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2195,13 +2194,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 35,
       "date": "2026-12-21",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2026-12-19 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2213,13 +2212,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 36,
       "date": "2026-12-22",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2026-12-20 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2231,13 +2230,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 37,
       "date": "2026-12-23",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2026-12-21 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2266,13 +2265,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 38,
       "date": "2026-12-24",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2026-12-22 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2284,13 +2283,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 39,
       "date": "2026-12-25",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2026-12-23 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2320,13 +2319,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 40,
       "date": "2026-12-26",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2026-12-24 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2338,13 +2337,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 41,
       "date": "2026-12-27",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2026-12-25 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2356,13 +2355,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 42,
       "date": "2026-12-28",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2026-12-26 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2374,13 +2373,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 43,
       "date": "2026-12-29",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2026-12-27 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2392,13 +2391,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 44,
       "date": "2026-12-30",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2026-12-28 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2444,13 +2443,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 45,
       "date": "2026-12-31",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2026-12-29 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2462,13 +2461,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 46,
       "date": "2027-01-01",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2026-12-30 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2516,13 +2515,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 47,
       "date": "2027-01-02",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2026-12-31 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2534,13 +2533,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 48,
       "date": "2027-01-03",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2027-01-01 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2552,13 +2551,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 49,
       "date": "2027-01-04",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2027-01-02 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2570,13 +2569,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 50,
       "date": "2027-01-05",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2027-01-03 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2588,13 +2587,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 51,
       "date": "2027-01-06",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2027-01-04 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2623,13 +2622,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 52,
       "date": "2027-01-07",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2027-01-05 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2641,13 +2640,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 53,
       "date": "2027-01-08",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2027-01-06 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2677,13 +2676,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 54,
       "date": "2027-01-09",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2027-01-07 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2695,13 +2694,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 55,
       "date": "2027-01-10",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2027-01-08 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2731,13 +2730,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 56,
       "date": "2027-01-11",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2027-01-09 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2749,13 +2748,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 57,
       "date": "2027-01-12",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2027-01-10 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2767,13 +2766,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 58,
       "date": "2027-01-13",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2027-01-11 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2837,13 +2836,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 59,
       "date": "2027-01-14",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2027-01-12 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2855,13 +2854,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 60,
       "date": "2027-01-15",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2027-01-13 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2909,13 +2908,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 61,
       "date": "2027-01-16",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2027-01-14 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2927,13 +2926,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 62,
       "date": "2027-01-17",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2027-01-15 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2945,13 +2944,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 63,
       "date": "2027-01-18",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2027-01-16 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2963,13 +2962,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 64,
       "date": "2027-01-19",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2027-01-17 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -2981,13 +2980,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 65,
       "date": "2027-01-20",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2027-01-18 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3034,13 +3033,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 66,
       "date": "2027-01-21",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2027-01-19 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3052,13 +3051,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 67,
       "date": "2027-01-22",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2027-01-20 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3088,13 +3087,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 68,
       "date": "2027-01-23",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2027-01-21 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3106,13 +3105,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 69,
       "date": "2027-01-24",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2027-01-22 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3124,13 +3123,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 70,
       "date": "2027-01-25",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2027-01-23 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3142,13 +3141,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 71,
       "date": "2027-01-26",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2027-01-24 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3160,13 +3159,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 72,
       "date": "2027-01-27",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2027-01-25 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3212,13 +3211,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 73,
       "date": "2027-01-28",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2027-01-26 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3230,13 +3229,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 74,
       "date": "2027-01-29",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2027-01-27 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3266,13 +3265,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 75,
       "date": "2027-01-30",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2027-01-28 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3284,13 +3283,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 76,
       "date": "2027-01-31",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2027-01-29 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3302,13 +3301,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 77,
       "date": "2027-02-01",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2027-01-30 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3338,13 +3337,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 78,
       "date": "2027-02-02",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2027-01-31 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3356,13 +3355,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 79,
       "date": "2027-02-03",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2027-02-01 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3391,13 +3390,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 80,
       "date": "2027-02-04",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2027-02-02 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3409,13 +3408,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 81,
       "date": "2027-02-05",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2027-02-03 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3445,13 +3444,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 82,
       "date": "2027-02-06",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2027-02-04 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3463,13 +3462,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 83,
       "date": "2027-02-07",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2027-02-05 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3481,13 +3480,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 84,
       "date": "2027-02-08",
-      "amount": 118442,
+      "amount": 355327,
       "currency": "USD",
-      "amountBase": 118442,
+      "amountBase": 355327,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11; sales of 2027-02-06 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3499,13 +3498,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 85,
       "date": "2027-02-09",
-      "amount": 138183,
+      "amount": 276366,
       "currency": "USD",
-      "amountBase": 138183,
+      "amountBase": 276366,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11; sales of 2027-02-07 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3517,13 +3516,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 86,
       "date": "2027-02-10",
-      "amount": 157923,
+      "amount": 118442,
       "currency": "USD",
-      "amountBase": 157923,
+      "amountBase": 118442,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.6/1.11; sales of 2027-02-08 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3569,13 +3568,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 87,
       "date": "2027-02-11",
-      "amount": 197404,
+      "amount": 138183,
       "currency": "USD",
-      "amountBase": 197404,
+      "amountBase": 138183,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.7/1.11; sales of 2027-02-09 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3587,13 +3586,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 88,
       "date": "2027-02-12",
-      "amount": 296106,
+      "amount": 157923,
       "currency": "USD",
-      "amountBase": 296106,
+      "amountBase": 157923,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 0.8/1.11; sales of 2027-02-10 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3623,13 +3622,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 89,
       "date": "2027-02-13",
-      "amount": 355327,
+      "amount": 197404,
       "currency": "USD",
-      "amountBase": 355327,
+      "amountBase": 197404,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.8/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1/1.11; sales of 2027-02-11 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",
@@ -3641,13 +3640,13 @@
       "commitmentId": "daily-sales",
       "legIndex": 90,
       "date": "2027-02-14",
-      "amount": 276366,
+      "amount": 296106,
       "currency": "USD",
-      "amountBase": 276366,
+      "amountBase": 296106,
       "direction": "in",
       "status": "likely",
       "confidence": 0.6,
-      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.4/1.11",
+      "basis": "daily sales: $2,199.64 average over the last 28 days x weekday weight 1.5/1.11; sales of 2027-02-12 settle 2 days later",
       "category": "sales",
       "sourceRef": {
         "system": "profile",

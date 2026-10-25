@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { Anchor, Profile } from "./profile";
 import type { CommitmentType, Records, Scenario } from "./records";
 import { forecast } from "../engine/forecast";
+import { diffDays } from "../engine/dates";
 
 const dir = join(import.meta.dirname, "..", "profiles");
 const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
@@ -81,7 +82,7 @@ describe.each(files)("profile %s", (file) => {
       parties: [], events: [], signals: [], rules: [], settlements: [], evidence: [],
       balances: [{ id: "bal", account: "main", amount: 5_000_000, currency: p.baseCurrency, asOf: "2026-11-16", sourceRef: src }],
       commitments: [
-        { id: "inv", type: "invoice", amount: 1_000_000, currency: p.baseCurrency, anchors: { invoice: "2026-11-02", due: "2026-12-02", delivery: "2026-11-01" }, status: "committed", sourceRef: src },
+        { id: "inv", type: "invoice", amount: 1_000_000, currency: p.baseCurrency, anchors: { invoice: "2026-11-02", due: "2026-12-02" }, status: "committed", sourceRef: src },
         { id: "deal", type: "sales_deal", amount: 2_000_000, currency: p.baseCurrency, anchors: { order: "2026-11-20", delivery: "2026-12-20", due: "2027-01-05" }, status: "likely", sourceRef: src },
         { id: "bill", type: "bill", amount: 300_000, currency: p.baseCurrency, anchors: { invoice: "2026-11-10", due: "2026-11-24" }, status: "committed", sourceRef: src },
       ],
@@ -93,7 +94,15 @@ describe.each(files)("profile %s", (file) => {
       expect(d.closing).toBe(prev + d.inflow - d.outflow);
       prev = d.closing;
     }
-    expect(run.events.some((e) => e.commitmentId === "inv")).toBe(true);
+    // The default invoice pattern honors the imported due date: with no payment history, the invoice is forecast
+    // in full within defaultLagDays (+1 for rounding) of it.
+    const inv = run.events.filter((e) => e.commitmentId === "inv");
+    expect(inv.reduce((a, e) => a + e.amount, 0)).toBe(1_000_000);
+    for (const e of inv) {
+      const days = diffDays(e.date, "2026-12-02");
+      expect(days, `${p.id} invoice ${e.date}`).toBeGreaterThanOrEqual(0);
+      expect(days, `${p.id} invoice ${e.date}`).toBeLessThanOrEqual(p.defaultLagDays + 1);
+    }
     expect(run.warnings.join(" ")).not.toMatch(/not scheduled/);
   });
 });

@@ -9,10 +9,10 @@
   "safetyLine": { "kind": "weeksOfFixedCosts", "weeks": 4 },
   "paymentPatterns": [
     {
-      "id": "client_net60",
+      "id": "client_invoice_due",
       "appliesTo": "invoice",
       "isDefault": true,
-      "legs": [{ "share": 1, "anchor": "invoice", "offsetDays": 60, "direction": "in" }]
+      "legs": [{ "share": 1, "anchor": "due", "offsetDays": 0, "direction": "in" }]
     },
     {
       "id": "milestones_50_50",
