@@ -36,7 +36,9 @@ describe("restore the signed-in business", () => {
     expect(api.account()).toEqual(account);
     expect(request).toHaveBeenCalledTimes(1);
     expect(request.mock.calls[0][0]).toBe("https://neri.example/context");
-    expect(request.mock.calls[0][1].headers).toEqual({ "Content-Type": "application/json", Authorization: "Bearer token" });
+    const { "X-Neri-Visitor": visitor, ...headers } = request.mock.calls[0][1].headers;
+    expect(headers).toEqual({ "Content-Type": "application/json", Authorization: "Bearer token" });
+    expect(visitor).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it("leaves a newly authenticated user ready for setup when demo mode returns a sample", async () => {
