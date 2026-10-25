@@ -10,6 +10,10 @@ An owner can onboard, supply documents/messages, review proposed changes, and un
 
 Own onboarding, payment settings, shared intake/review screens, daily briefing, forecast chart, and source-linked event detail. Consume fixtures first from persons 1, 2, 4, and 5, then replace them with real module outputs. Rendering action cards is yours; action eligibility and impact calculations belong to person 5.
 
+## Technical handoff
+
+Follow the [technical plan](../docs/TECHNICAL_PLAN.md) and the current [five-person lanes](../docs/design/09-api-repo-lanes.md#five-people) where this earlier checklist differs. Layer 1 extracts structured candidates; Layer 2 reconciles accepted records and applies profile rules to cash events. Person 3 owns API routes; person 5 coordinates store/integration and owns deterministic warnings/ranking. Person 4 owns AI extraction, proposals, explanations, Ask Neri, and drafts.
+
 ## First 30 minutes
 
 - [ ] Agree the owner journey and screen boundaries with the team.
