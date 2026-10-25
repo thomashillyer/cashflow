@@ -16,6 +16,20 @@
 -- load_records() needs no change: 20261025160000_tenant_access.sql already lets members load
 -- their own business (verified together with this migration).
 -- Grants are unchanged: anon, authenticated and service_role may execute (re-asserted below).
+-- Any membership role (owner, admin, member) may confirm. Today only owners exist (no invite
+-- path yet); decide whether plain members stay read-only when invites land.
+
+-- Fail loudly at apply time if the tenant-access migration is missing: plpgsql does not check
+-- function references at create time, so without this the migration would apply and every
+-- confirmation (synthetic and service callers too) would then fail at run time.
+do $$
+begin
+  if to_regprocedure('public.is_member(text)') is null or to_regclass('public.memberships') is null then
+    raise exception 'apply 20261025160000_tenant_access.sql first';
+  end if;
+end
+$$;
+
 create or replace function public.confirm_change_proposal(
   p_business_id text,
   p_proposal_id text,
