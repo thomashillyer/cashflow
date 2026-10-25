@@ -10,6 +10,10 @@ The integrated app explains what to do, by when, why it matters, and how the for
 
 Own deterministic attention/action rules, proposed action impact, follow-up drafts, reminders, shared application integration, deployment, and demo/submission. Coordinate the shared persistence and module boundaries. Every contributor integrates their own module and fixes its checks; this role does not absorb four unfinished implementations.
 
+## Technical handoff
+
+Follow the [technical plan](../docs/TECHNICAL_PLAN.md) and the current [five-person lanes](../docs/design/09-api-repo-lanes.md#five-people) where this earlier checklist differs. Layer 1 extracts structured candidates; Layer 2 reconciles accepted records and applies profile rules to cash events. Person 3 owns API routes; person 5 coordinates store/integration and owns deterministic warnings/ranking. Person 4 owns AI extraction, proposals, explanations, Ask Neri, and drafts.
+
 ## First 30 minutes
 
 - [ ] Confirm the team's familiar stack, single application/store, shared contracts, and five owners.
