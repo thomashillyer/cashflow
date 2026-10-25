@@ -54,7 +54,7 @@ docs/design/  the technical design, one file per area
 
 ## Lanes and contracts
 
-Four build lanes plus the product owner (five-person split in `docs/design/09-api-repo-lanes.md`). Each lane works against fixtures until integration (1 pm), so nobody blocks on anyone.
+Five owners: Niru (data ingestion), Thomas (cashflow engine), SilverBeck (UI and UX), Andras (AI ingestion and normalization), and Kiana (actions/recommendations, integration, and demo). See the five-person split in `docs/design/09-api-repo-lanes.md`. Each lane works against fixtures until integration (1 pm), so nobody blocks on anyone.
 
 | Lane | Owns | Consumes | Produces | Starts against |
 |---|---|---|---|---|
