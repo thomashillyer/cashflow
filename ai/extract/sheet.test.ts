@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { IntakeCandidate } from "../../schema/intake";
 import { validateCandidate } from "../normalize";
 import {
-  classifySheet, documentToCandidate, documentsToCandidates, SHEET_MAX_COLUMNS, SHEET_MAX_ROWS, tableToCandidates,
+  classifySheet, documentStarts, documentToCandidate, documentsToCandidates, SHEET_MAX_COLUMNS, SHEET_MAX_ROWS, tableToCandidates,
   type SheetCell, type SheetContent,
 } from "./sheet";
 
@@ -629,5 +629,73 @@ describe("P4.15 follow-ups", () => {
       expect(c.fields.outstanding && val(c.fields.outstanding)).toBe(40000);
       expect(c.notes.join(" ")).not.toMatch(/only money column/);
     });
+  });
+});
+
+describe("P4.15 review fixes", () => {
+  it("a letterhead above the INVOICE title is not a second document", () => {
+    const rows: SheetCell[][] = [
+      ["Cascade Trade Co."], ["12 Pike St, Seattle"], ["INVOICE"],
+      ["Invoice #", "INV-1187", null, "Bill to", "Evergreen Home"], ["Due date", "2026-11-01"], ["Total due", "USD 100.00"],
+    ];
+    expect(documentStarts(rows)).toEqual([0]);
+    const c = documentToCandidate(sheet(rows), opts);
+    expect(val(c.fields.amount)).toBe(10000);
+    expect(val(c.fields.reference)).toBe("INV-1187");
+    expect(documentsToCandidates(sheet(rows), opts)).toHaveLength(1);
+  });
+
+  it("inline label+value cells read the value and do not throw", () => {
+    for (const [cell, ref] of [["Invoice INV-2", "INV-2"], ["Invoice # INV-2", "INV-2"], ["Invoice no 7", "7"], ["invoice 1187", "1187"]] as const) {
+      const rows: SheetCell[][] = [[cell], ["Bill to", "Puget Market"], ["Total due", "USD 5.00"]];
+      const c = documentToCandidate(sheet(rows), opts);
+      expect(val(c.fields.reference), cell).toBe(ref);
+    }
+    expect(() => documentToCandidate(sheet([["PO 123"], ["Total", "USD 5.00"]]), opts)).not.toThrow();
+  });
+
+  it("a footer that repeats the invoice number in another format is not a second document", () => {
+    const rows: SheetCell[][] = [
+      ["INVOICE"], ["Invoice #", "INV-1187", null, "Bill to", "Evergreen Home"], ["Total due", "USD 100.00"], [null], ["Invoice number 1187"], ["Invoice no. INV-1187/A"],
+    ];
+    expect(documentStarts(rows)).toEqual([0]);
+  });
+
+  it("a second block with an invoice number but no total is unclear: first document only, partial", () => {
+    const rows: SheetCell[][] = [
+      ["Invoice #", "INV-1", null, "Bill to", "Evergreen Home"], ["Total due", "USD 100.00"], [null], ["Invoice #", "INV-2"],
+    ];
+    const out = documentsToCandidates(sheet(rows), opts);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.extraction).toBe("partial");
+    expect(val(out[0]!.fields.amount)).toBe(10000);
+  });
+
+  it("a bare Balance column is not promoted to the amount; Balance due is", () => {
+    const ledger = tableToCandidates(sheet([["Invoice #", "Customer", "Balance"], ["INV-1", "A", 400]]), opts);
+    expect(ledger.candidates).toEqual([]);
+    expect(ledger.reason).toMatch(/mapping/);
+    const due = tableToCandidates(sheet([["Invoice #", "Customer", "Balance due"], ["INV-1", "A", 400]]), opts);
+    expect(val(due.candidates[0]!.fields.amount)).toBe(40000);
+  });
+
+  it("an owner mapping of outstanding is not undone by the fallback", () => {
+    const rows: SheetCell[][] = [["Invoice #", "Customer", "Amount due", "Open"], ["INV-1", "A", 400, 300]];
+    const r = tableToCandidates(sheet(rows), { ...opts, columnMapping: { outstanding: 3 } });
+    expect(r.proposedMapping.columns).toMatchObject({ outstanding: 3 });
+    expect(r.proposedMapping.columns.amount).toBeUndefined();
+    expect(r.candidates).toEqual([]);
+  });
+
+  it("customers like 'Total (UK) Ltd' survive when the invoice number is real", () => {
+    const r = tableToCandidates(sheet([["Invoice #", "Customer", "Amount"], ["INV-5", "Total (UK) Ltd", 10], ["INV-6", "Total 360", 10]]), opts);
+    expect(r.candidates).toHaveLength(2);
+  });
+
+  it("a long newline-laden cell is handled quickly", () => {
+    const rows: SheetCell[][] = [["Invoice #", "INV-1"], ["total " + "1 ".repeat(20000) + "\n", "x"], ["Total due", "USD 1.00"]];
+    const t = Date.now();
+    documentsToCandidates(sheet(rows), opts);
+    expect(Date.now() - t).toBeLessThan(500);
   });
 });

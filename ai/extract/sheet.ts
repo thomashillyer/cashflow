@@ -202,8 +202,14 @@ const TOTAL_CELL = /^(grand |sub[ -]?|report )?totals?\s*:?$/i;
 // A footer label in any cell of the row: "Total outstanding", "Grand total: 3,000", "Balance carried forward". Still not
 // "Total Wine": after the word the label must end, carry a figure, or continue with a money word.
 const TOTAL_LABEL = /^\s*(?:(?:grand\s+|sub[ -]?)?totals?(?=\s*(?:[:(-]|\d|$)|\s+(?:due|outstanding|amount|balance|payable|open|owing|receivable|invoiced|usd|eur|gbp|cad|aud|jpy|cny|inr|mxn|chf)\b)|balance\s+carried\b)/i;
-const isTotalsRow = (row: SheetCell[], refCol: number): boolean =>
-  TOTAL_REF.test(text(row[refCol])) || row.some((c) => typeof c === "string" && (TOTAL_CELL.test(c.trim()) || TOTAL_LABEL.test(c)));
+// When the reference cell is a real invoice number ("INV-5"), only unambiguous wording counts, so "Total (UK) Ltd" survives.
+const TOTAL_WORDS = /^\s*(?:(?:grand\s+|sub[ -]?)?totals?\s+(?:due|outstanding|amount|balance|payable|open|owing|receivable|invoiced)\b|balance\s+carried\b)/i;
+const invoiceLike = (ref: string) => /\d/.test(ref) && !/\s/.test(ref);
+const isTotalsRow = (row: SheetCell[], refCol: number): boolean => {
+  const ref = text(row[refCol]);
+  const label = invoiceLike(ref) ? TOTAL_WORDS : TOTAL_LABEL;
+  return TOTAL_REF.test(ref) || row.some((c) => typeof c === "string" && (TOTAL_CELL.test(c.trim()) || label.test(c)));
+};
 
 const HEADER_PATTERNS: Record<ColumnKey, RegExp[]> = {
   reference: [/^(invoice|inv|bill|document|doc|reference|ref)( (#|no|num|number|id))?$/, /^(number|no|#|id)$/],
@@ -229,9 +235,15 @@ function inferColumns(row: SheetCell[]): ColumnMapping {
     });
     if (best) { out[key] = best.col; used.add(best.col); }
   }
-  // "Amount due" / "Balance due" with no total or amount column: it is all there is for the amount (see amountIsBalance).
-  if (out.amount === undefined && out.outstanding !== undefined) out.amount = out.outstanding;
   return out;
+}
+
+// "Amount due" / "Balance due" with no total or amount column: it is all there is for the amount (see amountIsBalance).
+// A bare "Balance" is usually a running balance and is not promoted.
+function withAmountFallback(columns: ColumnMapping, header: SheetCell[]): ColumnMapping {
+  const o = columns.outstanding;
+  if (columns.amount !== undefined || o === undefined || !/^(amount|balance) due$/.test(norm(text(header[o])))) return columns;
+  return { ...columns, amount: o };
 }
 
 const amountIsBalance = (c: ColumnMapping) => c.amount !== undefined && c.amount === c.outstanding;
@@ -239,7 +251,7 @@ const amountIsBalance = (c: ColumnMapping) => c.amount !== undefined && c.amount
 function findTableHeader(rows: SheetCell[][]): { headerRow: number; columns: ColumnMapping } | undefined {
   const n = trimmedRowCount(rows);
   for (let r = 0; r < Math.min(n, 25); r++) {
-    const columns = inferColumns(rows[r] ?? []);
+    const columns = withAmountFallback(inferColumns(rows[r] ?? []), rows[r] ?? []);
     if (columns.reference === undefined || columns.amount === undefined) continue;
     // At least one data row must carry an invoice-number-like value, or this is a header block of a single document.
     if (rows.slice(r + 1, n).some((x) => /\d/.test(text(x[columns.reference!])) && !TOTAL_REF.test(text(x[columns.reference!])))) return { headerRow: r + 1, columns };
@@ -278,7 +290,7 @@ const AMOUNT_LABELS = new Set<LabelKey>(["subtotal", "totalDue", "grandTotal", "
 type LabelHit = { key: LabelKey; label: string; inline?: string };
 
 function labelOf(cell: SheetCell | undefined): LabelHit | undefined {
-  if (typeof cell !== "string") return undefined;
+  if (typeof cell !== "string" || cell.length > 200) return undefined;   // labels are short; also bounds regex work on hostile cells
   const t = norm(cell);
   if (!t) return undefined;
   for (const [key, re] of FULL) if (re.test(t)) return { key, label: t };
@@ -287,9 +299,10 @@ function labelOf(cell: SheetCell | undefined): LabelHit | undefined {
     if (!INLINE_OK.has(key)) continue;
     const m = re.exec(lowered);
     if (!m) continue;
-    const inline = cell.trim().slice(cell.trim().length - m[1]!.length).trim();
+    const value = m[m.length - 1]!;   // the value group is last; some label patterns have groups of their own
+    const inline = cell.trim().slice(cell.trim().length - value.length).trim();
     if (AMOUNT_LABELS.has(key) && !looksLikeMoney(inline)) continue;
-    return { key, label: norm(cell.trim().slice(0, cell.trim().length - m[1]!.length)), inline };
+    return { key, label: norm(cell.trim().slice(0, cell.trim().length - value.length)), inline };
   }
   return undefined;
 }
@@ -378,6 +391,13 @@ function referenceIn(rows: SheetCell[][], r: number): string | undefined {
   return undefined;
 }
 
+// "INV-1187", "1187" and "Invoice no. 1187/A" are one invoice number for this purpose.
+const sameRef = (a: string, b: string | undefined): boolean => {
+  if (b === undefined) return false;
+  const da = a.replace(/\D/g, ""), db = b.replace(/\D/g, "");
+  return da !== "" && db !== "" ? da === db : a.replace(/[^a-z0-9]/g, "") === b.replace(/[^a-z0-9]/g, "");
+};
+
 // First row (0-based) of each document on a sheet. A new document starts at a second "Invoice"/"Bill" title, or at
 // a different invoice-number label after the previous one already stated a total. Rows right above that label
 // (letterhead, our name) belong to the new document.
@@ -395,8 +415,8 @@ export function documentStarts(rows: SheetCell[][]): number[] {
     const title = filled.length === 1 && typeof filled[0] === "string" && DOC_TITLE.test(norm(filled[0]));
     const ref = referenceIn(rows, r);
     let start: number | undefined;
-    if (title && r > cur && sawBody) start = r;
-    else if (!title && ref !== undefined && sawTotal && ref !== curRef) {
+    if (title && r > cur && sawBody && (sawTotal || curRef !== undefined)) start = r;
+    else if (!title && ref !== undefined && sawTotal && !sameRef(ref, curRef)) {
       start = r;
       while (start - 1 > cur && !blankRow(rows[start - 1]) && !statesTotal(rows, start - 1)) start--;
     }
@@ -497,7 +517,7 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
   const detected = findTableHeader(sheet.rows);
   const headerRow = opts.headerRow ?? detected?.headerRow ?? (opts.columnMapping ? 1 : undefined);
   const inferred = headerRow !== undefined ? inferColumns(sheet.rows[headerRow - 1] ?? []) : {};
-  const columns: ColumnMapping = { ...inferred, ...opts.columnMapping };
+  const columns: ColumnMapping = withAmountFallback({ ...inferred, ...opts.columnMapping }, sheet.rows[(headerRow ?? 1) - 1] ?? []);
   const owner = Object.keys(opts.columnMapping ?? {}).length > 0;
   const headerCells = headerRow !== undefined ? sheet.rows[headerRow - 1] ?? [] : [];
   const headers: ProposedMapping["headers"] = {};
@@ -614,7 +634,7 @@ export function documentsToCandidates(sheet: SheetContent, opts: SheetOptions): 
   if (starts.length <= 1) return [buildDocument(sheet, opts, {})];
   const n = trimmedRowCount(sheet.rows);
   const blocks = starts.map((s, i) => blockOf(sheet, s, starts[i + 1] ?? n));
-  const real = (b: SheetContent) => b.rows.some((_, r) => referenceIn(b.rows, r) !== undefined || statesTotal(b.rows, r));
+  const real = (b: SheetContent) => b.rows.some((_, r) => statesTotal(b.rows, r));
   if (!blocks.slice(1).every(real)) {
     return [buildDocument(blocks[0]!, opts, { stackedNote: stackedNote(starts) })];
   }
