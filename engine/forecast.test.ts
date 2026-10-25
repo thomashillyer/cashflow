@@ -343,6 +343,109 @@ describe("review regressions", () => {
   });
 });
 
+describe("levers act on one leg, in the right direction", () => {
+  const dealPattern: Profile["paymentPatterns"][number] = {
+    id: "deal", appliesTo: "sales_deal", isDefault: true,
+    legs: [{ share: 0.3, anchor: "order", offsetDays: 0, direction: "in" }, { share: 0.7, anchor: "delivery", offsetDays: 0, direction: "in" }],
+  };
+  const p: Profile = {
+    ...profile,
+    paymentPatterns: [...profile.paymentPatterns, dealPattern],
+    recurring: [
+      { id: "rec-payroll", name: "Payroll", amount: $(1000), cadence: "weekly", anchor: "2026-10-30", category: "payroll", nonDeferrable: true },
+      { id: "rec-sub", name: "Software", amount: $(200), cadence: "weekly", anchor: "2026-10-30", category: "software" },
+    ],
+  };
+  const sim = (records: Records, levers: Parameters<typeof simulate>[3]) => simulate(records, p, [], levers, "2026-10-25", {});
+  const po = () => {
+    const r = empty();
+    r.balances = [bal($(100000))];
+    r.commitments = [com("po", { type: "purchase_order", patternId: "split_50_50", amount: $(10000), anchors: { order: "2026-10-28", ship: "2026-11-10" } })];
+    return r;
+  };
+  const dates = (run: { events: CashEvent[] }, id: string) => run.events.filter((e) => e.commitmentId === id).map((e) => `${e.legIndex}:${e.date}`);
+
+  it("defer moves only the earliest remaining payment by default and keeps the other leg put", () => {
+    const { run } = sim(po(), [{ kind: "defer", commitmentId: "po", days: 5 }]);
+    expect(dates(run, "po")).toEqual(["0:2026-11-02", "1:2026-11-10"]);
+  });
+
+  it("defer with a legIndex moves that leg only", () => {
+    const { run } = sim(po(), [{ kind: "defer", commitmentId: "po", days: 5, legIndex: 1 }]);
+    expect(dates(run, "po")).toEqual(["0:2026-10-28", "1:2026-11-15"]);
+  });
+
+  it("chase moves one receipt leg, not the whole deal onto the assumed date", () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [com("deal", { type: "sales_deal", amount: $(1000), anchors: { order: "2026-10-27", delivery: "2026-11-20" } })];
+    const { run } = sim(r, [{ kind: "chase", commitmentId: "deal", assumeDate: "2026-10-26" }]);
+    expect(dates(run, "deal")).toEqual(["0:2026-10-26", "1:2026-11-20"]);
+  });
+
+  it("chase ignores outflow legs and warns when there is nothing to chase", () => {
+    const { run } = sim(po(), [{ kind: "chase", commitmentId: "po", assumeDate: "2026-10-26" }]);
+    expect(dates(run, "po")).toEqual(["0:2026-10-28", "1:2026-11-10"]);
+    expect(run.warnings.join(" ")).toMatch(/lever chase on po: no remaining receipt/);
+  });
+
+  it("chase never pulls a receipt later, so it skips legs already before the assumed date", () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [com("deal", { type: "sales_deal", amount: $(1000), anchors: { order: "2026-10-28", delivery: "2026-11-20" } })];
+    const { run } = sim(r, [{ kind: "chase", commitmentId: "deal", assumeDate: "2026-11-05" }]);
+    expect(dates(run, "deal")).toEqual(["0:2026-10-28", "1:2026-11-05"]);
+    const none = sim(r, [{ kind: "chase", commitmentId: "deal", assumeDate: "2026-12-01" }]);
+    expect(dates(none.run, "deal")).toEqual(["0:2026-10-28", "1:2026-11-20"]);
+    expect(none.lowPointDelta).toBe(0);
+    expect(none.run.warnings.join(" ")).toMatch(/no remaining receipt later than 2026-12-01/);
+  });
+
+  it("a legIndex that matches nothing warns and changes nothing", () => {
+    const s = sim(po(), [{ kind: "defer", commitmentId: "po", days: 5, legIndex: 9 }]);
+    expect(dates(s.run, "po")).toEqual(["0:2026-10-28", "1:2026-11-10"]);
+    expect(s.lowPointDelta).toBe(0);
+    expect(s.run.warnings.join(" ")).toMatch(/no remaining payment/);
+  });
+
+  it("nonDeferrable also covers the same category under a different id (e.g. payroll found in the bank file)", () => {
+    const r = empty();
+    r.balances = [bal($(100000))];
+    r.commitments = [com("payroll-bank", { type: "bill", category: "payroll", amount: $(500), anchors: { due: "2026-10-30" } })];
+    const s = sim(r, [{ kind: "defer", commitmentId: "payroll-bank", days: 7 }]);
+    expect(s.run.events.find((e) => e.commitmentId === "payroll-bank")?.date).toBe("2026-10-30");
+    expect(s.run.warnings.join(" ")).toMatch(/nonDeferrable/);
+  });
+
+  it("defer on a recurring item moves the next occurrence only", () => {
+    const { run } = sim(empty(), [{ kind: "defer", commitmentId: "rec-sub", days: 3 }]);
+    const sub = run.events.filter((e) => e.commitmentId === "rec-sub").map((e) => e.date);
+    expect(sub.slice(0, 3)).toEqual(["2026-11-02", "2026-11-06", "2026-11-13"]);
+  });
+
+  it("nonDeferrable items are never deferred, and the run says so", () => {
+    const s = sim(empty(), [{ kind: "defer", commitmentId: "rec-payroll", days: 7 }]);
+    expect(s.lowPointDelta).toBe(0);
+    expect(s.run.events.find((e) => e.commitmentId === "rec-payroll")?.date).toBe("2026-10-30");
+    expect(s.run.warnings.join(" ")).toMatch(/nonDeferrable/);
+  });
+
+  it("pay_early discount applies per outflow leg and never touches receipts", () => {
+    const r = po();
+    r.commitments = [{ ...r.commitments[0]!, discount: { pct: 2, byDate: "2026-11-30" } }];
+    const { run } = sim(r, [{ kind: "pay_early", commitmentId: "po" }]);
+    expect(run.events.filter((e) => e.commitmentId === "po").map((e) => [e.date, e.amount])).toEqual([["2026-10-25", $(4900)], ["2026-10-25", $(4900)]]);
+    expect(run.events.every((e) => e.direction === "out")).toBe(true);
+  });
+
+  it("pay_early after the discount date moves the date but keeps the amount", () => {
+    const r = po();
+    r.commitments = [{ ...r.commitments[0]!, discount: { pct: 2, byDate: "2026-10-01" } }];
+    const { run } = sim(r, [{ kind: "pay_early", commitmentId: "po" }]);
+    expect(run.events.filter((e) => e.commitmentId === "po").map((e) => e.amount)).toEqual([$(5000), $(5000)]);
+  });
+});
+
 describe("horizon and weeks", () => {
   it("buckets Monday-Sunday with a partial first week and a Monday + 13*7 end", () => {
     const r = empty();

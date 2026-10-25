@@ -63,23 +63,56 @@ function applyOverride(events: CashEvent[], o: Override, ctx: Ctx): CashEvent[] 
   });
 }
 
+// The leg a chase/defer acts on: the named one, else the earliest remaining event in the lever's direction.
+// Moving one leg keeps the others where they were (a deposit and a balance never collapse onto one date).
+function targetLeg(l: { commitmentId: string; legIndex?: number }, dir: "in" | "out", events: CashEvent[], pred: (e: CashEvent) => boolean = () => true): CashEvent | undefined {
+  const mine = events.filter((e) => e.commitmentId === l.commitmentId && e.direction === dir);
+  if (l.legIndex !== undefined) return mine.find((e) => e.legIndex === l.legIndex && pred(e));
+  return [...mine].filter(pred).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.legIndex - b.legIndex))[0];
+}
+
+// Profile rule: a recurring item flagged nonDeferrable (payroll, taxes), matched by id or by category so the same
+// obligation imported from a bank file under another id is covered too. Shared by every lane that proposes a defer.
+export function isNonDeferrable(profile: Profile, commitmentId: string, category?: string): boolean {
+  return profile.recurring.some((r) => r.nonDeferrable === true && (r.id === commitmentId || (!!category && r.category === category)));
+}
+
 function leverOverrides(l: Lever, events: CashEvent[], ctx: Ctx): Override[] {
   const id = `lever-${l.kind}-${l.commitmentId}`;
-  const target = { commitmentId: l.commitmentId };
+  const noTarget = (what: string): Override[] => {
+    ctx.warnings.push(`lever ${l.kind} on ${l.commitmentId}: no ${what} to act on; nothing changed`);
+    return [];
+  };
   switch (l.kind) {
-    case "chase":
-      return [{ id, target, change: { date: l.assumeDate }, origin: "lever" }];
-    case "defer":
-      return [{ id, target, change: { shiftDays: l.days }, origin: "lever" }];
+    case "chase": {
+      // A chase pulls a receipt earlier; never move one that is already at or before the assumed date.
+      const e = targetLeg(l, "in", events, (x) => x.date > l.assumeDate);
+      if (!e) return noTarget(`remaining receipt later than ${l.assumeDate}`);
+      return [{ id, target: { commitmentId: l.commitmentId, legIndex: e.legIndex }, change: { date: l.assumeDate }, origin: "lever" }];
+    }
+    case "defer": {
+      // Payroll, taxes and other fixed obligations are never deferred, even when asked.
+      const cat = ctx.commitments.find((c) => c.id === l.commitmentId)?.category ?? events.find((e) => e.commitmentId === l.commitmentId)?.category;
+      if (isNonDeferrable(ctx.profile, l.commitmentId, cat)) {
+        ctx.warnings.push(`lever defer on ${l.commitmentId} skipped: marked nonDeferrable in the profile`);
+        return [];
+      }
+      const e = targetLeg(l, "out", events);
+      if (!e) return noTarget("remaining payment");
+      return [{ id, target: { commitmentId: l.commitmentId, legIndex: e.legIndex }, change: { shiftDays: l.days }, origin: "lever" }];
+    }
     case "pay_early": {
       const c = ctx.commitments.find((x) => x.id === l.commitmentId);
       const out = events.filter((e) => e.commitmentId === l.commitmentId && e.direction === "out");
-      const ov: Override[] = [{ id, target, change: { date: ctx.asOf }, origin: "lever" }];
-      if (c?.discount && ctx.asOf <= c.discount.byDate && out.length) {
-        const total = out.reduce((a, e) => a + e.amount, 0);
-        ov.push({ id: `${id}-discount`, target, change: { amount: Math.round(total * (1 - c.discount.pct / 100)) }, origin: "lever" });
-      }
-      return ov;
+      if (out.length === 0) return noTarget("remaining payment");
+      const discounted = !!c?.discount && ctx.asOf <= c.discount.byDate;
+      // One override per outflow leg, so a discount never touches receipts and each leg keeps its own amount.
+      return out.map((e) => ({
+        id: `${id}-${e.legIndex}`,
+        target: { commitmentId: l.commitmentId, legIndex: e.legIndex },
+        change: discounted ? { date: ctx.asOf, amount: Math.round(e.amount * (1 - c!.discount!.pct / 100)) } : { date: ctx.asOf },
+        origin: "lever" as const,
+      }));
     }
     case "ask_advance":
       return []; // splits events, so adjust() handles it in applyAdvance
