@@ -31,6 +31,9 @@ describe("Ask bar example questions", () => {
       it(`${name}: ${q}`, async () => {
         const intent = await readIntent(q, { records, profile, asOf: meta.asOf, mode: "cache_only", cacheDir: INTENT_CACHE_DIR });
         expect(intent.unresolved).toEqual([]);
+        // A hypothetical item must land inside the forecast, or the answer can only say "no change".
+        const horizonEnd = new Date(Date.parse(`${meta.asOf}T00:00:00Z`) + (profile.horizonWeeks * 7 - 1) * 86_400_000).toISOString().slice(0, 10);
+        if (intent.date) expect(intent.date <= horizonEnd, `${intent.date} is past ${horizonEnd}`).toBe(true);
         const a = await askNeri(q, {
           records, profile, asOf: meta.asOf, fxRates: meta.fxRates, pendingReviewCount: 0, business: { name },
           mode: "cache_only", cacheDirs: { intent: INTENT_CACHE_DIR, voice: ASK_CACHE_DIR },
@@ -41,6 +44,25 @@ describe("Ask bar example questions", () => {
         expect(a.citations.length).toBeGreaterThan(0);
       });
     }
+  }
+});
+
+// The preview engine (app/mock/engine.js) answers the same chips when the app runs without an API.
+type PreviewAnswer = { text: string; missingData?: string; proposal?: { date: string }; scenario?: { run: { days: { date: string }[] } } };
+const previewDir = "../../app/mock/"; // a variable path: the preview engine is plain JS with no types
+describe("Ask bar example questions in the preview engine", () => {
+  for (const id of ["cascade_trade", "pike_noodle"]) {
+    it(`${id}: every hint gets an answer, and any plan lands inside the forecast`, async () => {
+      const { createEngine } = await import(/* @vite-ignore */ `${previewDir}engine.js`);
+      const fx = await import(/* @vite-ignore */ `${previewDir}${id}.js`);
+      const engine = createEngine(fx);
+      for (const q of ASK_HINTS) {
+        const a: PreviewAnswer = await engine.ask(q);
+        expect(a.missingData, q).toBeUndefined();
+        expect(a.text, q).not.toMatch(/can't|don't see/i);
+        if (a.proposal) expect(a.scenario?.run.days.some((d) => d.date === a.proposal!.date), q).toBe(true);
+      }
+    });
   }
 });
 

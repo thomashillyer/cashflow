@@ -72,8 +72,12 @@ export const INTENT_STANDINS: { question: string; raw: AskIntentRaw }[] = [
     raw: { ...none, kind: "fix_gap" },
   },
   {
-    question: "Can I afford a $25K purchase in January?",
-    raw: { ...none, kind: "afford", amountPhrase: "$25K", datePhrase: "in January", commitmentType: "plan", direction: "out" },
+    question: "What if I spend $10K in early January?",
+    raw: { ...none, kind: "what_if", amountPhrase: "$10K", datePhrase: "early January", commitmentType: "plan", direction: "out" },
+  },
+  {
+    question: "Can I afford a $25K purchase on January 15?",
+    raw: { ...none, kind: "afford", amountPhrase: "$25K", datePhrase: "on January 15", commitmentType: "plan", direction: "out" },
   },
   // Guards: an ambiguous party (the test adds a second "Harbor" party to the books) and an injected instruction.
   {

@@ -1,14 +1,14 @@
 {
-  "key": "440893ef43f37caba283ef1b98bac7418cd3dff992b75457b5509147261ff87b",
+  "key": "64f53c43eaa59aee7801adc24fa14b4b6eee145e94bb1e7ad8c31b95f89a42e1",
   "promptVersion": "read_intent@1",
   "model": "claude-opus-5-5",
   "source": "stand-in",
   "output": {
-    "kind": "afford",
+    "kind": "what_if",
     "partyPhrase": null,
     "referencePhrase": null,
-    "amountPhrase": "$25K",
-    "datePhrase": "in January",
+    "amountPhrase": "$10K",
+    "datePhrase": "early January",
     "windowPhrase": null,
     "commitmentType": "plan",
     "direction": "out",
