@@ -1,0 +1,10 @@
+{
+  "key": "1cfcfdd2eac7ec30cf97042a914dbdd574ce4d3740eafdfee03dbbe0900bb886",
+  "promptVersion": "draft_message@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in; replace with a live run (scripts/refresh-brief-cache.ts)",
+  "output": {
+    "subject": "Invoice INV-1187: $28,000",
+    "body": "Hello Evergreen Home team,\n\nOur records show invoice INV-1187 for $28,000 is due Dec 10. Could you let me know when we can expect payment? If you can pay it by Dec 18 at the latest, it would help us a great deal with our year-end commitments.\n\nIf anything is holding it up, please tell me and I will help sort it out.\n\nThank you,\nCascade Trade Co."
+  }
+}

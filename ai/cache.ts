@@ -10,6 +10,9 @@ import { join } from "node:path";
 // Committed demo entries for the synthetic fixtures. Read as a fallback; nothing at runtime writes here.
 export const DEFAULT_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/intake/cache");
 
+// Committed demo entries for brief text and drafts (ai/brief.ts), hand-authored stand-ins until refreshed live.
+export const BRIEF_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/brief/cache");
+
 // Where live extractions of real documents are stored. Gitignored (data/private/): the entries contain
 // names, amounts, and quotes from the owner's documents.
 export const LIVE_CACHE_DIR = join(import.meta.dirname, "../data/private/ai-cache");
