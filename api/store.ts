@@ -45,6 +45,8 @@ export type Account = {
   createdAt?: string;
   thoughts?: Thought[];                // owner notes (parked thoughts)
   intakeNotes?: IntakeNote[];          // import notes Review needs (e.g. "owner must confirm the date")
+  maskNames?: boolean;                 // mask party names and contact details in every API response (api/mask.ts)
+  maskAliases?: Record<string, string>; // real name -> stage name; the rest get Customer A, Supplier A, ...
 };
 
 export type StoredProfile = Profile & { account?: Account };

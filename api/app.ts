@@ -15,6 +15,7 @@ import { ownerRoutes } from "./routes/owner";
 import { workRoutes } from "./routes/work";
 import { demoRoutes } from "./routes/demo";
 import { overrideRoutes } from "./routes/overrides";
+import { installMask, maskRoutes } from "./mask";
 import { isBehind, type SchemaStatus, type SchemaStatusFn } from "./schema-status";
 
 // Verifies a Supabase access token. Returns null for an invalid or expired token.
@@ -164,6 +165,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(workRoutes(deps));
   await app.register(demoRoutes(deps));
   await app.register(overrideRoutes(deps));
+  await app.register(maskRoutes(deps));
+  installMask(app, deps);
 
   if (opts.staticDir && existsSync(opts.staticDir)) {
     // The committed app/config.js stays empty (the static preview publishes it). When this server serves the app,
