@@ -90,7 +90,7 @@ async function pull(input: ZohoPullInput): Promise<ZohoPull> {
       if (!providerId || !date) continue;
       if (++detailCalls > MAX_PAYMENT_DETAILS) { warnings.push(`Only the first ${MAX_PAYMENT_DETAILS} payments were read for payment history.`); break; }
       // The list names invoices; the detail says how much went to each.
-      const detail = await client.detail(path, providerId, "payment");
+      const detail = await client.detail(path, providerId, isIn ? "payment" : "vendorpayment");
       const applied = Array.isArray(detail?.[appliedKey]) ? (detail![appliedKey] as ZohoRecord[]) : [];
       const pcur = str(pay.currency_code) ?? str(detail?.currency_code);
       const pparty = str(pay[isIn ? "customer_id" : "vendor_id"]);
