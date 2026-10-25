@@ -27,7 +27,7 @@ import type {
   CandidateFields, ChangeProposal, Field, IntakeCandidate, PartyCandidate,
 } from "../schema/intake";
 import type { Evidence, Records, Signal, SourceRef } from "../schema/records";
-import { extractDocument, NO_CACHED_EXTRACTION, reviewCandidate } from "./extract/document";
+import { extractDocument, MAX_SOURCE_CHARS, NO_CACHED_EXTRACTION, reviewCandidate } from "./extract/document";
 import { parseEmail, parsePaste, parseWhatsApp, type LinkKind, type MessageBundle } from "./extract/message";
 import { extractPdfText, type PdfText } from "./extract/pdf";
 import { classifySheet, documentToCandidate, tableToCandidates, type ColumnMapping, type SheetContent } from "./extract/sheet";
@@ -94,7 +94,9 @@ export function mergeEvidence(records: Records, evidence: Evidence[]): Records {
 // ---------------------------------------------------------------------------
 // Helpers
 
-const EVIDENCE_TEXT_MAX = 20_000;
+const MAX_ATTACHMENTS = 10;
+const MAX_SHEETS = 4;
+const EVIDENCE_TEXT_MAX = MAX_SOURCE_CHARS; // the most extraction reads, so every quoted span is stored
 const sha256 = (data: Uint8Array | string) => createHash("sha256").update(data).digest("hex");
 const bounded = (text: string) => (text.length > EVIDENCE_TEXT_MAX ? text.slice(0, EVIDENCE_TEXT_MAX) : text);
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
@@ -301,15 +303,19 @@ function unreadableFile(env: Env, opts: {
 
 // ---- sheets
 
-function readSheets(env: Env, sheets: SheetContent[], opts: {
+function readSheets(env: Env, allSheets: SheetContent[], opts: {
   receivedAt: string; source?: InputSource; channel: Evidence["channel"]; parentId?: string;
   extraEvidenceIds?: string[]; currency?: string; dayFirst?: boolean; columnMapping?: ColumnMapping; headerRow?: number;
 }) {
+  const sheets = allSheets.slice(0, MAX_SHEETS);
+  if (allSheets.length > MAX_SHEETS) {
+    env.out.note(allSheets[0]!.evidenceId, `Only the first ${MAX_SHEETS} sheets were read; import the other sheets separately.`);
+  }
   const before = env.out.candidates.length;
   const reasons: string[] = [];
-  for (const sheet of sheets) {
+  for (const [sheetIndex, sheet] of sheets.entries()) {
     const evidenceId = sheet.evidenceId;
-    const prefix = `cand-${evidenceId}-${slug(sheet.sheet)}`;
+    const prefix = `cand-${evidenceId}-${sheetIndex + 1}-${slug(sheet.sheet)}`;
     const sheetOpts = {
       business: { name: env.ctx.business.name }, idPrefix: prefix,
       ...(opts.currency ? { currency: opts.currency } : {}), ...(opts.dayFirst !== undefined ? { dayFirst: opts.dayFirst } : {}),
@@ -370,6 +376,10 @@ function bodyCandidate(env: Env, c: IntakeCandidate, bundle: MessageBundle): Int
     env.out.note(id, "Demo mode has no saved reading of this text, so only the message's payment claims were checked.");
     return undefined;
   }
+  if (c.kind === "payment_evidence") {
+    const text = "This message says a payment was made, but a message is not a remittance. Upload the remittance or bank confirmation, or record the payment yourself.";
+    return reviewCandidate({ candidateId: c.id, revision: c.revision, evidenceIds: c.evidenceIds }, "partial", [text]);
+  }
   if (c.kind === "invoice" || c.kind === "bill" || c.kind === "purchase_order") {
     const ref = foundValue(c.fields.reference);
     const amount = foundValue(c.fields.amount);
@@ -386,7 +396,9 @@ async function readMessage(env: Env, input: Extract<IntakeInput, { kind: "email"
   const tz = ctx.timeZone;
   const text = input.kind === "paste" ? input.text.trim() : input.raw;
   const hash = sha256(text);
-  const evidenceId = input.source?.evidenceId ?? `ev-${input.kind}-${hash.slice(0, 16)}`;
+  // A pasted note has no timestamp of its own, so when it was received is part of what it is.
+  const idHash = input.kind === "paste" ? sha256(`${input.receivedAt}\n${text}`) : hash;
+  const evidenceId = input.source?.evidenceId ?? `ev-${input.kind}-${idHash.slice(0, 16)}`;
   const pOpts = {
     evidenceId, ...(input.source?.receivedAt ? { receivedAt: input.source.receivedAt } : {}), ...(tz ? { timeZone: tz } : {}),
   };
@@ -402,6 +414,12 @@ async function readMessage(env: Env, input: Extract<IntakeInput, { kind: "email"
     out.note(evidenceId, "The message has no readable date, so the time it was received is taken as now. Check any dates it mentions.");
   }
 
+  if (bundle.text.length > MAX_SOURCE_CHARS) {
+    out.addEvidence({ ...bundle.parent, fileHash: hash, extraction: "partial" });
+    out.note(evidenceId, `This message is over ${MAX_SOURCE_CHARS.toLocaleString("en-US")} characters. Split it, or paste just the part about the invoice.`);
+    out.addCandidate(reviewCandidate({ candidateId: `cand-${evidenceId}`, revision: 1, evidenceIds: [evidenceId] }, "partial", ["The message is too long to read in one piece; split it or paste the relevant part."]));
+    return;
+  }
   const links = dedupeLinks(bundle);
   const parent: Evidence = {
     ...bundle.parent, fileHash: hash, text: bounded(bundle.text),
@@ -414,7 +432,11 @@ async function readMessage(env: Env, input: Extract<IntakeInput, { kind: "email"
 
   // Attachments the sender named in the headers but nobody uploaded stay as placeholders; ones that
   // were uploaded replace theirs.
-  const attachments = input.kind === "paste" ? [] : input.attachments ?? [];
+  const allAttachments = input.kind === "paste" ? [] : input.attachments ?? [];
+  const attachments = allAttachments.slice(0, MAX_ATTACHMENTS);
+  if (allAttachments.length > MAX_ATTACHMENTS) {
+    out.note(parent.id, `Only the first ${MAX_ATTACHMENTS} attachments were read; upload the rest separately.`);
+  }
   const named = (bundle.headers?.["x-attachments"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const lowerNames = new Set(attachments.map((a) => a.fileName.toLowerCase()));
   const missingFiles = named.filter((n) => !lowerNames.has(n.toLowerCase()));
@@ -578,8 +600,8 @@ export async function ingest(input: IntakeInput, ctx: IntakeContext): Promise<In
 }
 
 // A message whose claim is about one commitment can be attached to it as evidence once the owner
-// confirms. No cash changes: the claim itself is a signal with its own confirmation. Still a "review"
-// item: the message is not a document.
+// confirms: an evidence-only "link" (no cash change). The claim itself is a Signal with its own
+// confirmation. When there is nothing new to attach, it stays an empty "review" item.
 function linkMessageToCommitment(
   proposal: ChangeProposal, candidate: IntakeCandidate, signals: Signal[], records: Records,
 ): ChangeProposal {
@@ -589,10 +611,12 @@ function linkMessageToCommitment(
   const target = records.commitments.find((c) => c.id === targets[0]);
   if (!target) return proposal;
   const fresh = candidate.evidenceIds.filter((id) => !target.evidenceIds?.includes(id));
+  if (!fresh.length) return { ...proposal, targetCommitmentId: target.id };
   return {
     ...proposal,
+    action: "link",
     targetCommitmentId: target.id,
-    ops: fresh.length ? [{ op: "linkEvidence", commitmentId: target.id, evidenceIds: fresh }] : [],
-    reasons: [...proposal.reasons, `The message is about ${target.reference ?? target.id}; confirm to keep it with that invoice as evidence (no cash change).`],
+    ops: [{ op: "linkEvidence", commitmentId: target.id, evidenceIds: fresh }],
+    reasons: [...proposal.reasons, `The message is about ${target.reference ?? target.id}; confirm to keep it with that invoice as evidence (no cash change).`].filter((r) => !r.startsWith("Message updates")),
   };
 }

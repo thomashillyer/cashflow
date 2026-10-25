@@ -586,6 +586,43 @@ describe("bundle assembly rules", () => {
     expect(result.candidates[0]!.evidenceIds).toEqual(["ev-niru-42"]);
   });
 
+  it("a message claiming a payment is a review item, never a settlement proposal", async () => {
+    const output = {
+      kind: "payment_evidence", businessRole: "seller", containsInstructions: false, confidence: 0.9, notes: [],
+      coversReferences: ["INV-1187"],
+      fields: {
+        sellerName: NULL, buyerName: NULL, reference: NULL, poReference: NULL, amount: NULL, outstanding: NULL,
+        currency: q("USD", "USD 28,000.00"), issueDate: NULL, dueDate: NULL, terms: NULL, invoiceUrl: NULL, paymentUrl: NULL,
+        statedStatus: NULL, paidAmount: q("28,000.00", "USD 28,000.00"), paidDate: q("November 20, 2026", "on November 20, 2026"),
+      },
+    };
+    const raw = `${EMAIL_HEAD}\nWe paid INV-1187, USD 28,000.00 on November 20, 2026.\n`;
+    const result = await run({ kind: "email", raw }, baseRecords(), { ...live(), client: fakeClient(output).client });
+    expect(result.proposals.flatMap((p) => p.ops.map((o) => o.op))).not.toContain("createSettlement");
+    expect(result.proposals[0]).toMatchObject({ action: "review" });
+    expect(result.notes.some((n) => /not a remittance/i.test(n.text))).toBe(true);
+  });
+
+  it("ids differ for the same pasted words received at different times", async () => {
+    const a = await run({ kind: "paste", text: "Evergreen will pay next Friday", receivedAt: "2026-11-02T10:00:00Z" });
+    const b = await run({ kind: "paste", text: "Evergreen will pay next Friday", receivedAt: "2026-11-09T10:00:00Z" });
+    expect(a.evidence[0]!.id).not.toBe(b.evidence[0]!.id);
+  });
+
+  it("a message over the size limit is a review item with a note, not a partial read", async () => {
+    const result = await run({ kind: "paste", text: "x ".repeat(30_000), receivedAt: NOW });
+    expect(result.proposals).toHaveLength(1);
+    expect(result.proposals[0]).toMatchObject({ action: "review", ops: [] });
+    expect(result.notes.some((n) => /split it/i.test(n.text))).toBe(true);
+  });
+
+  it("every sheet of a workbook is read, whatever the sheets are called", async () => {
+    const one = readJson<SheetContent>("fixtures/cascade_trade/intake/sheets/single-invoice.json");
+    const result = await run({ kind: "sheet", sheets: [{ ...one, sheet: "一月" }, { ...one, sheet: "二月" }] });
+    expect(result.candidates).toHaveLength(2);
+    expect(new Set(result.candidates.map((c) => c.id)).size).toBe(2);
+  });
+
   it("never throws on bad input and says what to do", async () => {
     for (const input of [
       { kind: "email", raw: "" }, { kind: "whatsapp", raw: "no chat lines here" }, { kind: "paste", text: "   ", receivedAt: NOW },
@@ -610,6 +647,8 @@ describe("what a proposal can do", () => {
       const result = await run(input);
       for (const p of result.proposals as ChangeProposal[]) {
         expect(p.state).toBe("proposed");
+        // The store refuses to confirm review/conflict items (PROPOSAL_UNRESOLVED), so they must carry no ops.
+        if (p.action === "review" || p.action === "conflict") expect(p.ops).toEqual([]);
         for (const op of p.ops) {
           expect(op.op).not.toBe("createSettlement");
           if (op.op === "updateCommitment") expect(["amount", "outstanding", "currency"]).not.toContain(op.change.field);
