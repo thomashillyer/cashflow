@@ -258,7 +258,7 @@ function summary() {
         ? `Cash is ${money(short)} below your line right now.`
         : `Cash holds until ${shortDate(holdsUntil)}, then drops ${money(short)} below your line.`,
       sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}${causes.length ? `, when ${causes.join(" and ")} go out` : ""}.`,
-      take: review ? [review.message, review.reasons[0]?.message].filter(Boolean).join(" ") : cfoTake(),
+      take: cfoTake(), // the check count lives once, in the fold-out under today's things
       tone: "short",
     };
   }
