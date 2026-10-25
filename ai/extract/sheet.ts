@@ -40,7 +40,7 @@ export type SheetOptions = {
   business: { name: string };
   currency?: string;            // fallback when the sheet states none; the candidate carries a note
   dayFirst?: boolean;           // ambiguous 03/04/2026 style dates
-  idPrefix: string;             // candidate ids: `${idPrefix}-${row}` for tables, `${idPrefix}` for documents
+  idPrefix: string;             // candidate ids: `${idPrefix}-${row}` for tables, `${idPrefix}` for a document (`${idPrefix}-${row}` per document when a sheet is split)
 };
 
 export type TableOptions = SheetOptions & {
@@ -174,8 +174,14 @@ const mentions = (haystack: string, name: string) => {
 };
 
 // Our own side of the document: found only when the sheet actually names the business.
+const firstContentRow = (rows: SheetCell[][]): number => {
+  const i = rows.findIndex((r) => !blankRow(r));
+  return i < 0 ? 0 : i;
+};
+
 function businessField(sheet: SheetContent, name: string): Field<string> {
-  for (let r = 0; r < Math.min(sheet.rows.length, 30); r++) {
+  const s = firstContentRow(sheet.rows);
+  for (let r = s; r < Math.min(sheet.rows.length, s + 30); r++) {
     for (const c of sheet.rows[r] ?? []) {
       const t = text(c);
       if (typeof c === "string" && t && mentions(t, name)) return { state: "found", value: name, evidence: [evidenceFor(sheet, r + 1, t)] };
@@ -185,7 +191,7 @@ function businessField(sheet: SheetContent, name: string): Field<string> {
 }
 
 const letterhead = (sheet: SheetContent, name: string): boolean =>
-  sheet.rows.slice(0, 5).some((row) => row.some((c) => typeof c === "string" && mentions(c, name)));
+  sheet.rows.slice(firstContentRow(sheet.rows), firstContentRow(sheet.rows) + 5).some((row) => row.some((c) => typeof c === "string" && mentions(c, name)));
 
 // ---------- table layout ----------
 
@@ -193,6 +199,11 @@ const letterhead = (sheet: SheetContent, name: string): boolean =>
 // in other cells only the bare word, so a customer called "Total Wine" survives.
 const TOTAL_REF = /^\s*(grand |sub[ -]?|report )?totals?\b/i;
 const TOTAL_CELL = /^(grand |sub[ -]?|report )?totals?\s*:?$/i;
+// A footer label in any cell of the row: "Total outstanding", "Grand total: 3,000", "Balance carried forward". Still not
+// "Total Wine": after the word the label must end, carry a figure, or continue with a money word.
+const TOTAL_LABEL = /^\s*(?:(?:grand\s+|sub[ -]?)?totals?(?=\s*(?:[:(-]|\d|$)|\s+(?:due|outstanding|amount|balance|payable|open|owing|receivable|invoiced|usd|eur|gbp|cad|aud|jpy|cny|inr|mxn|chf)\b)|balance\s+carried\b)/i;
+const isTotalsRow = (row: SheetCell[], refCol: number): boolean =>
+  TOTAL_REF.test(text(row[refCol])) || row.some((c) => typeof c === "string" && (TOTAL_CELL.test(c.trim()) || TOTAL_LABEL.test(c)));
 
 const HEADER_PATTERNS: Record<ColumnKey, RegExp[]> = {
   reference: [/^(invoice|inv|bill|document|doc|reference|ref)( (#|no|num|number|id))?$/, /^(number|no|#|id)$/],
@@ -200,8 +211,8 @@ const HEADER_PATTERNS: Record<ColumnKey, RegExp[]> = {
   currency: [/^(currency|ccy|cur)( code)?$/],
   issueDate: [/^(invoice|issue|bill|doc|document) date$/, /^(issued|date issued|date)$/],
   dueDate: [/^(due date|payment due|payment due date|due on|pay by|due)$/],
-  outstanding: [/^(balance due|balance|outstanding|open balance|amount outstanding|amount remaining|remaining|open amount)$/],
-  amount: [/^(invoice total|invoice amount|total amount|total|amount|gross amount|gross)$/, /^(amount due)$/],
+  outstanding: [/^(amount due|balance due|balance|outstanding|open balance|amount outstanding|amount remaining|remaining|open amount)$/],
+  amount: [/^(invoice total|invoice amount|total amount|total|amount|gross amount|gross)$/],
 };
 const COLUMN_ORDER: ColumnKey[] = ["reference", "party", "currency", "issueDate", "dueDate", "outstanding", "amount"];
 
@@ -218,8 +229,12 @@ function inferColumns(row: SheetCell[]): ColumnMapping {
     });
     if (best) { out[key] = best.col; used.add(best.col); }
   }
+  // "Amount due" / "Balance due" with no total or amount column: it is all there is for the amount (see amountIsBalance).
+  if (out.amount === undefined && out.outstanding !== undefined) out.amount = out.outstanding;
   return out;
 }
+
+const amountIsBalance = (c: ColumnMapping) => c.amount !== undefined && c.amount === c.outstanding;
 
 function findTableHeader(rows: SheetCell[][]): { headerRow: number; columns: ColumnMapping } | undefined {
   const n = trimmedRowCount(rows);
@@ -283,15 +298,21 @@ type LineBlock = { header: number; descCol: number; amountCol?: number; rows: nu
 
 const SUMMARY_CELL = /^(sub ?-?total|grand total|total( due| amount)?|amount due|balance( due)?)\s*:?$/i;
 
+function lineHeader(row: SheetCell[] | undefined): { heads: string[]; descCol: number } | undefined {
+  const heads = (row ?? []).map((c) => (typeof c === "string" ? norm(c) : ""));
+  const descCol = heads.findIndex((h) => /^(description|item|items|product|service|details|item description)$/.test(h));
+  const numeric = heads.filter((h, i) => i !== descCol && /^(qty|quantity|unit price|price|rate|amount|line total|total)$/.test(h));
+  const hasUnits = numeric.some((h) => /^(qty|quantity|unit price|price|rate)$/.test(h));
+  // A grid headed "SKU | Qty | Unit price | Total" is a line block too; its "Total" is not the document total.
+  return (descCol >= 0 ? numeric.length >= 1 : hasUnits && numeric.length >= 2) ? { heads, descCol } : undefined;
+}
+
 function findLineItems(rows: SheetCell[][]): LineBlock | undefined {
   const n = trimmedRowCount(rows);
   for (let r = 0; r < n; r++) {
-    const heads = (rows[r] ?? []).map((c) => (typeof c === "string" ? norm(c) : ""));
-    const descCol = heads.findIndex((h) => /^(description|item|items|product|service|details|item description)$/.test(h));
-    const numeric = heads.filter((h, i) => i !== descCol && /^(qty|quantity|unit price|price|rate|amount|line total|total)$/.test(h));
-    const hasUnits = numeric.some((h) => /^(qty|quantity|unit price|price|rate)$/.test(h));
-    // A grid headed "SKU | Qty | Unit price | Total" is a line block too; its "Total" is not the document total.
-    if (!(descCol >= 0 ? numeric.length >= 1 : hasUnits && numeric.length >= 2)) continue;
+    const head = lineHeader(rows[r]);
+    if (!head) continue;
+    const { heads, descCol } = head;
     const amountCol = heads.findIndex((h) => /^(amount|line total|total|extended( amount| price)?|ext amount|ext price)$/.test(h));
     const items: number[] = [];
     for (let i = r + 1; i < n; i++) {
@@ -332,6 +353,71 @@ function valueNear(rows: SheetCell[][], r: number, c: number, hit: LabelHit): Fo
   return undefined;
 }
 
+// ---------- stacked documents ----------
+
+const DOC_TITLE = /^(tax |sales |vendor )?(invoice|bill)$/;
+const TOTAL_KEYS = new Set<LabelKey>(["totalDue", "grandTotal", "total", "amountDue"]);
+
+// A row that states a total, ignoring a line-item grid's own "Total" header.
+function statesTotal(rows: SheetCell[][], r: number): boolean {
+  if (lineHeader(rows[r])) return false;
+  return (rows[r] ?? []).some((cell, c) => {
+    const hit = labelOf(cell);
+    return !!hit && TOTAL_KEYS.has(hit.key) && !!valueFor(rows, r, c, hit);
+  });
+}
+
+// The invoice number a row labels, if any ("Invoice # INV-2", or "Invoice" beside an id).
+function referenceIn(rows: SheetCell[][], r: number): string | undefined {
+  for (const [c, cell] of (rows[r] ?? []).entries()) {
+    const hit = labelOf(cell);
+    if (hit?.key !== "reference") continue;
+    const v = valueFor(rows, r, c, hit);
+    if (v) return text(v.cell).toLowerCase();
+  }
+  return undefined;
+}
+
+// First row (0-based) of each document on a sheet. A new document starts at a second "Invoice"/"Bill" title, or at
+// a different invoice-number label after the previous one already stated a total. Rows right above that label
+// (letterhead, our name) belong to the new document.
+export function documentStarts(rows: SheetCell[][]): number[] {
+  const n = trimmedRowCount(rows);
+  let cur = firstContentRow(rows);
+  const starts = [cur];
+  let sawTotal = false;
+  let sawBody = false;
+  let curRef: string | undefined;
+  for (let r = cur; r < n; r++) {
+    const row = rows[r] ?? [];
+    if (blankRow(row)) continue;
+    const filled = row.filter((c) => text(c) !== "");
+    const title = filled.length === 1 && typeof filled[0] === "string" && DOC_TITLE.test(norm(filled[0]));
+    const ref = referenceIn(rows, r);
+    let start: number | undefined;
+    if (title && r > cur && sawBody) start = r;
+    else if (!title && ref !== undefined && sawTotal && ref !== curRef) {
+      start = r;
+      while (start - 1 > cur && !blankRow(rows[start - 1]) && !statesTotal(rows, start - 1)) start--;
+    }
+    if (start !== undefined) {
+      starts.push(start);
+      cur = start;
+      sawTotal = false;
+      sawBody = false;
+      curRef = undefined;
+    }
+    if (!title) sawBody = true;
+    if (ref !== undefined && curRef === undefined) curRef = ref;
+    if (statesTotal(rows, r)) sawTotal = true;
+  }
+  return starts;
+}
+
+// Only rows start..end-1 of the sheet, with row numbers (and so evidence) unchanged.
+const blockOf = (sheet: SheetContent, start: number, end: number): SheetContent =>
+  ({ ...sheet, rows: sheet.rows.map((row, i) => (i >= start && i < end ? row : [])) });
+
 export function classifySheet(sheet: SheetContent): SheetClassification {
   const problem = limitProblem(sheet);
   if (problem) return { layout: "unknown", reason: problem };
@@ -368,6 +454,7 @@ function partyKind(header: string | undefined): PartyKind {
 function assemble(args: {
   id: string; sheet: SheetContent; kind: "invoice" | "bill"; counterparty: Field<string>; business: Field<string>;
   fields: Omit<CandidateFields, "sellerName" | "buyerName">; notes: string[]; base: number; partial?: boolean;
+  assumedCurrency?: string;     // currency came from the profile default, not the sheet
 }): IntakeCandidate {
   const { kind, counterparty, business, fields } = args;
   const full: CandidateFields = {
@@ -382,7 +469,8 @@ function assemble(args: {
   }
   if (full.amount.state === "missing") notes.push("Amount is missing; enter it manually before this can be confirmed.");
   if (full.currency.state !== "found") notes.push("Currency is missing; amounts were read assuming 2 decimal places.");
-  const ok = full.amount.state === "found" && full.currency.state === "found" && !args.partial;
+  if (args.assumedCurrency) notes.push(`currency assumed from profile default (${args.assumedCurrency}); confirm`);
+  const ok = full.amount.state === "found" && full.currency.state === "found" && !args.partial && !args.assumedCurrency;
   const lacking = [full.reference, full.amount, full.dueDate, counterparty].filter((f) => f.state !== "found").length;
   return {
     id: args.id,
@@ -438,8 +526,8 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
   const business = businessField(sheet, opts.business.name);
   const defaultCurrency = opts.currency ? currencyCode(opts.currency) : undefined;
 
-  if (/^amount due$/.test(norm(headers.amount ?? ""))) {
-    baseNotes.push("The amount column is headed \"Amount due\"; after part payments that is a balance, not the invoice total.");
+  if (amountIsBalance(columns)) {
+    baseNotes.push(`The only money column is headed "${headers.outstanding ?? headers.amount ?? ""}" (no total or amount column); used as the amount and as outstanding, but after part payments a balance is less than the invoice total.`);
   }
 
   const candidates: IntakeCandidate[] = [];
@@ -451,7 +539,7 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
   for (let r = headerRow; r < n; r++) {
     const row = sheet.rows[r] ?? [];
     const ref = text(row[columns.reference]);
-    if (blankRow(row) || !/\d/.test(ref) || TOTAL_REF.test(ref)) continue;
+    if (blankRow(row) || !/\d/.test(ref) || isTotalsRow(row, columns.reference)) continue;
     refCounts.set(refKey(row), (refCounts.get(refKey(row)) ?? 0) + 1);
   }
   for (let r = headerRow; r < n; r++) {
@@ -459,7 +547,7 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
     const rowNo = r + 1;
     if (blankRow(row)) continue;
     const refText = text(row[columns.reference]);
-    if (TOTAL_REF.test(refText) || row.some((c) => typeof c === "string" && TOTAL_CELL.test(c.trim()))) {
+    if (isTotalsRow(row, columns.reference)) {
       rejectedRows.push({ row: rowNo, reason: "Totals row; not an invoice." });
       continue;
     }
@@ -476,6 +564,7 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
     const reference = cellField(sheet, rowNo, row[columns.reference], (v) => v, "Invoice number");
     const party = columns.party !== undefined ? cellField(sheet, rowNo, row[columns.party], (v) => v, "Party name") : missing<string>("no party column");
 
+    let assumedCurrency: string | undefined;
     let currency: Field<string> = columns.currency !== undefined
       ? cellField(sheet, rowNo, row[columns.currency], currencyCode, "Currency")
       : missing("no currency column");
@@ -484,8 +573,8 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
     if (currency.state !== "found" && embedded.code) {
       currency = { state: "found", value: embedded.code, evidence: [evidenceFor(sheet, rowNo, amountText)] };
     } else if (currency.state !== "found" && defaultCurrency && amountText && !embedded.ambiguous) {
-      currency = { state: "found", value: defaultCurrency, evidence: [evidenceFor(sheet, rowNo, amountText)] };
-      notes.push(`Currency is not stated in the sheet; using the business default ${defaultCurrency}.`);
+      currency = { state: "found", value: defaultCurrency, evidence: [evidenceFor(sheet, rowNo, `${amountText} (currency assumed from profile default ${defaultCurrency})`)] };
+      assumedCurrency = defaultCurrency;
     }
     const cur = currency.state === "found" ? currency.value : "USD";
     const fields: Omit<CandidateFields, "sellerName" | "buyerName"> = {
@@ -498,7 +587,7 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
     };
     candidates.push(assemble({
       id: `${opts.idPrefix}-${rowNo}`, sheet, kind, counterparty: party, business, fields, notes,
-      base: owner ? 0.9 : 0.85,
+      base: owner ? 0.9 : 0.85, ...(assumedCurrency ? { assumedCurrency } : {}),
     }));
   }
   return { candidates, rejectedRows, proposedMapping };
@@ -506,10 +595,37 @@ export function tableToCandidates(sheet: SheetContent, opts: TableOptions): Tabl
 
 // ---------- documentToCandidate ----------
 
+// One document per sheet. If the sheet stacks several, only the first is read, flagged partial with a note;
+// totals are never merged across documents. documentsToCandidates splits them.
 export function documentToCandidate(sheet: SheetContent, opts: SheetOptions): IntakeCandidate {
+  const starts = documentStarts(sheet.rows);
+  if (starts.length <= 1) return buildDocument(sheet, opts, {});
+  return buildDocument(blockOf(sheet, starts[0]!, starts[1]!), opts, { stackedNote: stackedNote(starts) });
+}
+
+const stackedNote = (starts: number[]) =>
+  `This sheet appears to hold ${starts.length} documents (the next starts at row ${starts[1]! + 1}); only the first was read and nothing was added across them. Check the sheet.`;
+
+// Every document on the sheet, in order. One document keeps id `${idPrefix}`; several get `${idPrefix}-${firstRow}`.
+// When a later block has no invoice number and no total (a stray second title), the split is unclear: return the first
+// document only, flagged partial.
+export function documentsToCandidates(sheet: SheetContent, opts: SheetOptions): IntakeCandidate[] {
+  const starts = documentStarts(sheet.rows);
+  if (starts.length <= 1) return [buildDocument(sheet, opts, {})];
+  const n = trimmedRowCount(sheet.rows);
+  const blocks = starts.map((s, i) => blockOf(sheet, s, starts[i + 1] ?? n));
+  const real = (b: SheetContent) => b.rows.some((_, r) => referenceIn(b.rows, r) !== undefined || statesTotal(b.rows, r));
+  if (!blocks.slice(1).every(real)) {
+    return [buildDocument(blocks[0]!, opts, { stackedNote: stackedNote(starts) })];
+  }
+  return blocks.map((b, i) => buildDocument(b, { ...opts, idPrefix: `${opts.idPrefix}-${starts[i]! + 1}` }, {}));
+}
+
+function buildDocument(sheet: SheetContent, opts: SheetOptions, extra: { stackedNote?: string }): IntakeCandidate {
   const rows = sheet.rows;
   const block = findLineItems(rows);
   const notes: string[] = ["Interpreted as a single document from label/value pairs; confirm before it creates anything."];
+  if (extra.stackedNote) notes.push(extra.stackedNote);
   const ctx: Ctx = { sheet, ...(opts.dayFirst !== undefined ? { dayFirst: opts.dayFirst } : {}), notes };
   const lineRows = new Set(block?.rows ?? []);
 
@@ -530,6 +646,7 @@ export function documentToCandidate(sheet: SheetContent, opts: SheetOptions): In
   // Currency: explicit label, else a code written next to a total, else the business default.
   let currency: Field<string> = missing("currency not stated");
   let yen = false;
+  let assumedCurrency: string | undefined;
   const curLabel = first("currency");
   const fromLabel = curLabel ? currencyCode(text(curLabel.cell)) : undefined;
   if (curLabel && fromLabel) currency = { state: "found", value: fromLabel, evidence: [ev(curLabel)] };
@@ -543,8 +660,8 @@ export function documentToCandidate(sheet: SheetContent, opts: SheetOptions): In
   }
   const defaultCurrency = opts.currency ? currencyCode(opts.currency) : undefined;
   if (currency.state !== "found" && defaultCurrency && totalCells[0] && !yen) {
-    currency = { state: "found", value: defaultCurrency, evidence: [ev(totalCells[0])] };
-    notes.push(`Currency is not stated in the sheet; using the business default ${defaultCurrency}.`);
+    currency = { state: "found", value: defaultCurrency, evidence: [evidenceFor(sheet, totalCells[0].r + 1, `${totalCells[0].shown} (currency assumed from profile default ${defaultCurrency})`)] };
+    assumedCurrency = defaultCurrency;
   }
   const cur = currency.state === "found" ? currency.value : "USD";
   const asAmount = (f: Found, label: string) => amountField(ctx, f.r + 1, f.cell, cur, label, f.shown);
@@ -637,6 +754,7 @@ export function documentToCandidate(sheet: SheetContent, opts: SheetOptions): In
   };
   return assemble({
     id: opts.idPrefix, sheet, kind, counterparty: str(counterF, "Party name", "no party label"),
-    business: businessField(sheet, name), fields, notes, base: 0.8, partial: directionGuessed,
+    business: businessField(sheet, name), fields, notes, base: 0.8,
+    partial: directionGuessed || extra.stackedNote !== undefined, ...(assumedCurrency ? { assumedCurrency } : {}),
   });
 }
