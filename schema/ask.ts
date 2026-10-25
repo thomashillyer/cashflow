@@ -10,7 +10,8 @@
 // the owner states is persisted as a proposed owner Signal (claim "plan"), a rule as a proposed
 // Rule, both confirmed through the existing endpoints.
 
-import type { CommitmentDraft, Lever, Rule, Scenario } from "./records";
+import type { Commitment, CommitmentDraft, Lever, Rule, Scenario } from "./records";
+import type { Profile } from "./profile";
 import type { Answer } from "./forecast";
 
 export type AskIntentKind =
@@ -55,6 +56,7 @@ export type AskIntent = {
 export type Conviction = "high" | "medium" | "low";
 
 // A non-money number the answer may state: "40%", "10 days", "8 payments".
+// pct is a whole percent (40 means 40%); upfrontShare elsewhere stays 0..1.
 export type NumberFact = { label: string; value: number; unit: "pct" | "days" | "count" };
 
 // What code decided. Claude may only phrase this; it never changes a field.
@@ -87,7 +89,12 @@ export type Decision = {
   convictionReasons: string[];       // code-built from data quality; never quotes notes or messages
   whatWouldChange?: string;          // code-built: the lowest-confidence fact on the path, in plain words
   proposal?: { kind: "commitment"; draft: CommitmentDraft } | { kind: "rule"; rule: Omit<Rule, "id" | "state"> };
-  scenario?: Scenario;               // the what-if the chart should show (re-run with forecast())
+  scenario?: Scenario;               // overrides/levers of the what-if the chart should show
+  scenarioInputs?: {                 // drafts and hires a Scenario can't hold; the chart re-runs forecast() with these added
+    commitments?: Commitment[];      // synthetic ask-draft-<hash> commitments
+    recurring?: Profile["recurring"]; // synthetic recurring items (a hire)
+    upfrontShare?: { commitmentId: string; share: number };
+  };
   scenarioId?: string;
   citations: string[];               // record ids behind every headline fact
   allowed: { amounts: number[]; dates: string[]; numbers: NumberFact[] };  // every figure the answer may state
@@ -110,6 +117,6 @@ export type CfoAnswer = Answer & CfoVoice & {
   verdict: Decision["verdict"];
   conviction: Conviction;
   question?: string;                 // need_info
-  proposal?: Decision["proposal"];   // UI shows a one-tap confirm, backed by a persisted proposed Signal/Rule
+  proposal?: (Decision["proposal"] & { id: string });  // id of the persisted proposed Signal (plan) or Rule; UI confirms via /signals/:id/apply or /rules/:id/confirm
   usedFallback: boolean;
 };
