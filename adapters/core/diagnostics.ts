@@ -46,7 +46,7 @@ export function summarize(d: Omit<ImportDiagnostics, "completeness" | "rowsRejec
   return {
     ...d,
     rowsRejected,
-    completeness: considered <= 0 ? 1 : Math.min(1, d.rowsImported / considered),
+    completeness: considered <= 0 ? (d.errors.length > 0 ? 0 : 1) : Math.min(1, d.rowsImported / considered),
   };
 }
 
