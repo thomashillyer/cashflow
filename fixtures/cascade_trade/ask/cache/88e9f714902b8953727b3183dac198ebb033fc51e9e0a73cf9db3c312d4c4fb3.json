@@ -2,12 +2,12 @@
   "key": "88e9f714902b8953727b3183dac198ebb033fc51e9e0a73cf9db3c312d4c4fb3",
   "promptVersion": "cfo_voice@2",
   "model": "claude-opus-5-5",
-  "source": "stand-in",
+  "source": "live",
   "output": {
-    "headline": "Not yet: you're already $40,500 below your safety line on Dec 25 without it. First, chase Evergreen Home to pay INV-1187 by Dec 12.",
-    "why": "Your lowest cash point is −$5,500 on Dec 25, against a safety line of $35,000. That is $40,500 short. Doing this moves your lowest point to $14,000 on Jan 8, 2027. If that doesn't work, ask Cascade Customs Brokerage for 10 more days on DUTIES-2291, which lifts your lowest point by $9,000 on its own. Assumptions: Cash is below the safety line even without RFQ-77, so the order is not the cause.",
+    "headline": "Not yet: you are already $40,500 below your $35,000 safety line without the order, so first, chase Evergreen Home to pay INV-1187 by Dec 12.",
+    "why": "Even without RFQ-77, your cash drops to −$5,500 on Dec 25, so the order is not the cause. Getting INV-1187 paid lifts your lowest point by $19,500, to $14,000 on Jan 8, 2027. If that doesn't work, ask Cascade Customs Brokerage for 10 more days on DUTIES-2291, which lifts it by $9,000 on its own.",
     "nextStep": "Chase Evergreen Home to pay INV-1187 by Dec 12.",
-    "convictionNote": "High confidence: Based on 8 payments from Evergreen Home.",
-    "whatWouldChange": "Least certain: the $28,000 receipt from Evergreen Home (INV-1187), expected Dec 26."
+    "convictionNote": "High confidence: based on 8 payments from Evergreen Home.",
+    "whatWouldChange": "The least certain piece is the $28,000 payment from Evergreen Home on INV-1187, expected Dec 26; if it slips, the low point moves."
   }
 }

@@ -106,7 +106,9 @@ export async function callIntentModel(
     if (!parsed.success) return { problem: "the model's answer did not match the intent schema" };
     return { output: parsed.data };
   } catch (err) {
-    return { problem: `the intent call failed (${err instanceof Error ? err.message : String(err)})` };
+    // The owner sees the problem text (it becomes the decline reason); the SDK's error stays in the log.
+    console.error(`[ask] intent call failed: ${err instanceof Error ? err.message : String(err)}`);
+    return { problem: "the model couldn't be reached" };
   }
 }
 
@@ -590,6 +592,7 @@ export async function readIntent(question: string, ctx: ReadIntentContext): Prom
     }
     return resolveIntent(question, sanitizeRaw(raw, question), ctx);
   } catch (err) {
-    return unreadable(String(question), `I couldn't read that question (${err instanceof Error ? err.message : String(err)}).`);
+    console.error(`[ask] readIntent failed: ${err instanceof Error ? err.message : String(err)}`);
+    return unreadable(String(question), "I couldn't read that question. Try asking it again.");
   }
 }

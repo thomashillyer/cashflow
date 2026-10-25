@@ -198,7 +198,7 @@ export function fallbackVoice(d: Decision): CfoVoice {
         headline: "I can't answer that one.",
         why: join([d.missingData ? `${stripEnd(d.missingData)}.` : "It is outside what I can advise on.",
           lines.length ? `What I can tell you: ${lines.join("; ")}.` : undefined]),
-        convictionNote: "No call here: I won't advise on that.",
+        convictionNote: "No call on this one.", // also an unreadable question, so no "won't advise" claim
       };
     }
     case "proposed": {

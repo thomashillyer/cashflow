@@ -1,5 +1,6 @@
 // Entry point: `npm run dev` (tsx, port 8787) or `npm start`. Serves the API and, when app/ exists,
-// the app on the same origin (set window.NERI_API_BASE = "same-origin" in app/config.js).
+// the app on the same origin. With DEMO_MODE=1 or the Supabase values set, /config.js is served live
+// (same-origin API, plus sign-in when both public Supabase values are set); otherwise the committed preview config.
 // Env: see api/README.md. Secrets come from .env only.
 
 import { join } from "node:path";
@@ -41,6 +42,9 @@ const app = await buildApp({
   // Live Claude only with a key, and never by default on the public demo (anonymous callers could spend it).
   aiMode: env.ANTHROPIC_API_KEY && (env.NERI_AI_MODE === "live" || (!demoMode && env.NERI_AI_MODE !== "cache_only")) ? "live" : "cache_only",
   staticDir: env.NERI_STATIC_DIR ?? join(import.meta.dirname, "../app"),
+  ...(demoMode || (env.SUPABASE_URL && env.SUPABASE_ANON_KEY)
+    ? { appConfig: { supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY } }
+    : {}),
   allowReset: demoMode || env.NERI_ALLOW_RESET === "1",
   logger: true,
 });

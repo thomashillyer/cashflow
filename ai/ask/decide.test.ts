@@ -401,6 +401,13 @@ describe("need_info and decline", () => {
     expect(d.context.baseLowPoint).toEqual({ date: "2026-12-25", amount: -550_000 });
   });
 
+  it("decline for an unreadable question keeps its reason, not the investment-advice text", () => {
+    const d = run(intent("out_of_scope", { unresolved: ["I can't read that question right now (demo mode has no saved answer for it)."] }));
+    expect(d.verdict).toBe("decline");
+    expect(d.missingData).toContain("demo mode has no saved answer");
+    expect(d.missingData).not.toContain("investment");
+  });
+
   it("decline wins over unresolved slots", () => {
     expect(run(intent("out_of_scope", { unresolved: ["which?"] })).verdict).toBe("decline");
   });

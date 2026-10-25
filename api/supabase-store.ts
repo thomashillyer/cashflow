@@ -4,12 +4,13 @@
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ChangeProposal, IntakeCandidate } from "../schema/intake";
-import type { Records, WorkItem } from "../schema/records";
+import type { Override, Records, WorkItem } from "../schema/records";
 import {
   loadRecords, loadWorkItems, saveWorkItems, setWorkItemState, toStoreError, upsertBusiness,
   upsertChangeProposals, upsertEvidence, upsertIntakeCandidates, upsertRecords, upsertSignals,
 } from "../db/records";
 import { fromRow, type Row } from "../db/rows";
+import { validateOverrides } from "./overrides";
 import type { Business, IntakeWrite, Store, StoredProfile } from "./store";
 
 // PostgREST / Postgres codes for "this table or function does not exist" (migration not applied yet).
@@ -78,6 +79,15 @@ export class SupabaseStore implements Store {
     return Number(data);
   }
 
+  // One conditional UPDATE (atomic in Postgres): bumps only while store_revision is still `expected`.
+  async bumpRevisionIf(id: string, expected: number): Promise<number | null> {
+    const { data, error } = await this.db.from("businesses").update({ store_revision: expected + 1 })
+      .eq("id", id).eq("store_revision", expected).select("store_revision");
+    if (error) throw toStoreError(`bump revision ${id}`, error);
+    const row = (data as { store_revision: number | string }[] | null)?.[0];
+    return row ? Number(row.store_revision) : null;
+  }
+
   async saveIntake(id: string, w: IntakeWrite): Promise<void> {
     await upsertEvidence(this.db, id, w.evidence);
     await upsertIntakeCandidates(this.db, id, w.candidates);
@@ -111,6 +121,23 @@ export class SupabaseStore implements Store {
 
   setWorkItemState(id: string, itemId: string, state: WorkItem["state"]) {
     return setWorkItemState(this.db, id, itemId, state);
+  }
+
+  // The base scenario row holds the owner's saved overrides. upsertRecords never writes `scenarios`,
+  // so a re-import keeps them; deleting the business (demo reset) cascades.
+  async loadOverrides(id: string): Promise<Override[]> {
+    const { data, error } = await this.db.from("scenarios").select("overrides")
+      .eq("business_id", id).eq("id", "base").maybeSingle();
+    if (error) throw toStoreError(`load overrides ${id}`, error);
+    const list = (data as { overrides?: unknown } | null)?.overrides;
+    return Array.isArray(list) ? (list as Override[]) : [];
+  }
+
+  async saveOverrides(id: string, overrides: Override[]): Promise<void> {
+    const valid = validateOverrides(overrides);
+    const { error } = await this.db.from("scenarios")
+      .upsert({ business_id: id, id: "base", kind: "base", overrides: valid }, { onConflict: "business_id,id", defaultToNull: false });
+    if (error) throw toStoreError(`save overrides ${id}`, error);
   }
 
   // Synthetic only (the caller checks). Deleting the business cascades to every record table.

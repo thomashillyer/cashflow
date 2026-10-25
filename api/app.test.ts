@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { buildApp, type Verifier } from "./app";
+import { buildApp, isSecretKey, servedConfig, type Verifier } from "./app";
 import { loadSample, loadSamples } from "./demo";
 import { MemoryStore } from "./store";
 import JSZip from "jszip";
@@ -156,6 +156,42 @@ describe("routes return what app/api.js expects", () => {
     expect(rec.party).toBeTruthy();
     expect(rec.events.length).toBeGreaterThan(0);
     expect((await app.inject({ method: "GET", url: "/records/nope", headers: OTHER })).statusCode).toBe(404);
+  });
+
+  it("GET /records/:id resolves event ids, profile recurring items, daily sales and bank lines (Ask cites, week sheet)", async () => {
+    const get = async (id: string, business = "cascade_trade") =>
+      (await app.inject({ method: "GET", url: `/records/${encodeURIComponent(id)}`, headers: { ...OTHER, "x-neri-business": business } })).json();
+    const evt = await get("evt-inv-INV-1187-0");
+    expect(evt).toMatchObject({ source: "commitment", eventId: "evt-inv-INV-1187-0", commitment: { id: "inv-INV-1187" } });
+    expect(evt.party).toBeTruthy();
+    expect(evt.events.map((e: { id: string }) => e.id)).toContain("evt-inv-INV-1187-0");
+
+    const payroll = (await get("rec-payroll"));
+    expect(payroll).toMatchObject({ source: "profile_recurring", eventId: null, commitment: { id: "rec-payroll", type: "recurring", sourceRef: { system: "profile" } } });
+    expect(payroll.events.length).toBeGreaterThan(0);
+    const leg = payroll.events[0].id;
+    expect(await get(leg)).toMatchObject({ source: "profile_recurring", eventId: leg, commitment: { id: "rec-payroll" } });
+
+    const run = (await app.inject({ method: "GET", url: "/forecast", headers: { ...OTHER, "x-neri-business": "pike_noodle" } })).json();
+    const sale = run.events.find((e: { commitmentId?: string }) => e.commitmentId === "daily-sales");
+    const ds = await get(sale.id, "pike_noodle");
+    expect(ds).toMatchObject({ source: "daily_sales", eventId: sale.id, events: [{ id: sale.id }] });
+    expect(ds.basedOn.length).toBeGreaterThan(0);
+    expect(await get("bank-sales-2026-10-19", "pike_noodle")).toMatchObject({ source: "actual", commitment: { status: "actual", sourceRef: { system: "bank_csv" } } });
+    expect((await app.inject({ method: "GET", url: "/records/evt-nope-0", headers: OTHER })).statusCode).toBe(404);
+  });
+
+  it("owner-facing dates read like 'Dec 25', not ISO", async () => {
+    const iso = /\d{4}-\d{2}-\d{2}/;
+    for (const business of ["cascade_trade", "pike_noodle"]) {
+      const brief = (await app.inject({ method: "GET", url: "/brief", headers: { ...OTHER, "x-neri-business": business } })).json();
+      if (brief.shortfall) expect(brief.shortfall.title).not.toMatch(iso);
+    }
+    const [item] = (await app.inject({ method: "GET", url: "/review", headers: OTHER })).json();
+    expect(item.message.from).not.toMatch(/\.txt$/);
+    const { alert } = (await app.inject({ method: "POST", url: `/signals/${item.signal.id}/apply`, headers: OTHER })).json();
+    expect(alert.title).not.toMatch(iso);
+    expect(alert.detail).not.toMatch(iso);
   });
 
   it("PUT /profile with a partial body updates the safety line only", async () => {
@@ -425,5 +461,207 @@ describe("spreadsheet and WhatsApp imports (adapters lane)", () => {
   it("anonymous demo callers still cannot upload", async () => {
     await setup({ demoMode: true });
     expect((await app.inject({ method: "POST", url: "/import/sheet", payload: { text: "a,b" } })).statusCode).toBe(401);
+  });
+});
+
+describe("saved owner overrides (#40)", () => {
+  beforeEach(() => setup());
+
+  const H = (id: string) => ({ ...OWNER, "x-neri-business": id });
+  const leg = (run: { events: { commitmentId?: string; status: string; date: string; amount: number }[] }) =>
+    run.events.filter((e) => e.commitmentId === "inv-INV-1187" && e.status !== "actual");
+  const target = { commitmentId: "inv-INV-1187" };
+  const rev = async (id: string) => (await store.load(id)).storeRevision;
+
+  it("a saved override changes base and stress, simulate and brief; survives a re-import; is deletable", async () => {
+    const id = await privateBusiness();
+    const base0 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    const stress0 = (await app.inject({ method: "GET", url: "/forecast?scenario=stress", headers: H(id) })).json();
+    expect(leg(base0).length).toBeGreaterThan(0);
+
+    const put = await app.inject({ method: "PUT", url: "/overrides/ov-1187", headers: H(id), payload: {
+      target, change: { exclude: true }, origin: "lever", expectedRevision: await rev(id),
+    } });
+    expect(put.statusCode).toBe(200);
+    expect(put.json()).toMatchObject({ override: { id: "ov-1187", origin: "owner" }, created: true });
+    const rev1 = put.json().storeRevision as number;
+    expect(rev1).toBe(await rev(id));
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: H(id) })).json()).toEqual({ overrides: [put.json().override], storeRevision: rev1 });
+
+    const base1 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    const stress1 = (await app.inject({ method: "GET", url: "/forecast?scenario=stress", headers: H(id) })).json();
+    expect(leg(base1)).toHaveLength(0);
+    expect(leg(stress1)).toHaveLength(0);
+    expect(base1.inputsHash).not.toBe(base0.inputsHash);
+    expect(stress1.inputsHash).not.toBe(stress0.inputsHash);
+    const brief = (await app.inject({ method: "GET", url: "/brief", headers: H(id) })).json();
+    expect(brief.run.inputsHash).toBe(base1.inputsHash);
+    expect(brief.storeRevision).toBe(rev1);
+    const sim = (await app.inject({ method: "POST", url: "/simulate", headers: H(id), payload: { levers: [] } })).json();
+    expect(sim.run.lowPoint).toEqual(base1.lowPoint);
+
+    // Re-import: the same records upserted again (as a refresh would) keep the override.
+    await store.upsertRecords(id, loadSample("cascade_trade")!.records);
+    const base2 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    expect(leg(base2)).toHaveLength(0);
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+
+    // Update in place (same id); a write without, or with an old, expectedRevision is refused.
+    const shifted = await app.inject({ method: "PUT", url: "/overrides/ov-1187", headers: H(id), payload: { target, change: { shiftDays: 14 }, expectedRevision: await rev(id) } });
+    expect(shifted.json()).toMatchObject({ created: false, override: { change: { shiftDays: 14 } } });
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+    expect((await app.inject({ method: "PUT", url: "/overrides/ov-x", headers: H(id), payload: { target, change: { exclude: true } } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "DELETE", url: "/overrides/ov-1187", headers: H(id) })).statusCode).toBe(400);
+    const stale = await app.inject({ method: "DELETE", url: `/overrides/ov-1187?expectedRevision=${rev1}`, headers: H(id) });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toMatchObject({ error: { code: "STALE_REVIEW" }, revision: await rev(id) });
+
+    const del = await app.inject({ method: "DELETE", url: "/overrides/ov-1187", headers: { ...H(id), "content-type": "application/json" }, payload: { expectedRevision: await rev(id) } });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toMatchObject({ id: "ov-1187", deleted: true });
+    expect(del.json().storeRevision).toBeGreaterThan(shifted.json().storeRevision);
+    const base3 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    expect(leg(base3)).toEqual(leg(base0));
+    expect((await app.inject({ method: "DELETE", url: `/overrides/ov-1187?expectedRevision=${await rev(id)}`, headers: H(id) })).statusCode).toBe(404);
+  });
+
+  it("concurrent writes from the same revision: one 200, one 409, nothing lost", async () => {
+    const id = await privateBusiness();
+    const r0 = await rev(id);
+    const put = (ovId: string, expectedRevision: number) => app.inject({ method: "PUT", url: `/overrides/${ovId}`, headers: H(id), payload: { target, change: { shiftDays: 7 }, expectedRevision } });
+    const [a, b] = await Promise.all([put("ov-a", r0), put("ov-b", r0)]);
+    expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);
+    const [won, lost] = a.statusCode === 200 ? [a, b] : [b, a];
+    expect(lost.json().error.code).toBe("STALE_REVIEW");
+    expect((await store.loadOverrides(id)).map((o) => o.id)).toEqual([won.json().override.id]);
+    // The loser reloads and retries: both are kept.
+    const loserId = won.json().override.id === "ov-a" ? "ov-b" : "ov-a";
+    expect((await put(loserId, lost.json().revision)).statusCode).toBe(200);
+    expect((await store.loadOverrides(id)).map((o) => o.id).sort()).toEqual(["ov-a", "ov-b"]);
+  });
+
+  it("a failed save is a 500 and leaves the old list intact", async () => {
+    class FailingStore extends MemoryStore {
+      failSave = false;
+      override async saveOverrides(id: string, list: Parameters<MemoryStore["saveOverrides"]>[1]) {
+        if (this.failSave) throw new Error("db down");
+        return super.saveOverrides(id, list);
+      }
+    }
+    const failing = new FailingStore();
+    const s = loadSample("cascade_trade")!;
+    const id = await failing.createBusiness({ name: "Acme Imports", profile: s.profile, isSynthetic: false, ownerUserId: "u-owner" });
+    await failing.upsertRecords(id, s.records);
+    const kept = [{ id: "ov-1", target, change: { exclude: true as const }, origin: "owner" as const }];
+    await failing.saveOverrides(id, kept);
+    const fapp = await buildApp({ store: failing, verify, now: () => new Date("2026-11-16T17:00:00Z") });
+    failing.failSave = true;
+    const put = await fapp.inject({ method: "PUT", url: "/overrides/ov-2", headers: H(id), payload: { target, change: { shiftDays: 3 }, expectedRevision: (await failing.load(id)).storeRevision } });
+    expect(put.statusCode).toBe(500);
+    expect(put.json().error.code).toBe("INTERNAL");
+    const del = await fapp.inject({ method: "DELETE", url: `/overrides/ov-1?expectedRevision=${(await failing.load(id)).storeRevision}`, headers: H(id) });
+    expect(del.statusCode).toBe(500);
+    expect(await failing.loadOverrides(id)).toEqual(kept);
+  });
+
+  it("rejects bad input: unknown keys, non-integer amounts, bad dates, unknown targets, bad ids", async () => {
+    const id = await privateBusiness();
+    const expectedRevision = await rev(id);
+    const put = (ovId: string, payload: object) => app.inject({ method: "PUT", url: `/overrides/${ovId}`, headers: H(id), payload: { expectedRevision, ...payload } });
+    for (const payload of [
+      { target, change: { amount: 12.5 } },
+      { target, change: { amount: -100 } },
+      { target, change: { date: "2026-02-30" } },
+      { target, change: { date: "next week" } },
+      { target, change: { pay: true } },
+      { target, change: {} },
+      { target, change: { date: "2026-12-01", shiftDays: 3 } },
+      { target: { commitmentId: "inv-INV-1187", leg: 1 }, change: { exclude: true } },
+      { target, change: { exclude: true }, sendTo: "bank" },
+      { change: { exclude: true } },
+      { target: { commitmentId: "nope" }, change: { exclude: true } },
+    ]) {
+      const res = await put("ov-bad", payload);
+      expect(res.statusCode, JSON.stringify(payload)).toBe(400);
+      expect(res.json().error.code).toBe("INVALID_ARGUMENT");
+    }
+    expect((await put("bad%20id!", { target, change: { exclude: true } })).statusCode).toBe(400);
+    expect(await store.loadOverrides(id)).toEqual([]);
+    expect(await rev(id)).toBe(expectedRevision);
+  });
+
+  it("shared samples are read-only: anonymous demo callers and signed-in users get 403", async () => {
+    await setup({ demoMode: true });
+    const before = (await app.inject({ method: "GET", url: "/forecast", headers: OTHER })).json();
+    const expectedRevision = await rev("cascade_trade");
+    for (const headers of [{}, OTHER, OWNER] as Record<string, string>[]) {
+      const put = await app.inject({ method: "PUT", url: "/overrides/ov-1", headers, payload: { target, change: { exclude: true }, expectedRevision } });
+      expect(put.statusCode).toBe(403);
+      expect(put.json().error.code).toBe("FORBIDDEN");
+      expect((await app.inject({ method: "DELETE", url: `/overrides/ov-1?expectedRevision=${expectedRevision}`, headers })).statusCode).toBe(403);
+      expect((await app.inject({ method: "GET", url: "/overrides", headers })).json()).toEqual({ overrides: [], storeRevision: expectedRevision });
+    }
+    expect(await store.loadOverrides("cascade_trade")).toEqual([]);
+    expect(await rev("cascade_trade")).toBe(expectedRevision);
+    expect((await app.inject({ method: "GET", url: "/forecast" })).json().inputsHash).toBe(before.inputsHash);
+  });
+
+  it("non-members are refused", async () => {
+    const id = await privateBusiness();
+    await store.saveOverrides(id, [{ id: "ov-1", target, change: { exclude: true }, origin: "owner" }]);
+    const other = { ...OTHER, "x-neri-business": id };
+    const expectedRevision = await rev(id);
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: other })).statusCode).toBe(404);
+    expect((await app.inject({ method: "PUT", url: "/overrides/ov-2", headers: other, payload: { target, change: { exclude: true }, expectedRevision } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "DELETE", url: `/overrides/ov-1?expectedRevision=${expectedRevision}`, headers: other })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: { "x-neri-business": id } })).statusCode).toBe(401);
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+  });
+});
+
+describe("served app/config.js", () => {
+  const appDir = join(import.meta.dirname, "../app");
+  const committed = readFileSync(join(appDir, "config.js"), "utf8");
+
+  it("switches the app to same-origin and sets public Supabase values, keeping other lines", async () => {
+    const live = await buildApp({ store: new MemoryStore(), verify: async () => null, staticDir: appDir,
+      appConfig: { supabaseUrl: "https://example.supabase.co", supabaseAnonKey: "anon-key" } });
+    const res = await live.inject({ method: "GET", url: "/config.js" });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/javascript/);
+    expect(res.body).toContain('window.NERI_API_BASE = "same-origin";');
+    expect(res.body).toContain('window.NERI_SUPABASE_URL = "https://example.supabase.co";');
+    expect(res.body).toContain('window.NERI_SUPABASE_ANON_KEY = "anon-key";');
+    expect(res.body).toContain("window.NERI_LOCK_MINUTES = 15;");
+    await live.close();
+  });
+
+  it("leaves sign-in off without both Supabase values, and never touches the committed file", () => {
+    const out = servedConfig(committed, { supabaseUrl: "https://example.supabase.co" });
+    expect(out).toContain('window.NERI_API_BASE = "same-origin";');
+    expect(out).toContain('window.NERI_SUPABASE_URL = "";');
+    expect(readFileSync(join(appDir, "config.js"), "utf8")).toBe(committed);
+  });
+});
+
+describe("sample guards", () => {
+  it("never serves a service-role key as the anon key", () => {
+    const body = Buffer.from(JSON.stringify({ role: "service_role" })).toString("base64url");
+    const served = servedConfig(readFileSync(join(import.meta.dirname, "../app/config.js"), "utf8"),
+      { supabaseUrl: "https://example.supabase.co", supabaseAnonKey: `x.${body}.y` });
+    expect(served).toContain('window.NERI_SUPABASE_ANON_KEY = "";');
+    expect(isSecretKey("sb_secret_abc")).toBe(true);
+    expect(isSecretKey(`x.${Buffer.from(JSON.stringify({ role: "anon" })).toString("base64url")}.y`)).toBe(false);
+  });
+});
+
+describe("public demo uploads", () => {
+  it("refuses a signed-in user's upload into a shared sample in demo mode", async () => {
+    const store = new MemoryStore();
+    for (const s of loadSamples()) await store.resetBusiness(s, s.records);
+    const demo = await buildApp({ store, verify: async (t) => (t === "ok" ? { id: "u-1" } : null), demoMode: true });
+    const res = await demo.inject({ method: "POST", url: "/import/paste", headers: { authorization: "Bearer ok", "x-neri-business": "cascade_trade" }, payload: { text: "hello" } });
+    expect(res.statusCode).toBe(403);
+    await demo.close();
   });
 });

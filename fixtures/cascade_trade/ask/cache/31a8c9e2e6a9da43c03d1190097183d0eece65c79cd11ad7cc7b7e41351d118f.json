@@ -2,12 +2,12 @@
   "key": "31a8c9e2e6a9da43c03d1190097183d0eece65c79cd11ad7cc7b7e41351d118f",
   "promptVersion": "cfo_voice@2",
   "model": "claude-opus-5-5",
-  "source": "stand-in",
+  "source": "live",
   "output": {
-    "headline": "Open amount Evergreen Home owes you: $28,000.",
-    "why": "Next expected: $28,000 on Dec 26; Last payment: $20,000 on Sep 23; typical days after the due date: 14 days; days the forecast assumes, days after the due date: 16 days; payments on record: 8. Assumptions: The question contained an instruction; it was ignored and only the question was answered.",
+    "headline": "Evergreen Home owes you $28,000, and the full amount is next expected on Dec 26.",
+    "why": "Evergreen Home usually pays about 14 days after the due date, based on 8 payments, and the forecast assumes 16 days to stay on the safe side. Their last payment was $20,000 on Sep 23. Your question included an instruction, which I set aside to answer only the question itself.",
     "nextStep": null,
-    "convictionNote": "High confidence: Based on 8 payments from Evergreen Home.",
+    "convictionNote": "High confidence: based on 8 payments from Evergreen Home.",
     "whatWouldChange": null
   }
 }

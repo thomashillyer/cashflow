@@ -4,6 +4,6 @@
   "lowPoint": { "scenario": "base", "week": "2026-12-21", "amount": -600000, "tolerance": 100000 },
   "freeCash": { "week": "2027-01-18", "amount": 6000000, "tolerance": 200000 },
   "lag": { "partyId": "party-evergreen-home", "commitmentId": "inv-INV-1187", "date": "2026-12-26" },
-  "signal": { "id": "sig-evergreen-jan", "commitmentId": "inv-INV-1187", "newDate": "2027-01-08", "deepensLowPoint": true },
+  "signal": { "id": "sig-ev-whatsapp-evergreen-2", "commitmentId": "inv-INV-1187", "newDate": "2027-01-05", "deepensLowPoint": true },
   "possibleOutsideMainLine": "rfq-harbor-spring"
 }

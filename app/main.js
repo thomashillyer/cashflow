@@ -1,8 +1,9 @@
 import { api, SANDBOXES, suggestBusinessName, authLive } from "./api.js";
 import { currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
+import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
-import { icon, logo } from "./ui/icons.js";
+import { icon, logo, logoLarge } from "./ui/icons.js";
 import { speak, listen, canSpeak, canListen, speakable, spokenMoney } from "./ui/speech.js";
 import { addDays, dayDate, esc, greeting, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
 
@@ -58,7 +59,8 @@ async function load() {
 
 async function refresh() {
   const prevThree = new Set((app.brief?.three ?? []).map((i) => i.id + i.cashEffect));
-  [app.brief, app.review, app.notes] = await Promise.all([api.brief(), api.review(), api.notes()]);
+  // Context too, so names for commitments added by Review, notes or plans (live partyByCommitment) stay current.
+  [app.brief, app.review, app.notes, app.ctx] = await Promise.all([api.brief(), api.review(), api.notes(), api.context()]);
   app.ctx.safetyLine = app.brief.run.safetyLine;
   if (app.scenario === "stress") app.stressRun = await api.forecast("stress");
   if (prevThree.size) {
@@ -84,7 +86,7 @@ function aliasMap() {
   return map;
 }
 function masked(html) {
-  if (!app.mask) return html;
+  if (!app.mask || !app.ctx) return html;
   let out = html;
   for (const [name, alias] of aliasMap()) out = out.split(name).join(alias).split(esc(name)).join(alias);
   return out;
@@ -242,7 +244,17 @@ function render() {
   if (!app.ctx && r !== "welcome" && r !== "setup") return;
   renderShell();
   const views = { today: viewToday, details: viewDetails, notes: viewNotes, review: viewReview, sources: viewSources, settings: viewSettings, welcome: viewWelcome, setup: viewSetup };
+  const prevDeck = document.getElementById("deck");
+  const keepLeft = prevDeck ? prevDeck.scrollLeft : 0;
+  const keepFocus = document.activeElement?.closest?.("#deck") ? document.activeElement.dataset.action + ":" + document.activeElement.dataset.id : null;
   $("#view").innerHTML = masked(views[r]());
+  const deck = document.getElementById("deck");
+  if (deck && keepLeft) deck.scrollLeft = keepLeft;
+  if (deck && keepFocus) {
+    const [act, fid] = keepFocus.split(":");
+    [...deck.querySelectorAll(`[data-action="${act}"]`)].find((b) => b.dataset.id === fid)?.focus({ preventScroll: true });
+  }
+  requestAnimationFrame(syncDeck);
   document.title = `${{ today: "Home", details: "Details", notes: "Notes", review: "Review", sources: "Sources", settings: "Settings", welcome: "Sign up", setup: "Set up" }[r]} · Neri Cash`;
   if (app.drive) renderDrive();
 }
@@ -258,7 +270,6 @@ function viewToday() {
   return `
   <div class="home">
     <section class="home-top">
-      <p class="hello">${greeting(new Date().getHours())}, ${esc(ownerName())}</p>
       <h1 class="headline">${esc(s.headline)}</h1>
       <p class="subhead">${esc(s.sub)}</p>
       ${s.take ? `<p class="take"><span class="sunmark" aria-hidden="true"></span>${esc(s.take)}</p>` : ""}
@@ -270,8 +281,12 @@ function viewToday() {
     </section>
 
     <section class="today-list" aria-labelledby="today-h">
-      <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
-      ${n ? `<ol class="things">${b.three.map(homeRow).join("")}</ol>` : `<p class="calm">Nothing needs you today. Neri will speak up if a payment moves.</p>`}
+      <div class="deck-head">
+        <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
+        ${n > 1 ? `<div class="deck-nav"><button class="deck-arrow" data-action="deck" data-dir="-1" aria-label="Previous">${arrow("left")}</button><button class="deck-arrow" data-action="deck" data-dir="1" aria-label="Next">${arrow("right")}</button></div>` : ""}
+      </div>
+      ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}</ol>
+        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">Nothing needs you today. Neri will speak up if a payment moves.</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
     </section>
 
@@ -284,29 +299,65 @@ function viewToday() {
   </div>`;
 }
 
+// Fixed text, shared with the demo intent cache, so every hint gets a real answer with no API key.
 function askHints() {
-  const vocab = app.ctx.profile.vocabulary ?? {};
-  return ["Can I make payroll?", `What if ${firstCustomer()} pays 10 days late?`, `Planning a $25K ${vocab.purchase ?? "purchase"} in January`];
+  return ASK_HINTS;
 }
 
-function homeRow(i) {
+// One card per thing, side by side. The focused card fills the column; the next one peeks in as a lead-in.
+function homeCard(i, k, n) {
   const done = i.state === "done";
   const ref = i.evidenceRefs?.[0];
   const draft = i.actions.some((a) => a.kind === "draft_email");
   return `
-  <li class="thing home-row ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}">
-    <button class="check" data-action="done" data-id="${esc(i.id)}" aria-pressed="${done}" aria-label="${done ? "Done" : "Mark done"}: ${esc(i.title)}">${icon.check}</button>
-    <details>
-      <summary><span class="t">${esc(i.title)}</span><span class="e">${money(i.cashEffect, { signed: true })}</span></summary>
-      <p>${esc(i.why)}</p>
-      <div class="thing-actions">
-        <span class="by">Act by <b>${shortDate(i.neededBy)}</b></span>
-        ${draft ? `<button class="btn small" data-action="draft" data-id="${esc(i.id)}">${icon.mail}Draft email</button>` : ""}
-        ${ref ? `<button class="src" data-action="record" data-id="${esc(ref)}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
-      </div>
-    </details>
+  <li class="card ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}" aria-label="Thing ${k + 1} of ${n}">
+    <p class="card-effect"><b>${money(i.cashEffect, { signed: true })}</b><span>${i.warning === "early_pay_discount" ? "saved" : "to your low point"}</span></p>
+    <h3 class="card-title">${esc(i.title)}</h3>
+    <p class="card-why">${esc(i.why)}</p>
+    <div class="card-actions">
+      ${done ? "" : `<span class="card-by">Act by <b>${shortDate(i.neededBy)}</b></span>`}
+      ${draft && !done ? `<button class="btn small primary" data-action="draft" data-id="${esc(i.id)}">${icon.mail}Draft email</button>` : ""}
+      <button class="btn small ${done ? "" : "quiet"}" data-action="done" data-id="${esc(i.id)}" aria-pressed="${done}">${icon.check}${done ? "Done" : "Mark done"}</button>
+      ${ref ? `<button class="src" data-action="record" data-id="${esc(ref)}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
+    </div>
   </li>`;
 }
+function arrow(dir) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"}"/></svg>`;
+}
+function deckIndex(deck) {
+  const cards = [...deck.children];
+  const left = deck.getBoundingClientRect().left;
+  let best = 0;
+  cards.forEach((c, k) => {
+    if (Math.abs(c.getBoundingClientRect().left - left) < Math.abs(cards[best].getBoundingClientRect().left - left)) best = k;
+  });
+  return best;
+}
+function syncDeck() {
+  const deck = document.getElementById("deck");
+  if (!deck) return;
+  const k = deckIndex(deck);
+  document.querySelectorAll(".deck-dots i").forEach((d, n) => d.classList.toggle("on", n === k));
+  [...deck.children].forEach((c, n) => c.classList.toggle("focus", n === k));
+  const [prev, next] = document.querySelectorAll(".deck-arrow");
+  if (prev) prev.disabled = k === 0;
+  if (next) next.disabled = k === deck.children.length - 1;
+}
+function moveDeck(dir) {
+  const deck = document.getElementById("deck");
+  if (!deck) return;
+  const k = Math.max(0, Math.min(deck.children.length - 1, deckIndex(deck) + dir));
+  deck.scrollTo({ left: deck.children[k].offsetLeft - deck.children[0].offsetLeft, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+document.addEventListener("scroll", (e) => {
+  if (e.target?.id === "deck") syncDeck();
+}, true);
+document.addEventListener("keydown", (e) => {
+  if (e.target?.id !== "deck") return;
+  if (e.key === "ArrowRight") moveDeck(1);
+  if (e.key === "ArrowLeft") moveDeck(-1);
+});
 
 function thingRow(i) {
   const done = i.state === "done";
@@ -354,11 +405,6 @@ function dayOf(iso) {
 function syncTime(iso) {
   const day = new Date(iso).toLocaleDateString("en-CA", { timeZone: tz() });
   return day === app.ctx.business.asOf ? clock(iso) : `${dayOf(iso)}, ${clock(iso)}`;
-}
-
-function firstCustomer() {
-  const c = app.ctx.parties.find((p) => p.kind === "customer" && p.lagStats) ?? app.ctx.parties.find((p) => p.kind === "customer");
-  return c ? c.name.split(" ")[0] : "a customer";
 }
 
 function spokenLength() {
@@ -559,7 +605,7 @@ function reviewCard(rv) {
   const body = m ? esc(m.body).replace(esc(m.excerpt), `<mark>${esc(m.excerpt)}</mark>`) : "";
   return `
   <article class="review-card">
-    <header><span class="ico">${s.channel === "whatsapp" ? icon.chat : icon.mail}</span><div><b>${esc(rv.party?.name ?? "Unknown sender")} about ${esc(rv.commitment.sourceRef.record)}</b><span>${s.channel === "email" ? "Email" : esc(s.channel)} from ${esc(m?.from ?? "")}, ${dayOf(s.receivedAt)} at ${clock(s.receivedAt)}</span></div></header>
+    <header><span class="ico">${s.channel === "whatsapp" ? icon.chat : icon.mail}</span><div><b>${esc(rv.party?.name ?? "Unknown sender")} about ${esc(rv.commitment.sourceRef.record)}</b><span>${esc(sourceName(s.channel))}${m?.from ? ` from ${esc(m.from)}` : ""}, ${dayOf(s.receivedAt)} at ${clock(s.receivedAt)}</span></div></header>
     ${m ? `<div class="message">${body}</div>` : ""}
     <div class="change">
       <div><small>${esc(rv.commitment.sourceRef.record)}, ${money(rv.commitment.amount, { currency: rv.commitment.currency })}, expected</small><b>${shortDate(rv.from)}</b><span class="arrow">→</span><b>${shortDate(rv.to)}</b></div>
@@ -610,11 +656,15 @@ function viewSources() {
 
 // ---------------------------------------------------------------- Ask
 // Source chips: readable labels ("INV-1187", "Payroll Dec 24"), at most four, then a count.
+// A cite may be an event id ("evt-inv-INV-1187-0", "evt-rec-payroll-3", "evt-daily-sales-2027-01-15"): label what it points at.
 function citeLabel(cid) {
-  const ref = refLabel(cid);
-  if (ref !== "Source") return ref;
-  const name = app.ctx.parties.find((p) => p.id === app.ctx.partyOf?.(cid))?.name ?? "Record";
   const d = cid.match(/(\d{4}-\d{2}-\d{2})$/);
+  const base = cid.startsWith("evt-") ? (d ? cid.slice(4, -11) : cid.slice(4).replace(/-\d+$/, "")) : cid;
+  const ref = refLabel(base);
+  if (ref !== "Source") return ref;
+  const name = app.ctx.profile?.recurring?.find((r) => r.id === base)?.name
+    ?? (base === "daily-sales" ? "Daily sales" : null)
+    ?? app.ctx.parties.find((p) => p.id === app.ctx.partyOf?.(base))?.name ?? "Record";
   return d ? `${name} ${shortDate(d[1])}` : name;
 }
 function citeChips(cites) {
@@ -677,6 +727,7 @@ function viewWelcome() {
   if (su.step === "code") {
     return `
     <div class="portal-wrap">
+      <div class="portal-mark">${logoLarge}</div>
       <h1 class="portal-title">Check your email</h1>
       <p class="portal-sub">We sent a 6-digit code to <b>${esc(su.email)}</b>.</p>
       <form class="portal-form" data-submit="verify" novalidate>
@@ -693,6 +744,7 @@ function viewWelcome() {
   }
   return `
   <div class="portal-wrap">
+    <div class="portal-mark">${logoLarge}</div>
     <h1 class="portal-title">Your CFO, in your pocket.</h1>
     <p class="portal-sub">Neri reads your books, bank and messages, and every morning tells you where cash is headed and what to do about it.</p>
     <form class="portal-form" data-submit="signup" novalidate>
@@ -741,7 +793,7 @@ function lockScreen() {
   el.className = "lock";
   el.setAttribute("role", "dialog");
   el.setAttribute("aria-label", "Neri is locked");
-  el.innerHTML = `<div class="lock-card">${logo}<h2>Locked</h2><p>Your numbers are hidden after ${Math.round(LOCK_MS / 60000)} minutes away.</p><button class="btn primary big" data-action="unlock">Unlock</button></div>`;
+  el.innerHTML = `<div class="lock-card">${logoLarge}<h2>Locked</h2><p>Your numbers are hidden after ${Math.round(LOCK_MS / 60000)} minutes away.</p><button class="btn primary big" data-action="unlock">Unlock</button></div>`;
   document.body.append(el);
   document.body.classList.add("locked");
 }
@@ -877,7 +929,7 @@ async function showRecord(id) {
 }
 
 function sourceName(sys) {
-  return { zoho_books: "Zoho Books", bank_csv: "Bank statement", email: "Email", whatsapp: "WhatsApp", crm: "Zoho CRM", owner: "Your note", generic_file: "Uploaded file" }[sys] ?? sys;
+  return { zoho_books: "Zoho Books", bank_csv: "Bank statement", email: "Email", whatsapp: "WhatsApp", crm: "Zoho CRM", owner: "Your note", generic_file: "Uploaded file", profile: "Your setup" }[sys] ?? sys;
 }
 
 function showWeek(start) {
@@ -888,7 +940,7 @@ function showWeek(start) {
   const evs = run.events.filter((e) => e.date >= start && e.date <= addDays(start, 6) && e.status !== "possible");
   openSheet(`
     ${sheetHead(`Week of ${weekLabel(start)}`, `Ends at ${money(w.closing)}. Lowest day ${money(w.minClosing)}.`)}
-    ${evs.length ? evs.map((e) => `<div class="event"><b>${esc(partyNameFor(e))}<span class="status">${dayDate(e.date)}</span></b><span class="amt ${e.direction === "in" ? "in" : "out"}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p><button class="src" data-action="record" data-id="${esc(e.commitmentId)}">${esc(e.sourceRef.record)}</button></div>`).join("") : `<p>No money moves this week.</p>`}`);
+    ${evs.length ? evs.map((e) => `<div class="event"><b>${esc(partyNameFor(e))}<span class="status">${dayDate(e.date)}</span></b><span class="amt ${e.direction === "in" ? "in" : "out"}">${e.direction === "in" ? "+" : "−"}${money(e.amountBase)}</span><p>${esc(e.basis)}</p><button class="src" data-action="record" data-id="${esc(e.id)}">${esc(e.sourceRef.record)}</button></div>`).join("") : `<p>No money moves this week.</p>`}`);
 }
 function partyNameFor(e) {
   const pid = commitmentParty(e.commitmentId);
@@ -998,7 +1050,7 @@ function renderDrive() {
   // parts: [0]=headline, [1]=count, [2..]=items
   const itemSpeaking = (n) => app.speakingIndex === n + 2;
   el.innerHTML = masked(`
-    <div class="drive-top"><span>${dayDate(app.ctx.business.asOf)}</span><button data-action="drive-close">Done</button></div>
+    <div class="drive-top"><span class="drive-brand">${logo}${dayDate(app.ctx.business.asOf)}</span><button data-action="drive-close">Done</button></div>
     <div class="drive-body">
       <p class="drive-line">${esc(s.headline)}</p>
       <ol class="drive-list">${open.map((i, n) => `<li class="${itemSpeaking(n) ? "speaking" : ""}"><span>${n + 1}</span>${esc(i.title.replace(/\s*\([A-Z]+-[\w-]+\)/, ""))}</li>`).join("")}</ol>
@@ -1081,9 +1133,14 @@ function startCapture(target) {
       app.stopListen = null;
       if (target === "drive") {
         if (text) {
-          const n = await api.parkNote(text, "voice");
-          app.notes = await api.notes();
-          speak([`Parked. ${readingSentence(n)} I'll ask you to confirm when you're parked.`]);
+          try {
+            const n = await api.parkNote(text, "voice");
+            app.notes = await api.notes();
+            speak([`Parked. ${readingSentence(n)} I'll ask you to confirm when you're parked.`]);
+          } catch (err) {
+            speak([`I couldn't park that. ${speakable(err.message)}`]);
+            failed(err);
+          }
         }
         renderDrive();
       } else if (target === "ask") {
@@ -1125,14 +1182,22 @@ async function doAsk(q, via = "typed") {
   app.askLog.push(turn);
   render();
   scrollToDock();
-  if (parking) {
-    const n = await api.parkNote(q, via);
-    app.notes = await api.notes();
-    turn.note = n.id;
-    if (via === "voice") speak([`Got it. ${readingSentence(n)} It's in your notes, and nothing changes until you add it.`]);
-  } else {
-    turn.a = await api.ask(q);
-    if (via === "voice") speak([speakable(turn.a.text)]);
+  try {
+    if (parking) {
+      const n = await api.parkNote(q, via);
+      turn.note = n.id;
+      // The note is saved; a failed list reload shouldn't make the owner park it twice.
+      app.notes = await api.notes().catch(() => app.notes);
+      if (via === "voice") speak([`Got it. ${readingSentence(n)} It's in your notes, and nothing changes until you add it.`]);
+    } else {
+      turn.a = await api.ask(q);
+      if (via === "voice") speak([speakable(turn.a.text)]);
+    }
+  } catch (err) {
+    // Drop the half-finished turn so it doesn't spin forever, then say why.
+    app.askLog.splice(app.askLog.indexOf(turn), 1);
+    render();
+    return failed(err);
   }
   turn.pending = false;
   render();
@@ -1143,7 +1208,20 @@ function scrollToDock() {
   requestAnimationFrame(() => document.querySelector(".dock")?.scrollIntoView({ block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
 }
 
-document.addEventListener("click", async (ev) => {
+// A failed action tells the owner why, in the API's own words, instead of silently doing nothing.
+// A work item that's gone (404) or a stale Review (409) means the list moved on: reload it.
+async function failed(err) {
+  console.error(err);
+  const stale = err?.status === 409 || (err?.status === 404 && /^\/work-items\//.test(err.path ?? ""));
+  toast("Couldn't do that", err?.message || "Something went wrong. Try again.");
+  if (stale && app.ctx) {
+    closeSheet();
+    await refresh().catch((e) => console.error(e));
+  }
+}
+
+document.addEventListener("click", (ev) => onClick(ev).catch(failed));
+async function onClick(ev) {
   const el = ev.target.closest("[data-action]");
   if (!el) return;
   const a = el.dataset.action;
@@ -1157,6 +1235,7 @@ document.addEventListener("click", async (ev) => {
     return;
   }
   if (a === "talk") return openTalk();
+  if (a === "deck") return moveDeck(Number(el.dataset.dir));
   if (a === "unlock") return unlock();
   if (a === "resend") {
     try {
@@ -1349,7 +1428,7 @@ document.addEventListener("click", async (ev) => {
     location.href = href;
     return;
   }
-});
+}
 
 function viewForecastChartOnly() {
   const run = app.scenario === "stress" && app.stressRun ? app.stressRun : app.brief.run;
@@ -1367,7 +1446,8 @@ document.addEventListener("keydown", (ev) => {
   }
 });
 
-document.addEventListener("submit", async (ev) => {
+document.addEventListener("submit", (ev) => onSubmit(ev).catch(failed));
+async function onSubmit(ev) {
   const f = ev.target.closest("[data-submit]");
   if (!f) return;
   ev.preventDefault();
@@ -1423,9 +1503,10 @@ document.addEventListener("submit", async (ev) => {
     await refresh();
     toast("Your line is updated", `${money(Math.round(dollars * 100))}. The forecast and today's list are recalculated.`);
   }
-});
+}
 
-document.addEventListener("change", async (ev) => {
+document.addEventListener("change", (ev) => onChange(ev).catch(failed));
+async function onChange(ev) {
   const el = ev.target;
   if (el.dataset.change === "reserve") {
     app.setup.reserve = el.value;
@@ -1464,7 +1545,7 @@ document.addEventListener("change", async (ev) => {
     app.notes = await api.notes();
     render();
   }
-});
+}
 
 let resizeTimer;
 window.addEventListener("resize", () => {

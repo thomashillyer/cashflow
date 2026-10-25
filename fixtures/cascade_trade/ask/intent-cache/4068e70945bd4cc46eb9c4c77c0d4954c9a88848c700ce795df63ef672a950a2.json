@@ -10,7 +10,7 @@
     "amountPhrase": null,
     "datePhrase": "in early January",
     "windowPhrase": null,
-    "commitmentType": "invoice",
+    "commitmentType": null,
     "direction": "in",
     "ruleKind": null,
     "ruleParamPhrase": null,

@@ -10,6 +10,11 @@
 // Provenance of the work items: item 1 (chase INV-1187) takes its cashEffect from engine simulate() on
 // fixtures/cascade_trade (+$19,500). Items 2 and 3 are illustrative until the ranker (engine/rank.ts)
 // produces them: the engine has no ask_advance lever yet, and PO HH-PO-552 is added to the records here.
+//
+// The committed brief/ fixture is a snapshot of an earlier fixtures/cascade_trade/records.json (before #74 aligned it
+// with the intake fixtures; its forecast_run.json carries that run's inputsHash). Its figures still hold, but the cache
+// keys include the inputsHash, so re-running this script replaces the live entries with stand-ins under new keys.
+// Refresh both together: this script, then scripts/refresh-brief-cache.ts (live, needs ANTHROPIC_API_KEY).
 
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

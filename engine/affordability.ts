@@ -12,7 +12,7 @@ import type { Profile } from "../schema/profile";
 import type { ForecastRun } from "../schema/forecast";
 import { forecast } from "./forecast";
 import { ENGINE_DEFAULTS, engineSettings } from "./settings";
-import { legGetsLag } from "./expand";
+import { legGetsLag, pickPattern } from "./expand";
 
 // Default of profile engine.affordabilityStep; opts.step wins over the profile.
 export const DEFAULT_SHARE_STEP = ENGINE_DEFAULTS.affordabilityStep;
@@ -41,17 +41,12 @@ export type AffordabilityOptions = {
 const BP = 10000;
 const toBp = (share: number) => Math.round(share * BP);
 
-function pattern(c: Commitment, profile: Profile) {
-  if (c.patternId) return profile.paymentPatterns.find((p) => p.id === c.patternId);
-  return profile.paymentPatterns.find((p) => p.appliesTo === c.type && p.isDefault);
-}
-
 // Pattern leg indexes that count as upfront: inflow legs due on or before the order date. A leg that gets the
 // customer's lag (its own `lagged: true`, or order in engine.lag.laggedAnchors) lands after the order date, so it is
 // not money in hand at signing and is not upfront; with the default lists no order-day leg is lagged.
 function patternUpfrontLegs(deal: Commitment, profile: Profile): number[] {
   const tun = engineSettings(profile);
-  return (pattern(deal, profile)?.legs ?? []).flatMap((l, i) => (l.direction === "in" && l.anchor === "order" && l.offsetDays <= 0 && !legGetsLag(l, deal, tun) ? [i] : []));
+  return (pickPattern(deal, profile)?.legs ?? []).flatMap((l, i) => (l.direction === "in" && l.anchor === "order" && l.offsetDays <= 0 && !legGetsLag(l, deal, tun) ? [i] : []));
 }
 
 // Split `total` over `weights` in proportion, floor each part and put the exact remainder on the last.
