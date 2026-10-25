@@ -27,6 +27,8 @@ Tests: `npx vitest run api` (Fastify `inject()`, in-memory store, no network, no
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | Verify session tokens (`supabase.auth.getUser`). Without them every token is rejected. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server reads and writes, only after the auth and membership check. Never in the browser. |
 | `ANTHROPIC_API_KEY` | Live Claude for imports, brief words and drafts. Without it (or with `NERI_AI_MODE=cache_only`) the server runs on the committed caches and code-built text. |
+| `NERI_ASK_MODE` | `live` turns on real Claude for Ask Neri only (needs `ANTHROPIC_API_KEY`); brief, drafts and intake keep following `NERI_AI_MODE`. Ask reads the committed caches first and calls Claude only on a miss (12 s timeout; on error it answers with the code-built text). To turn it on: `fly secrets set ANTHROPIC_API_KEY=… NERI_ASK_MODE=live`. `/health` shows `askMode`. |
+| `NERI_ASK_LIVE_MAX_PER_HOUR` | Cap on live Ask model calls per hour (default 200); over it, Ask answers from cache only. Questions are capped at 500 characters. |
 | `NERI_AI_MODE` | `live` or `cache_only`. Default: live when a key is set, except in `DEMO_MODE`, where it is `cache_only` unless set to `live`. |
 | `DEMO_MODE=1` | Requests without a token may open the synthetic samples (public preview, judges); uploads (`/import`) still need sign-in, because the samples are shared. Private businesses still need a member's token. Visitors get a private sandbox copy of each sample (see Demo sandbox). |
 | `NERI_DEFAULT_BUSINESS` | Sample opened when the caller has no business of their own (default `cascade_trade`). |

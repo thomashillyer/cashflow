@@ -43,11 +43,15 @@ export const demoRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
     const body = (req.body ?? {}) as { question?: unknown };
     const question = typeof body.question === "string" ? body.question : "";
+    // Ask has its own mode: live Claude on a cache miss only, capped per hour; everything else stays on deps.aiMode.
+    const live = deps.askGuard.begin(deps.askMode, deps.askClient);
     const r = await handleAsk(req.body, {
       records, profile, asOf, fxRates, baseOverrides: overrides,
       pendingReviewCount: proposals.filter((p) => p.state === "proposed").length,
       business: { name: b.name },
-      mode: deps.aiMode,
+      mode: live.mode,
+      ...(live.client ? { client: live.client } : {}),
+      ...(deps.askCacheDirs ? { cacheDirs: deps.askCacheDirs } : {}),
       persistProposal: async (p) => {
         const id = `ask-${randomUUID().slice(0, 8)}`;
         if (p.kind === "rule") {
@@ -63,6 +67,7 @@ export const demoRoutes = (deps: Deps) => async (app: FastifyInstance) => {
         return id;
       },
     });
+    live.finish(r.status);
     if (r.status !== 200) {
       const msg = (r.body as { error?: string }).error ?? "Ask a question about your cash.";
       throw new HttpError(r.status, "INVALID_ARGUMENT", msg, { fieldIssues: [{ field: "question", issue: "invalid" }] });
