@@ -85,7 +85,8 @@ export async function briefFor(store: Store, b: Business, mode: AiMode, now: () 
     after = sim.run.lowPoint.amount;
     if (levers.length > 1) combined = { lowPointDelta: sim.lowPointDelta, lowPoint: sim.run.lowPoint };
   }
-  const residual = run.firstBelowSafety ? run.safetyLine - after : 0;
+  // No opening balance yet (a new business before its first import): no gap to show.
+  const residual = run.firstBelowSafety && records.balances.length ? run.safetyLine - after : 0;
   const currency = inputs.profile.baseCurrency;
   const shortfall: BriefResult["shortfall"] = residual > 0
     ? {

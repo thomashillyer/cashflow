@@ -65,7 +65,7 @@ export interface Store {
   // The first business this user belongs to, if any.
   findUserBusiness(userId: string): Promise<string | null>;
   createBusiness(b: { name: string; profile: StoredProfile; isSynthetic: boolean; ownerUserId?: string; id?: string }): Promise<string>;
-  saveProfile(id: string, profile: StoredProfile): Promise<void>;
+  saveProfile(id: string, profile: StoredProfile, name?: string): Promise<void>;
   load(id: string): Promise<{ records: Records; storeRevision: number }>;
   // Idempotent upserts of whole records, then a revision bump. Returns the new revision.
   upsertRecords(id: string, records: Partial<Records>): Promise<number>;
@@ -136,8 +136,10 @@ export class MemoryStore implements Store {
     });
     return id;
   }
-  async saveProfile(id: string, profile: StoredProfile): Promise<void> {
-    this.need(id).profile = structuredClone(profile);
+  async saveProfile(id: string, profile: StoredProfile, name?: string): Promise<void> {
+    const b = this.need(id);
+    b.profile = structuredClone(profile);
+    if (name) b.name = name;
   }
   async load(id: string) {
     const b = this.need(id);

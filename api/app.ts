@@ -32,7 +32,7 @@ export type AppOptions = {
 export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">>;
 
 // Routes that need a signed-in user but no business yet.
-const NO_BUSINESS = new Set(["/setup", "/demo/reset", "/ask"]);
+const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals",
@@ -63,6 +63,17 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   };
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 12 * 1024 * 1024 });
 
+  // The app sends Content-Type: application/json on every call, including body-less POSTs.
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (_req, body, done) => {
+    if (body === "") return done(null, undefined);
+    try {
+      done(null, JSON.parse(body as string));
+    } catch {
+      done(new HttpError(400, "INVALID_JSON", "That request wasn't valid JSON. Reload and try again."), undefined);
+    }
+  });
+
   app.setErrorHandler((err, _req, reply) => {
     if (!(err instanceof HttpError) && ((err as { statusCode?: number }).statusCode ?? 500) >= 500) app.log.error({ code: (err as { code?: string }).code }, "request failed");
     return sendError(reply, err);
@@ -80,6 +91,9 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       r.user = user;
     } else if (!deps.demoMode) {
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to see your numbers.");
+    } else if (req.url.startsWith("/import")) {
+      // Demo samples are shared and public: anonymous uploads would publish the file to every visitor.
+      throw new HttpError(401, "UNAUTHENTICATED", "Sign in to upload your own files. The sample already has its documents.");
     }
 
     const path = req.url.split("?")[0]!;

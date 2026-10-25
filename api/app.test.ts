@@ -62,6 +62,7 @@ describe("auth and tenant scope", () => {
     expect((await app.inject({ method: "GET", url: "/context", headers: { "x-neri-business": "pike_noodle" } })).json().business.id).toBe("pike_noodle");
     expect((await app.inject({ method: "GET", url: "/context", headers: { "x-neri-business": id } })).statusCode).toBe(404);
     expect((await app.inject({ method: "POST", url: "/setup", payload: { businessName: "X" } })).statusCode).toBe(401);
+    expect((await app.inject({ method: "POST", url: "/import/paste", payload: { text: "hello" } })).statusCode).toBe(401);
   });
 
   it("members see their business; non-members get 404", async () => {
@@ -205,12 +206,36 @@ describe("routes return what app/api.js expects", () => {
     expect(ctx.business).toMatchObject({ id: acc.businessId, synthetic: false });
     expect(ctx.profile.safetyLine).toEqual({ kind: "fixed", amount: 2500000 });
     expect((await app.inject({ method: "GET", url: "/context", headers: { ...OTHER, "x-neri-business": acc.businessId } })).statusCode).toBe(404);
+    // No sample money in a new business.
+    expect(ctx.profile.recurring).toEqual([]);
+    expect((await app.inject({ method: "GET", url: "/brief", headers: OWNER })).json().shortfall).toBeNull();
   });
 
-  it("POST /ask is 501 until Ask Neri lands; POST /demo/reset reseeds samples", async () => {
-    const ask = await app.inject({ method: "POST", url: "/ask", headers: OTHER, payload: { question: "Can I make payroll?" } });
-    expect(ask.statusCode).toBe(501);
-    expect(ask.json().error.code).toBe("NOT_IMPLEMENTED");
+  it("body-less POSTs with Content-Type: application/json work (app/api.js always sends it)", async () => {
+    const brief = (await app.inject({ method: "GET", url: "/brief", headers: OTHER })).json();
+    const res = await app.inject({ method: "POST", url: `/work-items/${brief.three[0].id}/draft`, headers: { ...OTHER, "content-type": "application/json" } });
+    expect(res.statusCode).toBe(200);
+    const bad = await app.inject({ method: "POST", url: "/plans", headers: { ...OTHER, "content-type": "application/json" }, payload: "{nope" });
+    expect(bad.statusCode).toBe(400);
+  });
+
+  it("POST /ask answers with text, a scenario run and a plan proposal; a stated rule is stored as proposed", async () => {
+    const ask = await app.inject({ method: "POST", url: "/ask", headers: OTHER, payload: { question: "Can I afford a $40K deposit to Shenzhen in December?" } });
+    expect(ask.statusCode).toBe(200);
+    const a = ask.json();
+    expect(a.text).toEqual(expect.any(String));
+    expect(a.scenario).toMatchObject({ label: expect.any(String), run: { days: expect.any(Array) } });
+    expect(a.proposal).toMatchObject({ kind: "plan", amount: 4000000, date: expect.stringMatching(/^2026-12-/) });
+    expect((await app.inject({ method: "POST", url: "/ask", headers: OTHER, payload: { question: "" } })).statusCode).toBe(400);
+
+    const rule = (await app.inject({ method: "POST", url: "/ask", headers: OTHER, payload: { question: "Evergreen always pays about 20 days late" } })).json();
+    if (rule.verdict === "proposed") {
+      const { records } = await store.load("cascade_trade");
+      expect(records.rules.some((r) => r.state === "proposed") || records.signals.some((s) => s.channel === "owner" && s.state === "proposed")).toBe(true);
+    }
+  });
+
+  it("POST /demo/reset reseeds samples", async () => {
     await app.inject({ method: "POST", url: "/plans", headers: OTHER, payload: { amount: 100000, date: "2026-12-01", note: "x" } });
     expect((await app.inject({ method: "POST", url: "/demo/reset", headers: OTHER })).json()).toEqual({ reset: ["cascade_trade", "pike_noodle"] });
     const { records } = await store.load("cascade_trade");

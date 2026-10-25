@@ -24,7 +24,7 @@ Tests: `npx vitest run api` (Fastify `inject()`, in-memory store, no network, no
 | `SUPABASE_SERVICE_ROLE_KEY` | Server reads and writes, only after the auth and membership check. Never in the browser. |
 | `ANTHROPIC_API_KEY` | Live Claude for imports, brief words and drafts. Without it (or with `NERI_AI_MODE=cache_only`) the server runs on the committed caches and code-built text. |
 | `NERI_AI_MODE` | `live` or `cache_only`. Default: live when a key is set, except in `DEMO_MODE`, where it is `cache_only` unless set to `live`. |
-| `DEMO_MODE=1` | Requests without a token may open the synthetic samples (public preview, judges). Private businesses still need a member's token. Also enables `POST /demo/reset`. |
+| `DEMO_MODE=1` | Requests without a token may open the synthetic samples (public preview, judges); uploads (`/import`) still need sign-in, because the samples are shared. Private businesses still need a member's token. Also enables `POST /demo/reset`. |
 | `NERI_DEFAULT_BUSINESS` | Sample opened when the caller has no business of their own (default `cascade_trade`). |
 | `NERI_STORE=memory` | In-memory store seeded from the fixtures, instead of Supabase. |
 | `NERI_ALLOW_RESET=1` | Enable `POST /demo/reset` outside demo mode. |
@@ -66,7 +66,7 @@ Errors are `{ error: { code, message, fieldIssues, retryable }, revision? }`; `m
 | `POST /work-items/:id/draft` | `draftMessage`; `{ channel?: "email" \| "message" \| "whatsapp" }` | `{ to, subject, body, channel, links, usedFallback }` (text only) |
 | `POST /work-items/:id/approve` | Marks the item done (never "sent" or "paid") | `{ id, state }` |
 | `POST /demo/reset` | Reseed the synthetic samples (`{ business? }`) | `{ reset }` |
-| `POST /ask` | Ask Neri: `501 NOT_IMPLEMENTED` until #102 lands `askNeri` | |
+| `POST /ask` | Ask Neri (`handleAsk`, ai/ask): `{ question, via?: "text" \| "voice" }`; a stated plan or rule is stored as a proposed owner Signal or Rule | `{ text, headline, verdict, ..., scenario?: { label, run }, proposal?: { kind: "plan", amount, date, note } }` |
 
 Owner notes and plans go in as **applied** owner Signals: the owner's own words, confirmed by the owner's click. Messages from anyone else stay `proposed` until the owner applies them in Review.
 

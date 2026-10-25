@@ -54,17 +54,20 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const createdAt = nowIso();
     const connections = connect.map((id) => ({ id, name: id, state: "waiting" as const }));
     const starter = readProfile(STARTER[kind]!);
+    // The starter's sample recurring costs (payroll, rent) are not this owner's: start empty, so nothing
+    // on screen is a number the owner didn't give us.
     const profile: StoredProfile = {
       ...starter,
+      recurring: [],
       ...(reserve !== undefined ? { safetyLine: { kind: "fixed", amount: reserve } } : {}),
-      account: { owner: ownerNameFrom(email), email, kind, connections, ownerUserId: user.id, createdAt, thoughts: [], intakeNotes: [] },
+      account: { owner: ownerNameFrom(email), email, kind, connections, ownerUserId: user.id, createdAt },
     };
-    // One business per owner for now: setting up again updates it.
+    // One business per owner for now: setting up again updates it (notes and import notes are kept).
     const existing = await deps.store.findUserBusiness(user.id);
     let businessId: string;
     if (existing) {
       const b = await deps.store.getBusiness(existing);
-      await deps.store.saveProfile(existing, { ...profile, account: { ...b?.profile.account, ...profile.account } });
+      await deps.store.saveProfile(existing, { ...profile, account: { ...b?.profile.account, ...profile.account } }, name);
       businessId = existing;
     } else {
       businessId = await deps.store.createBusiness({ name, profile, isSynthetic: false, ownerUserId: user.id });

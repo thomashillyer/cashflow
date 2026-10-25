@@ -59,8 +59,8 @@ export class SupabaseStore implements Store {
     return id;
   }
 
-  async saveProfile(id: string, profile: StoredProfile): Promise<void> {
-    const { error } = await this.db.from("businesses").update({ profile }).eq("id", id);
+  async saveProfile(id: string, profile: StoredProfile, name?: string): Promise<void> {
+    const { error } = await this.db.from("businesses").update({ profile, ...(name ? { name } : {}) }).eq("id", id);
     if (error) throw toStoreError(`save profile ${id}`, error);
   }
 
@@ -117,7 +117,10 @@ export class SupabaseStore implements Store {
   async resetBusiness(b: { id: string; name: string; profile: StoredProfile }, records: Records): Promise<void> {
     const { error } = await this.db.from("businesses").delete().eq("id", b.id).eq("is_synthetic", true);
     if (error) throw toStoreError(`reset ${b.id}`, error);
-    await upsertBusiness(this.db, { id: b.id, name: b.name, profile: b.profile, isSynthetic: true });
+    // Plain insert: if a private business holds this id, the delete above did nothing and this fails,
+    // instead of flipping it to synthetic.
+    const ins = await this.db.from("businesses").insert({ id: b.id, name: b.name, profile: b.profile, is_synthetic: true });
+    if (ins.error) throw toStoreError(`reset ${b.id}`, ins.error);
     await upsertRecords(this.db, b.id, records);
   }
 }
