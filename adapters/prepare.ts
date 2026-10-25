@@ -7,6 +7,7 @@ import type { IntakeInput } from "../ai/intake";
 import type { ColumnMapping } from "../ai/extract/sheet";
 import type { Evidence, Records } from "../schema/records";
 import type { ImportDiagnostics } from "./core/diagnostics";
+import { importBankStatement, type BankImport, type BankMapping } from "./bank_csv";
 import { importFile } from "./generic_file/import";
 import { importWhatsAppExport } from "./whatsapp/export";
 
@@ -77,4 +78,43 @@ export function enrichEvidence(evidence: Evidence[], fileEvidence: Evidence | un
   return evidence.map((e) => (e.id === fileEvidence.id
     ? { ...fileEvidence, extraction: rank[e.extraction] >= rank[fileEvidence.extraction] ? e.extraction : fileEvidence.extraction, ...(e.parentId ? { parentId: e.parentId } : {}) }
     : e));
+}
+
+// ---------------------------------------------------------------- bank statements
+// A statement is not a document to interpret: lines become actual events, the newest running balance a snapshot,
+// and regular payments recurring proposals (adapters/bank_csv). Same repeat rule as files: identical bytes already
+// read are a repeat, unless the owner supplied corrections. A separate function so the document path above is untouched.
+export type PrepareBankOptions = {
+  fileName: string;
+  bytes: Uint8Array;
+  receivedAt: string;
+  records: Pick<Records, "evidence">;
+  currency: string;
+  account?: string;
+  dayFirst?: boolean;
+  columnMapping?: BankMapping;
+  headerRow?: number;
+  retry?: boolean;
+};
+
+export type PreparedBank =
+  | { ok: true; repeat: false; bank: BankImport }
+  | { ok: true; repeat: true; bank: BankImport; evidenceId: string }
+  | { ok: false; message: string; nextStep: string; diagnostics: ImportDiagnostics };
+
+export async function prepareBankImport(o: PrepareBankOptions): Promise<PreparedBank> {
+  const bank = await importBankStatement(
+    { fileName: o.fileName, bytes: o.bytes, receivedAt: o.receivedAt },
+    {
+      currency: o.currency, existingEvidence: o.retry ? [] : o.records.evidence.filter(readable),
+      ...(o.account ? { account: o.account } : {}), ...(o.dayFirst !== undefined ? { dayFirst: o.dayFirst } : {}),
+      ...(o.columnMapping ? { columnMapping: o.columnMapping } : {}), ...(o.headerRow ? { headerRow: o.headerRow } : {}),
+    },
+  );
+  if (!bank.readable) {
+    const e = bank.diagnostics.errors[0]!;
+    return { ok: false, message: e.message, nextStep: e.nextStep, diagnostics: bank.diagnostics };
+  }
+  if (bank.repeat) return { ok: true, repeat: true, bank, evidenceId: bank.evidence.id };
+  return { ok: true, repeat: false, bank };
 }

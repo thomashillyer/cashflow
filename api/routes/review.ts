@@ -18,6 +18,7 @@ import { inferWhatsAppDateOrder, normalizeChat } from "../../adapters/whatsapp/e
 import { businessIdentity, loadForRun, runInputs, savedScenario } from "../engine";
 import { businessOf, HttpError, isIsoDate } from "../http";
 import type { Business, DecisionWrite, Store } from "../store";
+import { importBank } from "./bank";
 
 // ApplyError.code -> HTTP status (ai/README.md). Record<> makes tsc fail when a code is added.
 export const APPLY_ERROR_STATUS: Record<ApplyErrorCode, number> = {
@@ -218,6 +219,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     // On the public demo the samples are shared: an upload would publish the file to every visitor, signed in or not.
     if (b.isSynthetic && deps.demoMode) throw new HttpError(403, "FORBIDDEN", "The sample already has its documents. Set up your business to upload your own files.");
     const { adapter } = req.params as { adapter: string };
+    // Bank statements are history and a balance, not documents to interpret (api/routes/bank.ts).
+    if (adapter === "bank") return importBank(deps, b, (req.body ?? {}) as Record<string, unknown>, nowIso());
     const { records, storeRevision } = await deps.store.load(b.id);
     const prep = await toInput(adapter, (req.body ?? {}) as Record<string, unknown>, nowIso(), records, businessIdentity(b), b.profile.baseCurrency);
     if ("repeat" in prep) {
