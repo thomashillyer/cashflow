@@ -111,6 +111,33 @@ describe("pullZohoCrm", () => {
     expect(r.data.commitments.find((c) => c.sourceRef.record === "old")!.anchors.order).toBe("2026-04-30");
   });
 
+  it("warns that deals committed by probability alone may already be invoiced", async () => {
+    const r = await pull();
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.diagnostics.warnings.join(" ")).toMatch(/committed because the CRM says 100%.*map that stage to "skip"/);
+    const ruled = await pull({ deals: [deal("a")] }, { stageStatus: { "PO received": "committed" } });
+    if (!ruled.ok) throw new Error("expected ok");
+    expect(ruled.data.diagnostics.warnings.join(" ")).not.toMatch(/committed because the CRM says 100%/);
+  });
+
+  it("a stage named like an object property is not a rule, and a mistyped rule is a plain config error", async () => {
+    const r = await pull({ deals: [deal("a", { Stage: "constructor" }), deal("b", { Stage: "__proto__" })] });
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.commitments.map((c) => c.status)).toEqual(["committed", "committed"]);
+    const bad = await pull({}, { stageStatus: { Delivered: "won" as never } });
+    expect(bad).toMatchObject({ ok: false, error: { kind: "config", fallback: "file" } });
+    if (!bad.ok) expect(bad.error.nextStep).toMatch(/skip, committed, likely or possible/);
+  });
+
+  it("a deal with no closing date is imported unplaced and the engine puts no cash on the calendar for it", async () => {
+    const r = await pull({ deals: [deal("nodate", { Closing_Date: null })] });
+    if (!r.ok) throw new Error("expected ok");
+    const profile = JSON.parse(readFileSync(join(__dirname, "../../profiles/trading.json"), "utf8")) as Profile;
+    const records = { parties: r.data.parties, commitments: r.data.commitments, events: [], signals: [], rules: [], settlements: [], balances: [], evidence: r.data.evidence };
+    const run = expand(records as never, profile, "2026-10-25", horizonEnd(profile, "2026-10-25"), {});
+    expect(run.events.filter((e) => e.commitmentId === "deal-nodate")).toEqual([]);
+  });
+
   it("an empty CRM (204) is zero deals, not an error", async () => {
     const r = await pull({ deals: [] });
     expect(r).toMatchObject({ ok: true, data: { commitments: [] } });

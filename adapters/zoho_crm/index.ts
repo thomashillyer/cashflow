@@ -55,6 +55,12 @@ async function pull(input: ZohoCrmPullInput): Promise<ZohoCrmPull> {
   const module = m.module ?? "Deals";
   const committedAt = m.probabilityStatus?.committedAt ?? 1;
   const likelyAt = m.probabilityStatus?.likelyAt ?? 0.6;
+  const RULES = ["skip", "committed", "likely", "possible"];
+  for (const [stage, rule] of Object.entries(m.stageStatus ?? {})) {
+    if (!RULES.includes(rule as string)) {
+      throw new ConnectorFailure({ kind: "config", message: `The CRM mapping for stage "${stage}" is not valid.`, nextStep: "Use skip, committed, likely or possible for each stage in the profile's CRM mapping, or upload a CRM export instead.", fallback: "file" });
+    }
+  }
   const client = new ZohoCrmClient({ region: input.region, token: input.token, ...(input.fetch ? { fetch: input.fetch } : {}) });
   const { records, truncated } = await client.records(module, [f.name, f.stage, f.amount, f.currency, f.closeDate, f.account, f.probability, "Modified_Time"]);
 
@@ -62,6 +68,7 @@ async function pull(input: ZohoCrmPullInput): Promise<ZohoCrmPull> {
   const commitments: Commitment[] = [];
   const evidence: Evidence[] = [];
   const skipped: ZohoCrmPull["skipped"] = [];
+  const rawStageOf = new Map<string, string>();   // deal id -> stage, to tell a stage rule from the probability path
   const errors: RowError[] = [];
   const warnings: string[] = [];
   if (truncated) warnings.push(`Only the newest ${records.length} deals were read; older ones were left out.`);
@@ -77,7 +84,7 @@ async function pull(input: ZohoCrmPullInput): Promise<ZohoCrmPull> {
     // Certainty: the business's stage rule first, then the CRM's own probability. Never invented.
     const raw = rec[f.probability];
     const p = typeof raw === "number" ? raw / 100 : typeof raw === "string" && /^\d+(\.\d+)?$/.test(raw.trim()) ? Number(raw) / 100 : undefined;
-    const rule = m.stageStatus?.[stage];
+    const rule = m.stageStatus && Object.hasOwn(m.stageStatus, stage) ? m.stageStatus[stage] : undefined;   // own keys only: a stage named "constructor" is not a rule
     let status: Status | undefined;
     let probability: number | undefined;
     if (rule === "skip") { skipped.push({ dealId: id, stage, reason: "stage is mapped to skip (already in the books, or lost)" }); return; }
@@ -94,6 +101,7 @@ async function pull(input: ZohoCrmPullInput): Promise<ZohoCrmPull> {
     const close = isoDate(rec[f.closeDate]);
     if (!close) fail("missing_date", `Deal "${name ?? id}" has no closing date; it was imported but cannot be placed on the forecast yet.`, "Enter the closing date on the Review screen.");
 
+    rawStageOf.set(id, stage);
     const acct = lookup(rec[f.account]);
     let partyId: string | undefined;
     if (acct.id && acct.name) {
@@ -115,6 +123,9 @@ async function pull(input: ZohoCrmPullInput): Promise<ZohoCrmPull> {
     evidence.push(ev);
   });
 
+  // A deal committed only because the CRM says 100% may already be invoiced in the books.
+  const byProbability = commitments.filter((c) => c.status === "committed" && !(m.stageStatus && Object.hasOwn(m.stageStatus, rawStageOf.get(c.sourceRef.record) ?? ""))).length;
+  if (byProbability) warnings.push(`${byProbability} deal${byProbability === 1 ? " is" : "s are"} committed because the CRM says 100%. If ${byProbability === 1 ? "it is" : "they are"} already invoiced in your books, map that stage to "skip" in the profile's CRM mapping or the money is counted twice.`);
   // An open deal whose closing date is already past is probably stale (or already invoiced): the engine would
   // place its cash in the past. Say so; do not change the date.
   const today = input.now.slice(0, 10);
