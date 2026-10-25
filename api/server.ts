@@ -12,6 +12,7 @@ import { MemoryBlobs, SupabaseBlobs, type Blobs } from "./blobs";
 import { MemoryStore, type Store } from "./store";
 import { SupabaseStore } from "./supabase-store";
 import { isBehind, supabaseSchemaStatus } from "./schema-status";
+import { envSourceAccess } from "./sourceAccess";
 
 const env = process.env;
 const demoMode = env.DEMO_MODE === "1";
@@ -58,6 +59,7 @@ const app = await buildApp({
     : {}),
   allowReset: env.NERI_ALLOW_RESET === "1",
   logger: true,
+  ...(envSourceAccess(env) ? { sourceAccess: envSourceAccess(env)! } : {}),
   ...(schemaStatus ? { schemaStatus } : {}),
 });
 

@@ -1036,6 +1036,37 @@ async function showDraft(itemId) {
     <p class="fineprint">Neri never sends anything for you. You send it, from your own mail.</p>`, { mask: false });
 }
 
+// Apps Neri can read for real today (Sources > Connect). Everything else connects by file until its connector is ready.
+const PULLABLE = new Set(["zoho_books", "zoho_crm", "m365"]);
+
+async function pullApps(ids, onStep) {
+  const out = [];
+  for (const id of ids.filter((x) => PULLABLE.has(x))) {
+    const name = CONNECTORS.find((c) => c.id === id)?.name ?? id;
+    onStep?.(name);
+    try {
+      out.push({ id, name, ok: true, res: await api.pullSource(id) });
+    } catch (e) {
+      out.push({ id, name, ok: false, error: e.message });
+    }
+  }
+  return out;
+}
+
+// One plain sentence per app: what was read, or why not and what to do instead.
+function pullSummary(results) {
+  if (!results.length) return "Nothing to read yet. Upload a file or connect an app whenever you're ready.";
+  return results.map((r) => {
+    if (!r.ok) return `${r.name}: ${r.error}`;
+    const s = r.res?.summary ?? {};
+    const warn = r.res?.diagnostics?.warnings?.[0];
+    const what = r.res?.kind === "messages"
+      ? `${s.messages ?? 0} message${s.messages === 1 ? "" : "s"} to review`
+      : `${r.res?.diagnostics?.rowsRead ?? 0} item${r.res?.diagnostics?.rowsRead === 1 ? "" : "s"} read`;
+    return `${r.name}: ${what}.${warn ? ` ${warn}` : ""}`;
+  }).join(" ");
+}
+
 function showConnect(id) {
   const c = CONNECTORS.find((x) => x.id === id);
   const cat = CATEGORIES.find((x) => x.id === c.category);
@@ -1428,7 +1459,7 @@ async function onClick(ev) {
     const dollars = Number(String(st.reserve).replace(/[^\d.]/g, ""));
     // Preview: connectors marked Ready sign in on the Neri server; here they show as connected. Others wait for a file.
     try {
-      await new Promise((r) => setTimeout(r, st.picked.size ? 1100 : 0));
+      if (api.mode === "preview") await new Promise((r) => setTimeout(r, st.picked.size ? 1100 : 0));
       await api.completeSetup({ email: app.signup.email, businessName: app.signup.name, kind: st.kind, reserve: dollars ? Math.round(dollars * 100) : null, connect: [...st.picked] });
     } catch (e) {
       st.connecting = false;
@@ -1436,9 +1467,16 @@ async function onClick(ev) {
       toast("Couldn't finish setup", `${e.message} Try again, or upload a file instead.`);
       return;
     }
+    // Live: read each ticked app now, so Home opens with the real numbers. A failure is shown in words and the
+    // owner can upload a file instead; one app failing never stops the others.
+    const results = api.mode === "preview" ? [] : await pullApps([...st.picked], (name) => {
+      const btn = document.querySelector('[data-action="connect-all"]');
+      if (btn) btn.textContent = `Reading ${name}…`;
+    });
     st.connecting = false;
     history.replaceState(null, "", "#/today");
     await load();
+    if (results.length) return toast("All set", pullSummary(results));
     const c = app.account.connections;
     const ok = c.filter((x) => x.state === "ok").length;
     toast("All set", c.length ? `${ok} connected${c.length - ok ? `, ${c.length - ok} waiting for a file` : ""}. Here's today.` : "Upload a file or connect an app whenever you're ready.");
@@ -1530,7 +1568,15 @@ async function onClick(ev) {
   }
   if (a === "connect") return showConnect(id);
   if (a === "connect-go") {
-    toast("Sign-in opens on your Neri server", "This preview runs a fictional business with sample data.");
+    if (api.mode === "preview" || !PULLABLE.has(id)) {
+      toast("Sign-in opens on your Neri server", "This preview runs a fictional business with sample data.");
+      return;
+    }
+    el.disabled = true;
+    const results = await pullApps([id], (name) => { el.textContent = `Reading ${name}…`; });
+    closeSheet();
+    await load();
+    toast(results[0]?.ok ? "Connected" : "Couldn't connect", pullSummary(results));
     return;
   }
   if (a === "interest") {

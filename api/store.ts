@@ -37,7 +37,7 @@ export type Account = {
   timezone?: string;
   kind?: string;                       // starter profile the owner picked
   aliases?: string[];                  // other names the business goes by (intake matching)
-  connections?: { id: string; name: string; state: "ok" | "waiting" | "error" }[];
+  connections?: { id: string; name: string; state: "ok" | "waiting" | "error"; message?: string; syncedAt?: string }[];
   ownerUserId?: string;                // Supabase auth user id of the owner (membership fallback)
   asOf?: string;                       // fixed "today" for synthetic samples; real businesses use the clock
   fxRates?: Record<string, number>;

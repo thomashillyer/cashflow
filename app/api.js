@@ -149,6 +149,10 @@ const preview = {
   async uploadFile() {
     return { preview: true };
   },
+  // Preview has no live sources: connecting is simulated, so there is nothing to pull.
+  async pullSource() {
+    return null;
+  },
   // Parked thoughts (owner notes). Neri proposes a reading; owner confirms before it touches cash.
   async notes() {
     return engine.thoughts();
@@ -325,6 +329,10 @@ const live = {
     let bin = "";
     for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
     return http("/import/upload", { method: "POST", body: JSON.stringify({ fileName: file.name, base64: btoa(bin) }) });
+  },
+  // Read a connected app (Zoho Books, Zoho CRM, Microsoft 365) into this business. Read-only on the app's side.
+  async pullSource(id) {
+    return http(`/sources/${encodeURIComponent(id)}/pull`, { method: "POST", body: "{}" });
   },
   async setSafetyLine(cents) {
     return http("/profile", { method: "PUT", body: JSON.stringify({ safetyLine: { kind: "fixed", amount: cents } }) });

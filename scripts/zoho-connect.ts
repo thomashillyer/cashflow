@@ -21,7 +21,7 @@ const region = new URL(need("ZOHO_API_DOMAIN")).hostname.replace(/^www\.zohoapis
 const accounts = `https://accounts.zoho.${region}/oauth/v2`;
 const SCOPES = [
   "ZohoBooks.invoices.READ", "ZohoBooks.bills.READ", "ZohoBooks.contacts.READ",
-  "ZohoBooks.customerpayments.READ", "ZohoBooks.vendorpayments.READ", "ZohoBooks.purchaseorders.READ", "ZohoBooks.settings.READ",
+  "ZohoBooks.customerpayments.READ", "ZohoBooks.vendorpayments.READ", "ZohoBooks.purchaseorders.READ", "ZohoBooks.settings.READ", "ZohoBooks.banking.READ",
 ].join(",");
 const state = randomBytes(16).toString("hex");
 
