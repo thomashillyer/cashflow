@@ -45,7 +45,7 @@ Sources (accounting, bank, signals, owner)
                     + Evidence, Settlement, BalanceSnapshot, Override, Scenario
   -> engine/        expand, lag, forecast, simulate      [05-forecast-engine.md]
   -> engine/        warnings, rank -> WorkItems          [07-warnings-and-ranking.md]
-  -> ai/            Claude: extraction, brief text, Ask Neri, drafts  [08-claude-layer.md]
+  -> ai/            Claude: extraction, brief text, Ask Neri, drafts  [08-claude-layer.md; wiring into routes: ai/README.md]
   -> api/ + app/    three things, forecast chart, Ask Neri, approve   [09-api-repo-lanes.md]
 profiles/           business profile config, read by adapters, engine, warnings  [02-business-profile.md]
 ```
