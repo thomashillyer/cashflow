@@ -22,3 +22,6 @@ node_modules/
 __pycache__/
 dist/
 build/
+
+# Claude Code agent worktrees
+.claude/worktrees/

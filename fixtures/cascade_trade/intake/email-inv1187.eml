@@ -1,0 +1,19 @@
+From: Dana Whitfield <accounts@evergreenhome.example>
+To: billing@cascadetrade.example
+Subject: RE: Invoice INV-1187 from Cascade Trade Co.
+Date: Thu, 26 Nov 2026 16:42:10 -0800
+Message-ID: <evg-20261126-1642@evergreenhome.example>
+X-Attachments: inv1187.pdf
+
+Hi team,
+
+Thanks for sending this over. Attaching the invoice back for our records,
+our AP system needed it re-sent with the PO line.
+
+View invoice: https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187
+Pay now: https://checkout.stripe.example/c/pay/cs_live_inv1187_cascade
+
+We'll process it in our next payment run.
+
+Dana Whitfield
+Accounts Payable, Evergreen Home LLC

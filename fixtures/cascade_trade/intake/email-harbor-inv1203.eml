@@ -1,0 +1,20 @@
+From: billing@cascadetrade.example
+To: ap@harborandhearth.example
+Subject: Invoice INV-1203 (partial shipment, PO HH-PO-552)
+Date: Mon, 16 Nov 2026 10:05:00 -0800
+Message-ID: <cascade-20261116-1005@cascadetrade.example>
+
+Hello Harbor and Hearth AP,
+
+Please find our invoice for the first partial shipment against your PO HH-PO-552.
+
+Invoice: INV-1203
+Items: Hand-thrown mugs, 400 pcs @ 10.00
+Total due: USD 4,000.00
+Invoice date: November 16, 2026
+Due: December 16, 2026 (Net 30)
+
+View invoice: https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1203
+
+Thank you,
+Cascade Trade Co.
