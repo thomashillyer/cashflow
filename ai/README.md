@@ -204,7 +204,7 @@ function validOwnerEdits(body: unknown, target: Commitment): CommitmentFieldChan
 }
 ```
 
-A confirmed evidence-only `link` proposal adds no commitment and no cash event. A confirmed `create` proposal adds the commitment (and party) with ids derived from the source, such as `inv-INV-1203`. A `linkCommitments` op also changes the PO's outstanding amount.
+A confirmed evidence-only `link` proposal adds no commitment and no cash event. A confirmed `create` proposal adds the commitment (and party) with ids derived from the source, such as `inv-INV-1203`. A `linkCommitments` op also changes the PO's outstanding amount. A `createSettlement` op records the payment and, when the target commitment has `outstanding` set (and the payment is already in opening cash), lowers it and sets `settlement` to `partial` or `paid`; when `outstanding` is unset the engine derives the remainder from the settlements. Show these warnings from `applyProposal` to the owner.
 
 ## `POST /signals/:id/apply` and `/dismiss`
 

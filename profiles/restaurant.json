@@ -15,7 +15,7 @@
       "legs": [{ "share": 1, "anchor": "due", "offsetDays": 0, "direction": "out" }]
     }
   ],
-  "revenueModel": { "kind": "dailySales", "weekdayWeights": [0.6, 0.7, 0.8, 1.0, 1.5, 1.8, 1.4] },
+  "revenueModel": { "kind": "dailySales", "weekdayWeights": [0.6, 0.7, 0.8, 1.0, 1.5, 1.8, 1.4], "settleLagDays": 2 },
   "recurring": [
     { "id": "rec-payroll", "name": "Payroll", "amount": 750000, "cadence": "weekly", "anchor": "2026-11-20", "category": "payroll", "nonDeferrable": true },
     { "id": "rec-rent", "name": "Rent", "amount": 550000, "cadence": "monthly", "anchor": "2026-12-01", "category": "rent" },
@@ -28,7 +28,8 @@
     "rankFloor": 0.1,
     "relationshipPenalty": {},
     "staleAfterHours": 48,
-    "stressDelayDays": 3
+    "stressDelayDays": 3,
+    "splitIntervalDays": 14
   },
   "actionLeadDays": { "defer": 2, "pay_early": 1 },
   "signalSources": ["email"],

@@ -42,6 +42,13 @@ function storedEvidence(t: Commitment, value: unknown): FieldEvidence[] {
   return [{ evidenceId: t.evidenceIds?.[0] ?? t.sourceRef.record, text: `${t.sourceRef.system} ${t.sourceRef.record}: ${String(value)}` }];
 }
 
+// What is still owed: the stored outstanding, else the amount less same-currency settlements (as the engine derives it).
+function remainingOf(records: Records, c: Commitment): number {
+  if (c.outstanding !== undefined) return c.outstanding;
+  const paid = records.settlements.filter((s) => s.commitmentId === c.id && s.currency === c.currency).reduce((a, s) => a + s.amount, 0);
+  return Math.max(0, c.amount - paid);
+}
+
 // Sum of linked invoice/bill amounts against a PO. The store-side home for explicit
 // allocations is po_invoice_allocations (TECHNICAL_PLAN section 4); until then the
 // linked document's amount is the allocation.
@@ -154,7 +161,7 @@ export function propose(candidate: IntakeCandidate, records: Records, ctx: Propo
   if (amount !== undefined) {
     const lookalikes = sameParty.filter((c) =>
       commitmentDirection(c) === direction && c.settlement !== "paid" && c.settlement !== "cancelled" &&
-      (c.outstanding ?? c.amount) === amount && (!currency || c.currency === currency));
+      remainingOf(records, c) === amount && (!currency || c.currency === currency));
     if (lookalikes.length) {
       return review("Possible match by amount only; confirm before linking.", {
         matchCandidates: lookalikes.map((c) => ({ commitmentId: c.id, reasons: ["same party and amount; no reference match"] })),
@@ -189,10 +196,13 @@ function buildDraft(
   const draft: CommitmentDraft = {
     type, direction, partyId, amount, currency, anchors,
     status: type === "purchase_order" ? "likely" : "committed",
-    outstanding: found(f.outstanding) ?? amount,
     settlement: "open",
     evidenceIds: [...c.evidenceIds],
   };
+  // Only a balance due the document itself states is authoritative. Otherwise leave outstanding unset so the
+  // engine derives the remainder from amount minus Settlements (a set value would be counted on top of them).
+  const stated = found(f.outstanding);
+  if (stated !== undefined) draft.outstanding = stated;
   const reference = found(f.reference);
   if (reference) draft.reference = reference;
   const invoiceUrl = found(f.invoiceUrl);
@@ -224,7 +234,7 @@ function reconcileWithTarget(
       { value: currency, evidence: evidenceOf(f.currency) },
     ] });
   }
-  if (amount !== undefined && amount !== target.amount && amount !== target.outstanding) {
+  if (amount !== undefined && amount !== target.amount && amount !== remainingOf(records, target)) {
     conflicts.push({ field: "amount", values: [
       { value: target.amount, evidence: storedEvidence(target, target.amount) },
       { value: amount, evidence: evidenceOf(f.amount) },
