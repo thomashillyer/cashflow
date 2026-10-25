@@ -1,30 +1,164 @@
 {
   "_comment": "Minimal existing records for intake tests (synthetic). Person 1's fixtures/cascade_trade/records.json can replace this once it exists.",
   "parties": [
-    { "id": "party-evergreen-home", "name": "Evergreen Home", "kind": "customer", "tags": ["slow_payer"], "notes": ["They always pay about two weeks late"],
-      "contacts": { "emailDomains": ["evergreenhome.example"] } },
-    { "id": "party-puget-market", "name": "Puget Market", "kind": "customer", "tags": ["reliable"], "notes": ["Usually pays a week early"],
-      "contacts": { "emailDomains": ["pugetmarket.example"] } },
-    { "id": "party-harbor-hearth", "name": "Harbor and Hearth", "kind": "customer", "tags": ["reliable"], "notes": [],
-      "contacts": { "emailDomains": ["harborandhearth.example"] } },
-    { "id": "party-shenzhen-ceramics", "name": "Shenzhen Ceramics Co.", "kind": "supplier", "tags": ["preferred", "reliable"], "notes": ["Best quality; slow around Lunar New Year"],
-      "contacts": { "emailDomains": ["szceramics.example"] } },
-    { "id": "party-ningbo-pack", "name": "Ningbo Pack", "kind": "supplier", "tags": ["avoid"], "notes": ["Quality issues last year"],
-      "contacts": { "emailDomains": ["ningbopack.example"] } }
+    {
+      "id": "party-evergreen-home",
+      "name": "Evergreen Home",
+      "kind": "customer",
+      "tags": [
+        "slow_payer"
+      ],
+      "notes": [
+        "They always pay about two weeks late"
+      ],
+      "contacts": {
+        "emailDomains": [
+          "evergreenhome.example"
+        ]
+      }
+    },
+    {
+      "id": "party-puget-market",
+      "name": "Puget Market",
+      "kind": "customer",
+      "tags": [
+        "reliable"
+      ],
+      "notes": [
+        "Usually pays a week early"
+      ],
+      "contacts": {
+        "emailDomains": [
+          "pugetmarket.example"
+        ]
+      }
+    },
+    {
+      "id": "party-harbor-hearth",
+      "name": "Harbor and Hearth",
+      "kind": "customer",
+      "tags": [
+        "reliable"
+      ],
+      "notes": [],
+      "contacts": {
+        "emailDomains": [
+          "harborandhearth.example"
+        ]
+      }
+    },
+    {
+      "id": "party-shenzhen-ceramics",
+      "name": "Shenzhen Ceramics Co.",
+      "kind": "supplier",
+      "tags": [
+        "preferred",
+        "reliable"
+      ],
+      "notes": [
+        "Best quality; slow around Lunar New Year"
+      ],
+      "contacts": {
+        "emailDomains": [
+          "szceramics.example"
+        ]
+      }
+    },
+    {
+      "id": "party-ningbo-pack",
+      "name": "Ningbo Pack",
+      "kind": "supplier",
+      "tags": [
+        "avoid"
+      ],
+      "notes": [
+        "Quality issues last year"
+      ],
+      "contacts": {
+        "emailDomains": [
+          "ningbopack.example"
+        ]
+      }
+    }
   ],
   "commitments": [
-    { "id": "inv-INV-1187", "type": "invoice", "partyId": "party-evergreen-home", "amount": 2800000, "currency": "USD",
-      "anchors": { "invoice": "2026-11-10", "due": "2026-12-10" }, "status": "committed", "outstanding": 2800000, "settlement": "open",
-      "sourceRef": { "system": "zoho_books", "record": "INV-1187" } },
-    { "id": "inv-INV-104", "type": "invoice", "partyId": "party-puget-market", "amount": 1200000, "currency": "USD",
-      "anchors": { "invoice": "2026-09-30", "due": "2026-10-30" }, "status": "committed", "outstanding": 1200000, "settlement": "open",
-      "sourceRef": { "system": "zoho_books", "record": "INV-104" } },
-    { "id": "bill-SC-0042", "type": "bill", "partyId": "party-shenzhen-ceramics", "amount": 4200000, "currency": "USD",
-      "anchors": { "invoice": "2026-11-14", "due": "2026-12-14" }, "status": "committed", "outstanding": 4200000, "settlement": "open",
-      "sourceRef": { "system": "zoho_books", "record": "0042" } }
+    {
+      "id": "inv-INV-1187",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "INV-1187",
+      "partyId": "party-evergreen-home",
+      "amount": 2800000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-10",
+        "due": "2026-12-10"
+      },
+      "status": "committed",
+      "outstanding": 2800000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1187"
+      },
+      "evidenceIds": [
+        "ev-zoho-INV-1187"
+      ]
+    },
+    {
+      "id": "inv-INV-104",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "INV-104",
+      "partyId": "party-puget-market",
+      "amount": 1200000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-09-30",
+        "due": "2026-10-30"
+      },
+      "status": "committed",
+      "outstanding": 1200000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-104"
+      },
+      "evidenceIds": []
+    },
+    {
+      "id": "bill-SC-0042",
+      "type": "bill",
+      "direction": "out",
+      "reference": "0042",
+      "partyId": "party-shenzhen-ceramics",
+      "amount": 4200000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-14",
+        "due": "2026-12-14"
+      },
+      "status": "committed",
+      "outstanding": 4200000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "0042"
+      },
+      "evidenceIds": []
+    }
   ],
   "evidence": [
-    { "id": "ev-zoho-INV-1187", "channel": "zoho_books", "format": "api", "receivedAt": "2026-11-10T18:00:00Z", "extraction": "ok",
-      "commitmentId": "inv-INV-1187", "sourceRef": { "system": "zoho_books", "record": "INV-1187" } }
+    {
+      "id": "ev-zoho-INV-1187",
+      "channel": "zoho_books",
+      "format": "api",
+      "receivedAt": "2026-11-10T18:00:00Z",
+      "extraction": "ok",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1187"
+      }
+    }
   ]
 }
