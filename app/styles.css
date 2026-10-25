@@ -378,6 +378,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .reading dd input, .reading dd select {
   width: 100%; border: 1px solid var(--rule); background: var(--surface); border-radius: 6px; padding: 4px 8px; font-weight: 600; font-size: 14px;
 }
+.reading .dir-switch { display: flex; margin-top: 2px; font-size: 12.5px; }
 .reading .impact { margin: 12px 0 0; font-size: 14px; color: var(--ink); }
 .reading .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .note.settled .reading { display: none; }
