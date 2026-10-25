@@ -9,7 +9,7 @@ import type { Profile } from "../schema/profile";
 import { forecast } from "./forecast";
 import { simulate } from "./simulate";
 import { partyLag } from "./lag";
-import { mondayOf } from "./dates";
+import { addDays, dowOf, mondayOf } from "./dates";
 import { resolveEventSource } from "./resolve";
 import { signalEffect } from "./signal_effect";
 
@@ -92,6 +92,18 @@ describe.each(names)("fixture %s", (name) => {
     expect(s.lowPoint.amount).toBeLessThanOrEqual(b.lowPoint.amount);
   });
 
+  it("bank lines before the latest balance snapshot are history only: never forecast, never added to opening cash", () => {
+    const r = run();
+    const snap = records.balances.filter((b) => b.asOf <= meta.asOf).reduce((m, b) => (b.asOf > m ? b.asOf : m), "");
+    const ids = new Set(r.events.map((e) => e.id));
+    for (const e of records.events.filter((x) => x.date < snap)) expect(ids.has(e.id), e.id).toBe(false);
+    const sameCcy = records.balances.every((b) => b.currency === profile.baseCurrency) && records.events.every((e) => e.currency === profile.baseCurrency);
+    if (snap && sameCcy && records.balances.filter((b) => b.asOf === snap).length === records.balances.length) {
+      const since = records.events.filter((e) => e.date >= snap && e.date < meta.asOf).reduce((a, e) => a + (e.direction === "in" ? e.amount : -e.amount), 0);
+      expect(r.openingBalance).toBe(records.balances.reduce((a, b) => a + b.amount, 0) + since);
+    }
+  });
+
   it("source-system commitments have a unique (system, record) source, as the database requires", () => {
     const keyed = records.commitments.filter((c) => ["zoho_books", "bank_csv", "generic_file"].includes(c.sourceRef.system));
     const keys = keyed.map((c) => `${c.sourceRef.system}|${c.sourceRef.record}`);
@@ -132,6 +144,7 @@ describe.each(names)("fixture %s", (name) => {
       if (lp.week) expect(r.lowPoint.week).toBe(lp.week);
       if (lp.date) expect(r.lowPoint.date).toBe(lp.date);
     }
+    if (expected.lowPointMonth) expect(run().lowPoint.date.slice(0, 7), "low point month").toBe(expected.lowPointMonth);
     if (expected.freeCash) {
       const f = run().freeCash.find((x) => x.week === expected.freeCash.week);
       expect(Math.abs((f?.amount ?? 0) - expected.freeCash.amount)).toBeLessThanOrEqual(expected.freeCash.tolerance);
@@ -180,8 +193,19 @@ describe.each(names)("fixture %s", (name) => {
   }
 
   if (expected.noReceivableEvents) {
-    it("has no receivable events, only recurring items and daily sales", () => {
-      expect(records.commitments.every((c) => c.direction === "out")).toBe(true);
+    it("has no receivables: no invoices or sales deals, so no lagged receipts", () => {
+      expect(records.commitments.filter((c) => c.type === "invoice" || c.type === "sales_deal").map((c) => c.id)).toEqual([]);
+      expect(records.commitments.filter((c) => c.direction === "in" && c.type !== "plan").map((c) => c.id)).toEqual([]);
+    });
+  }
+  if (expected.recurringHistory) {
+    it("has bank history for recurring detection: a steady weekly series before the as-of date", () => {
+      const { category, minCount } = expected.recurringHistory as { category: string; minCount: number };
+      expect(profile.recurring.some((x) => x.category === category), `profile has a ${category} recurring item`).toBe(true);
+      const past = records.events.filter((e) => e.category === category && e.direction === "out" && e.status === "actual" && e.date < meta.asOf).map((e) => e.date).sort();
+      expect(past.length).toBeGreaterThanOrEqual(minCount);
+      expect(new Set(past.map(dowOf)).size, "same weekday").toBe(1);
+      past.slice(1).forEach((d, i) => expect(d).toBe(addDays(past[i]!, 7)));
     });
   }
   if (expected.hasDailySales) {

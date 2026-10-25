@@ -126,10 +126,25 @@ function cascadeTrade(): Records {
   return r;
 }
 
-// ---- pike_noodle: Pike Street Noodle Bar (restaurant, daily card sales, no receivables) ----
+// ---- pike_noodle: Pike Street Noodle Bar (restaurant, daily card sales, weekly payroll, no receivables) ----
+// Story (docs/design/10-testing-and-fixtures.md): a busy December with holiday catering, then a slow January where the
+// annual liquor license, the kitchen-line lease buyout and the quarterly estimated tax (profile recurring, Jan 15) land
+// in the same week as payroll. The low point is Friday Jan 15, 2027.
+//
+// Seasonal sales are out of scope for the engine today: the daily-sales model averages the last 28 days of card receipts
+// and shapes them by weekday only, so it cannot know January covers are softer. Rather than fake seasonality, the January
+// dip comes from real January outflows a restaurant has (committed bills), and the December bump from owner-entered
+// catering deposits (plans, likely). Neither needs an engine change.
 function pikeNoodle(): Records {
   const r = empty();
-  r.parties = [party("party-sound-produce", "Sound Produce", "supplier", [], []), party("party-noodle-wholesale", "Noodle Wholesale", "supplier", [], [])];
+  r.parties = [
+    party("party-sound-produce", "Sound Produce", "supplier", [], []),
+    party("party-noodle-wholesale", "Noodle Wholesale", "supplier", [], []),
+    party("party-wslcb", "Washington State Liquor and Cannabis Board", "supplier", [], ["Liquor license renews every January"]),
+    party("party-pacific-leasing", "Pacific Restaurant Leasing", "supplier", [], ["Kitchen line lease ends in January with a buyout payment"]),
+    party("party-catering-guests", "Holiday catering guests", "customer", [], ["Office holiday parties pay a deposit when they book"]),
+  ];
+  // Start-of-day snapshot on asOf: bank lines dated before it are history only (already inside this balance).
   r.balances = [balance("bal-pike", $(22000), "2026-11-16")];
   const weights = [0.6, 0.7, 0.8, 1.0, 1.5, 1.8, 1.4];
   const mean = weights.reduce((a, b) => a + b, 0) / 7;
@@ -140,17 +155,32 @@ function pikeNoodle(): Records {
     const amount = $((2200 * weights[dowOf(date)]!) / mean + noise * 10);
     events.push({ id: `bank-sales-${date}`, legIndex: 0, date, amount, currency: "USD", amountBase: amount, direction: "in", status: "actual", confidence: 1, basis: "card settlement", category: "sales", sourceRef: src("bank_csv", `sales-${date}`) });
   }
+  // Six Friday payroll runs before the snapshot: material for recurring detection (weekly, Friday, about $7,500, matching
+  // the profile's rec-payroll). Dated before 2026-11-16, so they are history, never forecast or added to opening cash.
+  const payroll = [7380, 7520, 7465, 7610, 7500, 7445];
+  payroll.forEach((amt, i) => {
+    const date = addDays("2026-10-09", i * 7);
+    events.push({ id: `bank-payroll-${date}`, legIndex: 0, date, amount: $(amt), currency: "USD", amountBase: $(amt), direction: "out", status: "actual", confidence: 1, basis: "payroll run", category: "payroll", sourceRef: src("bank_csv", `payroll-${date}`) });
+  });
   r.events = events;
-  // Weekly food and noodle bills on Thursdays through the horizon, net-7 from the invoice date.
-  const bills: [string, string, string, number][] = [];
+  // Weekly produce bills on Thursdays through the horizon, plus noodles every other week, net-7 from the invoice date.
+  const bills: [string, string, string, number, string?][] = [];
   for (let i = 0; i < 13; i++) {
     const due = addDays("2026-11-19", i * 7);
-    const noodle = i % 3 === 1;
-    bills.push([`${noodle ? "NW" : "FP"}-${4400 + i}`, noodle ? "party-noodle-wholesale" : "party-sound-produce", due, noodle ? 2600 : 3800 + (i % 4) * 100]);
+    bills.push([`FP-${4400 + i}`, "party-sound-produce", due, 3800 + (i % 4) * 100]);
+    if (i % 2 === 0) bills.push([`NW-${4400 + i}`, "party-noodle-wholesale", due, 1500]);
   }
-  r.commitments = bills.map(([ref, partyId, due, amt]) => ({
-    id: `bill-${ref}`, type: "bill", direction: "out", reference: ref, partyId, amount: $(amt), currency: "USD", anchors: { invoice: addDays(due, -7), due }, status: "committed", outstanding: $(amt), settlement: "open", sourceRef: src("zoho_books", ref),
+  // January: annual liquor license renewal and the kitchen-line lease buyout (final balloon payment).
+  bills.push(["WSLCB-2027", "party-wslcb", "2027-01-11", 2500, "license"]);
+  bills.push(["PRL-LEASE-88-BUYOUT", "party-pacific-leasing", "2027-01-14", 18000, "equipment lease"]);
+  r.commitments = bills.map(([ref, partyId, due, amt, category]) => ({
+    id: `bill-${ref}`, type: "bill", direction: "out", reference: ref, partyId, ...(category ? { category } : {}), amount: $(amt), currency: "USD", anchors: { invoice: addDays(due, -7), due }, status: "committed", outstanding: $(amt), settlement: "open", sourceRef: src("zoho_books", ref),
   }));
+  // December: holiday-party catering deposits the owner expects (owner plans, likely; not invoices, so no lag).
+  const catering: [string, number][] = [["2026-12-04", 2000], ["2026-12-11", 3500], ["2026-12-18", 2500]];
+  for (const [due, amt] of catering) {
+    r.commitments.push({ id: `plan-catering-${due}`, type: "plan", direction: "in", category: "catering", partyId: "party-catering-guests", amount: $(amt), currency: "USD", anchors: { due }, status: "likely", sourceRef: src("owner", `catering-${due}`) });
+  }
   return r;
 }
 
