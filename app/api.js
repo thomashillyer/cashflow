@@ -155,9 +155,18 @@ const preview = {
 };
 
 // ---- live implementation (team API) ------------------------------------------------
+// The sample the owner picked (welcome screen or switcher). Sent as X-Neri-Business so the server shows
+// that sample instead of its default. A signed-in owner's own business comes from their session, so a
+// non-sample account sends no header.
+let openedBiz = null;
+function businessHeader() {
+  const acc = readAccount() ?? memAccount;
+  return openedBiz && (!acc || acc.sample) ? { "X-Neri-Business": openedBiz } : {};
+}
+
 async function http(path, init) {
   const token = await auth.accessToken().catch(() => null);
-  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...businessHeader() };
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (res.status === 401) {
     await auth.signOut().catch(() => {});
@@ -165,7 +174,14 @@ async function http(path, init) {
     location.hash = "#/welcome";
     throw new Error("Your session ended. Sign in again with a new code.");
   }
-  if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} failed (${res.status})`);
+  if (!res.ok) {
+    // The API words its errors for the owner: { error: { code, message, fieldIssues, retryable } }.
+    const body = await res.json().catch(() => null);
+    const e = body?.error;
+    const err = new Error(e?.message || `Neri couldn't reach the server (${res.status}). Try again in a moment.`);
+    Object.assign(err, { status: res.status, code: e?.code, fieldIssues: e?.fieldIssues, retryable: e?.retryable, path });
+    throw err;
+  }
   return res.status === 204 ? null : res.json();
 }
 
@@ -199,10 +215,13 @@ const live = {
     await auth.signOut({ everywhere }).catch(() => {});
     writeAccount(null);
   },
-  async open() {},
-  // Needs one small addition to the API table: business name, sources with freshness, parties, rules.
+  async open(id) {
+    openedBiz = id ?? null;
+  },
+  // partyByCommitment (commitment id -> party id) becomes the same partyOf() the preview context offers.
   async context() {
-    return http("/context");
+    const c = await http("/context");
+    return { ...c, partyOf: (cid) => c.partyByCommitment?.[cid] };
   },
   // Expected: { three: WorkItem[], rest: WorkItem[], watch: WorkItem[], combined?, shortfall?, run: ForecastRun }
   async brief() {
