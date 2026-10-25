@@ -1,16 +1,16 @@
-name: App deploy (Cloudflare Pages)
+name: App deploy (Cloudflare)
 
-# Publishes app/ (static, no build) to the neri-cash Cloudflare Pages project.
-# main -> production (neri-cash.pages.dev); same-repo PRs -> a preview URL per branch.
+# Publishes app/ (static, no build) as the neri-cash Cloudflare Worker (static assets; config in wrangler.jsonc).
+# main -> production (neri-cash.trkhillyer.workers.dev); same-repo PRs -> a preview URL per branch.
 # Skips cleanly until CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are set as repo secrets.
 # The hosted site is public: it runs the fictional sample businesses only (config.js must stay empty).
 
 on:
   push:
     branches: [main]
-    paths: ["app/**", ".github/workflows/app-deploy.yml"]
+    paths: ["app/**", "wrangler.jsonc", ".github/workflows/app-deploy.yml"]
   pull_request:
-    paths: ["app/**", ".github/workflows/app-deploy.yml"]
+    paths: ["app/**", "wrangler.jsonc", ".github/workflows/app-deploy.yml"]
   workflow_dispatch:
 
 permissions:
@@ -42,10 +42,25 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to Cloudflare Pages
-        if: env.HAS_TOKEN == 'true'
+      - name: Preview alias from branch name
+        id: alias
+        if: env.HAS_TOKEN == 'true' && github.event_name == 'pull_request'
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: echo "alias=$(echo "$BRANCH" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g' | cut -c1-40 | sed -E 's/-+$//')" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy production
+        if: env.HAS_TOKEN == 'true' && github.event_name != 'pull_request'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy app --project-name=neri-cash --branch=${{ github.head_ref || github.ref_name }} --commit-dirty=true
+          command: deploy
+
+      - name: Upload PR preview
+        if: env.HAS_TOKEN == 'true' && github.event_name == 'pull_request'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: versions upload --preview-alias ${{ steps.alias.outputs.alias }}
