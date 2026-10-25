@@ -147,7 +147,8 @@ describe("routes return what app/api.js expects", () => {
 
     expect((await app.inject({ method: "POST", url: `/work-items/${item.id}/approve`, headers: OTHER })).json()).toEqual({ id: item.id, state: "done" });
     const after = (await app.inject({ method: "GET", url: "/brief", headers: OTHER })).json();
-    expect(after.three.map((i: { id: string }) => i.id)).not.toContain(item.id);
+    // Done stays on today's list, ticked off (docs/DEMO_SCRIPT.md: "The action shows Done").
+    expect(after.three.find((i: { id: string }) => i.id === item.id)?.state).toBe("done");
   });
 
   it("GET /records/:id", async () => {
