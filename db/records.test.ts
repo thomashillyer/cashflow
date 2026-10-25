@@ -107,7 +107,9 @@ describe("work items", () => {
     expect(upserted[0]).toMatchObject({ inputs_hash: "hash-1" });
     expect(calls).toContainEqual(["eq", ["state", "open"]]);
     expect(calls).toContainEqual(["not", ["id", "in", '("wi-x-chase-inv-\\"1\\"")']]);
-    expect(calls).toContainEqual(["update", [{ inputs_hash: "hash-1" }]]);
+    const stamp = calls.findIndex(([m, a]) => m === "update" && JSON.stringify(a) === '[{"inputs_hash":"hash-1"}]');
+    expect(stamp).toBeGreaterThan(-1);
+    expect(calls[stamp + 1]).toEqual(["eq", ["business_id", "cascade_trade"]]);
   });
 
   it("loadWorkItems returns the run hash only when every row agrees", async () => {
