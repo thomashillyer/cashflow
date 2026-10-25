@@ -18,6 +18,7 @@ import { intentCacheKey } from "../ai/ask/intent";
 import { ASK_CACHE_DIR, INTENT_CACHE_DIR } from "../ai/cache";
 import type { Profile } from "../schema/profile";
 import type { Records } from "../schema/records";
+import { anthropicOptions } from "../ai/config";
 
 if (!process.env.ANTHROPIC_API_KEY) {
   console.error("ANTHROPIC_API_KEY is not set.");
@@ -32,7 +33,7 @@ const evalSet = JSON.parse(readFileSync(join(dir, "ask/eval.json"), "utf8")) as 
 
 const wanted = process.argv.slice(2);
 const questions = wanted.length ? wanted : [...new Set([...evalSet.map((e) => e.question), ...ASK_HINTS])];
-const client = new Anthropic();
+const client = new Anthropic(anthropicOptions());
 const scratch = mkdtempSync(join(tmpdir(), "neri-ask-"));
 const intentDir = join(scratch, "intent");
 const voiceDir = join(scratch, "voice");

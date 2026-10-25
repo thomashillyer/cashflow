@@ -7,7 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_CACHE_DIR, writeCache } from "../ai/cache";
 import { callModel, extractionCacheKey } from "../ai/extract/document";
-import { EXTRACTION_MODEL, PROMPT_VERSION } from "../ai/config";
+import { EXTRACTION_MODEL, PROMPT_VERSION, anthropicOptions } from "../ai/config";
 import { CASCADE_BUSINESS, FIXTURE_NAMES, loadFixtureSegments } from "./cache-fixtures";
 
 if (!process.env.ANTHROPIC_API_KEY) {
@@ -17,7 +17,7 @@ if (!process.env.ANTHROPIC_API_KEY) {
 
 const wanted = process.argv.slice(2);
 const names = wanted.length ? wanted : [...FIXTURE_NAMES];
-const client = new Anthropic();
+const client = new Anthropic(anthropicOptions());
 let failed = 0;
 
 for (const name of names) {

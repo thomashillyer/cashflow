@@ -18,7 +18,7 @@ import { z } from "zod/v4";
 import type { Direction } from "../../schema/records";
 import type { CandidateFields, DocumentKind, Field, IntakeCandidate } from "../../schema/intake";
 import { cacheKey, DEFAULT_CACHE_DIR, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
-import { EXTRACTION_MODEL, PROMPT_VERSION } from "../config";
+import { EXTRACTION_MODEL, PROMPT_VERSION, anthropicOptions } from "../config";
 import {
   fieldFrom, locateQuote, missing, parseAmount, parseDate, validateCandidate, type SourceSegment,
 } from "../normalize";
@@ -102,7 +102,7 @@ export async function callModel(
   client: Anthropic | undefined, segments: SourceSegment[], business: BusinessIdentity, model: string,
 ): Promise<{ output: ExtractionOutput } | { problem: string }> {
   try {
-    client ??= new Anthropic(); // configured from ANTHROPIC_API_KEY
+    client ??= new Anthropic(anthropicOptions()); // configured from ANTHROPIC_API_KEY
     // messages.create with a structured-output format rather than messages.parse: parse() throws on
     // a refusal or a cut-off answer before stop_reason can be read, and we want to say which it was.
     const res = await client.messages.create(
