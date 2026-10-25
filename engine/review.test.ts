@@ -67,6 +67,11 @@ const cases: Case[] = [
     run: () => forecast({ ...withBal(), events: [{ id: "bank-eur", date: "2026-10-27", amount: $(5), currency: "EUR", direction: "out", basis: "bank", sourceRef: src } as CashEvent] }, profile, base, asOf, {}),
     refs: ["bank-eur"],
   },
+  {
+    code: "missing_fx",
+    run: () => forecast({ ...withBal(), events: [sale("2026-10-23"), { ...sale("2026-10-24"), currency: "EUR" }] }, daily, base, asOf, {}),
+    refs: ["s-2026-10-24"],
+  },
   { code: "overdue_receipt", run: () => forecast({ ...withBal(), commitments: [com("old", { type: "invoice", amount: $(500), anchors: { due: "2026-10-01" } })] }, profile, base, asOf, {}), refs: ["evt-old-0", "old"] },
   { code: "overdue_payment", run: () => forecast({ ...withBal(), commitments: [com("bill-old", { type: "bill", amount: $(500), anchors: { due: "2026-10-20" } })] }, profile, base, asOf, {}), refs: ["evt-bill-old-0", "bill-old"] },
   {
