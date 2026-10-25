@@ -1,6 +1,24 @@
+# Credentials and local configuration
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+
+# Local business data and parser scratch files
+private-data/
 data/private/
-node_modules/
+uploads/
+.local/
+*.log
+
+# Local planning review artifacts
+docs/reviews/
+
+# Tooling and generated output
 .DS_Store
+node_modules/
+.venv/
+__pycache__/
+dist/
+build/
