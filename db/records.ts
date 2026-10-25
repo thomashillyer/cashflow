@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
-  BalanceSnapshot, CashEvent, Commitment, Evidence, Party, Records, Rule, Settlement, Signal,
+  BalanceSnapshot, CashEvent, Commitment, Evidence, Party, Records, Rule, Settlement, Signal, WorkItem,
 } from "../schema/records";
 import type { ChangeProposal, ConfirmationResult, IntakeCandidate } from "../schema/intake";
 import { TABLES, fromRow, toRow, type Row } from "./rows";
@@ -99,6 +99,33 @@ export const upsertIntakeCandidates = (db: SupabaseClient, b: string, r: IntakeC
   upsert(db, "intake_candidates", b, r);
 export const upsertChangeProposals = (db: SupabaseClient, b: string, r: ChangeProposal[]) =>
   upsert(db, "change_proposals", b, r);
+
+// Work items (engine/rank.ts output), best first. Pass their id/state back to buildBrief as
+// `prior` so done and dismissed items stay that way across reruns.
+export async function loadWorkItems(db: SupabaseClient, businessId: string): Promise<WorkItem[]> {
+  const { data, error } = await db.from("work_items").select("*").eq("business_id", businessId)
+    .order("score", { ascending: false }).order("id");
+  if (error) throw toStoreError(`load work items ${businessId}`, error);
+  return (data as Row[]).map((r) => fromRow<WorkItem>(r, "work_items"));
+}
+
+// Service-role only: save a fresh ranking. Open items the new ranking no longer produces are
+// removed; done and dismissed items are kept, so a later rerun still knows their state.
+export async function saveWorkItems(db: SupabaseClient, businessId: string, items: WorkItem[]): Promise<void> {
+  await upsert(db, "work_items", businessId, items);
+  let stale = db.from("work_items").delete().eq("business_id", businessId).eq("state", "open");
+  if (items.length) stale = stale.not("id", "in", `(${items.map((i) => `"${i.id}"`).join(",")})`);
+  const { error } = await stale;
+  if (error) throw toStoreError(`prune work items ${businessId}`, error);
+}
+
+// Owner ticks an item off, or dismisses it. Changes work-item state only; never sends or pays.
+export async function setWorkItemState(
+  db: SupabaseClient, businessId: string, id: string, state: WorkItem["state"],
+): Promise<void> {
+  const { error } = await db.from("work_items").update({ state }).eq("business_id", businessId).eq("id", id);
+  if (error) throw toStoreError(`set work item ${id}`, error);
+}
 
 // Atomic confirm through the confirm_change_proposal RPC (one transaction). Throws StoreError
 // with code STALE_REVIEW / IDEMPOTENCY_CONFLICT / PROPOSAL_NOT_PENDING / PROPOSAL_UNRESOLVED (409),

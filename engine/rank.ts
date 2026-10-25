@@ -9,7 +9,8 @@
 import type { Candidate, ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
 import type { Commitment, Lever, Records, WorkItem } from "../schema/records";
-import { daysBetween, pendingEventsByCommitment, receivableShares, sumBase } from "./warnings";
+import { diffDays } from "./dates";
+import { pendingEventsByCommitment, receivableShares, sumBase } from "./warnings";
 
 // The orchestrator binds the engine's simulate(records, profile, baseOverrides, levers, asOf, fxRates)
 // to the base run, so ranking stays pure and testable.
@@ -48,19 +49,19 @@ function describe(
 ): { title: string; why: string } {
   const partyOf = (id?: string) => records.parties.find((p) => p.id === id)?.name ?? "this party";
   const ref = commitment?.reference ?? commitment?.id ?? "";
-  const party = partyOf(commitment?.partyId);
+  const named = records.parties.find((p) => p.id === commitment?.partyId)?.name;
   const lever = c.lever;
 
   switch (lever?.kind) {
     case "chase":
-      return { title: `Chase ${party} about ${ref}`,
+      return { title: named ? `Chase ${named} about ${ref}` : `Chase payment of ${ref}`,
         why: `Collecting it by ${lever.assumeDate} raises your low point by ${money(value)}.` };
     case "defer":
-      return { title: `Ask ${party} to move ${ref} by ${lever.days} days`,
-        why: `If they agree, your low point rises by ${money(value)}.` };
+      return { title: named ? `Ask ${named} to move ${ref} by ${lever.days} days` : `Move ${ref} by ${lever.days} days`,
+        why: `If ${named ? "they agree" : "it can wait"}, your low point rises by ${money(value)}.` };
     case "pay_early":
       return { title: `Pay ${ref} early to keep the discount`,
-        why: `Paying ${party} by ${c.neededBy} saves ${money(value)}.` };
+        why: `Paying by ${c.neededBy} saves ${money(value)}.` };
     case "split":
     case "ask_advance":
       return { title: `Change the terms on ${ref}`, why: `Your low point rises by ${money(value)}.` };
@@ -115,7 +116,7 @@ export function rank(
 
     const confidence = events.length ? Math.min(...events.map((e) => e.confidence)) : 1;
     const rel = c.lever ? relationship(commitment?.partyId, records, profile) : 1;
-    const d = Math.max(0, daysBetween(run.asOf, c.neededBy));
+    const d = Math.max(0, diffDays(c.neededBy, run.asOf));
     const score = Math.round((value / (1 + d / 7)) * confidence * rel);
 
     const id = workItemId(c);
