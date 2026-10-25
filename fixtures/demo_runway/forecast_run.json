@@ -842,7 +842,7 @@
       "amountBase": 1200000,
       "direction": "in",
       "status": "committed",
-      "confidence": 0.285,
+      "confidence": 0.095,
       "basis": "due 2026-10-30 + 0 days (profile default; no payment history)",
       "sourceRef": {
         "system": "zoho_books",

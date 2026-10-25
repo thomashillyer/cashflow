@@ -27,8 +27,8 @@ Follow the [technical plan](../docs/TECHNICAL_PLAN.md) and the current [five-per
 - [ ] Calculate each closing balance as previous cash plus inflows minus outflows.
 - [ ] Exclude settled movements already reflected in opening cash; reduce obligations for partial settlements.
 - [ ] Preserve contractual due dates separately from expected receipt dates and confirmed owner overrides.
-- [ ] Use confirmed promised dates first; otherwise infer median customer delay only with at least three settled samples, showing sample count.
-- [ ] Fall back to stated terms with a visible assumption when settlement history is insufficient.
+- [x] Use confirmed promised dates first; otherwise use the customer's payment history from the first settled payment: median days late over the last 12, shrunk toward `profile.defaultLagDays` with weight `k` (design doc 05), showing sample count and a confidence that falls with little or spread-out history.
+- [x] With no history at all, use the profile default lag with a visible assumption in `basis`.
 - [ ] Schedule supplier outflows by agreed dates; do not infer permission to pay late from historical behavior.
 - [ ] Expand editable recurring obligations and receipt patterns with explicit start/end dates and calendar-day behavior.
 - [ ] Retain unresolved overdue items as warnings/review requirements rather than silently moving them to today.

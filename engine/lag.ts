@@ -70,7 +70,7 @@ export function partyLag(records: Records, profile: Profile, partyId?: string): 
   const n = samples.length;
   if (n === 0) {
     const days = Math.round(profile.defaultLagDays);
-    return { days, confidence: 0.3, n, basis: `+ ${days} days (profile default; no payment history)` };
+    return { days, confidence: 0.1, n, basis: `+ ${days} days (profile default; no payment history)` };
   }
   const med = median(samples);
   const sorted = [...samples].sort((a, b) => a - b);
