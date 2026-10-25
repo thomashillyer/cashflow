@@ -641,6 +641,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
           mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
 }
 .dock-hints::-webkit-scrollbar { display: none; }
+@media (min-width: 761px) { .dock-hints { flex-wrap: wrap; overflow: visible; -webkit-mask-image: none; mask-image: none; } }
 .dock-hints .hint {
   flex-shrink: 0; white-space: nowrap; font-size: 13.5px; padding: 6px 13px; color: var(--ink);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface));
