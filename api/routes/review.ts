@@ -11,6 +11,7 @@ import { ApplyError, applyProposal, type ApplyErrorCode } from "../../ai/reconci
 import { propose } from "../../ai/reconcile/match";
 import { fmtDate } from "../../ai/brief";
 import { fmtMoney } from "../../ai/money";
+import { enrichEvidence, prepareFileImport, type PreparedImport } from "../../adapters/prepare";
 import type { Deps } from "../app";
 import { businessIdentity, loadForRun, runInputs, savedScenario } from "../engine";
 import { businessOf, HttpError, isIsoDate } from "../http";
@@ -100,7 +101,11 @@ function validOwnerEdits(body: unknown, target: Commitment): CommitmentFieldChan
   });
 }
 
-function toInput(adapter: string, body: Record<string, unknown>, now: string): IntakeInput {
+type Prepared = { input: IntakeInput; prepared?: Extract<PreparedImport, { ok: true; repeat: false }> } | { repeat: Extract<PreparedImport, { repeat: true }> };
+
+// Request body -> IntakeInput. Spreadsheets and WhatsApp exports are read by the adapters lane
+// (adapters/prepare.ts); the rest is passed through as before.
+async function toInput(adapter: string, body: Record<string, unknown>, now: string, records: Records, business: { name: string }, currency: string | undefined): Promise<Prepared> {
   const text = typeof body.text === "string" ? body.text : undefined;
   const fileName = typeof body.fileName === "string" ? body.fileName.slice(0, 200) : undefined;
   const bytes = () => {
@@ -114,20 +119,50 @@ function toInput(adapter: string, body: Record<string, unknown>, now: string): I
   let kind = adapter;
   if (adapter === "upload") {
     const ext = (fileName ?? "").toLowerCase().split(".").pop();
-    kind = ext === "pdf" ? "pdf" : ext === "eml" ? "email" : ext === "txt" || ext === undefined ? "paste" : `.${ext}`;
+    kind = ext === "pdf" ? "pdf" : ext === "eml" ? "email" : ext === "csv" || ext === "xlsx" ? "sheet" : ext === "zip" ? "whatsapp" : ext === "txt" || ext === undefined ? "paste" : `.${ext}`;
   }
+  const sheetOptions = () => ({
+    currency: typeof body.currency === "string" && /^[A-Za-z]{3}$/.test(body.currency) ? body.currency.toUpperCase() : currency,
+    ...(typeof body.dayFirst === "boolean" ? { dayFirst: body.dayFirst } : {}),
+    ...(isColumnMapping(body.columnMapping) ? { columnMapping: body.columnMapping } : {}),
+    ...(typeof body.headerRow === "number" && Number.isInteger(body.headerRow) && body.headerRow >= 1 ? { headerRow: body.headerRow } : {}),
+  });
+  const fromFile = async (k: "sheet" | "whatsapp", name: string, data: Uint8Array): Promise<Prepared> => {
+    const opts = sheetOptions();
+    const retry = ["columnMapping", "headerRow", "dayFirst", "currency"].some((f) => body[f] !== undefined);
+    const p = await prepareFileImport({
+      kind: k, fileName: name, bytes: data, receivedAt: now, records, business, retry,
+      ...(opts.currency ? { currency: opts.currency } : {}), ...(opts.dayFirst !== undefined ? { dayFirst: opts.dayFirst } : {}),
+      ...(opts.columnMapping ? { columnMapping: opts.columnMapping } : {}), ...(opts.headerRow ? { headerRow: opts.headerRow } : {}),
+    });
+    if (!p.ok) throw new HttpError(422, "UNREADABLE", `${p.message} ${p.nextStep}`);
+    return p.repeat ? { repeat: p } : { input: p.input, prepared: p };
+  };
   switch (kind) {
-    case "pdf": return { kind: "pdf", bytes: bytes(), ...(fileName ? { fileName } : {}) };
-    case "email": return { kind: "email", raw: raw() };
-    case "whatsapp": return { kind: "whatsapp", raw: raw() };
+    case "pdf": return { input: { kind: "pdf", bytes: bytes(), ...(fileName ? { fileName } : {}) } };
+    case "email": return { input: { kind: "email", raw: raw() } };
+    case "sheet": {
+      // A pasted table (text) is read as CSV.
+      const data = text !== undefined ? new TextEncoder().encode(text) : bytes();
+      return fromFile("sheet", fileName ?? "pasted.csv", data);
+    }
+    case "whatsapp":
+      if (typeof body.base64 === "string" || (text === undefined && /\.(zip|txt)$/i.test(fileName ?? ""))) return fromFile("whatsapp", fileName ?? "chat.txt", bytes());
+      return { input: { kind: "whatsapp", raw: raw() } };
     case "paste": {
       const t = raw();
       if (!t.trim()) throw new HttpError(400, "INVALID_ARGUMENT", "Paste the message text first.", { fieldIssues: [{ field: "text", issue: "empty" }] });
-      return { kind: "paste", text: t, receivedAt: typeof body.receivedAt === "string" && !Number.isNaN(Date.parse(body.receivedAt)) ? body.receivedAt : now };
+      return { input: { kind: "paste", text: t, receivedAt: typeof body.receivedAt === "string" && !Number.isNaN(Date.parse(body.receivedAt)) ? body.receivedAt : now } };
     }
     default:
-      throw new HttpError(415, "UNSUPPORTED", "Neri reads PDFs, emails (.eml), WhatsApp exports and pasted text here. For a spreadsheet, export it as PDF or paste the rows.");
+      throw new HttpError(415, "UNSUPPORTED", "Neri reads CSV and Excel (.xlsx) spreadsheets, PDFs, emails (.eml), WhatsApp exports and pasted text here. Export your file as one of those, or paste the details.");
   }
+}
+
+const COLUMN_KEYS = ["reference", "party", "amount", "currency", "issueDate", "dueDate", "outstanding"];
+function isColumnMapping(v: unknown): v is Record<string, number> {
+  return typeof v === "object" && v !== null && !Array.isArray(v) &&
+    Object.entries(v).every(([k, n]) => COLUMN_KEYS.includes(k) && typeof n === "number" && Number.isInteger(n) && n >= 0 && n < 50);
 }
 
 export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
@@ -138,18 +173,30 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     // On the public demo the samples are shared: an upload would publish the file to every visitor, signed in or not.
     if (b.isSynthetic && deps.demoMode) throw new HttpError(403, "FORBIDDEN", "The sample already has its documents. Set up your business to upload your own files.");
     const { adapter } = req.params as { adapter: string };
-    const input = toInput(adapter, (req.body ?? {}) as Record<string, unknown>, nowIso());
     const { records, storeRevision } = await deps.store.load(b.id);
-    const result = await ingest(input, {
+    const prep = await toInput(adapter, (req.body ?? {}) as Record<string, unknown>, nowIso(), records, businessIdentity(b), b.profile.baseCurrency);
+    if ("repeat" in prep) {
+      // Same bytes as a file already imported: nothing to ingest, so nothing can change.
+      return {
+        evidence: [], candidates: [], proposals: [], signals: [], notes: [], storeRevision, repeat: true,
+        repeatOf: prep.repeat.evidenceId, diagnostics: prep.repeat.diagnostics, preview: { candidates: 0, proposals: {}, signals: 0 },
+      };
+    }
+    const input = prep.input;
+    const ingested = await ingest(input, {
       records, storeRevision, business: businessIdentity(b), mode: deps.aiMode, now: nowIso(),
       ...(b.profile.account?.timezone ? { timeZone: b.profile.account.timezone } : {}),
     });
+    const result = { ...ingested, evidence: enrichEvidence(ingested.evidence, prep.prepared?.fileEvidence) };
     // Same input gives the same ids: never reopen a decided proposal, never reset a decided signal.
     const existing = new Map((await deps.store.listProposals(b.id)).map((p) => [p.id, p]));
     const proposals = result.proposals.filter((p) => existing.get(p.id)?.state !== "confirmed" && existing.get(p.id)?.state !== "dismissed");
     const known = new Set(records.signals.map((s) => s.id));
     const signals = result.signals.filter((s) => !known.has(s.id));
-    await deps.store.saveIntake(b.id, { evidence: result.evidence, candidates: result.candidates, proposals, signals });
+    // Evidence last: it carries the file hash that makes a later upload a repeat, so a failure partway
+    // through must leave the file importable again.
+    await deps.store.saveIntake(b.id, { evidence: [], candidates: result.candidates, proposals, signals });
+    await deps.store.saveIntake(b.id, { evidence: result.evidence, candidates: [], proposals: [], signals: [] });
     if (result.notes.length) {
       const acc = b.profile.account ?? {};
       const seen = new Set((acc.intakeNotes ?? []).map((n) => `${n.scope}\u0000${n.text}`));
@@ -158,7 +205,10 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     }
     const byAction: Record<string, number> = {};
     for (const p of result.proposals) byAction[p.action] = (byAction[p.action] ?? 0) + 1;
-    return { ...result, storeRevision, preview: { candidates: result.candidates.length, proposals: byAction, signals: result.signals.length } };
+    return {
+      ...result, storeRevision, ...(prep.prepared ? { diagnostics: prep.prepared.diagnostics } : {}),
+      preview: { candidates: result.candidates.length, proposals: byAction, signals: result.signals.length },
+    };
   });
 
   // The app's Review list: proposed signals with the words, the invoice, and the priced effect.

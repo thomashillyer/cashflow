@@ -8,6 +8,7 @@ import JSZip from "jszip";
 import type { Attachment, IntakeInput } from "../../ai/intake";
 import { summarize, type ImportDiagnostics, type RowError } from "../core/diagnostics";
 import { sha256Hex } from "../core/hash";
+import { readCapped } from "../core/zip";
 import { childEvidenceId, fileEvidenceId } from "../core/ids";
 import { readCsv, decodeText } from "../generic_file/csv";
 import { readXlsx } from "../generic_file/xlsx";
@@ -77,10 +78,11 @@ export async function importWhatsAppExport(input: WhatsAppExportInput): Promise<
       const declared = (e: JSZip.JSZipObject) => (e as unknown as { _data?: { uncompressedSize?: number } })._data?.uncompressedSize;
       const chat = entries.find((e) => /(^|\/)_chat\.txt$/i.test(e.name)) ?? entries.find((e) => /\.txt$/i.test(e.name));
       if (!chat) return fail("No chat text was found in this zip.", "Export the chat again from WhatsApp, or paste the messages.", now, evidenceId);
+      // Declared sizes are only a hint (the header can lie); every read below is capped on real bytes.
       const chatSize = declared(chat);
-      if (chatSize === undefined || chatSize > MAX_CHAT_BYTES) return fail("This chat is too large to read in one go.", "Export a shorter period, or paste the messages that matter.", now, evidenceId);
-      const chatBytes = await chat.async("uint8array");
-      if (chatBytes.length > MAX_CHAT_BYTES) return fail("This chat is too large to read in one go.", "Export a shorter period, or paste the messages that matter.", now, evidenceId);
+      if (chatSize !== undefined && chatSize > MAX_CHAT_BYTES) return fail("This chat is too large to read in one go.", "Export a shorter period, or paste the messages that matter.", now, evidenceId);
+      const chatBytes = await readCapped(chat, MAX_CHAT_BYTES);
+      if (!chatBytes) return fail("This chat is too large to read in one go.", "Export a shorter period, or paste the messages that matter.", now, evidenceId);
       chatText = decodeText(chatBytes);
       // Only files the chat names are opened, within one total budget.
       let budget = MAX_TOTAL_BYTES - chatBytes.length;
@@ -88,13 +90,11 @@ export async function importWhatsAppExport(input: WhatsAppExportInput): Promise<
         if (!SUPPORTED.test(name)) continue;
         const e = entries.find((x) => base(x.name) === name);
         if (!e) continue;
-        const size = declared(e);
-        if (size === undefined || size > MAX_ENTRY_BYTES || size > budget) {
+        const bytes = await readCapped(e, Math.min(MAX_ENTRY_BYTES, budget));
+        if (!bytes) {
           errors.push({ row: 1, code: "unsupported", message: `"${name}" is too large to read.`, nextStep: "Upload that file on the import screen." });
           continue;
         }
-        const bytes = await e.async("uint8array");
-        if (bytes.length > MAX_ENTRY_BYTES || bytes.length > budget) { errors.push({ row: 1, code: "unsupported", message: `"${name}" is too large to read.`, nextStep: "Upload that file on the import screen." }); continue; }
         budget -= bytes.length;
         files.set(name, bytes);
       }
