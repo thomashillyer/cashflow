@@ -1,0 +1,76 @@
+{
+  "key": "fa9b90501c3bfc33feb2999c90dbc6a70e8fd570aee3a34eb62dd14049ce3d6f",
+  "promptVersion": "extract_document@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in for inv1187-cad.pdf; replace with a live run (scripts/refresh-extraction-cache.ts)",
+  "output": {
+    "fields": {
+      "sellerName": {
+        "value": "CASCADE TRADE CO.",
+        "quote": "CASCADE TRADE CO."
+      },
+      "buyerName": {
+        "value": "Evergreen Home LLC",
+        "quote": "Bill to: Evergreen Home LLC"
+      },
+      "reference": {
+        "value": "INV-1187",
+        "quote": "INVOICE INV-1187"
+      },
+      "poReference": {
+        "value": null,
+        "quote": null
+      },
+      "amount": {
+        "value": "28,000.00",
+        "quote": "TOTAL DUE (CAD) 28,000.00"
+      },
+      "outstanding": {
+        "value": null,
+        "quote": null
+      },
+      "currency": {
+        "value": "CAD",
+        "quote": "TOTAL DUE (CAD)"
+      },
+      "issueDate": {
+        "value": "November 10, 2026",
+        "quote": "Invoice date: November 10, 2026"
+      },
+      "dueDate": {
+        "value": "December 10, 2026",
+        "quote": "Due date: December 10, 2026"
+      },
+      "terms": {
+        "value": "Net 30",
+        "quote": "Terms: Net 30"
+      },
+      "invoiceUrl": {
+        "value": "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187",
+        "quote": "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187"
+      },
+      "paymentUrl": {
+        "value": null,
+        "quote": null
+      },
+      "statedStatus": {
+        "value": null,
+        "quote": null
+      },
+      "paidAmount": {
+        "value": null,
+        "quote": null
+      },
+      "paidDate": {
+        "value": null,
+        "quote": null
+      }
+    },
+    "coversReferences": [],
+    "containsInstructions": false,
+    "notes": [],
+    "kind": "invoice",
+    "businessRole": "seller",
+    "confidence": 0.97
+  }
+}

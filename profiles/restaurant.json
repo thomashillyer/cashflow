@@ -1,0 +1,36 @@
+{
+  "id": "restaurant",
+  "displayName": "Restaurant and retail",
+  "baseCurrency": "USD",
+  "horizonWeeks": 13,
+  "freeCashLookaheadWeeks": 6,
+  "defaultLagDays": 0,
+  "lagShrinkageK": 3,
+  "safetyLine": { "kind": "weeksOfFixedCosts", "weeks": 2 },
+  "paymentPatterns": [
+    {
+      "id": "food_supplier_net7",
+      "appliesTo": "bill",
+      "isDefault": true,
+      "legs": [{ "share": 1, "anchor": "due", "offsetDays": 0, "direction": "out" }]
+    }
+  ],
+  "revenueModel": { "kind": "dailySales", "weekdayWeights": [0.6, 0.7, 0.8, 1.0, 1.5, 1.8, 1.4] },
+  "recurring": [
+    { "id": "rec-payroll", "name": "Payroll", "amount": 750000, "cadence": "weekly", "anchor": "2026-11-20", "category": "payroll", "nonDeferrable": true },
+    { "id": "rec-rent", "name": "Rent", "amount": 550000, "cadence": "monthly", "anchor": "2026-12-01", "category": "rent" },
+    { "id": "rec-sales-tax", "name": "Sales tax", "amount": 240000, "cadence": "monthly", "anchor": "2026-11-20", "category": "tax", "nonDeferrable": true },
+    { "id": "rec-est-tax", "name": "Quarterly estimated taxes", "amount": 400000, "cadence": "quarterly", "anchor": "2027-01-15", "category": "tax", "nonDeferrable": true }
+  ],
+  "thresholds": {
+    "idleBalanceOver": { "amount": 2000000, "minWeeks": 3 },
+    "signalAutoApplyConfidence": 0.85,
+    "rankFloor": 0.1,
+    "relationshipPenalty": {},
+    "staleAfterHours": 48,
+    "stressDelayDays": 3
+  },
+  "actionLeadDays": { "defer": 2, "pay_early": 1 },
+  "signalSources": ["email"],
+  "vocabulary": { "sales": "covers", "cost": "prime cost" }
+}

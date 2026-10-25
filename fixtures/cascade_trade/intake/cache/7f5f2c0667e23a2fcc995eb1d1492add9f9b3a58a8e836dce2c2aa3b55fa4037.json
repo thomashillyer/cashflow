@@ -1,0 +1,78 @@
+{
+  "key": "7f5f2c0667e23a2fcc995eb1d1492add9f9b3a58a8e836dce2c2aa3b55fa4037",
+  "promptVersion": "extract_document@1",
+  "model": "claude-opus-5-5",
+  "source": "hand-authored stand-in for email-inv1187.eml; replace with a live run (scripts/refresh-extraction-cache.ts)",
+  "output": {
+    "fields": {
+      "sellerName": {
+        "value": null,
+        "quote": null
+      },
+      "buyerName": {
+        "value": "Evergreen Home LLC",
+        "quote": "Accounts Payable, Evergreen Home LLC"
+      },
+      "reference": {
+        "value": null,
+        "quote": null
+      },
+      "poReference": {
+        "value": null,
+        "quote": null
+      },
+      "amount": {
+        "value": null,
+        "quote": null
+      },
+      "outstanding": {
+        "value": null,
+        "quote": null
+      },
+      "currency": {
+        "value": null,
+        "quote": null
+      },
+      "issueDate": {
+        "value": null,
+        "quote": null
+      },
+      "dueDate": {
+        "value": null,
+        "quote": null
+      },
+      "terms": {
+        "value": null,
+        "quote": null
+      },
+      "invoiceUrl": {
+        "value": "https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187",
+        "quote": "View invoice: https://books.zoho.example/portal/cascadetrade/invoice/2-INV-1187"
+      },
+      "paymentUrl": {
+        "value": "https://checkout.stripe.example/c/pay/cs_live_inv1187_cascade",
+        "quote": "Pay now: https://checkout.stripe.example/c/pay/cs_live_inv1187_cascade"
+      },
+      "statedStatus": {
+        "value": null,
+        "quote": null
+      },
+      "paidAmount": {
+        "value": null,
+        "quote": null
+      },
+      "paidDate": {
+        "value": null,
+        "quote": null
+      }
+    },
+    "coversReferences": [],
+    "containsInstructions": false,
+    "notes": [
+      "The customer re-sent the invoice and says they will process it in their next payment run; no payment date is given."
+    ],
+    "kind": "conversational_update",
+    "businessRole": "seller",
+    "confidence": 0.8
+  }
+}

@@ -1,0 +1,775 @@
+{
+  "parties": [
+    {
+      "id": "party-sound-produce",
+      "name": "Sound Produce",
+      "kind": "supplier",
+      "tags": [],
+      "notes": []
+    },
+    {
+      "id": "party-noodle-wholesale",
+      "name": "Noodle Wholesale",
+      "kind": "supplier",
+      "tags": [],
+      "notes": []
+    }
+  ],
+  "commitments": [
+    {
+      "id": "bill-FP-4400",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4400",
+      "partyId": "party-sound-produce",
+      "amount": 380000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-12",
+        "due": "2026-11-19"
+      },
+      "status": "committed",
+      "outstanding": 380000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4400"
+      }
+    },
+    {
+      "id": "bill-NW-4401",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4401",
+      "partyId": "party-noodle-wholesale",
+      "amount": 260000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-19",
+        "due": "2026-11-26"
+      },
+      "status": "committed",
+      "outstanding": 260000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4401"
+      }
+    },
+    {
+      "id": "bill-FP-4402",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4402",
+      "partyId": "party-sound-produce",
+      "amount": 400000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-26",
+        "due": "2026-12-03"
+      },
+      "status": "committed",
+      "outstanding": 400000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4402"
+      }
+    },
+    {
+      "id": "bill-FP-4403",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4403",
+      "partyId": "party-sound-produce",
+      "amount": 410000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-12-03",
+        "due": "2026-12-10"
+      },
+      "status": "committed",
+      "outstanding": 410000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4403"
+      }
+    },
+    {
+      "id": "bill-NW-4404",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4404",
+      "partyId": "party-noodle-wholesale",
+      "amount": 260000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-12-10",
+        "due": "2026-12-17"
+      },
+      "status": "committed",
+      "outstanding": 260000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4404"
+      }
+    },
+    {
+      "id": "bill-FP-4405",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4405",
+      "partyId": "party-sound-produce",
+      "amount": 390000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-12-17",
+        "due": "2026-12-24"
+      },
+      "status": "committed",
+      "outstanding": 390000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4405"
+      }
+    },
+    {
+      "id": "bill-FP-4406",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4406",
+      "partyId": "party-sound-produce",
+      "amount": 400000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-12-24",
+        "due": "2026-12-31"
+      },
+      "status": "committed",
+      "outstanding": 400000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4406"
+      }
+    },
+    {
+      "id": "bill-NW-4407",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4407",
+      "partyId": "party-noodle-wholesale",
+      "amount": 260000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-12-31",
+        "due": "2027-01-07"
+      },
+      "status": "committed",
+      "outstanding": 260000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4407"
+      }
+    },
+    {
+      "id": "bill-FP-4408",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4408",
+      "partyId": "party-sound-produce",
+      "amount": 380000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-01-07",
+        "due": "2027-01-14"
+      },
+      "status": "committed",
+      "outstanding": 380000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4408"
+      }
+    },
+    {
+      "id": "bill-FP-4409",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4409",
+      "partyId": "party-sound-produce",
+      "amount": 390000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-01-14",
+        "due": "2027-01-21"
+      },
+      "status": "committed",
+      "outstanding": 390000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4409"
+      }
+    },
+    {
+      "id": "bill-NW-4410",
+      "type": "bill",
+      "direction": "out",
+      "reference": "NW-4410",
+      "partyId": "party-noodle-wholesale",
+      "amount": 260000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-01-21",
+        "due": "2027-01-28"
+      },
+      "status": "committed",
+      "outstanding": 260000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4410"
+      }
+    },
+    {
+      "id": "bill-FP-4411",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4411",
+      "partyId": "party-sound-produce",
+      "amount": 410000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-01-28",
+        "due": "2027-02-04"
+      },
+      "status": "committed",
+      "outstanding": 410000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4411"
+      }
+    },
+    {
+      "id": "bill-FP-4412",
+      "type": "bill",
+      "direction": "out",
+      "reference": "FP-4412",
+      "partyId": "party-sound-produce",
+      "amount": 380000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2027-02-04",
+        "due": "2027-02-11"
+      },
+      "status": "committed",
+      "outstanding": 380000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4412"
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "bank-sales-2026-10-19",
+      "legIndex": 0,
+      "date": "2026-10-19",
+      "amount": 115462,
+      "currency": "USD",
+      "amountBase": 115462,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-19"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-20",
+      "legIndex": 0,
+      "date": "2026-10-20",
+      "amount": 142205,
+      "currency": "USD",
+      "amountBase": 142205,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-20"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-21",
+      "legIndex": 0,
+      "date": "2026-10-21",
+      "amount": 157949,
+      "currency": "USD",
+      "amountBase": 157949,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-21"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-22",
+      "legIndex": 0,
+      "date": "2026-10-22",
+      "amount": 193436,
+      "currency": "USD",
+      "amountBase": 193436,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-22"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-23",
+      "legIndex": 0,
+      "date": "2026-10-23",
+      "amount": 299154,
+      "currency": "USD",
+      "amountBase": 299154,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-23"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-24",
+      "legIndex": 0,
+      "date": "2026-10-24",
+      "amount": 354385,
+      "currency": "USD",
+      "amountBase": 354385,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-24"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-25",
+      "legIndex": 0,
+      "date": "2026-10-25",
+      "amount": 271410,
+      "currency": "USD",
+      "amountBase": 271410,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-25"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-26",
+      "legIndex": 0,
+      "date": "2026-10-26",
+      "amount": 120462,
+      "currency": "USD",
+      "amountBase": 120462,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-26"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-27",
+      "legIndex": 0,
+      "date": "2026-10-27",
+      "amount": 136205,
+      "currency": "USD",
+      "amountBase": 136205,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-27"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-28",
+      "legIndex": 0,
+      "date": "2026-10-28",
+      "amount": 162949,
+      "currency": "USD",
+      "amountBase": 162949,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-28"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-29",
+      "legIndex": 0,
+      "date": "2026-10-29",
+      "amount": 198436,
+      "currency": "USD",
+      "amountBase": 198436,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-29"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-30",
+      "legIndex": 0,
+      "date": "2026-10-30",
+      "amount": 293154,
+      "currency": "USD",
+      "amountBase": 293154,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-30"
+      }
+    },
+    {
+      "id": "bank-sales-2026-10-31",
+      "legIndex": 0,
+      "date": "2026-10-31",
+      "amount": 359385,
+      "currency": "USD",
+      "amountBase": 359385,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-10-31"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-01",
+      "legIndex": 0,
+      "date": "2026-11-01",
+      "amount": 276410,
+      "currency": "USD",
+      "amountBase": 276410,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-01"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-02",
+      "legIndex": 0,
+      "date": "2026-11-02",
+      "amount": 114462,
+      "currency": "USD",
+      "amountBase": 114462,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-02"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-03",
+      "legIndex": 0,
+      "date": "2026-11-03",
+      "amount": 141205,
+      "currency": "USD",
+      "amountBase": 141205,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-03"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-04",
+      "legIndex": 0,
+      "date": "2026-11-04",
+      "amount": 156949,
+      "currency": "USD",
+      "amountBase": 156949,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-04"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-05",
+      "legIndex": 0,
+      "date": "2026-11-05",
+      "amount": 192436,
+      "currency": "USD",
+      "amountBase": 192436,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-05"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-06",
+      "legIndex": 0,
+      "date": "2026-11-06",
+      "amount": 298154,
+      "currency": "USD",
+      "amountBase": 298154,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-06"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-07",
+      "legIndex": 0,
+      "date": "2026-11-07",
+      "amount": 353385,
+      "currency": "USD",
+      "amountBase": 353385,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-07"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-08",
+      "legIndex": 0,
+      "date": "2026-11-08",
+      "amount": 281410,
+      "currency": "USD",
+      "amountBase": 281410,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-08"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-09",
+      "legIndex": 0,
+      "date": "2026-11-09",
+      "amount": 119462,
+      "currency": "USD",
+      "amountBase": 119462,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-09"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-10",
+      "legIndex": 0,
+      "date": "2026-11-10",
+      "amount": 135205,
+      "currency": "USD",
+      "amountBase": 135205,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-10"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-11",
+      "legIndex": 0,
+      "date": "2026-11-11",
+      "amount": 161949,
+      "currency": "USD",
+      "amountBase": 161949,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-11"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-12",
+      "legIndex": 0,
+      "date": "2026-11-12",
+      "amount": 197436,
+      "currency": "USD",
+      "amountBase": 197436,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-12"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-13",
+      "legIndex": 0,
+      "date": "2026-11-13",
+      "amount": 292154,
+      "currency": "USD",
+      "amountBase": 292154,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-13"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-14",
+      "legIndex": 0,
+      "date": "2026-11-14",
+      "amount": 358385,
+      "currency": "USD",
+      "amountBase": 358385,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-14"
+      }
+    },
+    {
+      "id": "bank-sales-2026-11-15",
+      "legIndex": 0,
+      "date": "2026-11-15",
+      "amount": 275410,
+      "currency": "USD",
+      "amountBase": 275410,
+      "direction": "in",
+      "status": "actual",
+      "confidence": 1,
+      "basis": "card settlement",
+      "category": "sales",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "sales-2026-11-15"
+      }
+    }
+  ],
+  "signals": [],
+  "rules": [],
+  "settlements": [],
+  "balances": [
+    {
+      "id": "bal-pike",
+      "account": "operating",
+      "amount": 2200000,
+      "currency": "USD",
+      "asOf": "2026-11-16",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "bal-pike"
+      }
+    }
+  ],
+  "evidence": []
+}
