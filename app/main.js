@@ -58,7 +58,8 @@ async function load() {
 
 async function refresh() {
   const prevThree = new Set((app.brief?.three ?? []).map((i) => i.id + i.cashEffect));
-  [app.brief, app.review, app.notes] = await Promise.all([api.brief(), api.review(), api.notes()]);
+  // Context too, so names for commitments added by Review, notes or plans (live partyByCommitment) stay current.
+  [app.brief, app.review, app.notes, app.ctx] = await Promise.all([api.brief(), api.review(), api.notes(), api.context()]);
   app.ctx.safetyLine = app.brief.run.safetyLine;
   if (app.scenario === "stress") app.stressRun = await api.forecast("stress");
   if (prevThree.size) {
@@ -84,7 +85,7 @@ function aliasMap() {
   return map;
 }
 function masked(html) {
-  if (!app.mask) return html;
+  if (!app.mask || !app.ctx) return html;
   let out = html;
   for (const [name, alias] of aliasMap()) out = out.split(name).join(alias).split(esc(name)).join(alias);
   return out;
@@ -1134,9 +1135,14 @@ function startCapture(target) {
       app.stopListen = null;
       if (target === "drive") {
         if (text) {
-          const n = await api.parkNote(text, "voice");
-          app.notes = await api.notes();
-          speak([`Parked. ${readingSentence(n)} I'll ask you to confirm when you're parked.`]);
+          try {
+            const n = await api.parkNote(text, "voice");
+            app.notes = await api.notes();
+            speak([`Parked. ${readingSentence(n)} I'll ask you to confirm when you're parked.`]);
+          } catch (err) {
+            speak([`I couldn't park that. ${speakable(err.message)}`]);
+            failed(err);
+          }
         }
         renderDrive();
       } else if (target === "ask") {
@@ -1178,14 +1184,22 @@ async function doAsk(q, via = "typed") {
   app.askLog.push(turn);
   render();
   scrollToDock();
-  if (parking) {
-    const n = await api.parkNote(q, via);
-    app.notes = await api.notes();
-    turn.note = n.id;
-    if (via === "voice") speak([`Got it. ${readingSentence(n)} It's in your notes, and nothing changes until you add it.`]);
-  } else {
-    turn.a = await api.ask(q);
-    if (via === "voice") speak([speakable(turn.a.text)]);
+  try {
+    if (parking) {
+      const n = await api.parkNote(q, via);
+      turn.note = n.id;
+      // The note is saved; a failed list reload shouldn't make the owner park it twice.
+      app.notes = await api.notes().catch(() => app.notes);
+      if (via === "voice") speak([`Got it. ${readingSentence(n)} It's in your notes, and nothing changes until you add it.`]);
+    } else {
+      turn.a = await api.ask(q);
+      if (via === "voice") speak([speakable(turn.a.text)]);
+    }
+  } catch (err) {
+    // Drop the half-finished turn so it doesn't spin forever, then say why.
+    app.askLog.splice(app.askLog.indexOf(turn), 1);
+    render();
+    return failed(err);
   }
   turn.pending = false;
   render();
@@ -1196,7 +1210,20 @@ function scrollToDock() {
   requestAnimationFrame(() => document.querySelector(".dock")?.scrollIntoView({ block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }));
 }
 
-document.addEventListener("click", async (ev) => {
+// A failed action tells the owner why, in the API's own words, instead of silently doing nothing.
+// A work item that's gone (404) or a stale Review (409) means the list moved on: reload it.
+async function failed(err) {
+  console.error(err);
+  const stale = err?.status === 409 || (err?.status === 404 && /^\/work-items\//.test(err.path ?? ""));
+  toast("Couldn't do that", err?.message || "Something went wrong. Try again.");
+  if (stale && app.ctx) {
+    closeSheet();
+    await refresh().catch((e) => console.error(e));
+  }
+}
+
+document.addEventListener("click", (ev) => onClick(ev).catch(failed));
+async function onClick(ev) {
   const el = ev.target.closest("[data-action]");
   if (!el) return;
   const a = el.dataset.action;
@@ -1403,7 +1430,7 @@ document.addEventListener("click", async (ev) => {
     location.href = href;
     return;
   }
-});
+}
 
 function viewForecastChartOnly() {
   const run = app.scenario === "stress" && app.stressRun ? app.stressRun : app.brief.run;
@@ -1421,7 +1448,8 @@ document.addEventListener("keydown", (ev) => {
   }
 });
 
-document.addEventListener("submit", async (ev) => {
+document.addEventListener("submit", (ev) => onSubmit(ev).catch(failed));
+async function onSubmit(ev) {
   const f = ev.target.closest("[data-submit]");
   if (!f) return;
   ev.preventDefault();
@@ -1477,9 +1505,10 @@ document.addEventListener("submit", async (ev) => {
     await refresh();
     toast("Your line is updated", `${money(Math.round(dollars * 100))}. The forecast and today's list are recalculated.`);
   }
-});
+}
 
-document.addEventListener("change", async (ev) => {
+document.addEventListener("change", (ev) => onChange(ev).catch(failed));
+async function onChange(ev) {
   const el = ev.target;
   if (el.dataset.change === "reserve") {
     app.setup.reserve = el.value;
@@ -1518,7 +1547,7 @@ document.addEventListener("change", async (ev) => {
     app.notes = await api.notes();
     render();
   }
-});
+}
 
 let resizeTimer;
 window.addEventListener("resize", () => {
