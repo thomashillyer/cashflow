@@ -206,6 +206,15 @@ describe("envSourceAccess", () => {
     expect(access(ctx("any-id"), "zoho_books")).toBeUndefined();   // no verified user, no access
   });
 
+  it("NERI_SOURCE_EMAIL may list several operator emails; a similar-looking one is still refused", () => {
+    const access = envSourceAccess({ ...env, NERI_SOURCE_BUSINESS: undefined, NERI_SOURCE_EMAIL: " a@x.example , B@y.example " })!;
+    expect(access(ctx("1", "a@x.example"), "zoho_books")).toMatchObject({ region: "com" });
+    expect(access(ctx("2", "b@y.example"), "zoho_books")).toMatchObject({ region: "com" });
+    expect(access(ctx("3", "ab@x.example"), "zoho_books")).toBeUndefined();
+    expect(access(ctx("4", "a@x.example.evil.io"), "zoho_books")).toBeUndefined();
+    expect(envSourceAccess({ ...env, NERI_SOURCE_BUSINESS: undefined, NERI_SOURCE_EMAIL: " , " })).toBeUndefined();
+  });
+
   it("caches the access token until it nearly expires", async () => {
     let calls = 0;
     let clock = 0;
