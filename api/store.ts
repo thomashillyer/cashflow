@@ -4,8 +4,9 @@
 
 import type { ChangeProposal, IntakeCandidate } from "../schema/intake";
 import type { Profile } from "../schema/profile";
-import type { Evidence, Records, Signal, WorkItem } from "../schema/records";
+import type { Evidence, Override, Records, Signal, WorkItem } from "../schema/records";
 import type { IntakeNote } from "../ai/intake";
+import { validateOverrides } from "./overrides";
 
 // Owner-facing details that have no column of their own. Kept in businesses.profile under `account`
 // so no migration is needed; the engine ignores the extra key.
@@ -78,6 +79,12 @@ export interface Store {
   loadWorkItems(id: string): Promise<{ items: WorkItem[]; inputsHash?: string }>;
   saveWorkItems(id: string, items: WorkItem[], inputsHash: string): Promise<void>;
   setWorkItemState(id: string, itemId: string, state: WorkItem["state"]): Promise<void>;
+  // The owner's saved overrides: the base scenario (scenarios row id 'base'), kept apart from the
+  // imported records so upsertRecords / re-imports never touch them. [] when none are saved.
+  loadOverrides(id: string): Promise<Override[]>;
+  // Replaces the whole list. Validates the shape (throws status 400 INVALID_ARGUMENT); ids are unique.
+  // Does not bump the revision; the caller does.
+  saveOverrides(id: string, overrides: Override[]): Promise<void>;
   // Demo reset: delete every record of a synthetic business, then write these.
   resetBusiness(b: { id: string; name: string; profile: StoredProfile }, records: Records): Promise<void>;
 }
@@ -97,7 +104,7 @@ function upsertById<T extends { id: string }>(list: T[], next: T[]): T[] {
 type MemBiz = Business & {
   records: Records; storeRevision: number; members: Set<string>;
   proposals: Map<string, ChangeProposal>; candidates: Map<string, IntakeCandidate>;
-  workItems: Map<string, WorkItem>; workItemsHash?: string;
+  workItems: Map<string, WorkItem>; workItemsHash?: string; overrides: Override[];
 };
 
 // In-memory store with the same semantics as the Supabase one. Used by the tests and by
@@ -133,6 +140,7 @@ export class MemoryStore implements Store {
     this.biz.set(id, {
       id, name: b.name, isSynthetic: b.isSynthetic, profile: structuredClone(b.profile), records: empty(), storeRevision: 0,
       members: new Set(b.ownerUserId ? [b.ownerUserId] : []), proposals: new Map(), candidates: new Map(), workItems: new Map(),
+      overrides: [],
     });
     return id;
   }
@@ -189,6 +197,13 @@ export class MemoryStore implements Store {
     const w = this.need(id).workItems.get(itemId);
     if (!w) throw Object.assign(new Error("NOT_FOUND"), { status: 404, code: "NOT_FOUND" });
     w.state = state;
+  }
+  async loadOverrides(id: string) {
+    return structuredClone(this.need(id).overrides);
+  }
+  async saveOverrides(id: string, overrides: Override[]) {
+    const b = this.need(id);
+    b.overrides = structuredClone(validateOverrides(overrides));
   }
   async resetBusiness(b: { id: string; name: string; profile: StoredProfile }, records: Records) {
     this.biz.delete(b.id);

@@ -13,6 +13,7 @@ import { reviewRoutes } from "./routes/review";
 import { ownerRoutes } from "./routes/owner";
 import { workRoutes } from "./routes/work";
 import { demoRoutes } from "./routes/demo";
+import { overrideRoutes } from "./routes/overrides";
 
 // Verifies a Supabase access token. Returns null for an invalid or expired token.
 export type Verifier = (token: string) => Promise<User | null>;
@@ -36,7 +37,7 @@ const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals",
-  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask"];
+  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides"];
 
 const isApiPath = (url: string) => {
   const path = url.split("?")[0]!;
@@ -118,6 +119,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(ownerRoutes(deps));
   await app.register(workRoutes(deps));
   await app.register(demoRoutes(deps));
+  await app.register(overrideRoutes(deps));
 
   if (opts.staticDir && existsSync(opts.staticDir)) {
     await app.register(fastifyStatic, { root: opts.staticDir, prefix: "/", index: ["index.html"] });

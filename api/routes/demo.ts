@@ -6,7 +6,7 @@ import type { Signal } from "../../schema/records";
 import { handleAsk } from "../../ai/ask/index";
 import type { Deps } from "../app";
 import { loadSample, SAMPLES } from "../demo";
-import { runInputs } from "../engine";
+import { loadForRun, runInputs } from "../engine";
 import { businessOf, HttpError } from "../http";
 
 export const demoRoutes = (deps: Deps) => async (app: FastifyInstance) => {
@@ -33,12 +33,12 @@ export const demoRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   // proposed (owner Signal or Rule); nothing is applied until the owner confirms.
   app.post("/ask", async (req, reply) => {
     const b = businessOf(req);
-    const [{ records }, proposals] = await Promise.all([deps.store.load(b.id), deps.store.listProposals(b.id)]);
+    const [{ records, overrides }, proposals] = await Promise.all([loadForRun(deps.store, b.id), deps.store.listProposals(b.id)]);
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
     const body = (req.body ?? {}) as { question?: unknown };
     const question = typeof body.question === "string" ? body.question : "";
     const r = await handleAsk(req.body, {
-      records, profile, asOf, fxRates,
+      records, profile, asOf, fxRates, baseOverrides: overrides,
       pendingReviewCount: proposals.filter((p) => p.state === "proposed").length,
       business: { name: b.name },
       mode: deps.aiMode,

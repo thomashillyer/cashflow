@@ -4,14 +4,14 @@
 
 import type { FastifyInstance } from "fastify";
 import type { ChangeProposal, CommitmentFieldChange } from "../../schema/intake";
-import type { Commitment, Records, Signal } from "../../schema/records";
+import type { Commitment, Override, Records, Signal } from "../../schema/records";
 import { forecast } from "../../engine/forecast";
 import { ingest, type IntakeInput, type IntakeNote } from "../../ai/intake";
 import { ApplyError, applyProposal, type ApplyErrorCode } from "../../ai/reconcile/apply";
 import { propose } from "../../ai/reconcile/match";
 import { fmtMoney } from "../../ai/money";
 import type { Deps } from "../app";
-import { businessIdentity, runInputs } from "../engine";
+import { businessIdentity, loadForRun, runInputs, savedScenario } from "../engine";
 import { businessOf, HttpError, isIsoDate } from "../http";
 import type { Business, Store } from "../store";
 
@@ -44,11 +44,11 @@ export async function refreshPending(store: Store, businessId: string, records: 
   if (next.length) await store.saveProposals(businessId, next);
 }
 
-function signalItem(b: Business, records: Records, s: Signal, deps: Deps) {
+function signalItem(b: Business, records: Records, overrides: Override[], s: Signal, deps: Deps) {
   const c = records.commitments.find((x) => x.id === s.commitmentId);
   if (!c) return null;
   const { profile, asOf, fxRates } = runInputs(b, deps.now);
-  const scenario = { id: "base", kind: "base" as const, overrides: [] };
+  const scenario = savedScenario(overrides);
   const withState = (state: Signal["state"]): Records => ({ ...records, signals: records.signals.map((x) => (x.id === s.id ? { ...x, state } : x)) });
   const before = forecast(withState("proposed"), profile, scenario, asOf, fxRates);
   const after = forecast(withState("applied"), profile, scenario, asOf, fxRates);
@@ -155,8 +155,8 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   // The app's Review list: proposed signals with the words, the invoice, and the priced effect.
   app.get("/review", async (req) => {
     const b = businessOf(req);
-    const { records } = await deps.store.load(b.id);
-    return records.signals.filter((s) => s.state === "proposed").map((s) => signalItem(b, records, s, deps)).filter((x) => x !== null);
+    const { records, overrides } = await loadForRun(deps.store, b.id);
+    return records.signals.filter((s) => s.state === "proposed").map((s) => signalItem(b, records, overrides, s, deps)).filter((x) => x !== null);
   });
 
   // Everything pending from imports: change proposals with their candidate fields, evidence and notes,
@@ -265,7 +265,7 @@ export const reviewRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     if (decision === "dismiss") return { signal: next, storeRevision: revision, alert: null };
 
     const { profile, asOf, fxRates } = runInputs(b, deps.now);
-    const scenario = { id: "base", kind: "base" as const, overrides: [] };
+    const scenario = savedScenario(await deps.store.loadOverrides(b.id));
     const before = forecast(records, profile, scenario, asOf, fxRates).lowPoint;
     const after = forecast(nextRecords, profile, scenario, asOf, fxRates).lowPoint;
     const c = nextRecords.commitments.find((x) => x.id === next.commitmentId);

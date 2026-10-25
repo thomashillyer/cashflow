@@ -305,3 +305,96 @@ describe("import -> review -> confirm (INV-1187)", () => {
     expect((await app.inject({ method: "POST", url: "/import/paste", headers: OTHER, payload: { text: "  " } })).statusCode).toBe(400);
   });
 });
+
+describe("saved owner overrides (#40)", () => {
+  beforeEach(() => setup());
+
+  const H = (id: string) => ({ ...OWNER, "x-neri-business": id });
+  const leg = (run: { events: { commitmentId?: string; status: string; date: string; amount: number }[] }) =>
+    run.events.filter((e) => e.commitmentId === "inv-INV-1187" && e.status !== "actual");
+
+  it("a saved override changes base and stress, simulate and brief; survives a re-import; is deletable", async () => {
+    const id = await privateBusiness();
+    const base0 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    const stress0 = (await app.inject({ method: "GET", url: "/forecast?scenario=stress", headers: H(id) })).json();
+    expect(leg(base0).length).toBeGreaterThan(0);
+
+    const put = await app.inject({ method: "PUT", url: "/overrides/ov-1187", headers: H(id), payload: {
+      target: { commitmentId: "inv-INV-1187" }, change: { exclude: true }, origin: "lever", expectedRevision: (await store.load(id)).storeRevision,
+    } });
+    expect(put.statusCode).toBe(200);
+    expect(put.json()).toMatchObject({ override: { id: "ov-1187", origin: "owner" }, created: true });
+    const rev1 = put.json().storeRevision as number;
+    expect(rev1).toBeGreaterThan(0);
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: H(id) })).json()).toEqual({ overrides: [put.json().override], storeRevision: rev1 });
+
+    const base1 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    const stress1 = (await app.inject({ method: "GET", url: "/forecast?scenario=stress", headers: H(id) })).json();
+    expect(leg(base1)).toHaveLength(0);
+    expect(leg(stress1)).toHaveLength(0);
+    expect(base1.inputsHash).not.toBe(base0.inputsHash);
+    expect(stress1.inputsHash).not.toBe(stress0.inputsHash);
+    const brief = (await app.inject({ method: "GET", url: "/brief", headers: H(id) })).json();
+    expect(brief.run.inputsHash).toBe(base1.inputsHash);
+    expect(brief.storeRevision).toBe(rev1);
+    const sim = (await app.inject({ method: "POST", url: "/simulate", headers: H(id), payload: { levers: [] } })).json();
+    expect(sim.run.lowPoint).toEqual(base1.lowPoint);
+
+    // Re-import: the same records upserted again (as a refresh would) keep the override.
+    await store.upsertRecords(id, loadSample("cascade_trade")!.records);
+    const base2 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    expect(leg(base2)).toHaveLength(0);
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+
+    // Update in place (same id), then a stale write is refused.
+    const shifted = await app.inject({ method: "PUT", url: "/overrides/ov-1187", headers: H(id), payload: { target: { commitmentId: "inv-INV-1187" }, change: { shiftDays: 14 } } });
+    expect(shifted.json()).toMatchObject({ created: false, override: { change: { shiftDays: 14 } } });
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+    const stale = await app.inject({ method: "DELETE", url: `/overrides/ov-1187?expectedRevision=${rev1}`, headers: H(id) });
+    expect(stale.statusCode).toBe(409);
+
+    const del = await app.inject({ method: "DELETE", url: "/overrides/ov-1187", headers: { ...H(id), "content-type": "application/json" } });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toMatchObject({ id: "ov-1187", deleted: true });
+    expect(del.json().storeRevision).toBeGreaterThan(shifted.json().storeRevision);
+    const base3 = (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    expect(leg(base3)).toEqual(leg(base0));
+    expect((await app.inject({ method: "DELETE", url: "/overrides/ov-1187", headers: H(id) })).statusCode).toBe(404);
+  });
+
+  it("rejects bad input: unknown keys, non-integer amounts, bad dates, unknown targets, bad ids", async () => {
+    const id = await privateBusiness();
+    const put = (ovId: string, payload: unknown) => app.inject({ method: "PUT", url: `/overrides/${ovId}`, headers: H(id), payload: payload as object });
+    const target = { commitmentId: "inv-INV-1187" };
+    for (const payload of [
+      { target, change: { amount: 12.5 } },
+      { target, change: { amount: -100 } },
+      { target, change: { date: "2026-02-30" } },
+      { target, change: { date: "next week" } },
+      { target, change: { pay: true } },
+      { target, change: {} },
+      { target, change: { date: "2026-12-01", shiftDays: 3 } },
+      { target: { commitmentId: "inv-INV-1187", leg: 1 }, change: { exclude: true } },
+      { target, change: { exclude: true }, sendTo: "bank" },
+      { change: { exclude: true } },
+    ]) {
+      const res = await put("ov-bad", payload);
+      expect(res.statusCode, JSON.stringify(payload)).toBe(400);
+      expect(res.json().error.code).toBe("INVALID_ARGUMENT");
+    }
+    expect((await put("ov-bad", { target: { commitmentId: "nope" }, change: { exclude: true } })).statusCode).toBe(400);
+    expect((await put("bad%20id!", { target, change: { exclude: true } })).statusCode).toBe(400);
+    expect(await store.loadOverrides(id)).toEqual([]);
+  });
+
+  it("non-members are refused", async () => {
+    const id = await privateBusiness();
+    await store.saveOverrides(id, [{ id: "ov-1", target: { commitmentId: "inv-INV-1187" }, change: { exclude: true }, origin: "owner" }]);
+    const other = { ...OTHER, "x-neri-business": id };
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: other })).statusCode).toBe(404);
+    expect((await app.inject({ method: "PUT", url: "/overrides/ov-2", headers: other, payload: { target: { commitmentId: "inv-INV-1187" }, change: { exclude: true } } })).statusCode).toBe(404);
+    expect((await app.inject({ method: "DELETE", url: "/overrides/ov-1", headers: other })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: "/overrides", headers: { "x-neri-business": id } })).statusCode).toBe(401);
+    expect(await store.loadOverrides(id)).toHaveLength(1);
+  });
+});
