@@ -13,6 +13,25 @@ Claude never computes a forecast or a ranking. It reads, explains, answers, and 
 
 Pick current model IDs from the Anthropic docs on the day; keep them in one config file.
 
+## Ask Neri: a CFO, not a menu
+
+The owner asked for a CFO that infers and recommends with conviction, not a list of options to choose from. Contracts: `schema/ask.ts`.
+
+- **Lead with the call.** Every answer opens with a verdict and one recommendation: "Yes, if Harbor and Hearth pays 40% up front by Dec 1." Never "you could consider A, B, or C." At most one fallback: "If they refuse, ask Jaipur Textiles for 10 more days."
+- **Code decides; Claude voices.** Claude reads the question into an `AskIntent` (quotes, not computed values; code resolves dates, amounts, and parties). Code runs the engine (`forecast`, `simulate`, `runChecks`/`rank`, `smallestUpfrontShare`) and builds a `Decision`: the best move by simulated effect and the profile's ranking, the act-by date, and the resulting low point. Claude turns the Decision into a `CfoAnswer` and cannot change a field.
+- **Conviction is computed, not felt.** `high`/`medium`/`low` from data quality: payment-history sample size, unresolved reviews, stale sources, tentative or possible money in the path, vague dates. The answer says why in plain words and names the one fact that would change the call.
+- **Ask back only when it matters.** If a missing fact changes the call (which supplier? what amount?), ask one short question; otherwise assume the profile default and say so.
+- **Same guardrails.** Every figure passes `number_check` against `Decision.allowed`; citations required; code-built text on failure. Nothing is sent, paid, or applied: a stated plan or rule becomes a proposal with one-tap confirm. No investment or loan product advice (`out_of_scope` -> decline, with the cash facts).
+
+| Question | Intent | Decision |
+|---|---|---|
+| "Can I afford a $40K deposit in December?" | afford | yes / no / yes_if with the cheapest change that keeps cash above the safety line |
+| "What should I do about December?" | fix_gap | act_now with the top-ranked lever and act-by date |
+| "What if Evergreen pays in January?" | what_if | the new low point and the one move that covers it; scenarioId for the chart |
+| "Am I OK this month?" | status | on_track / act_now with the tightest day |
+| "When does Evergreen usually pay?" | lookup | info, from lag stats and history |
+| "Evergreen always pays 20 days late" | tell | proposed rule for one-tap confirm |
+
 ## Tools exposed to Claude
 
 ```ts
