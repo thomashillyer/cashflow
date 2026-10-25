@@ -1,7 +1,7 @@
 {
-  "id": "run-base-e86b42177c4e",
+  "id": "run-base-e1b73bc05fc5",
   "asOf": "2026-11-16",
-  "inputsHash": "e86b42177c4ee6ce9dda6457e782efc5795dac36311a8a673d4f0954d3ccb61e",
+  "inputsHash": "e1b73bc05fc5ce51fe701e7d3d038c2669c84634823ad466896009ebefa97fc3",
   "scenarioId": "base",
   "fxRates": {
     "USD": 1
@@ -39,10 +39,11 @@
     {
       "date": "2026-11-19",
       "inflow": 197404,
-      "outflow": 380000,
-      "closing": 2431952,
+      "outflow": 530000,
+      "closing": 2281952,
       "eventIds": [
         "evt-bill-FP-4400-0",
+        "evt-bill-NW-4400-0",
         "evt-daily-sales-2026-11-19"
       ]
     },
@@ -50,7 +51,7 @@
       "date": "2026-11-20",
       "inflow": 296106,
       "outflow": 990000,
-      "closing": 1738058,
+      "closing": 1588058,
       "eventIds": [
         "evt-daily-sales-2026-11-20",
         "evt-rec-payroll-0",
@@ -61,7 +62,7 @@
       "date": "2026-11-21",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 2093385,
+      "closing": 1943385,
       "eventIds": [
         "evt-daily-sales-2026-11-21"
       ]
@@ -70,7 +71,7 @@
       "date": "2026-11-22",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 2369751,
+      "closing": 2219751,
       "eventIds": [
         "evt-daily-sales-2026-11-22"
       ]
@@ -79,7 +80,7 @@
       "date": "2026-11-23",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 2488193,
+      "closing": 2338193,
       "eventIds": [
         "evt-daily-sales-2026-11-23"
       ]
@@ -88,7 +89,7 @@
       "date": "2026-11-24",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 2626376,
+      "closing": 2476376,
       "eventIds": [
         "evt-daily-sales-2026-11-24"
       ]
@@ -97,7 +98,7 @@
       "date": "2026-11-25",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 2784299,
+      "closing": 2634299,
       "eventIds": [
         "evt-daily-sales-2026-11-25"
       ]
@@ -105,10 +106,10 @@
     {
       "date": "2026-11-26",
       "inflow": 197404,
-      "outflow": 260000,
-      "closing": 2721703,
+      "outflow": 390000,
+      "closing": 2441703,
       "eventIds": [
-        "evt-bill-NW-4401-0",
+        "evt-bill-FP-4401-0",
         "evt-daily-sales-2026-11-26"
       ]
     },
@@ -116,7 +117,7 @@
       "date": "2026-11-27",
       "inflow": 296106,
       "outflow": 750000,
-      "closing": 2267809,
+      "closing": 1987809,
       "eventIds": [
         "evt-daily-sales-2026-11-27",
         "evt-rec-payroll-1"
@@ -126,7 +127,7 @@
       "date": "2026-11-28",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 2623136,
+      "closing": 2343136,
       "eventIds": [
         "evt-daily-sales-2026-11-28"
       ]
@@ -135,7 +136,7 @@
       "date": "2026-11-29",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 2899502,
+      "closing": 2619502,
       "eventIds": [
         "evt-daily-sales-2026-11-29"
       ]
@@ -144,7 +145,7 @@
       "date": "2026-11-30",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 3017944,
+      "closing": 2737944,
       "eventIds": [
         "evt-daily-sales-2026-11-30"
       ]
@@ -153,7 +154,7 @@
       "date": "2026-12-01",
       "inflow": 138183,
       "outflow": 550000,
-      "closing": 2606127,
+      "closing": 2326127,
       "eventIds": [
         "evt-daily-sales-2026-12-01",
         "evt-rec-rent-0"
@@ -163,7 +164,7 @@
       "date": "2026-12-02",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 2764050,
+      "closing": 2484050,
       "eventIds": [
         "evt-daily-sales-2026-12-02"
       ]
@@ -171,20 +172,22 @@
     {
       "date": "2026-12-03",
       "inflow": 197404,
-      "outflow": 400000,
-      "closing": 2561454,
+      "outflow": 550000,
+      "closing": 2131454,
       "eventIds": [
         "evt-bill-FP-4402-0",
+        "evt-bill-NW-4402-0",
         "evt-daily-sales-2026-12-03"
       ]
     },
     {
       "date": "2026-12-04",
-      "inflow": 296106,
+      "inflow": 496106,
       "outflow": 750000,
-      "closing": 2107560,
+      "closing": 1877560,
       "eventIds": [
         "evt-daily-sales-2026-12-04",
+        "evt-plan-catering-2026-12-04-0",
         "evt-rec-payroll-2"
       ]
     },
@@ -192,7 +195,7 @@
       "date": "2026-12-05",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 2462887,
+      "closing": 2232887,
       "eventIds": [
         "evt-daily-sales-2026-12-05"
       ]
@@ -201,7 +204,7 @@
       "date": "2026-12-06",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 2739253,
+      "closing": 2509253,
       "eventIds": [
         "evt-daily-sales-2026-12-06"
       ]
@@ -210,7 +213,7 @@
       "date": "2026-12-07",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 2857695,
+      "closing": 2627695,
       "eventIds": [
         "evt-daily-sales-2026-12-07"
       ]
@@ -219,7 +222,7 @@
       "date": "2026-12-08",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 2995878,
+      "closing": 2765878,
       "eventIds": [
         "evt-daily-sales-2026-12-08"
       ]
@@ -228,7 +231,7 @@
       "date": "2026-12-09",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 3153801,
+      "closing": 2923801,
       "eventIds": [
         "evt-daily-sales-2026-12-09"
       ]
@@ -237,7 +240,7 @@
       "date": "2026-12-10",
       "inflow": 197404,
       "outflow": 410000,
-      "closing": 2941205,
+      "closing": 2711205,
       "eventIds": [
         "evt-bill-FP-4403-0",
         "evt-daily-sales-2026-12-10"
@@ -245,11 +248,12 @@
     },
     {
       "date": "2026-12-11",
-      "inflow": 296106,
+      "inflow": 646106,
       "outflow": 750000,
-      "closing": 2487311,
+      "closing": 2607311,
       "eventIds": [
         "evt-daily-sales-2026-12-11",
+        "evt-plan-catering-2026-12-11-0",
         "evt-rec-payroll-3"
       ]
     },
@@ -257,7 +261,7 @@
       "date": "2026-12-12",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 2842638,
+      "closing": 2962638,
       "eventIds": [
         "evt-daily-sales-2026-12-12"
       ]
@@ -266,7 +270,7 @@
       "date": "2026-12-13",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 3119004,
+      "closing": 3239004,
       "eventIds": [
         "evt-daily-sales-2026-12-13"
       ]
@@ -275,7 +279,7 @@
       "date": "2026-12-14",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 3237446,
+      "closing": 3357446,
       "eventIds": [
         "evt-daily-sales-2026-12-14"
       ]
@@ -284,7 +288,7 @@
       "date": "2026-12-15",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 3375629,
+      "closing": 3495629,
       "eventIds": [
         "evt-daily-sales-2026-12-15"
       ]
@@ -293,7 +297,7 @@
       "date": "2026-12-16",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 3533552,
+      "closing": 3653552,
       "eventIds": [
         "evt-daily-sales-2026-12-16"
       ]
@@ -301,20 +305,22 @@
     {
       "date": "2026-12-17",
       "inflow": 197404,
-      "outflow": 260000,
-      "closing": 3470956,
+      "outflow": 530000,
+      "closing": 3320956,
       "eventIds": [
+        "evt-bill-FP-4404-0",
         "evt-bill-NW-4404-0",
         "evt-daily-sales-2026-12-17"
       ]
     },
     {
       "date": "2026-12-18",
-      "inflow": 296106,
+      "inflow": 546106,
       "outflow": 750000,
-      "closing": 3017062,
+      "closing": 3117062,
       "eventIds": [
         "evt-daily-sales-2026-12-18",
+        "evt-plan-catering-2026-12-18-0",
         "evt-rec-payroll-4"
       ]
     },
@@ -322,7 +328,7 @@
       "date": "2026-12-19",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 3372389,
+      "closing": 3472389,
       "eventIds": [
         "evt-daily-sales-2026-12-19"
       ]
@@ -331,7 +337,7 @@
       "date": "2026-12-20",
       "inflow": 276366,
       "outflow": 240000,
-      "closing": 3408755,
+      "closing": 3508755,
       "eventIds": [
         "evt-daily-sales-2026-12-20",
         "evt-rec-sales-tax-1"
@@ -341,7 +347,7 @@
       "date": "2026-12-21",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 3527197,
+      "closing": 3627197,
       "eventIds": [
         "evt-daily-sales-2026-12-21"
       ]
@@ -350,7 +356,7 @@
       "date": "2026-12-22",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 3665380,
+      "closing": 3765380,
       "eventIds": [
         "evt-daily-sales-2026-12-22"
       ]
@@ -359,7 +365,7 @@
       "date": "2026-12-23",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 3823303,
+      "closing": 3923303,
       "eventIds": [
         "evt-daily-sales-2026-12-23"
       ]
@@ -368,7 +374,7 @@
       "date": "2026-12-24",
       "inflow": 197404,
       "outflow": 390000,
-      "closing": 3630707,
+      "closing": 3730707,
       "eventIds": [
         "evt-bill-FP-4405-0",
         "evt-daily-sales-2026-12-24"
@@ -378,7 +384,7 @@
       "date": "2026-12-25",
       "inflow": 296106,
       "outflow": 750000,
-      "closing": 3176813,
+      "closing": 3276813,
       "eventIds": [
         "evt-daily-sales-2026-12-25",
         "evt-rec-payroll-5"
@@ -388,7 +394,7 @@
       "date": "2026-12-26",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 3532140,
+      "closing": 3632140,
       "eventIds": [
         "evt-daily-sales-2026-12-26"
       ]
@@ -397,7 +403,7 @@
       "date": "2026-12-27",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 3808506,
+      "closing": 3908506,
       "eventIds": [
         "evt-daily-sales-2026-12-27"
       ]
@@ -406,7 +412,7 @@
       "date": "2026-12-28",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 3926948,
+      "closing": 4026948,
       "eventIds": [
         "evt-daily-sales-2026-12-28"
       ]
@@ -415,7 +421,7 @@
       "date": "2026-12-29",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 4065131,
+      "closing": 4165131,
       "eventIds": [
         "evt-daily-sales-2026-12-29"
       ]
@@ -424,7 +430,7 @@
       "date": "2026-12-30",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 4223054,
+      "closing": 4323054,
       "eventIds": [
         "evt-daily-sales-2026-12-30"
       ]
@@ -432,10 +438,11 @@
     {
       "date": "2026-12-31",
       "inflow": 197404,
-      "outflow": 400000,
-      "closing": 4020458,
+      "outflow": 550000,
+      "closing": 3970458,
       "eventIds": [
         "evt-bill-FP-4406-0",
+        "evt-bill-NW-4406-0",
         "evt-daily-sales-2026-12-31"
       ]
     },
@@ -443,7 +450,7 @@
       "date": "2027-01-01",
       "inflow": 296106,
       "outflow": 1300000,
-      "closing": 3016564,
+      "closing": 2966564,
       "eventIds": [
         "evt-daily-sales-2027-01-01",
         "evt-rec-payroll-6",
@@ -454,7 +461,7 @@
       "date": "2027-01-02",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 3371891,
+      "closing": 3321891,
       "eventIds": [
         "evt-daily-sales-2027-01-02"
       ]
@@ -463,7 +470,7 @@
       "date": "2027-01-03",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 3648257,
+      "closing": 3598257,
       "eventIds": [
         "evt-daily-sales-2027-01-03"
       ]
@@ -472,7 +479,7 @@
       "date": "2027-01-04",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 3766699,
+      "closing": 3716699,
       "eventIds": [
         "evt-daily-sales-2027-01-04"
       ]
@@ -481,7 +488,7 @@
       "date": "2027-01-05",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 3904882,
+      "closing": 3854882,
       "eventIds": [
         "evt-daily-sales-2027-01-05"
       ]
@@ -490,7 +497,7 @@
       "date": "2027-01-06",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 4062805,
+      "closing": 4012805,
       "eventIds": [
         "evt-daily-sales-2027-01-06"
       ]
@@ -498,10 +505,10 @@
     {
       "date": "2027-01-07",
       "inflow": 197404,
-      "outflow": 260000,
-      "closing": 4000209,
+      "outflow": 410000,
+      "closing": 3800209,
       "eventIds": [
-        "evt-bill-NW-4407-0",
+        "evt-bill-FP-4407-0",
         "evt-daily-sales-2027-01-07"
       ]
     },
@@ -509,7 +516,7 @@
       "date": "2027-01-08",
       "inflow": 296106,
       "outflow": 750000,
-      "closing": 3546315,
+      "closing": 3346315,
       "eventIds": [
         "evt-daily-sales-2027-01-08",
         "evt-rec-payroll-7"
@@ -519,7 +526,7 @@
       "date": "2027-01-09",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 3901642,
+      "closing": 3701642,
       "eventIds": [
         "evt-daily-sales-2027-01-09"
       ]
@@ -528,7 +535,7 @@
       "date": "2027-01-10",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 4178008,
+      "closing": 3978008,
       "eventIds": [
         "evt-daily-sales-2027-01-10"
       ]
@@ -536,9 +543,10 @@
     {
       "date": "2027-01-11",
       "inflow": 118442,
-      "outflow": 0,
-      "closing": 4296450,
+      "outflow": 250000,
+      "closing": 3846450,
       "eventIds": [
+        "evt-bill-WSLCB-2027-0",
         "evt-daily-sales-2027-01-11"
       ]
     },
@@ -546,7 +554,7 @@
       "date": "2027-01-12",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 4434633,
+      "closing": 3984633,
       "eventIds": [
         "evt-daily-sales-2027-01-12"
       ]
@@ -555,7 +563,7 @@
       "date": "2027-01-13",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 4592556,
+      "closing": 4142556,
       "eventIds": [
         "evt-daily-sales-2027-01-13"
       ]
@@ -563,10 +571,12 @@
     {
       "date": "2027-01-14",
       "inflow": 197404,
-      "outflow": 380000,
-      "closing": 4409960,
+      "outflow": 2330000,
+      "closing": 2009960,
       "eventIds": [
         "evt-bill-FP-4408-0",
+        "evt-bill-NW-4408-0",
+        "evt-bill-PRL-LEASE-88-BUYOUT-0",
         "evt-daily-sales-2027-01-14"
       ]
     },
@@ -574,7 +584,7 @@
       "date": "2027-01-15",
       "inflow": 296106,
       "outflow": 1150000,
-      "closing": 3556066,
+      "closing": 1156066,
       "eventIds": [
         "evt-daily-sales-2027-01-15",
         "evt-rec-est-tax-0",
@@ -585,7 +595,7 @@
       "date": "2027-01-16",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 3911393,
+      "closing": 1511393,
       "eventIds": [
         "evt-daily-sales-2027-01-16"
       ]
@@ -594,7 +604,7 @@
       "date": "2027-01-17",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 4187759,
+      "closing": 1787759,
       "eventIds": [
         "evt-daily-sales-2027-01-17"
       ]
@@ -603,7 +613,7 @@
       "date": "2027-01-18",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 4306201,
+      "closing": 1906201,
       "eventIds": [
         "evt-daily-sales-2027-01-18"
       ]
@@ -612,7 +622,7 @@
       "date": "2027-01-19",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 4444384,
+      "closing": 2044384,
       "eventIds": [
         "evt-daily-sales-2027-01-19"
       ]
@@ -621,7 +631,7 @@
       "date": "2027-01-20",
       "inflow": 157923,
       "outflow": 240000,
-      "closing": 4362307,
+      "closing": 1962307,
       "eventIds": [
         "evt-daily-sales-2027-01-20",
         "evt-rec-sales-tax-2"
@@ -631,7 +641,7 @@
       "date": "2027-01-21",
       "inflow": 197404,
       "outflow": 390000,
-      "closing": 4169711,
+      "closing": 1769711,
       "eventIds": [
         "evt-bill-FP-4409-0",
         "evt-daily-sales-2027-01-21"
@@ -641,7 +651,7 @@
       "date": "2027-01-22",
       "inflow": 296106,
       "outflow": 750000,
-      "closing": 3715817,
+      "closing": 1315817,
       "eventIds": [
         "evt-daily-sales-2027-01-22",
         "evt-rec-payroll-9"
@@ -651,7 +661,7 @@
       "date": "2027-01-23",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 4071144,
+      "closing": 1671144,
       "eventIds": [
         "evt-daily-sales-2027-01-23"
       ]
@@ -660,7 +670,7 @@
       "date": "2027-01-24",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 4347510,
+      "closing": 1947510,
       "eventIds": [
         "evt-daily-sales-2027-01-24"
       ]
@@ -669,7 +679,7 @@
       "date": "2027-01-25",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 4465952,
+      "closing": 2065952,
       "eventIds": [
         "evt-daily-sales-2027-01-25"
       ]
@@ -678,7 +688,7 @@
       "date": "2027-01-26",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 4604135,
+      "closing": 2204135,
       "eventIds": [
         "evt-daily-sales-2027-01-26"
       ]
@@ -687,7 +697,7 @@
       "date": "2027-01-27",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 4762058,
+      "closing": 2362058,
       "eventIds": [
         "evt-daily-sales-2027-01-27"
       ]
@@ -695,9 +705,10 @@
     {
       "date": "2027-01-28",
       "inflow": 197404,
-      "outflow": 260000,
-      "closing": 4699462,
+      "outflow": 550000,
+      "closing": 2009462,
       "eventIds": [
+        "evt-bill-FP-4410-0",
         "evt-bill-NW-4410-0",
         "evt-daily-sales-2027-01-28"
       ]
@@ -706,7 +717,7 @@
       "date": "2027-01-29",
       "inflow": 296106,
       "outflow": 750000,
-      "closing": 4245568,
+      "closing": 1555568,
       "eventIds": [
         "evt-daily-sales-2027-01-29",
         "evt-rec-payroll-10"
@@ -716,7 +727,7 @@
       "date": "2027-01-30",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 4600895,
+      "closing": 1910895,
       "eventIds": [
         "evt-daily-sales-2027-01-30"
       ]
@@ -725,7 +736,7 @@
       "date": "2027-01-31",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 4877261,
+      "closing": 2187261,
       "eventIds": [
         "evt-daily-sales-2027-01-31"
       ]
@@ -734,7 +745,7 @@
       "date": "2027-02-01",
       "inflow": 118442,
       "outflow": 550000,
-      "closing": 4445703,
+      "closing": 1755703,
       "eventIds": [
         "evt-daily-sales-2027-02-01",
         "evt-rec-rent-2"
@@ -744,7 +755,7 @@
       "date": "2027-02-02",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 4583886,
+      "closing": 1893886,
       "eventIds": [
         "evt-daily-sales-2027-02-02"
       ]
@@ -753,7 +764,7 @@
       "date": "2027-02-03",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 4741809,
+      "closing": 2051809,
       "eventIds": [
         "evt-daily-sales-2027-02-03"
       ]
@@ -762,7 +773,7 @@
       "date": "2027-02-04",
       "inflow": 197404,
       "outflow": 410000,
-      "closing": 4529213,
+      "closing": 1839213,
       "eventIds": [
         "evt-bill-FP-4411-0",
         "evt-daily-sales-2027-02-04"
@@ -772,7 +783,7 @@
       "date": "2027-02-05",
       "inflow": 296106,
       "outflow": 750000,
-      "closing": 4075319,
+      "closing": 1385319,
       "eventIds": [
         "evt-daily-sales-2027-02-05",
         "evt-rec-payroll-11"
@@ -782,7 +793,7 @@
       "date": "2027-02-06",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 4430646,
+      "closing": 1740646,
       "eventIds": [
         "evt-daily-sales-2027-02-06"
       ]
@@ -791,7 +802,7 @@
       "date": "2027-02-07",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 4707012,
+      "closing": 2017012,
       "eventIds": [
         "evt-daily-sales-2027-02-07"
       ]
@@ -800,7 +811,7 @@
       "date": "2027-02-08",
       "inflow": 118442,
       "outflow": 0,
-      "closing": 4825454,
+      "closing": 2135454,
       "eventIds": [
         "evt-daily-sales-2027-02-08"
       ]
@@ -809,7 +820,7 @@
       "date": "2027-02-09",
       "inflow": 138183,
       "outflow": 0,
-      "closing": 4963637,
+      "closing": 2273637,
       "eventIds": [
         "evt-daily-sales-2027-02-09"
       ]
@@ -818,7 +829,7 @@
       "date": "2027-02-10",
       "inflow": 157923,
       "outflow": 0,
-      "closing": 5121560,
+      "closing": 2431560,
       "eventIds": [
         "evt-daily-sales-2027-02-10"
       ]
@@ -826,10 +837,11 @@
     {
       "date": "2027-02-11",
       "inflow": 197404,
-      "outflow": 380000,
-      "closing": 4938964,
+      "outflow": 530000,
+      "closing": 2098964,
       "eventIds": [
         "evt-bill-FP-4412-0",
+        "evt-bill-NW-4412-0",
         "evt-daily-sales-2027-02-11"
       ]
     },
@@ -837,7 +849,7 @@
       "date": "2027-02-12",
       "inflow": 296106,
       "outflow": 750000,
-      "closing": 4485070,
+      "closing": 1645070,
       "eventIds": [
         "evt-daily-sales-2027-02-12",
         "evt-rec-payroll-12"
@@ -847,7 +859,7 @@
       "date": "2027-02-13",
       "inflow": 355327,
       "outflow": 0,
-      "closing": 4840397,
+      "closing": 2000397,
       "eventIds": [
         "evt-daily-sales-2027-02-13"
       ]
@@ -856,7 +868,7 @@
       "date": "2027-02-14",
       "inflow": 276366,
       "outflow": 0,
-      "closing": 5116763,
+      "closing": 2276763,
       "eventIds": [
         "evt-daily-sales-2027-02-14"
       ]
@@ -866,15 +878,16 @@
     {
       "start": "2026-11-16",
       "inflow": 1539751,
-      "outflow": 1370000,
-      "closing": 2369751,
-      "minClosing": 1738058,
-      "pipelineClosing": 2369751,
+      "outflow": 1520000,
+      "closing": 2219751,
+      "minClosing": 1588058,
+      "pipelineClosing": 2219751,
       "eventIds": [
         "evt-daily-sales-2026-11-16",
         "evt-daily-sales-2026-11-17",
         "evt-daily-sales-2026-11-18",
         "evt-bill-FP-4400-0",
+        "evt-bill-NW-4400-0",
         "evt-daily-sales-2026-11-19",
         "evt-daily-sales-2026-11-20",
         "evt-rec-payroll-0",
@@ -886,15 +899,15 @@
     {
       "start": "2026-11-23",
       "inflow": 1539751,
-      "outflow": 1010000,
-      "closing": 2899502,
-      "minClosing": 2267809,
-      "pipelineClosing": 2899502,
+      "outflow": 1140000,
+      "closing": 2619502,
+      "minClosing": 1987809,
+      "pipelineClosing": 2619502,
       "eventIds": [
         "evt-daily-sales-2026-11-23",
         "evt-daily-sales-2026-11-24",
         "evt-daily-sales-2026-11-25",
-        "evt-bill-NW-4401-0",
+        "evt-bill-FP-4401-0",
         "evt-daily-sales-2026-11-26",
         "evt-daily-sales-2026-11-27",
         "evt-rec-payroll-1",
@@ -904,19 +917,21 @@
     },
     {
       "start": "2026-11-30",
-      "inflow": 1539751,
-      "outflow": 1700000,
-      "closing": 2739253,
-      "minClosing": 2107560,
-      "pipelineClosing": 2739253,
+      "inflow": 1739751,
+      "outflow": 1850000,
+      "closing": 2509253,
+      "minClosing": 1877560,
+      "pipelineClosing": 2509253,
       "eventIds": [
         "evt-daily-sales-2026-11-30",
         "evt-daily-sales-2026-12-01",
         "evt-rec-rent-0",
         "evt-daily-sales-2026-12-02",
         "evt-bill-FP-4402-0",
+        "evt-bill-NW-4402-0",
         "evt-daily-sales-2026-12-03",
         "evt-daily-sales-2026-12-04",
+        "evt-plan-catering-2026-12-04-0",
         "evt-rec-payroll-2",
         "evt-daily-sales-2026-12-05",
         "evt-daily-sales-2026-12-06"
@@ -924,11 +939,11 @@
     },
     {
       "start": "2026-12-07",
-      "inflow": 1539751,
+      "inflow": 1889751,
       "outflow": 1160000,
-      "closing": 3119004,
-      "minClosing": 2487311,
-      "pipelineClosing": 3119004,
+      "closing": 3239004,
+      "minClosing": 2607311,
+      "pipelineClosing": 3239004,
       "eventIds": [
         "evt-daily-sales-2026-12-07",
         "evt-daily-sales-2026-12-08",
@@ -936,6 +951,7 @@
         "evt-bill-FP-4403-0",
         "evt-daily-sales-2026-12-10",
         "evt-daily-sales-2026-12-11",
+        "evt-plan-catering-2026-12-11-0",
         "evt-rec-payroll-3",
         "evt-daily-sales-2026-12-12",
         "evt-daily-sales-2026-12-13"
@@ -943,18 +959,20 @@
     },
     {
       "start": "2026-12-14",
-      "inflow": 1539751,
-      "outflow": 1250000,
-      "closing": 3408755,
-      "minClosing": 3017062,
-      "pipelineClosing": 3408755,
+      "inflow": 1789751,
+      "outflow": 1520000,
+      "closing": 3508755,
+      "minClosing": 3117062,
+      "pipelineClosing": 3508755,
       "eventIds": [
         "evt-daily-sales-2026-12-14",
         "evt-daily-sales-2026-12-15",
         "evt-daily-sales-2026-12-16",
+        "evt-bill-FP-4404-0",
         "evt-bill-NW-4404-0",
         "evt-daily-sales-2026-12-17",
         "evt-daily-sales-2026-12-18",
+        "evt-plan-catering-2026-12-18-0",
         "evt-rec-payroll-4",
         "evt-daily-sales-2026-12-19",
         "evt-daily-sales-2026-12-20",
@@ -965,9 +983,9 @@
       "start": "2026-12-21",
       "inflow": 1539751,
       "outflow": 1140000,
-      "closing": 3808506,
-      "minClosing": 3176813,
-      "pipelineClosing": 3808506,
+      "closing": 3908506,
+      "minClosing": 3276813,
+      "pipelineClosing": 3908506,
       "eventIds": [
         "evt-daily-sales-2026-12-21",
         "evt-daily-sales-2026-12-22",
@@ -983,15 +1001,16 @@
     {
       "start": "2026-12-28",
       "inflow": 1539751,
-      "outflow": 1700000,
-      "closing": 3648257,
-      "minClosing": 3016564,
-      "pipelineClosing": 3648257,
+      "outflow": 1850000,
+      "closing": 3598257,
+      "minClosing": 2966564,
+      "pipelineClosing": 3598257,
       "eventIds": [
         "evt-daily-sales-2026-12-28",
         "evt-daily-sales-2026-12-29",
         "evt-daily-sales-2026-12-30",
         "evt-bill-FP-4406-0",
+        "evt-bill-NW-4406-0",
         "evt-daily-sales-2026-12-31",
         "evt-daily-sales-2027-01-01",
         "evt-rec-payroll-6",
@@ -1003,15 +1022,15 @@
     {
       "start": "2027-01-04",
       "inflow": 1539751,
-      "outflow": 1010000,
-      "closing": 4178008,
-      "minClosing": 3546315,
-      "pipelineClosing": 4178008,
+      "outflow": 1160000,
+      "closing": 3978008,
+      "minClosing": 3346315,
+      "pipelineClosing": 3978008,
       "eventIds": [
         "evt-daily-sales-2027-01-04",
         "evt-daily-sales-2027-01-05",
         "evt-daily-sales-2027-01-06",
-        "evt-bill-NW-4407-0",
+        "evt-bill-FP-4407-0",
         "evt-daily-sales-2027-01-07",
         "evt-daily-sales-2027-01-08",
         "evt-rec-payroll-7",
@@ -1022,15 +1041,18 @@
     {
       "start": "2027-01-11",
       "inflow": 1539751,
-      "outflow": 1530000,
-      "closing": 4187759,
-      "minClosing": 3556066,
-      "pipelineClosing": 4187759,
+      "outflow": 3730000,
+      "closing": 1787759,
+      "minClosing": 1156066,
+      "pipelineClosing": 1787759,
       "eventIds": [
+        "evt-bill-WSLCB-2027-0",
         "evt-daily-sales-2027-01-11",
         "evt-daily-sales-2027-01-12",
         "evt-daily-sales-2027-01-13",
         "evt-bill-FP-4408-0",
+        "evt-bill-NW-4408-0",
+        "evt-bill-PRL-LEASE-88-BUYOUT-0",
         "evt-daily-sales-2027-01-14",
         "evt-daily-sales-2027-01-15",
         "evt-rec-est-tax-0",
@@ -1043,9 +1065,9 @@
       "start": "2027-01-18",
       "inflow": 1539751,
       "outflow": 1380000,
-      "closing": 4347510,
-      "minClosing": 3715817,
-      "pipelineClosing": 4347510,
+      "closing": 1947510,
+      "minClosing": 1315817,
+      "pipelineClosing": 1947510,
       "eventIds": [
         "evt-daily-sales-2027-01-18",
         "evt-daily-sales-2027-01-19",
@@ -1062,14 +1084,15 @@
     {
       "start": "2027-01-25",
       "inflow": 1539751,
-      "outflow": 1010000,
-      "closing": 4877261,
-      "minClosing": 4245568,
-      "pipelineClosing": 4877261,
+      "outflow": 1300000,
+      "closing": 2187261,
+      "minClosing": 1555568,
+      "pipelineClosing": 2187261,
       "eventIds": [
         "evt-daily-sales-2027-01-25",
         "evt-daily-sales-2027-01-26",
         "evt-daily-sales-2027-01-27",
+        "evt-bill-FP-4410-0",
         "evt-bill-NW-4410-0",
         "evt-daily-sales-2027-01-28",
         "evt-daily-sales-2027-01-29",
@@ -1082,9 +1105,9 @@
       "start": "2027-02-01",
       "inflow": 1539751,
       "outflow": 1710000,
-      "closing": 4707012,
-      "minClosing": 4075319,
-      "pipelineClosing": 4707012,
+      "closing": 2017012,
+      "minClosing": 1385319,
+      "pipelineClosing": 2017012,
       "eventIds": [
         "evt-daily-sales-2027-02-01",
         "evt-rec-rent-2",
@@ -1101,15 +1124,16 @@
     {
       "start": "2027-02-08",
       "inflow": 1539751,
-      "outflow": 1130000,
-      "closing": 5116763,
-      "minClosing": 4485070,
-      "pipelineClosing": 5116763,
+      "outflow": 1280000,
+      "closing": 2276763,
+      "minClosing": 1645070,
+      "pipelineClosing": 2276763,
       "eventIds": [
         "evt-daily-sales-2027-02-08",
         "evt-daily-sales-2027-02-09",
         "evt-daily-sales-2027-02-10",
         "evt-bill-FP-4412-0",
+        "evt-bill-NW-4412-0",
         "evt-daily-sales-2027-02-11",
         "evt-daily-sales-2027-02-12",
         "evt-rec-payroll-12",
@@ -1119,79 +1143,85 @@
     }
   ],
   "lowPoint": {
-    "week": "2026-11-16",
-    "date": "2026-11-20",
-    "amount": 1738058
+    "week": "2027-01-11",
+    "date": "2027-01-15",
+    "amount": 1156066
   },
   "firstBelowSafety": "2026-11-20",
   "weeksBelowSafety": [
-    "2026-11-16"
+    "2026-11-16",
+    "2026-11-30",
+    "2027-01-11",
+    "2027-01-18",
+    "2027-01-25",
+    "2027-02-01",
+    "2027-02-08"
   ],
   "freeCash": [
     {
       "week": "2026-11-16",
-      "amount": -188096,
+      "amount": -338096,
       "weeksFree": 0
     },
     {
       "week": "2026-11-23",
-      "amount": 181406,
-      "weeksFree": 12
+      "amount": -48594,
+      "weeksFree": 0
     },
     {
       "week": "2026-11-30",
-      "amount": 181406,
-      "weeksFree": 11
+      "amount": -770088,
+      "weeksFree": 0
     },
     {
       "week": "2026-12-07",
-      "amount": 561157,
-      "weeksFree": 10
+      "amount": -770088,
+      "weeksFree": 0
     },
     {
       "week": "2026-12-14",
-      "amount": 1090410,
-      "weeksFree": 9
+      "amount": -770088,
+      "weeksFree": 0
     },
     {
       "week": "2026-12-21",
-      "amount": 1090410,
-      "weeksFree": 8
+      "amount": -770088,
+      "weeksFree": 0
     },
     {
       "week": "2026-12-28",
-      "amount": 1090410,
-      "weeksFree": 7
+      "amount": -770088,
+      "weeksFree": 0
     },
     {
       "week": "2027-01-04",
-      "amount": 1620161,
-      "weeksFree": 6
+      "amount": -770088,
+      "weeksFree": 0
     },
     {
       "week": "2027-01-11",
-      "amount": 1629912,
-      "weeksFree": 5
+      "amount": -770088,
+      "weeksFree": 0
     },
     {
       "week": "2027-01-18",
-      "amount": 1789663,
-      "weeksFree": 4
+      "amount": -610337,
+      "weeksFree": 0
     },
     {
       "week": "2027-01-25",
-      "amount": 2149165,
-      "weeksFree": 3
+      "amount": -540835,
+      "weeksFree": 0
     },
     {
       "week": "2027-02-01",
-      "amount": 2149165,
-      "weeksFree": 2
+      "amount": -540835,
+      "weeksFree": 0
     },
     {
       "week": "2027-02-08",
-      "amount": 2558916,
-      "weeksFree": 1
+      "amount": -281084,
+      "weeksFree": 0
     }
   ],
   "warnings": [],
@@ -1265,6 +1295,23 @@
       "sourceRef": {
         "system": "zoho_books",
         "record": "FP-4400"
+      }
+    },
+    {
+      "id": "evt-bill-NW-4400-0",
+      "commitmentId": "bill-NW-4400",
+      "legIndex": 0,
+      "date": "2026-11-19",
+      "amount": 150000,
+      "currency": "USD",
+      "amountBase": 150000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-11-19",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4400"
       }
     },
     {
@@ -1430,20 +1477,20 @@
       }
     },
     {
-      "id": "evt-bill-NW-4401-0",
-      "commitmentId": "bill-NW-4401",
+      "id": "evt-bill-FP-4401-0",
+      "commitmentId": "bill-FP-4401",
       "legIndex": 0,
       "date": "2026-11-26",
-      "amount": 260000,
+      "amount": 390000,
       "currency": "USD",
-      "amountBase": 260000,
+      "amountBase": 390000,
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
       "basis": "due 2026-11-26",
       "sourceRef": {
         "system": "zoho_books",
-        "record": "NW-4401"
+        "record": "FP-4401"
       }
     },
     {
@@ -1626,6 +1673,23 @@
       }
     },
     {
+      "id": "evt-bill-NW-4402-0",
+      "commitmentId": "bill-NW-4402",
+      "legIndex": 0,
+      "date": "2026-12-03",
+      "amount": 150000,
+      "currency": "USD",
+      "amountBase": 150000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-12-03",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4402"
+      }
+    },
+    {
       "id": "evt-daily-sales-2026-12-03",
       "commitmentId": "daily-sales",
       "legIndex": 17,
@@ -1659,6 +1723,24 @@
       "sourceRef": {
         "system": "profile",
         "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-plan-catering-2026-12-04-0",
+      "commitmentId": "plan-catering-2026-12-04",
+      "legIndex": 0,
+      "date": "2026-12-04",
+      "amount": 200000,
+      "currency": "USD",
+      "amountBase": 200000,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.7,
+      "basis": "due 2026-12-04",
+      "category": "catering",
+      "sourceRef": {
+        "system": "owner",
+        "record": "catering-2026-12-04"
       }
     },
     {
@@ -1823,6 +1905,24 @@
       }
     },
     {
+      "id": "evt-plan-catering-2026-12-11-0",
+      "commitmentId": "plan-catering-2026-12-11",
+      "legIndex": 0,
+      "date": "2026-12-11",
+      "amount": 350000,
+      "currency": "USD",
+      "amountBase": 350000,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.7,
+      "basis": "due 2026-12-11",
+      "category": "catering",
+      "sourceRef": {
+        "system": "owner",
+        "record": "catering-2026-12-11"
+      }
+    },
+    {
       "id": "evt-rec-payroll-3",
       "commitmentId": "rec-payroll",
       "legIndex": 3,
@@ -1931,13 +2031,30 @@
       }
     },
     {
+      "id": "evt-bill-FP-4404-0",
+      "commitmentId": "bill-FP-4404",
+      "legIndex": 0,
+      "date": "2026-12-17",
+      "amount": 380000,
+      "currency": "USD",
+      "amountBase": 380000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-12-17",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4404"
+      }
+    },
+    {
       "id": "evt-bill-NW-4404-0",
       "commitmentId": "bill-NW-4404",
       "legIndex": 0,
       "date": "2026-12-17",
-      "amount": 260000,
+      "amount": 150000,
       "currency": "USD",
-      "amountBase": 260000,
+      "amountBase": 150000,
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
@@ -1981,6 +2098,24 @@
       "sourceRef": {
         "system": "profile",
         "record": "revenueModel.dailySales"
+      }
+    },
+    {
+      "id": "evt-plan-catering-2026-12-18-0",
+      "commitmentId": "plan-catering-2026-12-18",
+      "legIndex": 0,
+      "date": "2026-12-18",
+      "amount": 250000,
+      "currency": "USD",
+      "amountBase": 250000,
+      "direction": "in",
+      "status": "likely",
+      "confidence": 0.7,
+      "basis": "due 2026-12-18",
+      "category": "catering",
+      "sourceRef": {
+        "system": "owner",
+        "record": "catering-2026-12-18"
       }
     },
     {
@@ -2288,6 +2423,23 @@
       }
     },
     {
+      "id": "evt-bill-NW-4406-0",
+      "commitmentId": "bill-NW-4406",
+      "legIndex": 0,
+      "date": "2026-12-31",
+      "amount": 150000,
+      "currency": "USD",
+      "amountBase": 150000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2026-12-31",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4406"
+      }
+    },
+    {
       "id": "evt-daily-sales-2026-12-31",
       "commitmentId": "daily-sales",
       "legIndex": 45,
@@ -2450,20 +2602,20 @@
       }
     },
     {
-      "id": "evt-bill-NW-4407-0",
-      "commitmentId": "bill-NW-4407",
+      "id": "evt-bill-FP-4407-0",
+      "commitmentId": "bill-FP-4407",
       "legIndex": 0,
       "date": "2027-01-07",
-      "amount": 260000,
+      "amount": 410000,
       "currency": "USD",
-      "amountBase": 260000,
+      "amountBase": 410000,
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
       "basis": "due 2027-01-07",
       "sourceRef": {
         "system": "zoho_books",
-        "record": "NW-4407"
+        "record": "FP-4407"
       }
     },
     {
@@ -2557,6 +2709,24 @@
       }
     },
     {
+      "id": "evt-bill-WSLCB-2027-0",
+      "commitmentId": "bill-WSLCB-2027",
+      "legIndex": 0,
+      "date": "2027-01-11",
+      "amount": 250000,
+      "currency": "USD",
+      "amountBase": 250000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-01-11",
+      "category": "license",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "WSLCB-2027"
+      }
+    },
+    {
       "id": "evt-daily-sales-2027-01-11",
       "commitmentId": "daily-sales",
       "legIndex": 56,
@@ -2625,6 +2795,41 @@
       "sourceRef": {
         "system": "zoho_books",
         "record": "FP-4408"
+      }
+    },
+    {
+      "id": "evt-bill-NW-4408-0",
+      "commitmentId": "bill-NW-4408",
+      "legIndex": 0,
+      "date": "2027-01-14",
+      "amount": 150000,
+      "currency": "USD",
+      "amountBase": 150000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-01-14",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4408"
+      }
+    },
+    {
+      "id": "evt-bill-PRL-LEASE-88-BUYOUT-0",
+      "commitmentId": "bill-PRL-LEASE-88-BUYOUT",
+      "legIndex": 0,
+      "date": "2027-01-14",
+      "amount": 1800000,
+      "currency": "USD",
+      "amountBase": 1800000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-01-14",
+      "category": "equipment lease",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "PRL-LEASE-88-BUYOUT"
       }
     },
     {
@@ -2969,13 +3174,30 @@
       }
     },
     {
+      "id": "evt-bill-FP-4410-0",
+      "commitmentId": "bill-FP-4410",
+      "legIndex": 0,
+      "date": "2027-01-28",
+      "amount": 400000,
+      "currency": "USD",
+      "amountBase": 400000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-01-28",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "FP-4410"
+      }
+    },
+    {
       "id": "evt-bill-NW-4410-0",
       "commitmentId": "bill-NW-4410",
       "legIndex": 0,
       "date": "2027-01-28",
-      "amount": 260000,
+      "amount": 150000,
       "currency": "USD",
-      "amountBase": 260000,
+      "amountBase": 150000,
       "direction": "out",
       "status": "committed",
       "confidence": 0.95,
@@ -3323,6 +3545,23 @@
       "sourceRef": {
         "system": "zoho_books",
         "record": "FP-4412"
+      }
+    },
+    {
+      "id": "evt-bill-NW-4412-0",
+      "commitmentId": "bill-NW-4412",
+      "legIndex": 0,
+      "date": "2027-02-11",
+      "amount": 150000,
+      "currency": "USD",
+      "amountBase": 150000,
+      "direction": "out",
+      "status": "committed",
+      "confidence": 0.95,
+      "basis": "due 2027-02-11",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "NW-4412"
       }
     },
     {
