@@ -1,0 +1,468 @@
+[
+  {
+    "id": "afford-harbor-order",
+    "question": "Can I take the Harbor order?",
+    "decision": {
+      "asOf": "2026-11-16",
+      "currency": "USD",
+      "intent": "afford",
+      "verdict": "yes_if",
+      "headlineFacts": [
+        {
+          "label": "Lowest cash point without a deposit",
+          "amount": 2150000,
+          "date": "2026-12-25"
+        },
+        {
+          "label": "Safety line",
+          "amount": 3500000
+        }
+      ],
+      "numbers": [
+        {
+          "label": "Up-front share",
+          "value": 40,
+          "unit": "pct"
+        },
+        {
+          "label": "Harbor and Hearth payments on record",
+          "value": 4,
+          "unit": "count"
+        },
+        {
+          "label": "Extra days from Jaipur Textiles",
+          "value": 10,
+          "unit": "days"
+        }
+      ],
+      "context": {
+        "baseLowPoint": {
+          "date": "2026-12-25",
+          "amount": 2150000
+        },
+        "safetyLine": 3500000,
+        "shortfall": 1350000
+      },
+      "recommendation": {
+        "action": "Ask Harbor and Hearth for 40% up front",
+        "lever": {
+          "kind": "ask_advance",
+          "commitmentId": "po-HH-PO-552",
+          "share": 0.4
+        },
+        "upfrontShare": 0.4,
+        "byDate": "2026-12-01",
+        "cashEffect": 1600000,
+        "resultingLowPoint": {
+          "date": "2026-12-25",
+          "amount": 3750000
+        }
+      },
+      "fallback": {
+        "action": "Ask Jaipur Textiles for 10 more days",
+        "lever": {
+          "kind": "defer",
+          "commitmentId": "po-PO-2302",
+          "days": 10
+        },
+        "cashEffect": 1200000
+      },
+      "assumptions": [
+        "linked costs unknown"
+      ],
+      "conviction": "medium",
+      "convictionReasons": [
+        "Harbor and Hearth has only 4 payments on record"
+      ],
+      "whatWouldChange": "The deposit arriving later than Dec 1",
+      "citations": [
+        "po-HH-PO-552",
+        "po-PO-2302"
+      ],
+      "allowed": {
+        "amounts": [
+          1200000,
+          1350000,
+          1600000,
+          2150000,
+          3500000,
+          3750000
+        ],
+        "dates": [
+          "2026-12-01",
+          "2026-12-25"
+        ],
+        "numbers": [
+          {
+            "label": "Up-front share",
+            "value": 40,
+            "unit": "pct"
+          },
+          {
+            "label": "Harbor and Hearth payments on record",
+            "value": 4,
+            "unit": "count"
+          },
+          {
+            "label": "Extra days from Jaipur Textiles",
+            "value": 10,
+            "unit": "days"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "fix-gap-december",
+    "question": "What should I do about December?",
+    "decision": {
+      "asOf": "2026-11-16",
+      "currency": "USD",
+      "intent": "fix_gap",
+      "verdict": "act_now",
+      "headlineFacts": [
+        {
+          "label": "Lowest cash point",
+          "amount": -550000,
+          "date": "2026-12-25"
+        },
+        {
+          "label": "INV-1187 (Evergreen Home)",
+          "amount": 2800000,
+          "date": "2026-12-10"
+        }
+      ],
+      "numbers": [
+        {
+          "label": "Evergreen Home payments on record",
+          "value": 8,
+          "unit": "count"
+        },
+        {
+          "label": "Extra days from Jaipur Textiles",
+          "value": 10,
+          "unit": "days"
+        }
+      ],
+      "context": {
+        "baseLowPoint": {
+          "date": "2026-12-25",
+          "amount": -550000
+        },
+        "safetyLine": 3500000,
+        "shortfall": 4050000
+      },
+      "recommendation": {
+        "action": "Chase Evergreen Home on INV-1187 for payment by Dec 18",
+        "lever": {
+          "kind": "chase",
+          "commitmentId": "inv-INV-1187",
+          "assumeDate": "2026-12-18"
+        },
+        "byDate": "2026-12-18",
+        "cashEffect": 1950000,
+        "resultingLowPoint": {
+          "date": "2026-12-25",
+          "amount": 1400000
+        }
+      },
+      "fallback": {
+        "action": "Ask Jaipur Textiles for 10 more days",
+        "lever": {
+          "kind": "defer",
+          "commitmentId": "po-PO-2302",
+          "days": 10
+        },
+        "cashEffect": 1200000
+      },
+      "assumptions": [],
+      "conviction": "high",
+      "convictionReasons": [
+        "Evergreen Home has 8 payments on record",
+        "no tentative money sits on the path"
+      ],
+      "whatWouldChange": "Evergreen Home paying later than Dec 26",
+      "citations": [
+        "inv-INV-1187",
+        "po-PO-2302"
+      ],
+      "allowed": {
+        "amounts": [
+          -550000,
+          1200000,
+          1400000,
+          1950000,
+          2800000,
+          3500000,
+          4050000
+        ],
+        "dates": [
+          "2026-12-10",
+          "2026-12-18",
+          "2026-12-25",
+          "2026-12-26"
+        ],
+        "numbers": [
+          {
+            "label": "Evergreen Home payments on record",
+            "value": 8,
+            "unit": "count"
+          },
+          {
+            "label": "Extra days from Jaipur Textiles",
+            "value": 10,
+            "unit": "days"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "what-if-evergreen-january",
+    "question": "What if Evergreen pays in January?",
+    "decision": {
+      "asOf": "2026-11-16",
+      "currency": "USD",
+      "intent": "what_if",
+      "verdict": "act_now",
+      "headlineFacts": [
+        {
+          "label": "New lowest cash point",
+          "amount": -3350000,
+          "date": "2027-01-14"
+        },
+        {
+          "label": "Lowest cash point today",
+          "amount": -550000,
+          "date": "2026-12-25"
+        }
+      ],
+      "numbers": [
+        {
+          "label": "Extra days from Jaipur Textiles",
+          "value": 10,
+          "unit": "days"
+        },
+        {
+          "label": "Up-front share",
+          "value": 40,
+          "unit": "pct"
+        }
+      ],
+      "context": {
+        "baseLowPoint": {
+          "date": "2027-01-14",
+          "amount": -3350000
+        },
+        "safetyLine": 3500000,
+        "shortfall": 6850000
+      },
+      "recommendation": {
+        "action": "Ask Jaipur Textiles for 10 more days on PO-2302",
+        "lever": {
+          "kind": "defer",
+          "commitmentId": "po-PO-2302",
+          "days": 10
+        },
+        "byDate": "2026-12-12",
+        "cashEffect": 1200000,
+        "resultingLowPoint": {
+          "date": "2027-01-14",
+          "amount": -2150000
+        }
+      },
+      "fallback": {
+        "action": "Ask Harbor and Hearth for 40% up front on HH-PO-552",
+        "lever": {
+          "kind": "ask_advance",
+          "commitmentId": "po-HH-PO-552",
+          "share": 0.4
+        },
+        "cashEffect": 400000
+      },
+      "assumptions": [
+        "assumed Jan 15 for 'in January'"
+      ],
+      "conviction": "medium",
+      "convictionReasons": [
+        "'in January' is a vague date"
+      ],
+      "whatWouldChange": "The exact date Evergreen Home pays",
+      "scenario": {
+        "id": "whatif-evergreen-2027-01-15",
+        "kind": "what_if",
+        "overrides": [
+          {
+            "id": "ov-ask-evergreen-jan",
+            "target": {
+              "commitmentId": "inv-INV-1187"
+            },
+            "change": {
+              "date": "2027-01-15"
+            },
+            "origin": "owner"
+          }
+        ]
+      },
+      "scenarioId": "whatif-evergreen-2027-01-15",
+      "citations": [
+        "inv-INV-1187",
+        "po-PO-2302",
+        "po-HH-PO-552"
+      ],
+      "allowed": {
+        "amounts": [
+          -3350000,
+          -2150000,
+          -550000,
+          400000,
+          1200000,
+          3500000,
+          6850000
+        ],
+        "dates": [
+          "2026-12-12",
+          "2026-12-25",
+          "2027-01-14",
+          "2027-01-15"
+        ],
+        "numbers": [
+          {
+            "label": "Extra days from Jaipur Textiles",
+            "value": 10,
+            "unit": "days"
+          },
+          {
+            "label": "Up-front share",
+            "value": 40,
+            "unit": "pct"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "status-this-month",
+    "question": "Am I OK this month?",
+    "decision": {
+      "asOf": "2026-11-16",
+      "currency": "USD",
+      "intent": "status",
+      "verdict": "on_track",
+      "headlineFacts": [
+        {
+          "label": "Tightest day this month",
+          "amount": 4800000,
+          "date": "2026-11-27"
+        },
+        {
+          "label": "Safety line",
+          "amount": 3500000
+        }
+      ],
+      "numbers": [
+        {
+          "label": "Payments behind the largest open invoice",
+          "value": 8,
+          "unit": "count"
+        }
+      ],
+      "context": {
+        "baseLowPoint": {
+          "date": "2026-11-27",
+          "amount": 4800000
+        },
+        "safetyLine": 3500000
+      },
+      "assumptions": [],
+      "conviction": "high",
+      "convictionReasons": [
+        "based on 8 payments and current books"
+      ],
+      "whatWouldChange": "A bank balance that is out of date",
+      "citations": [
+        "inv-INV-1187"
+      ],
+      "allowed": {
+        "amounts": [
+          1300000,
+          3500000,
+          4800000
+        ],
+        "dates": [
+          "2026-11-27"
+        ],
+        "numbers": [
+          {
+            "label": "Payments behind the largest open invoice",
+            "value": 8,
+            "unit": "count"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "lookup-evergreen-lag",
+    "question": "When does Evergreen usually pay?",
+    "decision": {
+      "asOf": "2026-11-16",
+      "currency": "USD",
+      "intent": "lookup",
+      "verdict": "info",
+      "headlineFacts": [
+        {
+          "label": "INV-1187 due",
+          "amount": 2800000,
+          "date": "2026-12-10"
+        },
+        {
+          "label": "INV-1187 expected",
+          "date": "2026-12-24"
+        }
+      ],
+      "numbers": [
+        {
+          "label": "Evergreen Home typically pays late by",
+          "value": 14,
+          "unit": "days"
+        },
+        {
+          "label": "Evergreen Home payments on record",
+          "value": 8,
+          "unit": "count"
+        }
+      ],
+      "context": {},
+      "assumptions": [],
+      "conviction": "high",
+      "convictionReasons": [
+        "based on 8 payments and no pending reviews"
+      ],
+      "citations": [
+        "inv-INV-1187"
+      ],
+      "allowed": {
+        "amounts": [
+          2800000
+        ],
+        "dates": [
+          "2026-12-10",
+          "2026-12-24"
+        ],
+        "numbers": [
+          {
+            "label": "Evergreen Home typically pays late by",
+            "value": 14,
+            "unit": "days"
+          },
+          {
+            "label": "Evergreen Home payments on record",
+            "value": 8,
+            "unit": "count"
+          }
+        ]
+      }
+    }
+  }
+]

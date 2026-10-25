@@ -31,6 +31,7 @@ type ForecastRun = {
   firstBelowSafety?: string;   // date
   firstNegative?: string;      // date
   warnings: string[];          // data-quality: stale source, unresolved reviews, missing facts
+  review?: { needed: boolean; reasons: { code: string; message: string; refs: string[] }[] };  // structured needs-review flag
   days: { date: string; closing: number; eventIds: string[] }[];  // daily drill-down
   weeks: {
     start: string;             // Monday
@@ -60,6 +61,7 @@ Daily balances determine the low point, first-negative date, safety warnings, an
 - Payables stay on their contractual dates; past late payment is not permission to pay late.
 - If a receipt and a large outflow land on the same day and the order matters, flag that intraday ordering is unknown.
 - No data, stale data, or unresolved material reviews can never produce an all-clear brief. Say what is missing.
+  The engine sets `ForecastRun.review` (`needed` plus coded reasons with record refs) for every warning that means data is missing or unresolved, so consumers check `review.needed` instead of parsing `warnings`. Informational notes (lever no-ops, short horizon) do not set it.
 - Report both "below safety line" and "below zero"; a positive month-end can hide a mid-month payroll gap.
 
 ## Payment-lag model

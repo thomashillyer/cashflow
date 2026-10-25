@@ -148,11 +148,15 @@ function pikeNoodle(): Records {
   r.balances = [balance("bal-pike", $(22000), "2026-11-16")];
   const weights = [0.6, 0.7, 0.8, 1.0, 1.5, 1.8, 1.4];
   const mean = weights.reduce((a, b) => a + b, 0) / 7;
+  // Card deposits land settleLagDays after the sale (profiles/restaurant.json), so each deposit is shaped by its
+  // sale date's weekday: history stays in phase with the forecast.
+  const restaurant = JSON.parse(readFileSync(join(root, "profiles/restaurant.json"), "utf8")) as Profile;
+  const lag = restaurant.revenueModel.kind === "dailySales" ? (restaurant.revenueModel.settleLagDays ?? 0) : 0;
   const events: CashEvent[] = [];
   for (let i = 28; i >= 1; i--) {
     const date = addDays("2026-11-16", -i);
     const noise = ((i * 37) % 11) - 5; // deterministic wobble, +-$50
-    const amount = $((2200 * weights[dowOf(date)]!) / mean + noise * 10);
+    const amount = $((2200 * weights[dowOf(addDays(date, -lag))]!) / mean + noise * 10);
     events.push({ id: `bank-sales-${date}`, legIndex: 0, date, amount, currency: "USD", amountBase: amount, direction: "in", status: "actual", confidence: 1, basis: "card settlement", category: "sales", sourceRef: src("bank_csv", `sales-${date}`) });
   }
   // Six Friday payroll runs before the snapshot: material for recurring detection (weekly, Friday, about $7,500, matching

@@ -389,7 +389,7 @@ const DraftOutput = z.object({ subject: z.string().nullable(), body: z.string() 
 type DraftOutput = z.infer<typeof DraftOutput>;
 
 const promptCache = new Map<string, string>();
-const prompt = (file: string): string => {
+export const prompt = (file: string): string => {
   let t = promptCache.get(file);
   if (t === undefined) {
     t = readFileSync(join(import.meta.dirname, "prompts", file), "utf8");
@@ -397,12 +397,12 @@ const prompt = (file: string): string => {
   }
   return t;
 };
-const sha = (s: string) => createHash("sha256").update(s).digest("hex");
+export const sha = (s: string) => createHash("sha256").update(s).digest("hex");
 
-type Turn = { role: "user" | "assistant"; content: string };
+export type Turn = { role: "user" | "assistant"; content: string };
 
 // One structured-output call. Never throws; a problem string says why there is no output.
-async function callStructured<T>(
+export async function callStructured<T>(
   client: Anthropic | undefined, model: string, system: string, turns: Turn[], schema: z.ZodType<T>, effort: "low" | "medium",
 ): Promise<{ output: T } | { problem: string }> {
   try {
@@ -431,7 +431,7 @@ async function callStructured<T>(
 }
 
 // `</facts` inside any string must not close the data block.
-const factsBlock = (facts: unknown) => `<facts>\n${JSON.stringify(facts, null, 1).replace(/<\/facts/gi, "<\\/facts")}\n</facts>`;
+export const factsBlock = (facts: unknown) => `<facts>\n${JSON.stringify(facts, null, 1).replace(/<\/facts/gi, "<\\/facts")}\n</facts>`;
 
 const cacheDirs = (ctx: BriefContext) => ({
   writeDir: ctx.cacheDir ?? LIVE_CACHE_DIR,

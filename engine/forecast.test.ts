@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CashEvent, Commitment, Records, Scenario, Settlement } from "../schema/records";
 import type { Profile } from "../schema/profile";
-import { forecast } from "./forecast";
+import { countedActualIds, forecast } from "./forecast";
+import { matchPayments, SETTLEMENT_MATCH_DAYS } from "./expand";
 import { simulate } from "./simulate";
 import { partyLag } from "./lag";
 import { addDays, mondayOf } from "./dates";
@@ -123,6 +124,106 @@ describe("opening-cash boundary", () => {
 
   it("no snapshot warns instead of looking green", () => {
     expect(forecast(empty(), profile, base, "2026-10-25", {}).warnings.join(" ")).toMatch(/No opening balance/);
+  });
+});
+
+describe("opening cash with several accounts", () => {
+  const snap = (account: string, amount: number, asOf: string, currency = "USD") => ({ id: `bal-${account}-${asOf}`, account, amount, currency, asOf, sourceRef: src });
+  const act = (id: string, date: string, amount: number, o: Partial<CashEvent> = {}): CashEvent => ({ id, legIndex: 0, date, amount, currency: "USD", amountBase: amount, direction: "in", status: "actual", confidence: 1, basis: "bank", sourceRef: src, ...o });
+  const run = (r: Records) => forecast(r, profile, base, "2026-10-25", {});
+
+  it("rolls each account forward from its own snapshot date", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-18"), snap("sav", $(1000), "2026-10-22")] };
+    r.events = [
+      act("chk-mid", "2026-10-20", $(10), { account: "chk" }), // after chk snapshot, before sav: counted
+      act("chk-late", "2026-10-23", $(5), { account: "chk", direction: "out" }),
+      act("sav-early", "2026-10-20", $(999), { account: "sav" }), // already in sav's snapshot
+      act("sav-mid", "2026-10-23", $(50), { account: "sav" }),
+      act("after", "2026-10-25", $(7), { account: "chk" }), // on as-of: a forecast actual, not opening
+    ];
+    const out = run(r);
+    expect(out.openingBalance).toBe($(100 + 10 - 5 + 1000 + 50));
+    expect(out.warnings.join(" ")).not.toMatch(/different as-of|could not be matched/);
+    expect(out.events.filter((e) => e.status === "actual").map((e) => e.id)).toEqual(["after"]);
+  });
+
+  it("an actual dated before its account's snapshot is excluded", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20"), snap("sav", $(0), "2026-10-15")] };
+    r.events = [act("chk-pre", "2026-10-18", $(999), { account: "chk" }), act("sav-in", "2026-10-18", $(3), { account: "sav" })];
+    expect(run(r).openingBalance).toBe($(103));
+  });
+
+  it("unattributed actuals go to the only account", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20")], events: [act("pre", "2026-10-19", $(999)), act("mid", "2026-10-22", $(10))] };
+    const out = run(r);
+    expect(out.openingBalance).toBe($(110));
+    expect(out.warnings.join(" ")).not.toMatch(/could not be matched/);
+  });
+
+  it("untagged actuals between snapshot dates with several accounts: outflows counted, inflows left out, flagged", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-18"), snap("sav", $(1000), "2026-10-22")] };
+    r.events = [
+      act("old", "2026-10-10", $(999)), // before every snapshot: already in them, not ambiguous
+      act("amb-in", "2026-10-19", $(20)),
+      act("amb-out", "2026-10-21", $(30), { direction: "out" }),
+      act("amb-in2", "2026-10-21", $(15)),
+      act("new", "2026-10-23", $(4)), // after the latest snapshot: rolled forward
+    ];
+    const out = run(r);
+    expect(out.openingBalance).toBe($(1100 - 30 + 4));
+    expect(out.warnings.join(" ")).toMatch(/3 actuals with no account dated 2026-10-18 to before 2026-10-22.*net \$5\.00 in.*outflows \(\$30\.00\) are counted.*inflows \(\$35\.00\) left out.*needs review/);
+    const ids = countedActualIds(r, profile, "2026-10-25", {});
+    expect([...ids].sort()).toEqual(["amb-out", "new", "old"]);
+  });
+
+  it("an actual with no FX rate in an account's roll-forward is left out with a warning", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-18"), snap("eur", $(50), "2026-10-22")] };
+    r.events = [act("eur-1", "2026-10-20", $(10), { account: "chk", currency: "EUR" }), act("usd-1", "2026-10-20", $(5), { account: "chk" })];
+    const out = run(r);
+    expect(out.openingBalance).toBe($(155));
+    expect(out.warnings.join(" ")).toMatch(/Actual eur-1 is in EUR with no FX rate; left out of opening cash/);
+  });
+
+  it("actuals tagged to an account with no snapshot are left out of opening and the main line, one warning per account", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20")] };
+    r.events = [
+      act("card-old", "2026-10-01", $(500), { account: "card", direction: "out" }), // before the oldest snapshot: ignored
+      act("card-1", "2026-10-22", $(10), { account: "card", direction: "out" }),
+      act("card-2", "2026-10-23", $(4), { account: "card" }),
+      act("card-3", "2026-10-27", $(20), { account: "card", direction: "out" }), // after asOf: also out of the main line
+    ];
+    const out = run(r);
+    expect(out.openingBalance).toBe($(100));
+    expect(out.events.some((e) => e.id.startsWith("card"))).toBe(false);
+    const w = out.warnings.filter((x) => /account card/.test(x));
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatch(/^3 actuals tagged to account card, which has no balance on or before 2026-10-25 \(net \$26\.00 out\).*needs review/);
+    expect(countedActualIds(r, profile, "2026-10-25", {}).size).toBe(0);
+  });
+
+  it("with no snapshot at all, tagged actuals from the last 90 days are reported", () => {
+    const r = { ...empty(), events: [act("a", "2026-07-01", $(1), { account: "chk" }), act("b", "2026-10-01", $(2), { account: "chk" })] };
+    expect(run(r).warnings.join(" ")).toMatch(/1 actual tagged to account chk.*net \$2\.00 in/);
+  });
+
+  it("stale balances are checked per account", () => {
+    const r = { ...empty(), balances: [snap("checking", $(100), "2026-10-24"), snap("savings", $(100), "2026-09-01")] };
+    const w = forecast(r, { ...profile, thresholds: { ...profile.thresholds, staleAfterHours: 48 } }, base, "2026-10-25", {}).warnings;
+    expect(w.filter((x) => /older than 48 hours/.test(x))).toEqual(["Bank balance for savings is from 2026-09-01, older than 48 hours; refresh before relying on this."]);
+  });
+
+  it("countedActualIds: in-snapshot, rolled and main-line actuals count; no-FX and orphan ones do not", () => {
+    const r = { ...empty(), balances: [snap("chk", $(100), "2026-10-20")] };
+    r.events = [
+      act("in-snap", "2026-10-19", $(5000), { account: "chk", direction: "out" }),
+      act("rolled", "2026-10-21", $(5000), { account: "chk", direction: "out" }),
+      act("no-fx", "2026-10-21", $(5000), { account: "chk", direction: "out", currency: "EUR" }),
+      act("orphan", "2026-10-21", $(5000), { account: "card", direction: "out" }),
+      act("future", "2026-10-26", $(5000), { direction: "out" }),
+      act("future-no-fx", "2026-10-26", $(5000), { direction: "out", currency: "EUR" }),
+    ];
+    expect([...countedActualIds(r, profile, "2026-10-25", {})].sort()).toEqual(["future", "in-snap", "rolled"]);
+    expect(countedActualIds(r, profile, "2026-10-25", { EUR: 1.1 }).has("no-fx")).toBe(true);
   });
 });
 
@@ -867,7 +968,7 @@ describe("overdue outflows: what rolls to asOf and what does not", () => {
     const run = forecast(r, profile, base, asOf, {});
     expect(run.openingBalance).toBe($(95000));
     expect(closing(run, asOf)).toBe($(95000));
-    expect(run.warnings.join(" ")).toMatch(/possibly paid already \(bank line bank-1\), needs reconciliation/);
+    expect(run.warnings.join(" ")).toMatch(/\$5,000\.00 paid per bank line bank-1 with no matching settlement in the books; deducted from what is expected \(needs reconciliation\)/);
   });
 
   it("partial bank cover rolls only the uncovered remainder", () => {
@@ -905,5 +1006,307 @@ describe("overdue outflows: what rolls to asOf and what does not", () => {
     r.signals = [{ id: "sig-d", channel: "owner", receivedAt: "2026-11-15T00:00:00Z", commitmentId: "bill2", claim: { kind: "date_change", newDate: "2026-11-20" }, confidence: 1, state: "applied", sourceRef: src }];
     const run = forecast(r, p, base, asOf, {});
     expect(run.events.filter((e) => e.commitmentId === "bill2").map((e) => e.date).sort()).toEqual(["2026-11-20", "2026-12-01"]);
+  });
+});
+
+describe("split lever (#39)", () => {
+  const p: Profile = {
+    ...profile,
+    thresholds: { ...profile.thresholds, splitIntervalDays: 14 },
+    recurring: [{ id: "rec-payroll", name: "Payroll", amount: $(1000), cadence: "weekly", anchor: "2026-10-30", category: "payroll", nonDeferrable: true }],
+  };
+  const asOf = "2026-10-25";
+  const sim = (records: Records, levers: Parameters<typeof simulate>[3], prof: Profile = p) => simulate(records, prof, [], levers, asOf, {});
+  const legs = (run: { events: CashEvent[] }, id: string) => run.events.filter((e) => e.commitmentId === id).map((e) => [e.id, e.date, e.amount] as const);
+  const bill = (due = "2026-10-29", amount = 10001) => {
+    const r = empty();
+    r.balances = [bal($(15000))];
+    r.commitments = [com("bill", { type: "bill", amount, anchors: { due } })];
+    return r;
+  };
+
+  it("installments sum exactly to the leg, are spaced by the profile interval, and keep their source", () => {
+    const s = sim(bill(), [{ kind: "split", commitmentId: "bill", shares: [1 / 3, 1 / 3, 1 / 3] }]);
+    const orig = s.base.events.find((e) => e.commitmentId === "bill")!.id;
+    const out = s.run.events.filter((e) => e.commitmentId === "bill");
+    expect(out.map((e) => [e.id, e.date, e.amount])).toEqual([
+      [`${orig}-split0`, "2026-10-29", 3333],
+      [`${orig}-split1`, "2026-11-12", 3333],
+      [`${orig}-split2`, "2026-11-26", 3335],
+    ]);
+    expect(out.reduce((a, e) => a + e.amount, 0)).toBe(10001);
+    expect(out.reduce((a, e) => a + e.amountBase, 0)).toBe(10001);
+    for (const e of out) {
+      expect(e.overriddenBy).toContain("lever-split-bill");
+      expect(e.basis).toMatch(/installment \d of 3/);
+      expect(e.sourceRef).toEqual(src);
+    }
+  });
+
+  it("uses 30 days when the profile has no splitIntervalDays", () => {
+    const { run } = sim(bill(), [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }], { ...p, thresholds: profile.thresholds });
+    expect(legs(run, "bill").map((x) => x[1])).toEqual(["2026-10-29", "2026-11-28"]);
+  });
+
+  it("splitting a payable raises the low point, and simulate reports it", () => {
+    const r = bill("2026-10-29", $(20000));
+    r.commitments.push(com("inv", { type: "invoice", amount: $(12000), anchors: { due: "2026-11-05" } }));
+    const s = sim(r, [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }], { ...p, recurring: [] });
+    expect(s.base.lowPoint.amount).toBe(-$(5000));
+    expect(s.run.lowPoint.amount).toBe($(5000));
+    expect(s.lowPointDelta).toBe($(10000));
+    expect(s.lowPointDelta).toBeGreaterThan(0);
+    expect(legs(s.base, "bill")).toHaveLength(1);
+  });
+
+  it("invalid shares warn and change nothing", () => {
+    for (const shares of [[0.5, 0.4], [1.2, -0.2], [], [0.5, 0.5 + 1e-6]]) {
+      const s = sim(bill(), [{ kind: "split", commitmentId: "bill", shares }]);
+      expect(legs(s.run, "bill")).toEqual(legs(s.base, "bill"));
+      expect(s.lowPointDelta).toBe(0);
+      expect(s.run.warnings.join(" ")).toMatch(/lever split on bill skipped: shares must be positive and sum to 1/);
+    }
+    const ok = sim(bill(), [{ kind: "split", commitmentId: "bill", shares: [0.1, 0.2, 0.7] }]);
+    expect(legs(ok.run, "bill")).toHaveLength(3);
+  });
+
+  it("nonDeferrable items are never split", () => {
+    const s = sim(empty(), [{ kind: "split", commitmentId: "rec-payroll", shares: [0.5, 0.5] }]);
+    expect(s.lowPointDelta).toBe(0);
+    expect(legs(s.run, "rec-payroll")).toEqual(legs(s.base, "rec-payroll"));
+    expect(s.run.warnings.join(" ")).toMatch(/lever split on rec-payroll skipped: marked nonDeferrable/);
+  });
+
+  it("a receivable splits its next receipt only, never an outflow", () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [com("inv", { type: "invoice", amount: $(9000), anchors: { due: "2026-11-02" } })];
+    const { run } = sim(r, [{ kind: "split", commitmentId: "inv", shares: [0.25, 0.75] }]);
+    expect(legs(run, "inv").map((x) => [x[1], x[2]])).toEqual([["2026-11-02", $(2250)], ["2026-11-16", $(6750)]]);
+    expect(run.events.filter((e) => e.commitmentId === "inv").every((e) => e.direction === "in")).toBe(true);
+  });
+
+  it("splits only the earliest remaining leg by default, or the named legIndex", () => {
+    const r = empty();
+    r.balances = [bal($(100000))];
+    r.commitments = [com("po", { type: "purchase_order", patternId: "split_50_50", amount: $(10000), anchors: { order: "2026-10-28", ship: "2026-11-10" } })];
+    const first = sim(r, [{ kind: "split", commitmentId: "po", shares: [0.5, 0.5] }]);
+    expect(legs(first.run, "po").map((x) => [x[1], x[2]])).toEqual([["2026-10-28", $(2500)], ["2026-11-10", $(5000)], ["2026-11-11", $(2500)]]);
+    const second = sim(r, [{ kind: "split", commitmentId: "po", shares: [0.5, 0.5], legIndex: 1 }]);
+    expect(legs(second.run, "po").map((x) => [x[1], x[2]])).toEqual([["2026-10-28", $(5000)], ["2026-11-10", $(2500)], ["2026-11-24", $(2500)]]);
+  });
+
+  it("an overdue payment is not split (base applies bank-cover checks to it)", () => {
+    const s = sim(bill("2026-10-10", $(3000)), [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }]);
+    expect(legs(s.run, "bill")).toEqual(legs(s.base, "bill"));
+    expect(s.lowPointDelta).toBe(0);
+    expect(s.run.warnings.join(" ")).toMatch(/overdue payment; split skipped — check whether it is already paid/);
+  });
+
+  const deal = () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [com("deal", { type: "sales_deal", amount: $(10000), anchors: { order: "2026-10-10", delivery: "2026-11-20" } })];
+    return r;
+  };
+  const dp: Profile = {
+    ...p,
+    recurring: [],
+    paymentPatterns: [...p.paymentPatterns, { id: "deal", appliesTo: "sales_deal", isDefault: true, legs: [{ share: 0.3, anchor: "order", offsetDays: 0, direction: "in" }, { share: 0.7, anchor: "delivery", offsetDays: 0, direction: "in" }] }],
+  };
+
+  it("with no legIndex, an overdue receipt is skipped and the earliest future receipt is split", () => {
+    const { run } = sim(deal(), [{ kind: "split", commitmentId: "deal", shares: [0.5, 0.5] }], dp);
+    expect(legs(run, "deal").map((x) => [x[1], x[2]])).toEqual([["2026-10-10", $(3000)], ["2026-11-20", $(3500)], ["2026-12-04", $(3500)]]);
+  });
+
+  it("a named overdue receipt starts one interval after asOf, never as instant cash", () => {
+    const s = sim(deal(), [{ kind: "split", commitmentId: "deal", shares: [0.5, 0.5], legIndex: 0 }], dp);
+    expect(legs(s.run, "deal").map((x) => [x[1], x[2]])).toEqual([["2026-11-08", $(1500)], ["2026-11-20", $(7000)], ["2026-11-22", $(1500)]]);
+    expect(closing(s.run, asOf)).toBe(0);
+  });
+
+  it("a later lever acts on one installment: [split, pay_early] keeps the discount on every part, ids unique", () => {
+    const r = bill("2026-11-20", $(10000));
+    r.commitments = [{ ...r.commitments[0]!, discount: { pct: 2, byDate: "2026-11-30" } }];
+    const { run } = sim(r, [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }, { kind: "pay_early", commitmentId: "bill" }], { ...p, recurring: [] });
+    const out = run.events.filter((e) => e.commitmentId === "bill");
+    expect(out.map((e) => [e.date, e.amount])).toEqual([[asOf, $(4900)], [asOf, $(4900)]]);
+    expect(out.reduce((a, e) => a + e.amount, 0)).toBe($(9800));
+    expect(new Set(run.events.map((e) => e.id)).size).toBe(run.events.length);
+    const payIds = out.map((e) => e.overriddenBy!.find((x) => x.startsWith("lever-pay_early"))!);
+    expect(new Set(payIds).size).toBe(2);
+  });
+
+  it("[split, defer 10] defers only the first installment by default", () => {
+    const { run } = sim(bill("2026-11-02", $(10000)), [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }, { kind: "defer", commitmentId: "bill", days: 10 }]);
+    expect(legs(run, "bill").map((x) => [x[1], x[2]])).toEqual([["2026-11-12", $(5000)], ["2026-11-16", $(5000)]]);
+  });
+});
+
+describe("settlement / bank-line identity: a payment counts once (#96)", () => {
+  const asOf = "2026-10-25";
+  const bank = (id: string, date: string, amount: number, o: Partial<CashEvent> = {}): CashEvent => ({ id, commitmentId: "inv", legIndex: 0, date, amount, currency: "USD", amountBase: amount, direction: "in", status: "actual", confidence: 1, basis: "bank", sourceRef: src, ...o });
+  const settle = (id: string, date: string, amount: number, o: Partial<Settlement> = {}): Settlement => ({ id, commitmentId: "inv", amount, currency: "USD", date, sourceRef: src, ...o });
+  const expected = (run: ReturnType<typeof forecast>, id = "inv") => run.events.filter((e) => e.commitmentId === id && e.status !== "actual").map((e) => e.amount);
+  const inv = (o: Partial<Commitment> = {}) => com("inv", { type: "invoice", amount: $(50), settlement: "partial", anchors: { due: "2026-10-27" }, ...o });
+
+  it("TECHNICAL_PLAN 6, bank only: $100 + $20 tagged bank line + $30 expected = $150", () => {
+    const r = { ...empty(), balances: [bal($(100))], commitments: [inv()], events: [bank("bank-1", "2026-10-26", $(20))] };
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(30)]);
+    expect(closing(run, "2026-10-28")).toBe($(150));
+    expect(run.warnings.join(" ")).toMatch(/\$20\.00 paid per bank line bank-1 with no matching settlement in the books/);
+  });
+
+  it("TECHNICAL_PLAN 6, accounting only: a settlement inside the snapshot reduces what is expected once", () => {
+    // The $20 landed on Oct 26; the Oct 27 snapshot of $120 already includes it, and no bank line is loaded.
+    const r = { ...empty(), balances: [bal($(120), "2026-10-27")], commitments: [inv({ anchors: { due: "2026-10-29" } })], settlements: [settle("set-1", "2026-10-26", $(20))] };
+    const run = forecast(r, profile, base, "2026-10-27", {});
+    expect(expected(run)).toEqual([$(30)]);
+    expect(closing(run, "2026-10-30")).toBe($(150));
+  });
+
+  it("TECHNICAL_PLAN 6, both: a settlement and its bank line a day apart count once", () => {
+    const r = { ...empty(), balances: [bal($(100))], commitments: [inv()], settlements: [settle("set-1", "2026-10-25", $(20))], events: [bank("bank-1", "2026-10-26", $(20))] };
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(30)]);
+    expect(closing(run, "2026-10-28")).toBe($(150));
+    expect(run.warnings.join(" ")).not.toMatch(/not seen in the bank|no matching settlement|double count/);
+  });
+
+  it("the same for a bill with outstanding set: books, bank, or both all give one payment", () => {
+    const mk = (settlements: Settlement[], events: CashEvent[], outstanding?: number) =>
+      forecast({ ...empty(), balances: [bal($(1000))], commitments: [com("inv", { type: "bill", amount: $(50), ...(outstanding === undefined ? {} : { outstanding }), anchors: { due: "2026-11-05" } })], settlements, events }, profile, base, asOf, {});
+    const pay = bank("bank-1", "2026-10-28", $(20), { direction: "out" });
+    for (const run of [mk([], [pay]), mk([settle("s", "2026-10-28", $(20))], [pay]), mk([], [pay], $(30)), mk([settle("s", "2026-10-27", $(20))], [pay], $(30))]) {
+      expect(expected(run)).toEqual([$(30)]);
+      expect(closing(run, "2026-11-06")).toBe($(950));
+    }
+  });
+
+  it("a future-dated bill the bank already shows as paid is counted once, with or without a settlement", () => {
+    const bill = com("bill-f", { type: "bill", amount: $(1000), anchors: { due: "2026-11-10" } });
+    const paid = bank("bank-f", "2026-11-03", $(1000), { commitmentId: "bill-f", direction: "out" });
+    for (const settlements of [[], [settle("set-f", "2026-11-02", $(1000), { commitmentId: "bill-f" })]]) {
+      const run = forecast({ ...empty(), balances: [bal($(5000))], commitments: [bill], settlements, events: [paid] }, profile, base, asOf, {});
+      expect(expected(run, "bill-f")).toEqual([]);
+      expect(closing(run, "2026-11-11")).toBe($(4000));
+    }
+  });
+
+  it("a tagged bank line reduces the earliest pattern leg, not only overdue ones", () => {
+    const r = empty();
+    r.balances = [bal($(100000))];
+    r.commitments = [com("po", { type: "purchase_order", patternId: "split_50_50", amount: $(10000), anchors: { order: "2026-10-26", ship: "2026-11-10" } })];
+    r.events = [bank("bank-po", "2026-10-26", $(5000), { commitmentId: "po", direction: "out" })];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(run.events.filter((e) => e.commitmentId === "po" && e.status !== "actual").map((e) => [e.legIndex, e.amount])).toEqual([[1, $(5000)]]);
+    expect(closing(run, "2026-11-11")).toBe($(90000));
+  });
+
+  it("two partial payments pair up greedily by date, each side used once", () => {
+    const c = com("inv", { type: "invoice", amount: $(100), anchors: { due: "2026-11-10" } });
+    const records = { ...empty(), settlements: [settle("s1", "2026-10-26", $(30)), settle("s2", "2026-10-28", $(30))], events: [bank("a1", "2026-10-27", $(30)), bank("a2", "2026-10-28", $(30))] };
+    const m = matchPayments(c, records, "2027-01-25", []);
+    expect(m.pairs.map((p) => `${p.settlement.id}=${p.actual.id}`)).toEqual(["s2=a2", "s1=a1"]);
+    expect(m.settlements).toEqual([]);
+    expect(m.actuals).toEqual([]);
+    const run = forecast({ ...records, balances: [bal($(100))], commitments: [c] }, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(40)]);
+    expect(closing(run, "2026-11-11")).toBe($(200));
+  });
+
+  it(`dates more than ${SETTLEMENT_MATCH_DAYS} days apart are not the same payment`, () => {
+    const c = inv();
+    const m = matchPayments(c, { ...empty(), settlements: [settle("s1", "2026-10-26", $(20))], events: [bank("a1", "2026-10-30", $(20))] }, "2027-01-25", []);
+    expect(m.pairs).toEqual([]);
+  });
+
+  it("an unmatched settlement and bank line (different amount or date) are one payment; the books' figure counts", () => {
+    const r = { ...empty(), balances: [bal($(100))], commitments: [inv()], settlements: [settle("set-1", "2026-10-26", $(25))], events: [bank("bank-1", "2026-10-26", $(20))] };
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(25)]);
+    expect(run.warnings.join(" ")).toMatch(/settlement set-1 and bank line bank-1 differ \(amount\/date\); treated as one payment, counting the books' \$25\.00 \(needs reconciliation\)/);
+    expect(run.warnings.join(" ")).not.toMatch(/double count|not seen in the bank/);
+  });
+
+  it("review A: outstanding set, settlement 10-16 and bank line 10-21 of $1,000 are one payment, $1,000 still expected", () => {
+    const r = empty();
+    r.balances = [bal($(5000), "2026-10-14")];
+    r.commitments = [com("inv", { type: "bill", amount: $(2000), outstanding: $(1000), anchors: { due: "2026-11-05" } })];
+    r.settlements = [settle("set-a", "2026-10-16", $(1000))];
+    r.events = [bank("bank-a", "2026-10-21", $(1000), { direction: "out" })];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(1000)]);
+    expect(closing(run, "2026-11-06")).toBe($(3000));
+    expect(run.warnings.join(" ")).toMatch(/settlement set-a and bank line bank-a differ/);
+  });
+
+  it("review B: outstanding unset, settlement $1,000 and bank line $985 count as the books' $1,000", () => {
+    const r = empty();
+    r.balances = [bal($(5000))];
+    r.commitments = [com("inv", { type: "invoice", amount: $(2000), anchors: { due: "2026-11-05" } })];
+    r.settlements = [settle("set-b", "2026-10-26", $(1000))];
+    r.events = [bank("bank-b", "2026-10-26", $(985))];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(1000)]);
+  });
+
+  it("review C: only actuals the run counts reduce what is expected (two accounts, ambiguous window)", () => {
+    const snap = (account: string, amount: number, d: string) => ({ id: `bal-${account}`, account, amount, currency: "USD", asOf: d, sourceRef: src });
+    const mk = (e: CashEvent, c: Commitment) => forecast({ ...empty(), balances: [snap("chk", $(1000), "2026-10-20"), snap("sav", $(1000), "2026-10-24")], commitments: [c], events: [e] }, profile, base, asOf, {});
+    // An untagged bill payment between the two snapshot dates is counted in opening cash (conservative), so it pays the bill once.
+    const bill = com("inv", { type: "bill", amount: $(300), anchors: { due: "2026-11-05" } });
+    const paidOut = mk(bank("bank-c", "2026-10-22", $(300), { direction: "out" }), bill);
+    expect(paidOut.openingBalance).toBe($(1700));
+    expect(expected(paidOut)).toEqual([]);
+    // An untagged receipt in the same window is left out of opening cash, so the invoice stays expected.
+    const invoice = com("inv", { type: "invoice", amount: $(300), anchors: { due: "2026-11-05" } });
+    const leftOut = mk(bank("bank-c", "2026-10-22", $(300)), invoice);
+    expect(leftOut.openingBalance).toBe($(2000));
+    expect(expected(leftOut)).toEqual([$(300)]);
+  });
+
+  it("a payment from an account with no snapshot does not cancel the bill", () => {
+    const r = { ...empty(), balances: [bal($(1000))], commitments: [com("inv", { type: "bill", amount: $(300), anchors: { due: "2026-11-05" } })], events: [bank("card-1", "2026-10-26", $(300), { direction: "out", account: "card" })] };
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(300)]);
+    expect(closing(run, "2026-11-06")).toBe($(700));
+  });
+
+  it("an actual on the (exclusive) horizon end is not a payment toward the commitment", () => {
+    const c = inv();
+    const at = matchPayments(c, { ...empty(), events: [bank("a1", "2027-01-25", $(20))] }, "2027-01-25", []);
+    const before = matchPayments(c, { ...empty(), events: [bank("a1", "2027-01-24", $(20))] }, "2027-01-25", []);
+    expect(at.actuals).toEqual([]);
+    expect(before.actuals.map((e) => e.id)).toEqual(["a1"]);
+  });
+
+  it("payments beyond the amount warn of a possible double count and name a same-party invoice the excess matches", () => {
+    const r = empty();
+    r.balances = [bal($(1000))];
+    r.commitments = [
+      com("inv", { type: "invoice", partyId: "p1", reference: "INV-1", amount: $(100), anchors: { due: "2026-11-05" } }),
+      com("inv2", { type: "invoice", partyId: "p1", reference: "INV-2", amount: $(50), anchors: { due: "2026-11-05" } }),
+    ];
+    r.events = [bank("bank-1", "2026-10-26", $(150))];
+    const run = forecast(r, profile, base, asOf, {});
+    expect(expected(run)).toEqual([]);
+    expect(expected(run, "inv2")).toEqual([$(50)]);
+    expect(run.warnings.join(" ")).toMatch(/INV-1: payments recorded \(\$150\.00\) exceed the amount \(\$100\.00\); the extra \$50\.00 matches INV-2 of the same party, which bank line bank-1 may also pay; possible double count/);
+  });
+
+  it("with outstanding set, bank-only money beyond what the books reflect reduces further", () => {
+    const run = forecast({ ...empty(), balances: [bal($(100))], commitments: [inv({ outstanding: $(25) })], events: [bank("bank-1", "2026-10-26", $(45))] }, profile, base, asOf, {});
+    expect(expected(run)).toEqual([$(5)]);
+    expect(run.warnings.join(" ")).toMatch(/\$20\.00 paid per bank line bank-1 is beyond what outstanding reflects/);
+  });
+
+  it("bank lines in the other direction or another currency do not count as payments", () => {
+    const r = { ...empty(), balances: [bal($(100))], commitments: [inv()], events: [bank("refund", "2026-10-26", $(20), { direction: "out" }), bank("eur", "2026-10-26", $(20), { currency: "EUR" })] };
+    const run = forecast(r, profile, base, asOf, { EUR: 1 });
+    expect(expected(run)).toEqual([$(50)]);
+    expect(run.warnings.join(" ")).toMatch(/bank line eur is in EUR, not USD/);
   });
 });

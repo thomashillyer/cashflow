@@ -123,6 +123,38 @@ describe.each(names)("fixture %s", (name) => {
     for (const x of [b, s]) expect(x.days.some((d) => d.eventIds.some((id) => x.events.find((e) => e.id === id)?.commitmentId === "inv-overdue-probe"))).toBe(false);
   });
 
+  it("review is present; needed iff reasons; every needs-review warning has a structured reason (#42)", () => {
+    for (const r of [run(), forecast(records, profile, stress, meta.asOf, meta.fxRates)]) {
+      expect(r.review).toBeDefined();
+      expect(r.review!.needed).toBe(r.review!.reasons.length > 0);
+      for (const x of r.review!.reasons) expect(r.warnings).toContain(x.message);
+      const flagged = new Set(r.review!.reasons.map((x) => x.message));
+      const mustFlag = r.warnings.filter((w) => /needs review|needs reconciliation|no FX rate|cannot be trusted|refresh before|^Overdue|^Unconfirmed|matches no forecast event|not forecast|check the allocation|double count/.test(w));
+      expect(mustFlag.filter((w) => !flagged.has(w))).toEqual([]);
+      if (mustFlag.length > 0) expect(r.review!.needed).toBe(true);
+    }
+    expect(read<{ review?: unknown }>(`fixtures/${name}/forecast_run.json`).review).toEqual(run().review);
+  });
+
+  it("an overdue receipt makes the run need review, citing it (#42)", () => {
+    const due = new Date(Date.parse(`${meta.asOf}T00:00:00Z`) - (profile.defaultLagDays + 3) * 86400000).toISOString().slice(0, 10);
+    const r: Records = {
+      ...records,
+      commitments: [...records.commitments, { id: "inv-overdue-probe", type: "invoice", amount: 100, currency: profile.baseCurrency, anchors: { due }, status: "committed", sourceRef: { system: "test", record: "probe" } }],
+    };
+    const x = forecast(r, profile, base, meta.asOf, meta.fxRates);
+    expect(x.review!.needed).toBe(true);
+    expect(x.review!.reasons.some((y) => y.code === "overdue_receipt" && y.refs.includes("inv-overdue-probe"))).toBe(true);
+  });
+
+  if (expected.review) {
+    it("matches the expected review flag", () => {
+      const r = run();
+      expect(r.review!.needed).toBe(expected.review.needed);
+      expect([...new Set(r.review!.reasons.map((x) => x.code))].sort()).toEqual([...(expected.review.codes ?? [])].sort());
+    });
+  }
+
   it("simulate leaves the base untouched", () => {
     const c = records.commitments.find((x) => x.direction === "out" && x.settlement !== "paid");
     if (!c) return;
@@ -212,8 +244,10 @@ describe.each(names)("fixture %s", (name) => {
     it("forecasts daily sales from history, shaped by weekday", () => {
       const sales = run().events.filter((e) => e.commitmentId === "daily-sales");
       expect(sales.length).toBe(run().days.length);
-      const byDow = (d: number) => sales.find((e) => new Date(e.date + "T00:00:00Z").getUTCDay() === d)!.amount;
-      expect(byDow(6)).toBeGreaterThan(byDow(1)); // Saturday beats Monday
+      // Weekday of the sale, not the settlement: card sales land settleLagDays after the sale.
+      const lag = profile.revenueModel.kind === "dailySales" ? (profile.revenueModel.settleLagDays ?? 0) : 0;
+      const byDow = (d: number) => sales.find((e) => new Date(e.date + "T00:00:00Z").getUTCDay() === (d + lag) % 7)!.amount;
+      expect(byDow(6)).toBeGreaterThan(byDow(1)); // Saturday sales beat Monday sales
     });
   }
 });

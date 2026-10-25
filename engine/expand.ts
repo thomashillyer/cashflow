@@ -1,16 +1,18 @@
 // Step 1-3 of a run: commitments -> dated CashEvents (pattern legs, anchors, lag, recurring, linked costs).
 // Pure: no I/O, no clock. Docs: docs/design/05-forecast-engine.md, docs/TECHNICAL_PLAN.md section 6.
 
-import type { CashEvent, Commitment, Direction, Records, Signal } from "../schema/records";
+import type { CashEvent, Commitment, Direction, Records, Settlement, Signal } from "../schema/records";
 import type { Anchor, PaymentPattern, Profile } from "../schema/profile";
 import { addDays, addMonthsClamped, dateRange, diffDays, dowOf, endOfMonth } from "./dates";
 import { partyLag } from "./lag";
+import { Notes } from "./review";
+import type { ReviewReason } from "../schema/forecast";
 
-export type Expanded = { events: CashEvent[]; commitments: Commitment[]; warnings: string[] };
+export type Expanded = { events: CashEvent[]; commitments: Commitment[]; warnings: string[]; reasons: ReviewReason[] };
 
 type Leg = PaymentPattern["legs"][number];
 
-const STATUS_CONFIDENCE = { actual: 1, committed: 0.95, likely: 0.7, possible: 0.3 } as const;
+export const STATUS_CONFIDENCE = { actual: 1, committed: 0.95, likely: 0.7, possible: 0.3 } as const;
 
 // Anchors that mean "wait for the customer to pay", so the party's lag applies. `order` and `ship` are our own dates.
 const LAGGED_ANCHORS: Anchor[] = ["due", "invoice", "delivery", "month_end"];
@@ -26,7 +28,7 @@ export function toBase(amount: number, currency: string, profile: Profile, fx: R
   return rate === undefined ? undefined : Math.round(amount * rate);
 }
 
-function defaultDirection(c: Commitment): Direction {
+export function defaultDirection(c: Commitment): Direction {
   if (c.direction) return c.direction;
   if (c.type === "invoice" || c.type === "sales_deal") return "in";
   return "out";
@@ -50,14 +52,36 @@ function allocate(total: number, shares: number[]): number[] {
   return out;
 }
 
-function resolveAnchor(anchor: Anchor, c: Commitment, profile: Profile): { date?: string; note?: string } {
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+// First anchor date the commitment has, in the given order, with the name of the anchor used (for basis).
+function firstAnchor(c: Commitment, order: ("invoice" | "due" | "order" | "delivery")[]): { name: string; date: string } | undefined {
+  for (const name of order) {
+    const date = c.anchors[name];
+    if (date) return { name, date };
+  }
+  return undefined;
+}
+
+// `why` explains a missing date in the "not scheduled" warning.
+function resolveAnchor(anchor: Anchor, c: Commitment, profile: Profile, leg?: Leg): { date?: string; note?: string; why?: string } {
   const a = c.anchors;
   const lt = profile.leadTimes ?? {};
   if (anchor === "month_end") {
-    const ref = a.invoice ?? a.due ?? a.order ?? a.delivery;
-    return ref ? { date: endOfMonth(ref), note: `end of month of ${ref}` } : {};
+    // Last day of the calendar month of the invoice date (else due, order, delivery). offsetDays then counts from
+    // that day, so "net 30 end of month" is { anchor: "month_end", offsetDays: 30 }.
+    const ref = firstAnchor(c, ["invoice", "due", "order", "delivery"]);
+    return ref ? { date: endOfMonth(ref.date), note: `end of month of ${ref.name} ${ref.date}` } : { why: "needs an invoice, due, order, or delivery date" };
   }
-  if (anchor === "weekday") return {};
+  if (anchor === "weekday") {
+    // First date on/after the reference date (invoice, else order, else due) that falls on leg.weekday (0 = Monday).
+    const wd = leg?.weekday;
+    if (wd === undefined || !Number.isInteger(wd) || wd < 0 || wd > 6) return { why: "weekday anchor needs a leg weekday 0-6 (0 = Monday) in the profile" };
+    const ref = firstAnchor(c, ["invoice", "order", "due"]);
+    if (!ref) return { why: "needs an invoice, order, or due date" };
+    const date = addDays(ref.date, (wd - dowOf(ref.date) + 7) % 7);
+    return { date, note: `first ${WEEKDAYS[wd]} on/after ${ref.name} ${ref.date}` };
+  }
   if (a[anchor]) return { date: a[anchor] };
   if (anchor === "ship" && a.order && lt.productionDays !== undefined)
     return { date: addDays(a.order, lt.productionDays), note: `ship estimated = order + ${lt.productionDays}d production` };
@@ -92,7 +116,7 @@ function prepare(records: Records): Prepared {
 // Linked, same-direction, same-currency invoices/bills that replace part of a commitment (PO <-> invoice overlap).
 // Cross-currency links are skipped with a warning (TECHNICAL_PLAN 6.B.6: overlap only in the same currency).
 type Cover = { amount: number; cutoff?: string; id: string };
-function coveredByLinked(c: Commitment, byId: Map<string, Commitment>, warnings: string[]): Cover[] {
+function coveredByLinked(c: Commitment, byId: Map<string, Commitment>, warnings: Notes): Cover[] {
   const out: Cover[] = [];
   const label = c.reference ?? c.id;
   for (const id of c.linkedCommitmentIds ?? []) {
@@ -101,70 +125,154 @@ function coveredByLinked(c: Commitment, byId: Map<string, Commitment>, warnings:
     if (defaultDirection(l) !== defaultDirection(c)) continue;
     if (l.settlement === "cancelled" || l.settlement === "credited") continue;
     if (l.currency !== c.currency) {
-      warnings.push(`${label}: linked ${l.reference ?? l.id} is in ${l.currency}, not ${c.currency}; not offset against it (check for double counting)`);
+      warnings.review("linked_currency_mismatch", `${label}: linked ${l.reference ?? l.id} is in ${l.currency}, not ${c.currency}; not offset against it (check for double counting)`, [c.id, l.id]);
       continue;
     }
     out.push({ amount: l.amount, cutoff: l.anchors.due ?? l.anchors.invoice, id: l.id });
   }
   const covered = out.reduce((a, x) => a + x.amount, 0);
-  if (covered > c.amount) warnings.push(`${label}: linked invoices (${money(covered, c.currency)}) exceed the amount (${money(c.amount, c.currency)}); check the allocation`);
+  if (covered > c.amount) warnings.review("linked_overallocated", `${label}: linked invoices (${money(covered, c.currency)}) exceed the amount (${money(c.amount, c.currency)}); check the allocation`, [c.id, ...out.map((x) => x.id)]);
   // Earliest-dated invoice first; undated last. Ties by id so the run is deterministic.
   const key = (x: Cover) => `${x.cutoff ?? "9999-99-99"}|${x.id}`;
   return out.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 }
 
-// What of a commitment is already paid, and the total it is paid out of.
-// - `outstanding` unset: paid = the commitment's Settlements in its own currency. Settlements dated before the latest
-//   balance snapshot are inside opening cash; ones on/after it count only when a bank actual for the commitment is in
-//   records.events, otherwise the money stays expected and we warn (a Settlement and its bank line are one payment,
-//   TECHNICAL_PLAN 6 opening-cash boundary).
-// - `outstanding` set: amount - outstanding may already include linked invoices (an importer or older reconcile run
-//   lowered it), so the part not explained by settlements is treated as linked coverage already applied, and only the
-//   rest of the linked coverage is subtracted again later. paid = amount - outstanding - that pre-applied coverage.
+// A Settlement (from the books) and a bank actual tagged with the same commitmentId are one payment when they have the
+// same amount and currency and their dates are at most this many days apart (bank posting vs. booking date).
+// TODO(#44): move to the profile with the other tunables.
+export const SETTLEMENT_MATCH_DAYS = 3;
+
+type Payments = {
+  pairs: { settlement: Settlement; actual: CashEvent }[];
+  settlements: Settlement[]; // unmatched, in the commitment's currency
+  actuals: CashEvent[]; // unmatched tagged bank actuals, in the commitment's currency and direction
+};
+
+// What the payment rules need besides the commitment.
+// countedActuals: ids of stored actuals whose cash the run counts (forecast.ts countedActualIds). Actuals left out of
+// opening cash and the main line must not cancel expected money. Undefined (expand() called on its own): all count.
+export type PaymentContext = { snapDate: string; horizonEnd: string; countedActuals?: Set<string>; byId: Map<string, Commitment> };
+
+// The payment identity rule (TECHNICAL_PLAN 6 opening-cash boundary: a Settlement and its bank line count once).
+// Candidate pairs share amount and currency and lie within SETTLEMENT_MATCH_DAYS; they are matched greedily by date
+// distance, then settlement id, then actual id, so each side is used at most once and the result is deterministic.
+// Tagged actuals the run counts are payments on any date before the (exclusive) horizon end, including future-dated
+// (scheduled) bank payments. Actuals in the other direction (refunds) are not payments toward the commitment.
+export function matchPayments(c: Commitment, records: Records, horizonEnd: string, warnings: Notes | string[], countedActuals?: Set<string>): Payments {
+  // Exported for tests and callers that only want strings; inside a run it gets the Notes collector.
+  const flag = (code: string, msg: string, refs: string[]) => (warnings instanceof Notes ? warnings.review(code, msg, refs) : warnings.push(msg));
+  const label = c.reference ?? c.id;
+  const dir = defaultDirection(c);
+  const settlements: Settlement[] = [];
+  for (const s of records.settlements) {
+    if (s.commitmentId !== c.id) continue;
+    if (s.currency !== c.currency) {
+      flag("missing_fx", `${label}: settlement ${s.id} is in ${s.currency}, not ${c.currency}; not deducted from what is outstanding (needs review)`, [c.id, s.id]);
+      continue;
+    }
+    settlements.push(s);
+  }
+  const actuals: CashEvent[] = [];
+  for (const e of records.events) {
+    if (e.commitmentId !== c.id || e.direction !== dir || e.date >= horizonEnd) continue;
+    if (countedActuals && !countedActuals.has(e.id)) continue; // not in the run's cash, so not proof of payment here
+    if (e.currency !== c.currency) {
+      flag("missing_fx", `${label}: bank line ${e.id} is in ${e.currency}, not ${c.currency}; not deducted from what is outstanding (needs review)`, [c.id, e.id]);
+      continue;
+    }
+    actuals.push(e);
+  }
+  const candidates: { s: Settlement; a: CashEvent; gap: number }[] = [];
+  for (const s of settlements)
+    for (const a of actuals) {
+      const gap = Math.abs(diffDays(a.date, s.date));
+      if (s.amount === a.amount && gap <= SETTLEMENT_MATCH_DAYS) candidates.push({ s, a, gap });
+    }
+  candidates.sort((x, y) => x.gap - y.gap || (x.s.id < y.s.id ? -1 : x.s.id > y.s.id ? 1 : x.a.id < y.a.id ? -1 : x.a.id > y.a.id ? 1 : 0));
+  const usedS = new Set<string>();
+  const usedA = new Set<string>();
+  const pairs: Payments["pairs"] = [];
+  for (const { s, a } of candidates) {
+    if (usedS.has(s.id) || usedA.has(a.id)) continue;
+    usedS.add(s.id);
+    usedA.add(a.id);
+    pairs.push({ settlement: s, actual: a });
+  }
+  return { pairs, settlements: settlements.filter((s) => !usedS.has(s.id)), actuals: actuals.filter((a) => !usedA.has(a.id)) };
+}
+
+// What of a commitment is already paid, and the total it is paid out of. Payments come from matchPayments: a matched
+// Settlement + bank line counts once.
+// Unmatched on both sides (fees or an FX haircut change the amount, a posting delay breaks the window): the
+// Settlements and bank lines are treated as the same payment(s) and the books' figure (the Settlements) counts, as
+// seen in the bank; the bank-only money is not deducted again. Warned for reconciliation.
+// - `outstanding` unset: paid = matched pairs + unmatched Settlements that the bank shows (an unmatched bank line
+//   exists, or the Settlement is dated before the latest balance snapshot, so inside opening cash) + bank-only money
+//   when there is no unmatched Settlement. An unmatched Settlement on/after the snapshot with no bank line stays
+//   expected and warns. More paid than the amount warns of a possible double count.
+// - `outstanding` set: amount - outstanding is what the books already reflect. Settlements come from the same books, so
+//   they never reduce beyond it (excess warns). Bank lines may be newer than the books: payments are assumed reflected
+//   first, and only bank-only money beyond `amount - outstanding` reduces further. The part of `amount - outstanding`
+//   explained by no payment is treated as linked coverage already applied, and only the rest of the linked coverage is
+//   subtracted again later.
 // An applied amount_change signal states the new total; what was already paid stays paid.
 function paidSoFar(
   c: Commitment,
   records: Records,
   amountSignal: Signal | undefined,
   covered: number,
-  snapDate: string,
-  warnings: string[],
+  ctx: PaymentContext,
+  warnings: Notes,
 ): { total: number; paid: number; counted: Set<string> } {
   const label = c.reference ?? c.id;
   const counted = new Set<string>();
-  const mine = records.settlements.filter((s) => s.commitmentId === c.id);
+  const pay = matchPayments(c, records, ctx.horizonEnd, warnings, ctx.countedActuals);
+  const pairsSum = pay.pairs.reduce((a, p) => a + p.actual.amount, 0);
+  for (const p of pay.pairs) counted.add(p.settlement.id);
+  const bankIds = pay.actuals.map((e) => e.id).join(", ");
+  const merged = pay.settlements.length > 0 && pay.actuals.length > 0;
+  if (merged)
+    warnings.review("payment_mismatch", `${label}: settlement ${pay.settlements.map((s) => s.id).join(", ")} and bank line ${bankIds} differ (amount/date); treated as one payment, counting the books' ${money(pay.settlements.reduce((a, s) => a + s.amount, 0), c.currency)} (needs reconciliation)`, [c.id, ...pay.settlements.map((s) => s.id), ...pay.actuals.map((e) => e.id)]);
+  const bankOnly = merged ? 0 : pay.actuals.reduce((a, e) => a + e.amount, 0);
   let paid: number;
   let outstanding: number;
   if (c.outstanding === undefined) {
-    const banked = records.events.some((e) => e.commitmentId === c.id);
-    let settled = 0;
-    for (const s of mine) {
-      if (s.currency !== c.currency) {
-        warnings.push(`${label}: settlement ${s.id} is in ${s.currency}, not ${c.currency}; not deducted from what is outstanding (needs review)`);
-        continue;
-      }
-      if (s.date >= snapDate && !banked) {
-        warnings.push(`${label}: payment of ${money(s.amount, s.currency)} recorded on ${s.date} but not seen in the bank; still forecast as expected (needs reconciliation)`);
+    let settled = pairsSum + bankOnly;
+    for (const s of pay.settlements) {
+      if (s.date >= ctx.snapDate && !merged) {
+        warnings.review("unreconciled_settlement", `${label}: payment of ${money(s.amount, s.currency)} recorded on ${s.date} but not seen in the bank; still forecast as expected (needs reconciliation)`, [c.id, s.id]);
         continue;
       }
       settled += s.amount;
       counted.add(s.id);
     }
+    if (settled > c.amount) {
+      // One bank line can pay several invoices of the same party; name the open ones the excess would exactly cover.
+      const excess = settled - c.amount;
+      const also = [...ctx.byId.values()]
+        .filter((o) => o.id !== c.id && o.partyId !== undefined && o.partyId === c.partyId && o.currency === c.currency && defaultDirection(o) === defaultDirection(c) && (o.outstanding ?? o.amount) === excess)
+        .map((o) => o.reference ?? o.id);
+      warnings.review("possible_double_count", `${label}: payments recorded (${money(settled, c.currency)}) exceed the amount (${money(c.amount, c.currency)})${also.length ? `; the extra ${money(excess, c.currency)} matches ${also.join(", ")} of the same party, which ${bankIds ? `bank line ${bankIds}` : "the payment"} may also pay` : ""}; possible double count (needs reconciliation)`, [c.id, ...pay.pairs.map((p) => p.settlement.id), ...pay.settlements.map((s) => s.id), ...pay.actuals.map((e) => e.id)]);
+    } else if (bankOnly > 0)
+      warnings.review("unreconciled_payment", `${label}: ${money(bankOnly, c.currency)} paid per bank line ${bankIds} with no matching settlement in the books; deducted from what is expected (needs reconciliation)`, [c.id, ...pay.actuals.map((e) => e.id)]);
     paid = Math.min(c.amount, settled);
     outstanding = c.amount - paid;
   } else {
     outstanding = c.outstanding;
-    const settled = mine.filter((s) => s.currency === c.currency).reduce((a, s) => a + s.amount, 0);
-    for (const s of mine) if (s.currency === c.currency) counted.add(s.id);
+    const booked = pairsSum + pay.settlements.reduce((a, s) => a + s.amount, 0);
+    for (const s of pay.settlements) counted.add(s.id);
     const reduced = Math.max(0, c.amount - outstanding);
-    if (settled > reduced) warnings.push(`${label}: settlements (${money(settled, c.currency)}) exceed what outstanding reflects (${money(reduced, c.currency)}); possible double count (needs reconciliation)`);
-    const preCovered = Math.min(covered, Math.max(0, reduced - settled));
-    paid = reduced - preCovered;
+    if (booked > reduced) warnings.review("possible_double_count", `${label}: settlements (${money(booked, c.currency)}) exceed what outstanding reflects (${money(reduced, c.currency)}); possible double count (needs reconciliation)`, [c.id, ...pay.pairs.map((p) => p.settlement.id), ...pay.settlements.map((s) => s.id)]);
+    const beyond = Math.min(bankOnly, Math.max(0, booked + bankOnly - reduced));
+    if (beyond > 0)
+      warnings.review("unreconciled_payment", `${label}: ${money(beyond, c.currency)} paid per bank line ${bankIds} is beyond what outstanding reflects; deducted from what is expected (needs reconciliation)`, [c.id, ...pay.actuals.map((e) => e.id)]);
+    const preCovered = Math.min(covered, Math.max(0, reduced - booked - bankOnly));
+    paid = reduced - preCovered + beyond;
   }
   if (c.settlement === "partial" && outstanding >= c.amount)
-    warnings.push(`${label}: marked partially paid but nothing is recorded as paid; forecasting the full ${money(c.amount, c.currency)} (needs review)`);
+    warnings.review("settlement_status_mismatch", `${label}: marked partially paid but nothing is recorded as paid; forecasting the full ${money(c.amount, c.currency)} (needs review)`, [c.id]);
   if (c.settlement === "open" && paid > 0)
-    warnings.push(`${label}: marked open but ${money(paid, c.currency)} is already paid; forecasting only what remains (needs review)`);
+    warnings.review("settlement_status_mismatch", `${label}: marked open but ${money(paid, c.currency)} is already paid; forecasting only what remains (needs review)`, [c.id]);
   const total = amountSignal?.claim.kind === "amount_change" ? amountSignal.claim.newAmount : c.amount;
   return { total, paid: Math.min(total, paid), counted };
 }
@@ -176,16 +284,16 @@ function expandCommitment(
   fx: Record<string, number>,
   byId: Map<string, Commitment>,
   amountSignal: Signal | undefined,
-  snapDate: string,
-  warnings: string[],
+  ctx: PaymentContext,
+  warnings: Notes,
 ): CashEvent[] {
   const label = c.reference ?? c.id;
   if (c.settlement === "paid" && c.outstanding !== undefined && c.outstanding > 0)
-    warnings.push(`${label}: marked paid but ${money(c.outstanding, c.currency)} is still outstanding; nothing forecast (needs review)`);
+    warnings.review("settlement_status_mismatch", `${label}: marked paid but ${money(c.outstanding, c.currency)} is still outstanding; nothing forecast (needs review)`, [c.id]);
   if (c.settlement === "paid" || c.settlement === "cancelled" || c.settlement === "credited") return [];
   if (c.type === "recurring" && !c.anchors.due) return []; // profile.recurring owns aggregate recurrences
   const covers = coveredByLinked(c, byId, warnings);
-  const { total, paid, counted } = paidSoFar(c, records, amountSignal, covers.reduce((a, x) => a + x.amount, 0), snapDate, warnings);
+  const { total, paid, counted } = paidSoFar(c, records, amountSignal, covers.reduce((a, x) => a + x.amount, 0), ctx, warnings);
   const pattern = pickPattern(c, profile);
   const dir0 = defaultDirection(c);
   const legs: Leg[] = pattern?.legs ?? [{ share: 1, anchor: "due", offsetDays: 0, direction: dir0 }];
@@ -226,9 +334,9 @@ function expandCommitment(
   legs.forEach((leg, i) => {
     const amount = legAmounts[i]!;
     if (amount <= 0) return;
-    const anchor = resolveAnchor(leg.anchor, c, profile);
+    const anchor = resolveAnchor(leg.anchor, c, profile, leg);
     if (!anchor.date) {
-      warnings.push(`${label}: no ${leg.anchor} date for leg ${i + 1}; not scheduled (needs review)`);
+      warnings.review("missing_anchor", `${label}: no ${leg.anchor} date for leg ${i + 1}${anchor.why ? ` (${anchor.why})` : ""}; not scheduled (needs review)`, [c.id]);
       return;
     }
     let date = addDays(anchor.date, leg.offsetDays);
@@ -246,7 +354,7 @@ function expandCommitment(
     }
     const base = toBase(amount, c.currency, profile, fx);
     if (base === undefined) {
-      warnings.push(`${label}: no FX rate for ${c.currency}; excluded from the forecast`);
+      warnings.review("missing_fx", `${label}: no FX rate for ${c.currency}; excluded from the forecast`, [c.id]);
       return;
     }
     events.push({
@@ -280,7 +388,7 @@ const monthIdx = (d: string) => Number(d.slice(0, 4)) * 12 + Number(d.slice(5, 7
 // re-import that moves the commitment's due date never retargets an owner override's legIndex:
 // weekly/biweekly = round(days from r.anchor / step); monthly = months from r.anchor's month; quarterly = that / 3;
 // semimonthly = 2n for the phase day and 2n+1 for secondDay in month n. `startDate`/`endDate` (inclusive) bound it.
-function occurrences(r: Recurring, phase: string, from: string, until: string, warnings: string[]): Occurrence[] {
+function occurrences(r: Recurring, phase: string, from: string, until: string, warnings: Notes): Occurrence[] {
   const out: Occurrence[] = [];
   const lo = r.startDate && r.startDate > from ? r.startDate : from;
   const stop = r.endDate && r.endDate < until ? addDays(r.endDate, 1) : until; // exclusive
@@ -305,7 +413,7 @@ function occurrences(r: Recurring, phase: string, from: string, until: string, w
       push(d, Math.round(monthsFromAnchor(d) / step));
     }
   } else {
-    if (r.secondDay === undefined) warnings.push(`recurring ${r.name}: semimonthly needs secondDay; treating as monthly`);
+    if (r.secondDay === undefined) warnings.review("invalid_profile", `recurring ${r.name}: semimonthly needs secondDay; treating as monthly`, [r.id]);
     for (let n = monthIdx(lo) - monthIdx(phase) - 1; ; n++) {
       const a = addMonthsClamped(phase, n, day);
       const b = r.secondDay === undefined ? undefined : addMonthsClamped(phase, n, r.secondDay);
@@ -331,7 +439,7 @@ function expandRecurring(
   fx: Record<string, number>,
   asOf: string,
   horizonEnd: string,
-  warnings: string[],
+  warnings: Notes,
 ): CashEvent[] {
   const events: CashEvent[] = [];
   const byId = new Map(commitments.map((c) => [c.id, c]));
@@ -345,7 +453,7 @@ function expandRecurring(
     const phase = due ?? r.anchor;
     const amountBase = toBase(amount, currency, profile, fx);
     if (amountBase === undefined) {
-      warnings.push(`${label}: no FX rate for ${currency}; recurring ${r.name} excluded from the forecast`);
+      warnings.review("missing_fx", `${label}: no FX rate for ${currency}; recurring ${r.name} excluded from the forecast`, [c?.id ?? r.id]);
       continue;
     }
     let until = horizonEnd;
@@ -355,7 +463,7 @@ function expandRecurring(
       const end = due ?? asOf;
       if (end < until) until = end;
       note = `; cancelled from ${end}`;
-      warnings.push(`${label}: recurring ${r.name} is cancelled from ${end}; later occurrences dropped (needs review)`);
+      warnings.review("recurring_cancelled", `${label}: recurring ${r.name} is cancelled from ${end}; later occurrences dropped (needs review)`, [c.id]);
     } else if (c && (c.settlement === "paid" || c.settlement === "credited") && due) {
       skip = due;
       note = `; ${due} ${c.settlement}`;
@@ -367,7 +475,7 @@ function expandRecurring(
     const span = `${r.startDate ? `, starts ${r.startDate}` : ""}${r.endDate ? `, ends ${r.endDate}` : ""}`;
     const found = occurrences(r, phase, asOf, until, warnings).filter((o) => o.date !== skip);
     if (c && found.length === 0 && c.settlement !== "cancelled")
-      warnings.push(`${label}: recurring commitment yields no payments in the horizon (needs review)`);
+      warnings.review("recurring_no_occurrences", `${label}: recurring commitment yields no payments in the horizon (needs review)`, [c.id]);
     for (const { date, index } of found) {
       events.push({
         id: `evt-${r.id}-${index}`,
@@ -395,35 +503,42 @@ export const SALES_HISTORY_DAYS = 28;
 export const DAILY_SALES_ID = "daily-sales";
 
 // Daily-sales revenue model: average daily sales from the last 28 days of actual "sales" receipts, shaped by the
-// profile's weekday weights (index 0 = Monday). Dates that already have actual sales are not forecast again.
-function expandDailySales(records: Records, profile: Profile, asOf: string, horizonEnd: string, warnings: string[]): CashEvent[] {
+// profile's weekday weights (index 0 = Monday). With `settleLagDays` (card settlement), each sale day's money lands
+// that many days later. Settlement dates that already have actual sales receipts are not forecast again.
+function expandDailySales(records: Records, profile: Profile, asOf: string, horizonEnd: string, warnings: Notes): CashEvent[] {
   if (profile.revenueModel.kind !== "dailySales") return [];
   const weights = profile.revenueModel.weekdayWeights;
+  const lag = Math.max(0, Math.round(profile.revenueModel.settleLagDays ?? 0));
   const meanW = weights.reduce((a, b) => a + b, 0) / (weights.length || 1);
   const from = addDays(asOf, -SALES_HISTORY_DAYS);
   const history = records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date >= from && e.date < asOf);
   if (weights.length !== 7 || meanW <= 0) {
-    warnings.push("Daily-sales model needs seven positive weekday weights; no sales forecast.");
+    warnings.review("invalid_profile", "Daily-sales model needs seven positive weekday weights; no sales forecast.", [DAILY_SALES_ID]);
     return [];
   }
   if (history.length === 0) {
-    warnings.push(`No sales receipts in the ${SALES_HISTORY_DAYS} days before ${asOf}; daily sales are not forecast.`);
+    warnings.review("no_sales_history", `No sales receipts in the ${SALES_HISTORY_DAYS} days before ${asOf}; daily sales are not forecast.`);
     return [];
   }
   // Average over the days the bank data actually covers (first receipt to asOf, capped), weighting each covered day
   // by its weekday so a short history of busy days is not scaled up again. Full 4-week coverage: weight sum = 28.
   const first = records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date < asOf).reduce((m, e) => (e.date < m ? e.date : m), asOf);
   const days = Math.max(1, Math.min(SALES_HISTORY_DAYS, diffDays(asOf, first)));
-  if (days < SALES_HISTORY_DAYS) warnings.push(`Sales history covers only ${days} days before ${asOf} (want ${SALES_HISTORY_DAYS}); the daily-sales average is less reliable (needs review).`);
-  const weightDays = dateRange(addDays(asOf, -days), asOf).reduce((a, d) => a + weights[dowOf(d)]! / meanW, 0);
+  if (days < SALES_HISTORY_DAYS) warnings.review("short_sales_history", `Sales history covers only ${days} days before ${asOf} (want ${SALES_HISTORY_DAYS}); the daily-sales average is less reliable (needs review).`, history.map((e) => e.id));
+  // Receipts are bank deposits, so a deposit on day d carries the sales of day d - lag: weight it by that weekday.
+  const weightDays = dateRange(addDays(asOf, -days), asOf).reduce((a, d) => a + weights[dowOf(addDays(d, -lag))]! / meanW, 0);
   const total = history.reduce((a, e) => a + (toBase(e.amount, e.currency, profile, { [profile.baseCurrency]: 1 }) ?? 0), 0);
   const avg = weightDays > 0 ? total / weightDays : 0;
   const booked = new Set(records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date >= asOf).map((e) => e.date));
   const out: CashEvent[] = [];
-  dateRange(asOf, horizonEnd).forEach((date, i) => {
+  // Sale dates from asOf - lag, so every settlement in [asOf, horizonEnd) is covered; a settlement date that already
+  // has an actual sales receipt is not forecast again.
+  dateRange(addDays(asOf, -lag), addDays(horizonEnd, -lag)).forEach((sale, i) => {
+    const date = addDays(sale, lag);
     if (booked.has(date)) return;
-    const w = weights[dowOf(date)]!;
+    const w = weights[dowOf(sale)]!;
     const amount = Math.round((avg * w) / meanW);
+    const settles = lag ? `; sales of ${sale} settle ${lag} days later` : "";
     out.push({
       id: `evt-daily-sales-${date}`,
       commitmentId: DAILY_SALES_ID,
@@ -435,7 +550,7 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
       direction: "in",
       status: "likely",
       confidence: 0.6,
-      basis: `daily sales: ${money(Math.round(avg), profile.baseCurrency)} average over the last ${days} days x weekday weight ${w}/${Math.round(meanW * 100) / 100}`,
+      basis: `daily sales: ${money(Math.round(avg), profile.baseCurrency)} average over the last ${days} days x weekday weight ${w}/${Math.round(meanW * 100) / 100}${settles}`,
       category: "sales",
       sourceRef: { system: "profile", record: "revenueModel.dailySales" },
     });
@@ -477,8 +592,9 @@ function linkedCostCommitments(deal: Commitment, profile: Profile, byId: Map<str
   return out;
 }
 
-export function expand(records: Records, profile: Profile, asOf: string, horizonEnd: string, fx: Record<string, number>): Expanded {
-  const warnings: string[] = [];
+// countedActuals: see PaymentContext; forecast() passes countedActualIds so uncounted bank lines never cancel a bill.
+export function expand(records: Records, profile: Profile, asOf: string, horizonEnd: string, fx: Record<string, number>, countedActuals?: Set<string>): Expanded {
+  const warnings = new Notes();
   const { commitments, amountSignals } = prepare(records);
   const byId = new Map(commitments.map((c) => [c.id, c]));
   const events: CashEvent[] = [];
@@ -494,19 +610,20 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
   let snapDate = "";
   for (const b of records.balances) if (b.asOf <= asOf && b.asOf > snapDate) snapDate = b.asOf;
   if (!snapDate) snapDate = asOf;
+  const ctx: PaymentContext = { snapDate, horizonEnd, countedActuals, byId };
   const recurringIds = new Set(profile.recurring.map((r) => r.id));
   for (const c of all) {
     if (recurringIds.has(c.id)) continue; // overrides the profile recurring item of the same id (expandRecurring)
     const open = c.settlement !== "paid" && c.settlement !== "cancelled" && c.settlement !== "credited";
     if (open && unknownPattern(c, profile)) {
       const fallback = pickPattern(c, profile);
-      warnings.push(`${c.reference ?? c.id}: unknown payment pattern ${c.patternId}; used ${fallback ? `the ${c.type} default ${fallback.id}` : "a single due-date leg"} (needs review)`);
+      warnings.review("unknown_pattern", `${c.reference ?? c.id}: unknown payment pattern ${c.patternId}; used ${fallback ? `the ${c.type} default ${fallback.id}` : "a single due-date leg"} (needs review)`, [c.id]);
     }
     if (open && c.type === "recurring" && !c.anchors.due)
-      warnings.push(`${c.reference ?? c.id}: recurring commitment has no due date and matches no profile recurring item; not scheduled (needs review)`);
-    events.push(...expandCommitment(c, records, profile, fx, byId, amountSignals.get(c.id), snapDate, warnings));
+      warnings.review("missing_anchor", `${c.reference ?? c.id}: recurring commitment has no due date and matches no profile recurring item; not scheduled (needs review)`, [c.id]);
+    events.push(...expandCommitment(c, records, profile, fx, byId, amountSignals.get(c.id), ctx, warnings));
   }
   events.push(...expandRecurring(commitments, amountSignals, profile, fx, asOf, horizonEnd, warnings));
   events.push(...expandDailySales(records, profile, asOf, horizonEnd, warnings));
-  return { events, commitments: all, warnings };
+  return { events, commitments: all, warnings: warnings.list, reasons: warnings.reviewReasons };
 }
