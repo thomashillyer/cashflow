@@ -18,6 +18,12 @@ function recipient(party: Party | undefined, channel: "email" | "message"): stri
   return `${party.kind === "customer" ? "ap" : "accounts"}@${domain}`;
 }
 
+// Shown as the To placeholder when we know the company's domain but not an address.
+function recipientHint(party: Party | undefined, channel: "email" | "message"): string | undefined {
+  const domain = party?.contacts?.emailDomains?.[0];
+  return channel === "email" && domain ? `someone@${domain}` : undefined;
+}
+
 export const workRoutes = (deps: Deps) => async (app: FastifyInstance) => {
   // Body (optional): { channel: "email" | "message" | "whatsapp" }.
   app.post("/work-items/:id/draft", async (req) => {
@@ -35,7 +41,7 @@ export const workRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const commitmentId = item.lever?.commitmentId ?? item.evidenceRefs[0];
     const partyId = c.records.commitments.find((x) => x.id === commitmentId)?.partyId;
     const party = c.records.parties.find((p) => p.id === partyId);
-    return { ...draft, to: recipient(party, draft.channel), subject: draft.subject ?? "", itemId: id };
+    return { ...draft, to: recipient(party, draft.channel), toHint: recipientHint(party, draft.channel), subject: draft.subject ?? "", itemId: id };
   });
 
   app.post("/work-items/:id/approve", async (req) => {

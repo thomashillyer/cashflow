@@ -3,6 +3,7 @@ import { currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
 import { ASK_HINTS } from "./catalog/ask-hints.js";
 import { cashChart } from "./ui/chart.js";
+import { isQuestion } from "./ui/question.js";
 import { icon, logo, logoLarge } from "./ui/icons.js";
 import { speak, listen, canSpeak, canListen, speakable, spokenMoney } from "./ui/speech.js";
 import { addDays, dayDate, esc, greeting, money, moneyShort, parseDate, shortDate, weekLabel } from "./ui/format.js";
@@ -212,6 +213,7 @@ function route() {
   return ROUTES.includes(r) ? r : "today";
 }
 window.addEventListener("hashchange", () => {
+  closeSheet();
   render();
   window.scrollTo(0, 0);
 });
@@ -986,7 +988,7 @@ async function showDraft(itemId) {
   const d = await api.draft(itemId);
   openSheet(`
     ${sheetHead("Draft email", "Edit it, then copy it or open it in your mail app.")}
-    <div class="draft-field"><label for="d-to">To</label><input id="d-to" value="${esc(d.to)}" /></div>
+    <div class="draft-field"><label for="d-to">To</label><input id="d-to" value="${esc(d.to)}"${d.to || !d.toHint ? "" : ` placeholder="${esc(d.toHint)}"`} /></div>
     <div class="draft-field"><label for="d-sub">Subject</label><input id="d-sub" value="${esc(d.subject)}" /></div>
     <div class="draft-field"><label for="d-body">Message</label><textarea id="d-body">${esc(d.body)}</textarea></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1206,14 +1208,11 @@ function readingSentence(n) {
 }
 
 // ---------------------------------------------------------------- actions
-// One bar for everything: questions get answers; anything else is a thought to park.
-const QUESTION = /\?\s*$|^(what|when|where|who|whom|why|how|can|could|will|would|should|shall|is|are|was|do|does|did|am|show|tell|give|list|explain)\b/i;
-
 async function doAsk(q, via = "typed") {
   q = q.trim();
   if (!q) return;
   if (route() !== "today") location.hash = "#/today";
-  const parking = !QUESTION.test(q);
+  const parking = !isQuestion(q);
   const turn = { q, pending: true, parking };
   app.askLog.push(turn);
   render();
