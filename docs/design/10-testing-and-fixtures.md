@@ -27,7 +27,9 @@ Design targets for the fixture (tune the data until the engine produces roughly 
 
 - Low point about −$6K in the week of Dec 21, 2026, caused by the Shenzhen 70% balance ($42K), landing costs ($9K), payroll, and Evergreen's late payment.
 - About $60K of free cash above the safety line in late January 2027.
-- A pasted email from Evergreen ("we'll pay once our customer pays us, early January") moves invoice INV-1187 and deepens the dip, with the email cited.
+- A pasted WhatsApp chat from Evergreen ("we'll pay once our customer pays us, early January") moves invoice INV-1187 and deepens the dip, with the message cited.
+
+One source of truth: `scripts/make-engine-fixtures.ts` writes both `fixtures/cascade_trade/records.json` (the engine fixture) and `fixtures/cascade_trade/intake/base_records.json` (the slice the intake cases start from), so the intake files (`fixtures/cascade_trade/intake/`) link to the same INV-1187, INV-104, INV-1203 and Shenzhen bill 0042 instead of adding second copies. The proposed Evergreen signal in `records.json` is what the AI lane extracts from `whatsapp-evergreen.txt`.
 
 Sample events file:
 
