@@ -58,6 +58,24 @@ export type IntakeWrite = {
   signals: Signal[];
 };
 
+// One owner decision (confirm, dismiss, apply) written as a single atomic step. See Store.commitDecision.
+export type DecisionWrite = {
+  expectedRevision: number;            // the storeRevision this request loaded (or the client's expectedRevision)
+  idempotencyKey: string;
+  requestHash: string;                 // sha256 of route + target id + normalized body
+  records: Partial<Records>;           // upserts (records and/or signals)
+  proposals: ChangeProposal[];         // proposal state changes
+  response: Record<string, unknown>;   // what the route returns, minus storeRevision
+};
+
+export type DecisionResult =
+  | { kind: "ok"; storeRevision: number; response: Record<string, unknown> }
+  | { kind: "replay"; response: Record<string, unknown> }   // same key and same hash: the stored response
+  | { kind: "conflict" }                                    // same key, different hash
+  | { kind: "stale"; storeRevision: number };               // revision moved
+
+export type DecisionLookup = { kind: "replay"; response: Record<string, unknown> } | { kind: "conflict" } | null;
+
 export interface Store {
   getBusiness(id: string): Promise<Business | null>;
   // Membership: the caller is a member of a private business (memberships table when it exists,
@@ -70,6 +88,13 @@ export interface Store {
   load(id: string): Promise<{ records: Records; storeRevision: number }>;
   // Idempotent upserts of whole records, then a revision bump. Returns the new revision.
   upsertRecords(id: string, records: Partial<Records>): Promise<number>;
+  // "Code computes, the DB commits": the route computes the change, then this writes the records, the
+  // proposal states and the stored response in one atomic step, only while the revision is still
+  // `expectedRevision`, and bumps the revision. The idempotency key is checked first, so a replay
+  // succeeds even though the revision has since moved.
+  commitDecision(id: string, d: DecisionWrite): Promise<DecisionResult>;
+  // Read-only look at a stored decision: replay / conflict, or null when the key is unused.
+  lookupDecision(id: string, key: string, requestHash: string): Promise<DecisionLookup>;
   bumpRevision(id: string): Promise<number>;
   // Compare-and-bump: +1 only when the revision is still `expected`. Returns the new revision, or null
   // when another write got there first.
@@ -108,6 +133,7 @@ type MemBiz = Business & {
   records: Records; storeRevision: number; members: Set<string>;
   proposals: Map<string, ChangeProposal>; candidates: Map<string, IntakeCandidate>;
   workItems: Map<string, WorkItem>; workItemsHash?: string; overrides: Override[];
+  decisions: Map<string, { hash: string; response: Record<string, unknown> }>;
 };
 
 // In-memory store with the same semantics as the Supabase one. Used by the tests and by
@@ -143,7 +169,7 @@ export class MemoryStore implements Store {
     this.biz.set(id, {
       id, name: b.name, isSynthetic: b.isSynthetic, profile: structuredClone(b.profile), records: empty(), storeRevision: 0,
       members: new Set(b.ownerUserId ? [b.ownerUserId] : []), proposals: new Map(), candidates: new Map(), workItems: new Map(),
-      overrides: [],
+      overrides: [], decisions: new Map(),
     });
     return id;
   }
@@ -158,11 +184,33 @@ export class MemoryStore implements Store {
   }
   async upsertRecords(id: string, records: Partial<Records>): Promise<number> {
     const b = this.need(id);
+    this.writeRecords(b, records);
+    return ++b.storeRevision;
+  }
+  private writeRecords(b: MemBiz, records: Partial<Records>): void {
     for (const k of KEYS) {
       const next = records[k];
       if (next?.length) (b.records[k] as { id: string }[]) = upsertById(b.records[k] as { id: string }[], structuredClone(next));
     }
-    return ++b.storeRevision;
+  }
+  // No await between the checks and the writes, so on the event loop this is atomic: two concurrent
+  // requests cannot both pass the revision check.
+  async commitDecision(id: string, d: DecisionWrite): Promise<DecisionResult> {
+    const b = this.need(id);
+    const prior = b.decisions.get(d.idempotencyKey);
+    if (prior) return prior.hash === d.requestHash ? { kind: "replay", response: structuredClone(prior.response) } : { kind: "conflict" };
+    if (b.storeRevision !== d.expectedRevision) return { kind: "stale", storeRevision: b.storeRevision };
+    this.writeRecords(b, d.records);
+    for (const p of d.proposals) b.proposals.set(p.id, structuredClone(p));
+    const storeRevision = ++b.storeRevision;
+    const response = { ...structuredClone(d.response), storeRevision };
+    b.decisions.set(d.idempotencyKey, { hash: d.requestHash, response: structuredClone(response) });
+    return { kind: "ok", storeRevision, response };
+  }
+  async lookupDecision(id: string, key: string, requestHash: string): Promise<DecisionLookup> {
+    const prior = this.need(id).decisions.get(key);
+    if (!prior) return null;
+    return prior.hash === requestHash ? { kind: "replay", response: structuredClone(prior.response) } : { kind: "conflict" };
   }
   async bumpRevision(id: string): Promise<number> {
     return ++this.need(id).storeRevision;

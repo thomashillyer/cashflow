@@ -3,7 +3,9 @@
 import { describe, expect, it } from "vitest";
 import type { Override } from "../schema/records";
 import { loadSample } from "./demo";
-import { MemoryStore } from "./store";
+import { MemoryStore, type DecisionWrite } from "./store";
+import type { ChangeProposal } from "../schema/intake";
+import type { Signal } from "../schema/records";
 
 const ov = (id: string, change: Override["change"], extra: Partial<Override> = {}): Override =>
   ({ id, target: { commitmentId: "inv-INV-1187" }, change, origin: "owner", ...extra });
@@ -59,5 +61,46 @@ describe("MemoryStore bumpRevisionIf", () => {
     expect(await store.bumpRevisionIf(id, r)).toBe(r + 1);
     expect(await store.bumpRevisionIf(id, r)).toBeNull();
     expect((await store.load(id)).storeRevision).toBe(r + 1);
+  });
+});
+
+describe("MemoryStore commitDecision", () => {
+  const setupBiz = async () => {
+    const store = new MemoryStore();
+    const s = loadSample("cascade_trade")!;
+    const id = await store.createBusiness({ name: "A", profile: s.profile, isSynthetic: false });
+    await store.upsertRecords(id, s.records);
+    const signal = s.records.signals[0]!;
+    const proposal = { id: "cp-1", state: "proposed" } as unknown as ChangeProposal;
+    await store.saveProposals(id, [proposal]);
+    return { store, id, signal, proposal };
+  };
+  const decision = (over: Partial<DecisionWrite>, signal: Signal, proposal: ChangeProposal): DecisionWrite => ({
+    expectedRevision: 0, idempotencyKey: "k", requestHash: "h", records: { signals: [{ ...signal, state: "applied" }] },
+    proposals: [{ ...proposal, state: "confirmed" }], response: { ok: true }, ...over,
+  });
+
+  it("a stale commit changes neither the records nor the proposal", async () => {
+    const { store, id, signal, proposal } = await setupBiz();
+    const { storeRevision } = await store.load(id);
+    const before = JSON.stringify(await store.load(id));
+    const r = await store.commitDecision(id, decision({ expectedRevision: storeRevision - 1 }, signal, proposal));
+    expect(r).toEqual({ kind: "stale", storeRevision });
+    expect(JSON.stringify(await store.load(id))).toBe(before);
+    expect((await store.listProposals(id))[0]!.state).toBe("proposed");
+    // A rejected commit does not burn the key.
+    expect((await store.commitDecision(id, decision({ expectedRevision: storeRevision }, signal, proposal))).kind).toBe("ok");
+  });
+
+  it("ok bumps once, then replays after the revision moved, and flags a different hash", async () => {
+    const { store, id, signal, proposal } = await setupBiz();
+    const { storeRevision } = await store.load(id);
+    const ok = await store.commitDecision(id, decision({ expectedRevision: storeRevision }, signal, proposal));
+    expect(ok).toEqual({ kind: "ok", storeRevision: storeRevision + 1, response: { ok: true, storeRevision: storeRevision + 1 } });
+    await store.bumpRevision(id);
+    const replay = await store.commitDecision(id, decision({ expectedRevision: storeRevision }, signal, proposal));
+    expect(replay).toEqual({ kind: "replay", response: { ok: true, storeRevision: storeRevision + 1 } });
+    expect((await store.commitDecision(id, decision({ expectedRevision: storeRevision, requestHash: "other" }, signal, proposal))).kind).toBe("conflict");
+    expect((await store.load(id)).storeRevision).toBe(storeRevision + 2);
   });
 });
