@@ -404,3 +404,70 @@ describe("candidates never invent cash", () => {
     for (const c of all) expect(val(c.fields.amount)).toBeGreaterThan(0);
   });
 });
+
+describe("direction and currency safety (review fixes)", () => {
+  it("reads a vendor bill as money out when Bill to is a legal-name variant of ours", () => {
+    const rows: SheetCell[][] = [
+      ["Invoice #", "NB-77", null, "Vendor", "Ningbo Supply"],
+      ["Bill to", "Cascade Trade LLC", null, null, null],
+      ["Total", "5,000.00"],
+    ];
+    const c = documentToCandidate(sheet(rows), { ...opts, currency: "USD" });
+    expect(c).toMatchObject({ kind: "bill", direction: "out" });
+    expect(val(c.fields.sellerName)).toBe("Ningbo Supply");
+  });
+
+  it("flags a guessed direction and never marks it ok", () => {
+    const rows: SheetCell[][] = [
+      ["Invoice #", "X-1", null, "From", "Some Seller"],
+      ["Bill to", "Some Buyer", null, null, null],
+      ["Total", "USD 100.00"],
+    ];
+    const c = documentToCandidate(sheet(rows), opts);
+    expect(c.extraction).toBe("partial");
+    expect(c.notes.join(" ")).toMatch(/Could not tell whether/);
+  });
+
+  it("table: a currency written in the amount cell beats the default", () => {
+    const rows: SheetCell[][] = [["Invoice #", "Customer", "Amount"], ["INV-1", "A", "€1,200.00"], ["INV-2", "B", "5,000 JPY"], ["INV-3", "C", "EUR 5,000"]];
+    const r = tableToCandidates(sheet(rows), { ...opts, currency: "USD" });
+    const by = Object.fromEntries(r.candidates.map((c) => [val(c.fields.reference), c]));
+    expect(val(by["INV-1"]!.fields.currency)).toBe("EUR");
+    expect(val(by["INV-1"]!.fields.amount)).toBe(120000);
+    expect(val(by["INV-2"]!.fields.currency)).toBe("JPY");
+    expect(val(by["INV-2"]!.fields.amount)).toBe(5000);
+    expect(val(by["INV-3"]!.fields.amount)).toBe(500000);
+  });
+
+  it("table: an amount cell that contradicts the currency column is left blank, not misread", () => {
+    const rows: SheetCell[][] = [["Invoice #", "Customer", "Currency", "Amount"], ["INV-1", "A", "USD", "EUR 5,000"]];
+    const c = tableToCandidates(sheet(rows), opts).candidates[0]!;
+    expect(c.fields.amount.state).toBe("missing");
+  });
+
+  it("table: a yen sign with no settled currency is not defaulted to USD", () => {
+    const rows: SheetCell[][] = [["Invoice #", "Customer", "Amount"], ["INV-1", "A", "¥50,000"]];
+    const c = tableToCandidates(sheet(rows), { ...opts, currency: "USD" }).candidates[0]!;
+    expect(c.fields.currency.state).toBe("missing");
+    expect(c.fields.amount.state).toBe("missing");
+  });
+
+  it("document: a euro total beats the default currency", () => {
+    const rows: SheetCell[][] = [
+      ["Invoice #", "NB-9", null, "Vendor", "Ningbo Supply"],
+      ["Bill to", "Cascade Trade Co.", null, null, null],
+      ["Total due", "€1,200.00"],
+    ];
+    const c = documentToCandidate(sheet(rows), { ...opts, currency: "USD" });
+    expect(val(c.fields.currency)).toBe("EUR");
+    expect(val(c.fields.amount)).toBe(120000);
+  });
+
+  it("refuses a very long amount-like cell quickly", () => {
+    const rows: SheetCell[][] = [["Invoice #", "Customer", "Amount"], ["INV-1", "A", "1" + " ".repeat(30000) + "x"]];
+    const t = Date.now();
+    const c = tableToCandidates(sheet(rows), opts).candidates[0]!;
+    expect(Date.now() - t).toBeLessThan(500);
+    expect(c.fields.amount.state).toBe("missing");
+  });
+});
