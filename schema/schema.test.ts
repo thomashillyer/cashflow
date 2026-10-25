@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CashEvent, Records } from "./records";
-import type { IntakeCandidate, Field } from "./intake";
+import type { ChangeProposal, CommitmentFieldChange, Field, ProposalOp } from "./intake";
 
-// Compile-time checks that the contracts fit the examples in docs/design/03-data-model.md.
+// Type-level checks run under `tsc --noEmit` (part of `npm test`).
 describe("schema", () => {
   it("accepts the documented example cash event", () => {
     const evt: CashEvent = {
@@ -24,11 +24,20 @@ describe("schema", () => {
     expect(records.events).toHaveLength(1);
   });
 
-  it("represents a missing amount without a zero", () => {
-    const missing: Field<number> = { state: "missing", reason: "blank Total column" };
-    const candidate: Pick<IntakeCandidate, "kind" | "extraction"> & { amount: Field<number> } = {
-      kind: "invoice", extraction: "partial", amount: missing,
+  it("pins intake invariants", () => {
+    // @ts-expect-error a missing field has no value
+    const bad: Field<number> = { state: "missing", value: 0 };
+    // @ts-expect-error documents can't change settlement
+    const settle: CommitmentFieldChange = { field: "settlement", to: "paid" };
+    // @ts-expect-error found needs evidence
+    const noEvidence: Field<string> = { state: "found", value: "INV-1187" };
+    const link: ProposalOp = { op: "linkEvidence", commitmentId: "inv-INV-1187", evidenceIds: ["ev-pdf-1"] };
+    const proposal: ChangeProposal = {
+      id: "cp-1", action: "link", ops: [link], expectedStoreRevision: 3, evidenceIds: ["ev-pdf-1"],
+      targetCommitmentId: "inv-INV-1187", reasons: ["same party, reference, currency"], conflicts: [],
+      state: "proposed", createdAt: "2026-11-26T00:00:00Z",
     };
-    expect(candidate.amount).not.toHaveProperty("value");
+    expect([bad, settle, noEvidence].length).toBe(3);
+    expect(proposal.ops[0]?.op).toBe("linkEvidence");
   });
 });

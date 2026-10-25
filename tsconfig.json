@@ -10,8 +10,17 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["schema", "adapters", "engine", "ai", "api", "intake", "fixtures/**/*.ts", "**/*.test.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "data",
+    ".claude"
+  ]
 }
