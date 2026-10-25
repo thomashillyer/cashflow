@@ -1,5 +1,5 @@
 {
-  "key": "b12ea74aa9eb8b5bf3ecd4c39cc633f2c992790d6788765be9115567324d9e68",
+  "key": "105ab8858f2c4395e4c23e9868fe0ad6600a5f6cd155a6a7decb40eef484d974",
   "promptVersion": "draft_message@1",
   "model": "claude-opus-5-5",
   "source": "hand-authored stand-in; replace with a live run (scripts/refresh-brief-cache.ts)",

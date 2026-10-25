@@ -1,5 +1,5 @@
 {
-  "_comment": "Synthetic. Subset of fixtures/cascade_trade/records.json for the brief/draft tests, plus PO HH-PO-552 (from the intake fixtures) and an invoice link on INV-1187. Regenerate with scripts/make-brief-fixture.ts.",
+  "_comment": "Synthetic. Subset of fixtures/cascade_trade/records.json for the brief/draft tests, plus PO HH-PO-552 (from the intake fixtures) and an invoice link on INV-1187. work_items.json is illustrative: only the INV-1187 cashEffect comes from the engine. Regenerate with scripts/make-brief-fixture.ts.",
   "parties": [
     {
       "id": "party-evergreen-home",

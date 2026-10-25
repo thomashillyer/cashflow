@@ -76,19 +76,21 @@ export type Facts = {
   expected: { date: string; basis: string; amountBase: number }[];
   lowPoint: { week: string; date: string; amount: number };
   safetyLine: number;
-  amountAfterLever: number;   // lowest point if this item is done: base low point + cashEffect (not for dollars saved)
+  amountAfterLever?: number;  // lowest point if this item is done: base low point + cashEffect; absent for dollars saved and for items with no lever
   vocabulary: Record<string, string>;
 };
 
 // Notes are the owner's words: bounded, single-line, and never a source of allowed figures.
 const cleanNote = (n: string) => n.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, MAX_NOTE_CHARS);
 
+// Engine basis strings can embed the owner's own words (a rule's fromNote, in quotes). Those are data from
+// outside the engine: drop them so they cannot carry text or dates into the facts or the allowed set.
+const cleanBasis = (b: string) => b.replace(/"[^"]*"/g, '""').slice(0, 300);
+
 function findCommitment(item: WorkItem, records: Records): Commitment | undefined {
   const byId = new Map(records.commitments.map((c) => [c.id, c]));
-  const lever = item.lever;
-  if (lever && byId.has(lever.commitmentId)) return byId.get(lever.commitmentId);
-  for (const ref of item.evidenceRefs) if (byId.has(ref)) return byId.get(ref);
-  return undefined;
+  // Only through the lever: a warning without one (idle cash, concentration) is not about one document.
+  return item.lever ? byId.get(item.lever.commitmentId) : undefined;
 }
 
 export function buildFacts(item: WorkItem, ctx: Pick<BriefContext, "run" | "records" | "profile">): Facts {
@@ -106,7 +108,7 @@ export function buildFacts(item: WorkItem, ctx: Pick<BriefContext, "run" | "reco
   const saved = l?.kind === "pay_early";
   const expected = c
     ? run.events.filter((e) => e.commitmentId === c.id && e.date >= run.asOf).slice(0, MAX_EXPECTED)
-      .map((e) => ({ date: e.date, basis: e.basis.slice(0, 300), amountBase: e.amountBase }))
+      .map((e) => ({ date: e.date, basis: cleanBasis(e.basis), amountBase: e.amountBase }))
     : [];
   return {
     itemId: item.id,
@@ -135,17 +137,23 @@ export function buildFacts(item: WorkItem, ctx: Pick<BriefContext, "run" | "reco
     expected,
     lowPoint: run.lowPoint,
     safetyLine: run.safetyLine,
-    amountAfterLever: run.lowPoint.amount + item.cashEffect,
+    ...(l && !saved ? { amountAfterLever: run.lowPoint.amount + item.cashEffect } : {}),
     vocabulary: profile.vocabulary,
   };
 }
 
 // Figures the text may state. Owner notes are removed first: they are data from outside the engine
 // and must never widen the allowed set.
-export function allowedFromFacts(facts: Facts): Allowed {
+export function allowedFromFacts(facts: { party?: Facts["party"] } & Record<string, unknown>): Allowed {
   const { party, ...rest } = facts;
   const safeParty = party ? { ...party, ownerNotes: [] } : undefined;
   return allowedFromToolResults([{ ...rest, ...(safeParty ? { party: safeParty } : {}) }]);
+}
+
+// What a draft to a counterparty may draw on: the document and its dates, not the owner's cash position.
+export function draftFacts(f: Facts): Omit<Facts, "lowPoint" | "safetyLine" | "amountAfterLever" | "cashEffect" | "cashEffectMeans"> {
+  const { lowPoint: _l, safetyLine: _s, amountAfterLever: _a, cashEffect: _c, cashEffectMeans: _m, ...rest } = f;
+  return rest;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +192,8 @@ export function fallbackBrief(f: Facts): { title: string; why: string } {
   const cm = f.commitment;
   const cur = cm?.currency ?? f.baseCurrency;
   const owed = cm ? fmtMoney(cm.outstanding ?? cm.amount, cur, f.baseCurrency) : undefined;
-  const lift = `lifts your lowest point from ${money(f.lowPoint.amount)} (week of ${date(f.lowPoint.week)}) to ${money(f.amountAfterLever)}`;
+  const lift = f.amountAfterLever === undefined ? "helps your lowest point"
+    : `lifts your lowest point from ${money(f.lowPoint.amount)} (week of ${date(f.lowPoint.week)}) to ${money(f.amountAfterLever)}`;
   const kind = f.lever?.kind;
   switch (kind) {
     case "chase":
@@ -234,9 +243,9 @@ export function fallbackDraft(f: Facts, business: string): { subject?: string; b
   let subject: string;
   switch (f.lever?.kind) {
     case "chase":
-      subject = amt ? `Invoice ${ref}: ${amt}` : `Invoice ${ref}`;
+      subject = cm?.reference ? (amt ? `Invoice ${ref}: ${amt}` : `Invoice ${ref}`) : "Open invoice";
       lines.push(
-        `I'm following up on invoice ${ref}${amt ? ` for ${amt}` : ""}${cm?.due ? `, due ${date(cm.due)}` : ""}.` +
+        `I'm following up on ${cm?.reference ? `invoice ${ref}` : "an open invoice"}${amt ? ` for ${amt}` : ""}${cm?.due ? `, due ${date(cm.due)}` : ""}.` +
         ` Could you let me know when we can expect payment?` +
         (f.lever.assumeDate ? ` Receiving it by ${date(f.lever.assumeDate)} would help us a great deal.` : ""),
         "", "If anything is holding it up, please tell me and I will help sort it out.");
@@ -275,6 +284,8 @@ const BriefOutput = z.object({
   items: z.array(z.object({ id: z.string(), title: z.string(), why: z.string() })),
 });
 type BriefOutput = z.infer<typeof BriefOutput>;
+
+const BriefItemOutput = z.object({ title: z.string(), why: z.string() });
 
 const DraftOutput = z.object({ subject: z.string().nullable(), body: z.string() });
 type DraftOutput = z.infer<typeof DraftOutput>;
@@ -351,7 +362,39 @@ function storeOutput(ctx: BriefContext, key: string, promptVersion: string, mode
 // Validation
 
 const checkOpts = (f: Facts): CheckOpts => ({ currency: f.baseCurrency, asOf: f.asOf });
-const hasLink = (s: string) => /https?:|www\.|\bftp:/i.test(s);
+const LINKISH_RE = /https?:|ftp:|www\.|\b[a-z0-9-]+\.(?:com|net|org|io|co|ly|me|app|biz|info|xyz|link|pay|example|test)\b|@/i;
+const BANK_RE = /\b(?:iban|swift|routing|account\s+(?:number|no)|sort code|wire|wired|bank details)\b/i;
+
+// Links, addresses, and bank details come from the commitment or the owner, never from the model. A run of
+// six or more digits is an account number unless it is part of the document's own reference.
+function hygieneProblem(text: string, f: Facts): string | undefined {
+  if (LINKISH_RE.test(text)) return "contains a link or address (links are added by code)";
+  if (BANK_RE.test(text)) return "mentions bank or wire details";
+  const ref = f.commitment?.reference;
+  const rest = (ref ? text.split(ref).join(" ") : text).replace(/\d{4}-\d{2}-\d{2}/g, " ");
+  if (/\d{6,}/.test(rest)) return "contains a long number";
+  return undefined;
+}
+
+// Day counts, percentages, and week counts are figures too: number_check reads only money and dates, so
+// they are matched against the lever and the engine's own basis text here.
+function countProblems(text: string, f: Facts): string[] {
+  const nums = (s: string) => [...s.matchAll(/\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+  const basis = f.expected.flatMap((e) => nums(e.basis));
+  const allowed: Record<"day" | "pct" | "week", Set<number>> = {
+    day: new Set([...(f.lever?.days !== undefined ? [f.lever.days] : []), ...(f.party?.medianDaysLate !== undefined ? [Math.abs(f.party.medianDaysLate)] : []), ...basis]),
+    pct: new Set([...(f.lever?.advancePct !== undefined ? [f.lever.advancePct] : []), ...(f.commitment?.discount ? [f.commitment.discount.pct] : [])]),
+    week: new Set(),
+  };
+  const out: string[] = [];
+  for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(?:more\s+|extra\s+|additional\s+|business\s+|calendar\s+|working\s+)?(%|percent\b|per\s?cent\b|days?\b|weeks?\b)/gi)) {
+    const unit = m[2]!.toLowerCase();
+    const kind = unit.startsWith("day") ? "day" : unit.startsWith("week") ? "week" : "pct";
+    if (!allowed[kind].has(Number(m[1]))) out.push(`"${m[0]}" is not in the facts`);
+  }
+  return out;
+}
+
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 const citationsFor = (item: WorkItem, f: Facts) => [...new Set([...(item.evidenceRefs ?? []), f.commitment?.id ?? item.id])];
 
@@ -360,28 +403,31 @@ export function checkBriefText(title: string, why: string, item: WorkItem, f: Fa
   if (!title.trim() || !why.trim()) return "empty title or why";
   if (wordCount(title) > MAX_TITLE_WORDS) return `title is longer than ${MAX_TITLE_WORDS} words`;
   if (why.length > MAX_WHY_CHARS) return "why is too long";
-  if (hasLink(title) || hasLink(why)) return "contains a link";
-  const allowed = allowedFromFacts(f);
-  const r = checkText(`${title}\n${why}`, citationsFor(item, f), allowed, checkOpts(f));
-  if (r.ok) return undefined;
+  const text = `${title}\n${why}`;
+  const hygiene = hygieneProblem(text, f);
+  if (hygiene) return hygiene;
+  const r = checkText(text, citationsFor(item, f), allowedFromFacts(f), checkOpts(f));
   const parts = [
     ...r.unmatched.map((u) => `${u.kind} "${u.raw}" is not in the facts`),
-    ...r.problems,
+    ...r.problems, ...countProblems(text, f),
   ];
-  return parts.join("; ");
+  return parts.length ? parts.join("; ") : undefined;
 }
 
 // Phrases that claim something was sent or paid. Drafts are text for the owner to send; they never say it was.
-const CLAIM_RE = /\bsent\b|\b(?:have|has|had|already|just|am|are|was|were)\s+(?:been\s+)?(?:paid|wired|transferred|submitted|processed)\b|\bi(?:'ve| have)\s+paid\b|\bon its way\b|\bpayment\s+(?:is|was)\s+(?:made|processed|complete)/i;
+const CLAIM_RE = /\bsent\b|\b(?:we|i)(?:'ve| have)?\s+(?:already\s+|just\s+)?(?:paid|wired|transferred)\b|\b(?:have|has|had|already|just|am|are|was|were)\s+(?:been\s+)?(?:paid|wired|transferred|submitted|processed)\b|\bi(?:'ve| have)\s+paid\b|\bon its way\b|\bpayment\s+(?:is|was)\s+(?:made|processed|complete)/i;
 
 export function checkDraftText(subject: string | undefined, body: string, item: WorkItem, f: Facts): string | undefined {
   if (!body.trim()) return "empty body";
   const all = `${subject ?? ""}\n${body}`;
-  if (hasLink(all)) return "contains a link (links are added by code)";
+  const hygiene = hygieneProblem(all, f);
+  if (hygiene) return hygiene;
   if (CLAIM_RE.test(all)) return "claims something was sent or paid";
-  const r = checkText(all, citationsFor(item, f), allowedFromFacts(f), checkOpts(f));
-  if (r.ok) return undefined;
-  return [...r.unmatched.map((u) => `${u.kind} "${u.raw}" is not in the facts`), ...r.problems].join("; ");
+  // A message to a counterparty may state only what is on the document: never our own cash position
+  // (low point, safety line) or the lever's effect on it.
+  const r = checkText(all, citationsFor(item, f), allowedFromFacts(draftFacts(f)), checkOpts(f));
+  const parts = [...r.unmatched.map((u) => `${u.kind} "${u.raw}" is not in the facts`), ...r.problems, ...countProblems(all, f)];
+  return parts.length ? parts.join("; ") : undefined;
 }
 
 const feedback = (problems: string[]) =>
@@ -392,21 +438,25 @@ const feedback = (problems: string[]) =>
 // ---------------------------------------------------------------------------
 // Cache keys: prompt text + version, model, run inputs, and the facts block (everything that shapes the answer).
 
+// One entry per item, so a change to one ranked item (or a different top three) never invalidates the others.
 export function briefCacheKey(
-  items: WorkItem[], ctx: Pick<BriefContext, "run" | "records" | "profile" | "model">,
+  item: WorkItem, ctx: Pick<BriefContext, "run" | "records" | "profile" | "model">,
 ): string {
   return cacheKey({
     promptVersion: BRIEF_PROMPT_VERSION, promptHash: sha(prompt("write_brief.md")), model: ctx.model ?? BRIEF_MODEL,
-    inputsHash: ctx.run.inputsHash, facts: items.slice(0, MAX_BRIEF_ITEMS).map((i) => buildFacts(i, ctx)),
+    inputsHash: ctx.run.inputsHash, facts: buildFacts(item, ctx),
   });
 }
+
+const draftPayload = (item: WorkItem, ctx: Pick<BriefContext, "run" | "records" | "profile" | "business">) =>
+  ({ businessName: ctx.business.name, ...draftFacts(buildFacts(item, ctx)) });
 
 export function draftCacheKey(
   item: WorkItem, ctx: Pick<BriefContext, "run" | "records" | "profile" | "business" | "model">,
 ): string {
   return cacheKey({
     promptVersion: DRAFT_PROMPT_VERSION, promptHash: sha(prompt("draft_message.md")), model: ctx.model ?? DRAFT_MODEL,
-    inputsHash: ctx.run.inputsHash, payload: { businessName: ctx.business.name, ...buildFacts(item, ctx) },
+    inputsHash: ctx.run.inputsHash, payload: draftPayload(item, ctx),
   });
 }
 
@@ -422,7 +472,7 @@ export async function writeBrief(
   const facts = top.map((i) => buildFacts(i, ctx));
   const system = prompt("write_brief.md");
   const user = factsBlock(facts);
-  const key = briefCacheKey(top, { ...ctx, model });
+  const keys = top.map((i) => briefCacheKey(i, { ...ctx, model }));
 
   // Per item: accepted text, or undefined while still unresolved.
   const accepted = new Map<string, { title: string; why: string }>();
@@ -439,10 +489,11 @@ export async function writeBrief(
     return problems;
   };
 
+  for (const [idx, item] of top.entries()) {
+    const hit = cachedOutput(ctx, keys[idx]!, BriefItemOutput);
+    if (hit) evaluate({ items: [{ id: item.id, ...hit }] });
+  }
   let problems: string[] = [];
-  const hit = cachedOutput(ctx, key, BriefOutput);
-  if (hit) problems = evaluate(hit);
-  else problems = top.map((i) => `${i.id}: no cached answer`);
 
   // A miss or a failing cache entry goes to the model in live mode: one attempt, then one retry with feedback.
   if (accepted.size < top.length && ctx.mode === "live") {
@@ -450,10 +501,12 @@ export async function writeBrief(
     for (let attempt = 1; attempt <= 2 && accepted.size < top.length; attempt++) {
       const res = await callStructured(ctx.client, model, system, turns, BriefOutput, "medium");
       if ("problem" in res) { problems = [res.problem]; continue; }
+      const before = new Set(accepted.keys());
       problems = evaluate(res.output);
-      if (accepted.size === top.length) {
-        storeOutput(ctx, key, BRIEF_PROMPT_VERSION, model, { items: top.map((i) => ({ id: i.id, ...accepted.get(i.id)! })) });
-      } else {
+      for (const [idx, item] of top.entries()) {
+        if (accepted.has(item.id) && !before.has(item.id)) storeOutput(ctx, keys[idx]!, BRIEF_PROMPT_VERSION, model, accepted.get(item.id));
+      }
+      if (accepted.size < top.length) {
         turns.push({ role: "assistant", content: JSON.stringify(res.output) }, { role: "user", content: feedback(problems) });
       }
     }
@@ -490,7 +543,7 @@ export async function draftMessage(item: WorkItem, ctx: BriefContext): Promise<D
   const model = ctx.model ?? DRAFT_MODEL;
   const facts = buildFacts(item, ctx);
   const system = prompt("draft_message.md");
-  const payload = { businessName: ctx.business.name, ...facts };
+  const payload = draftPayload(item, ctx);
   const key = draftCacheKey(item, { ...ctx, model });
   const links = linksFor(item, ctx.records);
   const channel = channelFor(item);

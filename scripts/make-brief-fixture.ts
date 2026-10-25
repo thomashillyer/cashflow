@@ -42,7 +42,7 @@ const poHH552: Commitment = {
   sourceRef: { system: "generic_file", record: "harbor-po-552.pdf" },
 };
 const records: Records & { _comment: string } = {
-  _comment: "Synthetic. Subset of fixtures/cascade_trade/records.json for the brief/draft tests, plus PO HH-PO-552 (from the intake fixtures) and an invoice link on INV-1187. Regenerate with scripts/make-brief-fixture.ts.",
+  _comment: "Synthetic. Subset of fixtures/cascade_trade/records.json for the brief/draft tests, plus PO HH-PO-552 (from the intake fixtures) and an invoice link on INV-1187. work_items.json is illustrative: only the INV-1187 cashEffect comes from the engine. Regenerate with scripts/make-brief-fixture.ts.",
   parties: [party("party-evergreen-home"), party("party-jaipur-textiles"), party("party-harbor-hearth")],
   commitments: [inv1187, po2302, poHH552],
   events: [], signals: [], rules: [], settlements: [], balances: [], evidence: [],
@@ -96,9 +96,12 @@ for (const [i, it] of fx.items.entries()) {
   const problem = checkBriefText(b.title, b.why, it, buildFacts(it, ctx));
   if (problem) throw new Error(`brief stand-in ${it.id}: ${problem}`);
 }
-writeCache(BRIEF_CACHE_DIR, {
-  key: briefCacheKey(fx.items, ctx), promptVersion: BRIEF_PROMPT_VERSION, model: BRIEF_MODEL, source: SOURCE, output: brief,
-});
+for (const [i, it] of fx.items.entries()) {
+  const { title, why } = brief.items[i]!;
+  writeCache(BRIEF_CACHE_DIR, {
+    key: briefCacheKey(it, ctx), promptVersion: BRIEF_PROMPT_VERSION, model: BRIEF_MODEL, source: SOURCE, output: { title, why },
+  });
+}
 
 const drafts: Record<string, { subject: string; body: string }> = {
   "wi-chase-INV-1187": {

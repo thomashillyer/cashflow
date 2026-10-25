@@ -26,15 +26,18 @@ const scratch = mkdtempSync(join(tmpdir(), "neri-brief-"));
 const ctx = { ...fx, mode: "live" as const, client, cacheDir: scratch };
 let failed = 0;
 
+// One cache entry per item. An item whose text fell back (failed validation twice) keeps its current entry.
 const brief = await writeBrief(fx.items, ctx);
-const briefKey = briefCacheKey(fx.items, ctx);
-const briefEntry = readCache(scratch, briefKey);
-if (brief.usedFallback.length || !briefEntry) {
-  failed++;
-  console.log(`FAILED brief: fallback used for ${brief.usedFallback.join(", ") || "all items"}`);
-} else {
-  writeCache(BRIEF_CACHE_DIR, { ...briefEntry, promptVersion: BRIEF_PROMPT_VERSION, model: BRIEF_MODEL });
-  console.log(`ok     brief  ${briefKey}`);
+for (const item of fx.items.slice(0, 3)) {
+  const key = briefCacheKey(item, ctx);
+  const entry = readCache(scratch, key);
+  if (brief.usedFallback.includes(item.id) || !entry) {
+    failed++;
+    console.log(`FAILED brief ${item.id}: fallback used`);
+    continue;
+  }
+  writeCache(BRIEF_CACHE_DIR, { ...entry, promptVersion: BRIEF_PROMPT_VERSION, model: BRIEF_MODEL });
+  console.log(`ok     brief  ${item.id}  ${key}`);
 }
 
 for (const item of fx.items.slice(0, 3)) {

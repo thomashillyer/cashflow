@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { BRIEF_BUSINESS, loadBriefFixture } from "../scripts/brief-fixture";
 import type { Lever, Records, WorkItem } from "../schema/records";
 import {
-  allowedFromFacts, briefCacheKey, buildFacts, checkBriefText, checkDraftText, draftCacheKey, draftMessage, fallbackBrief,
+  allowedFromFacts, briefCacheKey, buildFacts, checkBriefText, checkDraftText, draftCacheKey, draftFacts, draftMessage, fallbackBrief,
   fallbackDraft, fmtMoney, MAX_BRIEF_ITEMS, writeBrief, type BriefContext,
 } from "./brief";
 import { BRIEF_CACHE_DIR, readCache, writeCache } from "./cache";
@@ -80,15 +80,18 @@ describe("writeBrief with the committed demo cache", () => {
     expect(out.items).toHaveLength(MAX_BRIEF_ITEMS);
     expect(out.items.map((i) => i.id)).toEqual(fx.items.map((i) => i.id));
 
-    const one = await writeBrief([chase], cached()); // no cache entry for a one-item brief
+    // Entries are per item: a one-item brief hits the same cache entry as in the three-item brief.
+    const one = await writeBrief([chase], cached());
     expect(one.items).toHaveLength(1);
-    expect(one.usedFallback).toEqual([chase.id]);
+    expect(one.usedFallback).toEqual([]);
+    const unseen = await writeBrief([{ ...chase, id: "unseen" }], cached());
+    expect(unseen.usedFallback).toEqual(["unseen"]);
     expect((await writeBrief([], cached())).items).toEqual([]);
   });
 
   it("does not trust a cache entry with an invented figure: that item falls back, the others stay", async () => {
     const dir = cacheCopy();
-    rewrite(dir, briefCacheKey(fx.items, fx), (o) => { o.items[0].why = "Evergreen Home's $30,000 is expected Dec 26."; });
+    rewrite(dir, briefCacheKey(chase, fx), (o) => { o.why = "Evergreen Home's $30,000 is expected Dec 26."; });
     const out = await writeBrief(fx.items, cached({ cacheDir: dir }));
     expect(out.usedFallback).toEqual([chase.id]);
     expect(out.items[0]!.title).toBe("Chase Evergreen Home on INV-1187");
@@ -102,12 +105,15 @@ describe("writeBrief with the committed demo cache", () => {
 
   it("an invented date, an over-long title, or a link also falls back", async () => {
     for (const edit of [
-      (o: any) => { o.items[0].why = "Evergreen Home pays on Dec 30, so ask now."; },
-      (o: any) => { o.items[0].title = "Please chase Evergreen Home today about the late invoice INV-1187"; },
-      (o: any) => { o.items[0].why = "Open https://example.test/pay to see it."; },
+      (o: any) => { o.why = "Evergreen Home pays on Dec 30, so ask now."; },
+      (o: any) => { o.title = "Please chase Evergreen Home today about the late invoice INV-1187"; },
+      (o: any) => { o.why = "Open https://example.test/pay to see it."; },
+      (o: any) => { o.why = "Ask them to pay via bit.ly/xyz to lift your lowest point to $14,000."; },
+      (o: any) => { o.why = "Wire to account 123456789 to lift your lowest point to $14,000."; },
+      (o: any) => { o.why = "Chasing it within 30 days lifts your lowest point to $14,000."; },
     ]) {
       const dir = cacheCopy();
-      rewrite(dir, briefCacheKey(fx.items, fx), edit);
+      rewrite(dir, briefCacheKey(chase, fx), edit);
       const out = await writeBrief(fx.items, cached({ cacheDir: dir }));
       expect(out.usedFallback).toEqual([chase.id]);
       rmSync(dir, { recursive: true });
@@ -127,7 +133,9 @@ describe("writeBrief with the committed demo cache", () => {
 });
 
 describe("writeBrief live mode (fake client)", () => {
-  const good = JSON.parse(readFileSync(join(BRIEF_CACHE_DIR, readdirSync(BRIEF_CACHE_DIR).find((f) => f.startsWith(briefCacheKey(fx.items, fx)))!), "utf8")).output;
+  const good = {
+    items: fx.items.map((i) => ({ id: i.id, ...JSON.parse(readFileSync(join(BRIEF_CACHE_DIR, `${briefCacheKey(i, fx)}.json`), "utf8")).output })),
+  };
   const bad = { items: good.items.map((i: any) => ({ ...i, why: `${i.why} It is worth $99,999.` })) };
 
   it("sends a structured request, caches a valid answer, and a second call makes no request", async () => {
@@ -141,7 +149,7 @@ describe("writeBrief live mode (fake client)", () => {
     expect(requests[0].system[0].text).toMatch(/only source/);
     expect(requests[0].tools).toBeUndefined();
     expect(requests[0].messages[0].content).toMatch(/^<facts>/);
-    expect(readdirSync(dir)).toHaveLength(1);
+    expect(readdirSync(dir)).toHaveLength(3); // one entry per item
     const again = await writeBrief(fx.items, { ...fx, mode: "live", client, cacheDir: dir });
     expect(requests).toHaveLength(1);
     expect(again.items.map((i) => i.title)).toEqual(out.items.map((i) => i.title));
@@ -357,5 +365,59 @@ describe("draftMessage", () => {
     expect(readdirSync(BRIEF_CACHE_DIR)).toHaveLength(before);
     expect(readdirSync(dir)).toHaveLength(1);
     rmSync(dir, { recursive: true });
+  });
+});
+
+describe("validation gaps found in review", () => {
+  const f = facts(defer);
+  const check = (title: string, why: string, it = defer) => checkBriefText(title, why, it, facts(it));
+
+  it("day counts and percentages must match the lever", () => {
+    expect(check("Ask Jaipur Textiles for 10 more days", "Moving the balance back 10 days lifts your lowest point to $6,500.")).toBeUndefined();
+    expect(check("Ask Jaipur Textiles for 30 more days", "Moving it back lifts your lowest point to $6,500.")).toMatch(/30 more days/);
+    expect(check("Ask Harbor and Hearth for a 90% advance", "Asking for 90% up front lifts your lowest point to −$1,500.", advance)).toMatch(/90%/);
+    expect(check("Ask Harbor and Hearth for a 40% advance", "Asking for 40% up front lifts your lowest point to −$1,500.", advance)).toBeUndefined();
+  });
+
+  it("drafts cannot state the owner's cash position or the lever's effect, nor ask for an amount not on the document", () => {
+    const ok = "Hello,\n\nCould you allow 10 more days on PO-2302?\n\nThank you,\nCascade Trade Co.";
+    expect(checkDraftText("Timing", ok, defer, f)).toBeUndefined();
+    expect(checkDraftText("Timing", "Our cash dips to −$5,500 in the week of Dec 21.", defer, f)).toMatch(/not in the facts/);
+    expect(checkDraftText("Timing", "We sit below our $35,000 safety line.", defer, f)).toMatch(/not in the facts/);
+    expect(checkDraftText("Timing", "Please pay $12,000 now.", defer, f)).toBeUndefined(); // an amount on the PO's own schedule
+    expect(checkDraftText("Timing", "Please pay $6,500 now.", defer, f)).toMatch(/not in the facts/);
+    // The draft model is not even shown the low point, safety line, or lever effect.
+    expect(JSON.stringify(draftFacts(f))).not.toMatch(/lowPoint|safetyLine|amountAfterLever|cashEffect/);
+  });
+
+  it("scheme-less links, addresses, bank details, and \"we paid\" claims are rejected", () => {
+    for (const body of [
+      "Please pay via bit.ly/xyz.", "Use evil.example/pay.", "Write to me at a@b.co.", "Wire to account 123456789.",
+      "IBAN GB00 TEST.", "We paid the deposit last week.", "I have paid already.",
+    ]) {
+      expect(checkDraftText(undefined, body, defer, f), body).toBeDefined();
+    }
+    // Document references with long digits are allowed.
+    const it = { ...chase };
+    const fc = { ...facts(chase), commitment: { ...facts(chase).commitment!, reference: "INV-20260001" } };
+    expect(checkDraftText(undefined, "Following up on INV-20260001.", it, fc)).toBeUndefined();
+  });
+
+  it("pay_early and lever-less items carry no amountAfterLever, and no commitment is guessed from evidence", () => {
+    const early = { ...chase, lever: { kind: "pay_early", commitmentId: "inv-INV-1187" } as Lever };
+    expect(facts(early).amountAfterLever).toBeUndefined();
+    const none = { ...chase, lever: undefined, evidenceRefs: ["inv-INV-1187"] };
+    expect(facts(none).commitment).toBeUndefined();
+    expect(facts(none).amountAfterLever).toBeUndefined();
+    expect(facts(chase).amountAfterLever).toBe(1400000);
+  });
+
+  it("owner-rule text inside an engine basis is dropped from the facts and the allowed dates", () => {
+    const run = JSON.parse(JSON.stringify(fx.run));
+    const ev = run.events.find((e: any) => e.commitmentId === "inv-INV-1187");
+    ev.basis = 'owner rule: "pays on 2026-11-30 or later" + 5 days';
+    const out = buildFacts(chase, { run, records: fx.records, profile: fx.profile });
+    expect(JSON.stringify(out)).not.toContain("2026-11-30");
+    expect(allowedFromFacts(out).dates).not.toContain("2026-11-30");
   });
 });
