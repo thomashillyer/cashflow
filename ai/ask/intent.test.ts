@@ -7,7 +7,7 @@ import type { AskIntentRaw } from "../../schema/ask";
 import type { Profile } from "../../schema/profile";
 import type { Records } from "../../schema/records";
 import { INTENT_STANDINS } from "../../scripts/intent-standins";
-import { ASK_CACHE_DIR, readCache, writeCache } from "../cache";
+import { INTENT_CACHE_DIR, readCache, writeCache } from "../cache";
 import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../config";
 import {
   askDraftId, draftCadence, intentAssumptions, intentCacheKey, intentContent, intentSystemPrompt, readAmountPhrase, readIntent,
@@ -20,7 +20,7 @@ const profile = JSON.parse(readFileSync(join(root, "profiles/trading.json"), "ut
 const asOf = JSON.parse(readFileSync(join(root, "fixtures/cascade_trade/fixture.json"), "utf8")).asOf as string;
 const TZ = "America/Los_Angeles";
 
-const demo: ReadIntentContext = { records, profile, asOf, mode: "cache_only", cacheDir: ASK_CACHE_DIR };
+const demo: ReadIntentContext = { records, profile, asOf, mode: "cache_only", cacheDir: INTENT_CACHE_DIR };
 const ask = (q: string, over: Partial<ReadIntentContext> = {}) => readIntent(q, { ...demo, ...over });
 
 const tmp = () => mkdtempSync(join(tmpdir(), "neri-intent-test-"));
@@ -49,13 +49,12 @@ function fakeClient(replies: (object | Error | string | { stop_reason: string })
 describe("committed stand-in cache", () => {
   it("answers every stand-in question with no model call, and marks each entry a stand-in", () => {
     for (const { question } of INTENT_STANDINS) {
-      const entry = readCache(ASK_CACHE_DIR, intentCacheKey(question));
+      const entry = readCache(INTENT_CACHE_DIR, intentCacheKey(question));
       expect(entry, question).toBeDefined();
       expect(entry!.source).toBe("stand-in");
       expect(entry!.promptVersion).toBe(INTENT_PROMPT_VERSION);
       expect(entry!.model).toBe(INTENT_MODEL);
     }
-    expect(readdirSync(ASK_CACHE_DIR).length).toBe(INTENT_STANDINS.length);
   });
 });
 

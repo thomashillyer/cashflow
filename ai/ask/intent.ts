@@ -18,7 +18,7 @@ import { z } from "zod/v4";
 import type { AskIntent, AskIntentKind, AskIntentRaw } from "../../schema/ask";
 import type { Profile } from "../../schema/profile";
 import type { Commitment, CommitmentDraft, Records, Rule } from "../../schema/records";
-import { ASK_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
+import { INTENT_CACHE_DIR, cacheKey, LIVE_CACHE_DIR, readCache, writeCache } from "../cache";
 import { fmtDate } from "../brief";
 import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../config";
 import { parseAmount } from "../normalize";
@@ -536,7 +536,7 @@ export type ReadIntentContext = ResolveIntentContext & {
   mode: "live" | "cache_only";
   client?: Anthropic;          // live mode; defaults to a client configured from ANTHROPIC_API_KEY
   // Read and write directory. Default: reads LIVE_CACHE_DIR (gitignored) then the committed demo cache
-  // (ASK_CACHE_DIR); live results are written to LIVE_CACHE_DIR, never to the fixtures.
+  // (INTENT_CACHE_DIR); live results are written to LIVE_CACHE_DIR, never to the fixtures.
   cacheDir?: string;
   model?: string;
 };
@@ -568,7 +568,7 @@ export async function readIntent(question: string, ctx: ReadIntentContext): Prom
     const content = intentContent(question);
     const key = intentCacheKey(question, model);
     const writeDir = ctx.cacheDir ?? LIVE_CACHE_DIR;
-    const readDirs = ctx.cacheDir ? [ctx.cacheDir] : [LIVE_CACHE_DIR, ASK_CACHE_DIR];
+    const readDirs = ctx.cacheDir ? [ctx.cacheDir] : [LIVE_CACHE_DIR, INTENT_CACHE_DIR];
 
     let raw: AskIntentRaw | undefined;
     for (const dir of readDirs) {

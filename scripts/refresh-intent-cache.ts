@@ -10,7 +10,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { callIntentModel, intentCacheKey, intentContent } from "../ai/ask/intent";
-import { ASK_CACHE_DIR, writeCache } from "../ai/cache";
+import { INTENT_CACHE_DIR, writeCache } from "../ai/cache";
 import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../ai/config";
 import { INTENT_STANDINS } from "./intent-standins";
 
@@ -33,7 +33,7 @@ for (const question of questions) {
     console.log(`FAILED ${question}: ${result.problem}`);
     continue;
   }
-  writeCache(ASK_CACHE_DIR, { key, promptVersion: INTENT_PROMPT_VERSION, model: INTENT_MODEL, source: "live", output: result.output });
+  writeCache(INTENT_CACHE_DIR, { key, promptVersion: INTENT_PROMPT_VERSION, model: INTENT_MODEL, source: "live", output: result.output });
   console.log(`ok     ${key}  kind=${result.output.kind}  ${question}`);
 }
 process.exit(failed ? 1 : 0);

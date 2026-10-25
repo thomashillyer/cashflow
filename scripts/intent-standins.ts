@@ -4,9 +4,9 @@
 // writes real answers under the same cache keys; the gitignored live cache is read first.
 //
 //   npx tsx scripts/intent-standins.ts            # print keys
-//   npx tsx scripts/intent-standins.ts --write    # write fixtures/cascade_trade/ask/cache/<key>.json
+//   npx tsx scripts/intent-standins.ts --write    # write fixtures/cascade_trade/ask/intent-cache/<key>.json
 
-import { ASK_CACHE_DIR, writeCache } from "../ai/cache";
+import { INTENT_CACHE_DIR, writeCache } from "../ai/cache";
 import { intentCacheKey } from "../ai/ask/intent";
 import { INTENT_MODEL, INTENT_PROMPT_VERSION } from "../ai/config";
 import type { AskIntentRaw } from "../schema/ask";
@@ -82,7 +82,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const key = intentCacheKey(question);
     console.log(`${key}  ${question}`);
     if (write) {
-      writeCache(ASK_CACHE_DIR, {
+      writeCache(INTENT_CACHE_DIR, {
         key, promptVersion: INTENT_PROMPT_VERSION, model: INTENT_MODEL,
         source: "stand-in", // hand-authored; replace with a live run (scripts/refresh-intent-cache.ts)
         output: raw,

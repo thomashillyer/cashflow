@@ -13,9 +13,6 @@ export const DEFAULT_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_
 // Committed demo entries for brief text and drafts (ai/brief.ts), hand-authored stand-ins until refreshed live.
 export const BRIEF_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/brief/cache");
 
-// Committed demo entries for Ask Neri intent reading (ai/ask/intent.ts), hand-authored stand-ins until refreshed live.
-export const ASK_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/ask/cache");
-
 // Where live extractions of real documents are stored. Gitignored (data/private/): the entries contain
 // names, amounts, and quotes from the owner's documents.
 export const LIVE_CACHE_DIR = join(import.meta.dirname, "../data/private/ai-cache");
@@ -81,3 +78,6 @@ export function writeCache(dir: string, entry: CacheEntry): void {
 
 // Committed demo entries for Ask Neri's CFO voice (ai/ask/voice.ts), hand-authored stand-ins until refreshed live.
 export const ASK_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/ask/cache");
+
+// Committed demo entries for Ask Neri intent reading (ai/ask/intent.ts), hand-authored stand-ins until refreshed live.
+export const INTENT_CACHE_DIR = join(import.meta.dirname, "../fixtures/cascade_trade/ask/intent-cache");
