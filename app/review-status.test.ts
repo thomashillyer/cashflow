@@ -21,7 +21,9 @@ const makeRun = (r: Records = records) => forecast(r, profile, base, asOf, {});
 // Execute the real screen and narration code with browser boot disabled. This catches contradictory
 // all-clear text in any of the owner-facing paths without introducing a DOM dependency.
 const main = readFileSync(new URL("./main.js", import.meta.url), "utf8");
-const ui = main.slice(0, main.lastIndexOf("\nload().catch")).replace(/^import .*;\n/gm, "");
+const boot = main.lastIndexOf("\nstart().catch");
+if (boot < 0) throw new Error("The app boot entrypoint changed; update this screen harness.");
+const ui = main.slice(0, boot).replace(/^import .*;\n/gm, "");
 function render(run: ForecastRun, mode = "live") {
   const drive = { innerHTML: "" };
   const supplied = {
