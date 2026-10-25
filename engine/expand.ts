@@ -160,8 +160,21 @@ type Payments = {
 // own `lagged` flag decides when set; otherwise the profile-wide engine.lag.laggedTypes and laggedAnchors do.
 export function legGetsLag(leg: PaymentPattern["legs"][number], c: Commitment, tun: EngineSettings): boolean {
   if (leg.direction !== "in" || c.funding || c.status === "actual") return false;
-  if (leg.lagged !== undefined) return leg.lagged;
+  // Only a real boolean counts: a profile stored as JSON could hold "false" as a string (flagged by checkLegFlags).
+  if (typeof leg.lagged === "boolean") return leg.lagged;
   return tun.lag.laggedTypes.includes(c.type) && tun.lag.laggedAnchors.includes(leg.anchor);
+}
+
+// Profile check, once per run: a leg's `lagged` must be a boolean, and only inflow legs can wait for a customer.
+function checkLegFlags(profile: Profile, warnings: Notes): void {
+  for (const p of profile.paymentPatterns) {
+    p.legs.forEach((leg, i) => {
+      const flag = (leg as { lagged?: unknown }).lagged;
+      if (flag === undefined) return;
+      if (typeof flag !== "boolean") warnings.review("invalid_profile", `payment pattern ${p.id} leg ${i + 1}: lagged must be true or false; ignored.`, [p.id]);
+      else if (flag && leg.direction !== "in") warnings.review("invalid_profile", `payment pattern ${p.id} leg ${i + 1}: lagged applies only to money coming in; ignored on a payment.`, [p.id]);
+    });
+  }
 }
 
 export type PaymentContext = { snapDate: string; horizonEnd: string; countedActuals?: Set<string>; byId: Map<string, Commitment>; lags?: Map<string | undefined, Lag>; settings?: EngineSettings; payments?: PaymentIndex };
@@ -681,6 +694,7 @@ function flagLinkedCostsAfterCancel(deal: Commitment, byId: Map<string, Commitme
 // countedActuals: see PaymentContext; forecast() passes countedActualIds so uncounted bank lines never cancel a bill.
 export function expand(records: Records, profile: Profile, asOf: string, horizonEnd: string, fx: Record<string, number>, countedActuals?: Set<string>): Expanded {
   const warnings = new Notes();
+  checkLegFlags(profile, warnings);
   const { commitments, amountSignals } = prepare(records);
   const byId = new Map(commitments.map((c) => [c.id, c]));
   const events: CashEvent[] = [];

@@ -8,6 +8,8 @@ import type { CommitmentType, Records, Scenario } from "./records";
 import { forecast } from "../engine/forecast";
 import { diffDays } from "../engine/dates";
 import { smallestUpfrontShare } from "../engine/affordability";
+import { legGetsLag } from "../engine/expand";
+import { engineSettings } from "../engine/settings";
 
 const dir = join(import.meta.dirname, "..", "profiles");
 const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
@@ -182,5 +184,28 @@ describe("per-leg lagged flag", () => {
     const q = withPattern(agency(), [{ ...legs[0]!, lagged: true }, legs[1]!]);
     expect(dates(r, q)).toEqual(["2026-12-05", "2027-02-14"]);
     expect(smallestUpfrontShare(r, q, [], "d", "2026-11-16", {}).note).toMatch(/no deposit leg/);
+  });
+});
+
+describe("lagged flag stored with the wrong type (review of #137)", () => {
+  it("a non-boolean lagged is ignored and flagged; lagged on a payment is flagged", () => {
+    const base = JSON.parse(readFileSync(join(import.meta.dirname, "..", "profiles", "trading.json"), "utf8"));
+    const profile = {
+      ...base,
+      paymentPatterns: [
+        ...base.paymentPatterns,
+        { id: "bad_flag", appliesTo: "plan", legs: [{ share: 1, anchor: "due", offsetDays: 0, direction: "in", lagged: "false" }] },
+        { id: "flag_on_payment", appliesTo: "plan", legs: [{ share: 1, anchor: "due", offsetDays: 0, direction: "out", lagged: true }] },
+      ],
+    };
+    const leg = profile.paymentPatterns.at(-2).legs[0];
+    const c = { id: "x", type: "invoice", amount: 100, currency: "USD", anchors: { due: "2026-11-02" }, status: "committed", sourceRef: { system: "t", record: "x" } };
+    // the string "false" is not honored as true: falls back to the lists (invoice + due anchor -> lagged by default)
+    expect(legGetsLag({ ...leg, anchor: "order" }, c as never, engineSettings(profile))).toBe(false);
+    const empty = { parties: [], commitments: [], events: [], signals: [], rules: [], settlements: [], balances: [{ id: "b", account: "a", amount: 0, currency: "USD", asOf: "2026-10-26", sourceRef: { system: "t", record: "b" } }], evidence: [] };
+    const run = forecast(empty as never, profile, { id: "base", kind: "base", overrides: [] }, "2026-10-26", {});
+    const msgs = (run.review?.reasons ?? []).filter((r) => r.code === "invalid_profile").map((r) => r.message).join(" ");
+    expect(msgs).toMatch(/bad_flag leg 1: lagged must be true or false/);
+    expect(msgs).toMatch(/flag_on_payment leg 1: lagged applies only to money coming in/);
   });
 });
