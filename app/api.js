@@ -6,6 +6,7 @@
 // The UI only calls the functions below, so wiring the real API means filling in `live` and nothing else.
 
 import { createEngine } from "./mock/engine.js";
+import * as auth from "./ui/auth.js";
 
 export const SANDBOXES = [
   { id: "cascade_trade", label: "Cascade Trade Co.", kind: "Trading and import" },
@@ -66,10 +67,12 @@ const preview = {
   },
   async startSignup(email) {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Enter your work email, like you@yourbusiness.com.");
-    return { suggestedName: suggestBusinessName(email), personal: FREE_MAIL.test(email.split("@")[1] ?? "") };
+    if (auth.authConfigured) await auth.sendCode(email);
+    return { suggestedName: suggestBusinessName(email), personal: FREE_MAIL.test(email.split("@")[1] ?? ""), realCode: auth.authConfigured };
   },
   async verifyCode(email, code) {
     if (!/^\d{6}$/.test(code.trim())) throw new Error("Enter the 6-digit code from the email.");
+    if (auth.authConfigured) await auth.verifyCode(email, code);
     return { ok: true };
   },
   async completeSetup({ email, businessName, kind, reserve, connect }) {
@@ -96,7 +99,8 @@ const preview = {
     writeAccount(acc);
     return acc;
   },
-  async signOut() {
+  async signOut({ everywhere = false } = {}) {
+    await auth.signOut({ everywhere }).catch(() => {});
     writeAccount(null);
   },
   async open(id) {
@@ -152,7 +156,14 @@ const preview = {
 
 // ---- live implementation (team API) ------------------------------------------------
 async function http(path, init) {
-  const res = await fetch(`${API_BASE}${path}`, { headers: { "Content-Type": "application/json" }, ...init });
+  const token = await auth.accessToken().catch(() => null);
+  const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  if (res.status === 401) {
+    writeAccount(null);
+    location.hash = "#/welcome";
+    throw new Error("Your session ended. Sign in again with a new code.");
+  }
   if (!res.ok) throw new Error(`${init?.method ?? "GET"} ${path} failed (${res.status})`);
   return res.status === 204 ? null : res.json();
 }
@@ -162,12 +173,15 @@ const live = {
   account() {
     return readAccount() ?? memAccount;
   },
+  // Sign-in goes straight to Supabase Auth (one-time code). The API only ever sees the session token.
   async startSignup(email) {
-    return http("/auth/start", { method: "POST", body: JSON.stringify({ email }) });
+    if (!auth.authConfigured) throw new Error("Sign-in isn't configured on this server yet.");
+    await auth.sendCode(email);
+    return { suggestedName: suggestBusinessName(email), personal: FREE_MAIL.test(email.split("@")[1] ?? ""), realCode: true };
   },
   async verifyCode(email, code) {
-    const r = await http("/auth/verify", { method: "POST", body: JSON.stringify({ email, code }) });
-    return r;
+    await auth.verifyCode(email, code);
+    return { ok: true };
   },
   // Creates the tenant (business), sets the starter profile and reserve, starts the chosen connectors.
   async completeSetup(setup) {
@@ -180,9 +194,9 @@ const live = {
     writeAccount(acc);
     return acc;
   },
-  async signOut() {
+  async signOut({ everywhere = false } = {}) {
+    await auth.signOut({ everywhere }).catch(() => {});
     writeAccount(null);
-    await http("/auth/signout", { method: "POST" }).catch(() => {});
   },
   async open() {},
   // Needs one small addition to the API table: business name, sources with freshness, parties, rules.
@@ -236,3 +250,4 @@ const live = {
 };
 
 export const api = API_BASE ? live : preview;
+export const authLive = auth.authConfigured;

@@ -799,3 +799,16 @@ body.portal::before { background: transparent; }
 
 .bar-note { color: var(--ink-soft); font-size: 13.5px; }
 .app-tile .logo { letter-spacing: -0.02em; }
+
+/* ---------- idle lock ---------- */
+body.locked #view, body.locked .preview-note { filter: blur(14px); pointer-events: none; user-select: none; }
+.lock {
+  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 24px;
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+.lock-card { text-align: center; display: grid; gap: 10px; justify-items: center; max-width: 340px; }
+.lock-card svg { width: 44px; height: 44px; }
+.lock-card h2 { margin: 6px 0 0; font-size: 26px; letter-spacing: -0.02em; }
+.lock-card p { margin: 0 0 8px; color: var(--ink-soft); }
+.linklike[disabled] { color: var(--ink-faint); cursor: default; }
+body.locked .talk { display: none; }

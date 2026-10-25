@@ -1,4 +1,5 @@
-import { api, SANDBOXES, suggestBusinessName } from "./api.js";
+import { api, SANDBOXES, suggestBusinessName, authLive } from "./api.js";
+import { currentSession } from "./ui/auth.js";
 import { CATEGORIES, CONNECTORS, AVAILABILITY_LABEL } from "./catalog/connectors.js";
 import { cashChart } from "./ui/chart.js";
 import { icon, logo } from "./ui/icons.js";
@@ -650,6 +651,13 @@ function viewSettings() {
       <form class="control" data-submit="safety" style="display:flex;gap:8px"><label class="money-input"><span>$</span><input name="amt" inputmode="numeric" value="${Math.round(app.brief.run.safetyLine / 100)}" aria-label="Your line in dollars" /></label><button class="btn small" type="submit">Save</button></form></div>
     <div class="setting"><h3>Account</h3><p>${app.account?.sample ? "You're looking at a sample business." : `${esc(app.account?.email ?? "")}${app.account?.businessName ? `, ${esc(app.account.businessName)}` : ""}`}</p>
       <div class="control" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${app.account?.sample ? `<button class="btn small primary" data-action="signout">Create your account</button>` : `<button class="btn small" data-action="signout">Sign out</button>`}</div></div>
+    <h2 class="section-title" style="margin-top:28px">Security</h2>
+    <p class="section-note">How your business's data is protected.</p>
+    <div class="setting"><h3>Sign-in</h3><p>${authLive ? "One-time codes to your business email. No passwords are stored." : "Preview sign-up. On a Neri server, sign-in uses one-time codes to your business email."}</p>
+      ${authLive && !app.account?.sample ? `<button class="btn small control" data-action="signout-all">Sign out everywhere</button>` : ""}</div>
+    <div class="setting"><h3>Who can see your numbers</h3><p>Only people you invite to ${esc(app.account?.businessName || "your business")}. The database checks this on every request, not just the app.</p></div>
+    <div class="setting"><h3>Your connected apps</h3><p>Read-only. Neri never writes back, sends or pays. Disconnect any source in Sources and Neri stops reading it.</p></div>
+    <div class="setting"><h3>Screen lock</h3><p>${LOCK_MS ? `Numbers hide after ${Math.round(LOCK_MS / 60000)} minutes away.` : "Off."}</p></div>
     <div class="setting"><h3>Sample data</h3><p>Switch between the fictional businesses this preview runs on.</p>
       <select class="biz control" data-change="biz" aria-label="Sample business">${SANDBOXES.map((x) => `<option value="${x.id}" ${x.id === app.bizId ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>
     <div class="setting"><h3>Hide names</h3><p>Show customers and suppliers as Customer A, Supplier B. For demos and screen sharing.</p>
@@ -679,7 +687,8 @@ function viewWelcome() {
         ${err}
         <button class="btn primary big" type="submit">Create account</button>
       </form>
-      <p class="portal-fine">${api.mode === "preview" ? "Preview: any 6 digits work." : ""} <button class="linklike" data-action="signup-back">Use a different email</button></p>
+      <p class="portal-fine">${authLive ? "The code works once and expires soon." : "Preview: any 6 digits work."}</p>
+      <p class="portal-fine"><button class="linklike" data-action="resend" ${resendWait() ? "disabled" : ""}>${resendWait() ? `Send a new code in ${resendWait()}s` : "Send a new code"}</button> <span aria-hidden="true">&nbsp;</span> <button class="linklike" data-action="signup-back">Use a different email</button></p>
     </div>`;
   }
   return `
@@ -692,10 +701,72 @@ function viewWelcome() {
       ${err}
       <button class="btn primary big" type="submit">Continue</button>
     </form>
-    <p class="portal-fine">One account for your business. Invite your team later.</p>
+    <p class="portal-fine">No password to remember or leak: we email you a one-time code. Your business's data is visible only to people you invite.</p>
     <p class="portal-fine"><button class="linklike" data-action="sample">Look around with a sample business first</button></p>
   </div>`;
 }
+
+function resendWait() {
+  const left = Math.ceil(((app.signup.sentAt ?? 0) + 60000 - Date.now()) / 1000);
+  return left > 0 ? left : 0;
+}
+let resendTimer;
+function tickResend() {
+  clearInterval(resendTimer);
+  resendTimer = setInterval(() => {
+    if (route() !== "welcome" || app.signup.step !== "code") return clearInterval(resendTimer);
+    const b = document.querySelector('[data-action="resend"]');
+    if (!b) return;
+    const w = resendWait();
+    b.disabled = w > 0;
+    b.textContent = w ? `Send a new code in ${w}s` : "Send a new code";
+    if (!w) clearInterval(resendTimer);
+  }, 1000);
+}
+
+// ---------------------------------------------------------------- idle lock
+// After NERI_LOCK_MINUTES with no activity (or that long in the background), the numbers are hidden.
+// With real sign-in, unlocking checks the session is still valid; an ended session goes back to sign-in.
+const LOCK_MS = (Number(window.NERI_LOCK_MINUTES ?? 15) || 0) * 60000;
+let lastActive = Date.now();
+let hiddenAt = 0;
+function lockIfIdle() {
+  if (!LOCK_MS || !app.account || app.account.sample || document.querySelector(".lock")) return;
+  if (Date.now() - lastActive >= LOCK_MS) lockScreen();
+}
+function lockScreen() {
+  app.stopSpeak?.();
+  app.stopSpeak = null;
+  const el = document.createElement("div");
+  el.className = "lock";
+  el.setAttribute("role", "dialog");
+  el.setAttribute("aria-label", "Neri is locked");
+  el.innerHTML = `<div class="lock-card">${logo}<h2>Locked</h2><p>Your numbers are hidden after ${Math.round(LOCK_MS / 60000)} minutes away.</p><button class="btn primary big" data-action="unlock">Unlock</button></div>`;
+  document.body.append(el);
+  document.body.classList.add("locked");
+}
+async function unlock() {
+  if (authLive && !(await currentSession())) {
+    document.querySelector(".lock")?.remove();
+    document.body.classList.remove("locked");
+    await api.signOut();
+    app.signup = { step: "email", email: app.account?.email ?? "", name: "", error: "Your session ended. Sign in again with a new code." };
+    location.hash = "#/welcome";
+    return load();
+  }
+  document.querySelector(".lock")?.remove();
+  document.body.classList.remove("locked");
+  lastActive = Date.now();
+}
+for (const ev of ["pointerdown", "keydown", "scroll", "touchstart"]) addEventListener(ev, () => (lastActive = Date.now()), { passive: true });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) hiddenAt = Date.now();
+  else if (hiddenAt && LOCK_MS && Date.now() - hiddenAt >= LOCK_MS) {
+    lastActive = 0;
+    lockIfIdle();
+  }
+});
+setInterval(lockIfIdle, 30000);
 
 // ---------------------------------------------------------------- Set up (one page)
 const KINDS = [
@@ -1084,6 +1155,29 @@ document.addEventListener("click", async (ev) => {
     return;
   }
   if (a === "talk") return openTalk();
+  if (a === "unlock") return unlock();
+  if (a === "resend") {
+    try {
+      await api.startSignup(app.signup.email);
+      app.signup.sentAt = Date.now();
+      app.signup.error = "";
+      toast("New code sent", `Check ${app.signup.email}.`);
+    } catch (e) {
+      app.signup.error = e.message;
+    }
+    render();
+    tickResend();
+    return;
+  }
+  if (a === "signout-all") {
+    await api.signOut({ everywhere: true });
+    app.signup = { step: "email", email: "", name: "", error: "" };
+    app.askLog = [];
+    location.hash = "#/welcome";
+    await load();
+    toast("Signed out everywhere", "Every device needs a new code to get back in.");
+    return;
+  }
   if (a === "talk-stop") return app.stopListen?.();
   if (a === "talk-close") return closeTalk();
   if (a === "signup-back") {
@@ -1286,7 +1380,8 @@ document.addEventListener("submit", async (ev) => {
     const email = String(new FormData(f).get("email") ?? "").trim();
     try {
       const r = await api.startSignup(email);
-      app.signup = { step: "code", email, name: r.suggestedName ?? suggestBusinessName(email), error: "" };
+      app.signup = { step: "code", email, name: r.suggestedName ?? suggestBusinessName(email), error: "", sentAt: Date.now() };
+      tickResend();
     } catch (e) {
       app.signup.error = e.message;
       app.signup.email = email;
