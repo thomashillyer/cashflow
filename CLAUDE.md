@@ -10,14 +10,14 @@ It must work for **any** small business, not just our first user. PilotCo (a cro
 
 ## North star: the judging rubric
 
-We are graded on five criteria, **equal weight, each scored 1 to 8 with no middle**; the score is the mean. Five judges each see about four entries over dinner and send one to the final; finalists are scored on stage. **Aim for 7-8 on every criterion.** One weak criterion costs as much as one strong one earns, so when choosing what to do next, **work on whatever raises our lowest criterion.**
+We are graded on five criteria, **equal weight, each scored 1 to 8 with no middle**; the score is the mean. Five judges each see about four entries over dinner and send one to the final; finalists are scored on stage. **Aim for 7-8 on every criterion.** One weak criterion costs as much as one strong one earns, so when choosing what to do next **within your lane and assigned issue**, prefer whatever raises our lowest criterion. Scoring the whole build against this table is the team lead's job.
 
 | Criterion | 7-8 means | Rules for every change |
 |---|---|---|
 | **Does it work** | Works end to end; a business could try it today | Protect the end-to-end loop (import → review → forecast → three things → draft) over new features. Keep `main` green (`npm test`). The demo runs from a clean clone on synthetic data, with cached Claude responses so it never waits or fails on stage. A half-built feature behind the loop is worse than no feature. |
-| **Ease of implementation for a small business** | Plug-and-play; clear README; no code needed | An owner sets up by picking a starter profile and uploading or pasting what they already have. No config-file edits, no terminal for the owner. Every live connector has a file/paste fallback. Every error tells the owner the next step in plain words. Keep the README's owner setup to three steps and test it from a clean machine. |
-| **Impact on the business's operations** | Changes how a core part of the business runs | Lead with "three things to do today": each item has a dollar effect, a deadline, and a drafted action. Every feature must answer "which owner decision does this change, and how much time or money does it save?" If it doesn't, cut it. |
-| **Creativity of the solution** | Something judges hadn't thought of | Protect our differentiators and make them visible in the demo: messages from outside the books (email/WhatsApp) move the forecast with the words cited; one invoice from five channels counted once; deal-level cash before signing; one engine, swapped business profiles. Never ship it as a generic chatbot or dashboard template. |
+| **Ease of implementation for a small business** | Plug-and-play; clear README; no code needed | The owner uses the hosted app (one Node service, `docs/TECHNICAL_PLAN.md` §9): pick a starter profile, then upload or paste what they already have. No config-file edits and no code for the owner. Every live connector has a file/paste fallback. Every error tells the owner the next step in plain words. Write the README's owner setup in three steps and test it from a clean browser. |
+| **Impact on the business's operations** | Changes how a core part of the business runs | Lead with "three things to do today": each item has a dollar effect, a needed-by date, and a drafted action. Every feature must answer "which owner decision does this change, and how much time or money does it save?" If it doesn't, cut it (enablers of the loop, such as Review, adapters, and the profile editor, are exempt). |
+| **Creativity of the solution** | Something judges hadn't thought of | Protect our differentiators and make them visible in the demo: messages from outside the books (email/WhatsApp) propose a forecast change, with the words cited, that the owner confirms; one invoice arriving by export, PDF, email, and WhatsApp counted once; deal-level cash before signing; one engine, swapped business profiles. Never ship it as a generic chatbot or dashboard template. |
 | **Teamwork** | Every member had a distinct, visible role, and the team shows how they worked together | Not everyone codes: business, design, research, and pitch roles count. Work happens in your lane (`tasks/`, owners in `docs/design/09-api-repo-lanes.md`), through issues and PRs that name the lane, so the history shows who did what. Record non-code contributions (pitch, research, user interviews, design) in `docs/TEAM.md`. The demo includes how we worked together: lanes, shared contracts, review-before-push. |
 
 Before feature freeze, score the current build honestly against this table and spend the remaining time on the lowest row.
@@ -119,7 +119,7 @@ npm run demo       # demo profile + cached Claude responses (not yet)
 
 ## Definition of done (for any change)
 
-- It moves at least one rubric criterion (above) and lowers none; say which in the PR.
+- The PR names the rubric criterion it serves, or says it is a fix, test, or enabler for the end-to-end loop.
 - Golden tests in `fixtures/expected/` pass for **every** fixture, not just the one you were looking at.
 - No business-specific branching in code; new behavior is driven by profile fields.
 - Any number shown to the owner links to its source record.

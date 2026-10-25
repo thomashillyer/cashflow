@@ -78,7 +78,7 @@ Five equally weighted criteria, each scored 1 to 8 with no middle; the score is 
 
 | Criterion | What 7–8 means | Design choice that earns it |
 |---|---|---|
-| Does it work | Works end to end; a business could try it today | One loop rehearsed on real books: forecast, warning, explanation, fix, approved action. Deterministic engine, so the demo is repeatable. Claude responses cached for the demo dataset. |
+| Does it work | Works end to end; a business could try it today | One loop rehearsed on masked PilotCo data (the public demo uses synthetic data): forecast, warning, explanation, fix, approved action. Deterministic engine, so the demo is repeatable. Claude responses cached for the demo dataset. |
 | Ease for a small business | Plug-and-play; clear README; no code | A new business picks a starter profile and uploads an accounting export. Every live connector has a file or forward fallback. README in three steps. |
 | Impact on operations | Changes how a core part of the business runs | "Three things to do today" turns cash management into a daily habit, with the email already drafted. |
 | Creativity | Something judges hadn't thought of | Signals from outside the books move the forecast, with the message cited. Deals become probability-weighted cash before they're signed. One engine, swapped profiles. |

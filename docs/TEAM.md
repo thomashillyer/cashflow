@@ -6,11 +6,11 @@ The Teamwork criterion rewards a distinct, visible role for every member and sho
 
 | Person | Lane | Visible contribution |
 |---|---|---|
-| Niru (1) | Data and adapters | |
-| Thomas (2) | Engine; technical plan | |
-| SilverBeck (3) | App | |
-| Andras (4) | AI (Claude): extraction, reconciliation, signals, answers | |
-| Kiana (5) | Warnings, integration, demo | |
+| Niru (1) | Data and adapters | Source adapters, evidence capture, fixture records |
+| Thomas (2) | Engine; technical plan | Forecast engine, lag model, scenarios; `docs/TECHNICAL_PLAN.md`; repo setup |
+| SilverBeck (3) | App | Owner UI: home screen, chart, Review, onboarding |
+| Andras (4) | AI (Claude): extraction, reconciliation, signals, answers | Shared schema, intake fixtures, document/message extraction, reconciliation, Supabase, number check, brief and drafts |
+| Kiana (5) | Warnings, integration, demo | Warnings and ranking, end-to-end wiring, deploy, demo and pitch |
 
 ## How we worked together
 
@@ -20,6 +20,17 @@ The Teamwork criterion rewards a distinct, visible role for every member and sho
 
 ## Log (non-code and notable decisions)
 
-| Time | Who | What |
-|---|---|---|
-| | | |
+Add entries under your own name to avoid merge conflicts. Each owner keeps their row in Roles current.
+
+### Niru
+
+### Thomas
+
+### SilverBeck
+
+### Andras
+
+- Adopted the Neri Cash design and merged it with the earlier plan; set up the PR/review workflow and the Supabase project; encoded the judging rubric in CLAUDE.md.
+
+### Kiana
+
