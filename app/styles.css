@@ -812,3 +812,57 @@ body.locked #view, body.locked .preview-note { filter: blur(14px); pointer-event
 .lock-card p { margin: 0 0 8px; color: var(--ink-soft); }
 .linklike[disabled] { color: var(--ink-faint); cursor: default; }
 body.locked .talk { display: none; }
+
+/* ---------- today's things: horizontal cards, one in focus, the next peeking in ---------- */
+.deck-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.deck-head .section-title { margin: 0; }
+.deck-nav { display: flex; gap: 6px; }
+.deck-arrow {
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--rule); background: var(--surface);
+  display: grid; place-items: center; color: var(--ink-soft); padding: 0;
+}
+.deck-arrow svg { width: 16px; height: 16px; }
+.deck-arrow:hover:not([disabled]) { color: var(--ink); border-color: color-mix(in srgb, var(--ink) 25%, var(--rule)); }
+.deck-arrow[disabled] { opacity: 0.35; cursor: default; }
+
+.deck {
+  list-style: none; margin: 0; padding: 4px 2px 18px; display: flex; gap: 14px;
+  overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-left: 2px; scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.deck::-webkit-scrollbar { display: none; }
+.deck:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 20px; }
+.card {
+  flex: 0 0 84%; scroll-snap-align: start; scroll-snap-stop: always; min-width: 0;
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--surface); border: 1px solid var(--rule); border-radius: 20px; padding: 22px 22px 18px;
+  box-shadow: var(--shadow); transition: opacity 0.2s, transform 0.2s;
+  opacity: 0.55; transform: scale(0.985);
+}
+.deck.single .card { flex-basis: 100%; }
+.card.focus, .deck.single .card { opacity: 1; transform: none; }
+.card.fresh { animation: settle 1.2s ease-out; }
+.card-top { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; font-weight: 600; color: var(--ink-faint); }
+.card-by { color: var(--ink-soft); }
+.card-effect { margin: 2px 0 0; display: flex; align-items: baseline; gap: 8px; }
+.card-effect b { font-size: clamp(30px, 4.2vw, 40px); font-weight: 650; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1; }
+.card-effect span { font-size: 13px; color: var(--ink-faint); }
+.card-title { margin: 0; font-size: 19px; line-height: 1.32; font-weight: 600; letter-spacing: -0.014em; text-wrap: balance; }
+.card-why { margin: 0; color: var(--ink-soft); font-size: 14.5px; line-height: 1.5; }
+.card-actions { margin-top: auto; padding-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.card.done { box-shadow: none; }
+.card.done .card-title, .card.done .card-effect b { color: var(--ink-faint); }
+.card.done .card-why { display: none; }
+.card.done .card-by { color: var(--good); }
+.deck-dots { display: flex; justify-content: center; gap: 6px; margin-top: -4px; }
+.deck-dots i { width: 6px; height: 6px; border-radius: 3px; background: var(--rule); transition: width 0.2s, background 0.2s; }
+.deck-dots i.on { width: 18px; background: var(--accent); }
+
+@media (max-width: 760px) {
+  .card { flex-basis: 86%; padding: 18px 18px 16px; }
+  .card-title { font-size: 17px; }
+  .deck-nav { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+}

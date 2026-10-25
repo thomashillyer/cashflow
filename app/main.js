@@ -242,7 +242,17 @@ function render() {
   if (!app.ctx && r !== "welcome" && r !== "setup") return;
   renderShell();
   const views = { today: viewToday, details: viewDetails, notes: viewNotes, review: viewReview, sources: viewSources, settings: viewSettings, welcome: viewWelcome, setup: viewSetup };
+  const prevDeck = document.getElementById("deck");
+  const keepLeft = prevDeck ? prevDeck.scrollLeft : 0;
+  const keepFocus = document.activeElement?.closest?.("#deck") ? document.activeElement.dataset.action + ":" + document.activeElement.dataset.id : null;
   $("#view").innerHTML = masked(views[r]());
+  const deck = document.getElementById("deck");
+  if (deck && keepLeft) deck.scrollLeft = keepLeft;
+  if (deck && keepFocus) {
+    const [act, fid] = keepFocus.split(":");
+    [...deck.querySelectorAll(`[data-action="${act}"]`)].find((b) => b.dataset.id === fid)?.focus({ preventScroll: true });
+  }
+  requestAnimationFrame(syncDeck);
   document.title = `${{ today: "Home", details: "Details", notes: "Notes", review: "Review", sources: "Sources", settings: "Settings", welcome: "Sign up", setup: "Set up" }[r]} · Neri Cash`;
   if (app.drive) renderDrive();
 }
@@ -270,8 +280,12 @@ function viewToday() {
     </section>
 
     <section class="today-list" aria-labelledby="today-h">
-      <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
-      ${n ? `<ol class="things">${b.three.map(homeRow).join("")}</ol>` : `<p class="calm">Nothing needs you today. Neri will speak up if a payment moves.</p>`}
+      <div class="deck-head">
+        <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
+        ${n > 1 ? `<div class="deck-nav"><button class="deck-arrow" data-action="deck" data-dir="-1" aria-label="Previous">${arrow("left")}</button><button class="deck-arrow" data-action="deck" data-dir="1" aria-label="Next">${arrow("right")}</button></div>` : ""}
+      </div>
+      ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}</ol>
+        ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${b.three.map((_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">Nothing needs you today. Neri will speak up if a payment moves.</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
     </section>
 
@@ -289,24 +303,63 @@ function askHints() {
   return ["Can I make payroll?", `What if ${firstCustomer()} pays 10 days late?`, `Planning a $25K ${vocab.purchase ?? "purchase"} in January`];
 }
 
-function homeRow(i) {
+// One card per thing, side by side. The focused card fills the column; the next one peeks in as a lead-in.
+function homeCard(i, k, n) {
   const done = i.state === "done";
   const ref = i.evidenceRefs?.[0];
   const draft = i.actions.some((a) => a.kind === "draft_email");
   return `
-  <li class="thing home-row ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}">
-    <button class="check" data-action="done" data-id="${esc(i.id)}" aria-pressed="${done}" aria-label="${done ? "Done" : "Mark done"}: ${esc(i.title)}">${icon.check}</button>
-    <details>
-      <summary><span class="t">${esc(i.title)}</span><span class="e">${money(i.cashEffect, { signed: true })}</span></summary>
-      <p>${esc(i.why)}</p>
-      <div class="thing-actions">
-        <span class="by">Act by <b>${shortDate(i.neededBy)}</b></span>
-        ${draft ? `<button class="btn small" data-action="draft" data-id="${esc(i.id)}">${icon.mail}Draft email</button>` : ""}
-        ${ref ? `<button class="src" data-action="record" data-id="${esc(ref)}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
-      </div>
-    </details>
+  <li class="card ${done ? "done" : ""} ${app.fresh.has(i.id) ? "fresh" : ""}">
+    <div class="card-top">
+      <span class="card-n">${k + 1} of ${n}</span>
+      <span class="card-by">${done ? "Done" : `Act by ${shortDate(i.neededBy)}`}</span>
+    </div>
+    <p class="card-effect"><b>${money(i.cashEffect, { signed: true })}</b><span>${i.warning === "early_pay_discount" ? "saved" : "to your low point"}</span></p>
+    <h3 class="card-title">${esc(i.title)}</h3>
+    <p class="card-why">${esc(i.why)}</p>
+    <div class="card-actions">
+      ${draft && !done ? `<button class="btn small primary" data-action="draft" data-id="${esc(i.id)}">${icon.mail}Draft email</button>` : ""}
+      <button class="btn small ${done ? "" : "quiet"}" data-action="done" data-id="${esc(i.id)}" aria-pressed="${done}">${icon.check}${done ? "Done" : "Mark done"}</button>
+      ${ref ? `<button class="src" data-action="record" data-id="${esc(ref)}" title="Where this number comes from">${esc(refLabel(ref))}</button>` : ""}
+    </div>
   </li>`;
 }
+function arrow(dir) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${dir === "left" ? "M15 5l-7 7 7 7" : "M9 5l7 7-7 7"}"/></svg>`;
+}
+function deckIndex(deck) {
+  const cards = [...deck.children];
+  const left = deck.getBoundingClientRect().left;
+  let best = 0;
+  cards.forEach((c, k) => {
+    if (Math.abs(c.getBoundingClientRect().left - left) < Math.abs(cards[best].getBoundingClientRect().left - left)) best = k;
+  });
+  return best;
+}
+function syncDeck() {
+  const deck = document.getElementById("deck");
+  if (!deck) return;
+  const k = deckIndex(deck);
+  document.querySelectorAll(".deck-dots i").forEach((d, n) => d.classList.toggle("on", n === k));
+  [...deck.children].forEach((c, n) => c.classList.toggle("focus", n === k));
+  const [prev, next] = document.querySelectorAll(".deck-arrow");
+  if (prev) prev.disabled = k === 0;
+  if (next) next.disabled = k === deck.children.length - 1;
+}
+function moveDeck(dir) {
+  const deck = document.getElementById("deck");
+  if (!deck) return;
+  const k = Math.max(0, Math.min(deck.children.length - 1, deckIndex(deck) + dir));
+  deck.scrollTo({ left: deck.children[k].offsetLeft - deck.children[0].offsetLeft, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+document.addEventListener("scroll", (e) => {
+  if (e.target?.id === "deck") syncDeck();
+}, true);
+document.addEventListener("keydown", (e) => {
+  if (e.target?.id !== "deck") return;
+  if (e.key === "ArrowRight") moveDeck(1);
+  if (e.key === "ArrowLeft") moveDeck(-1);
+});
 
 function thingRow(i) {
   const done = i.state === "done";
@@ -1157,6 +1210,7 @@ document.addEventListener("click", async (ev) => {
     return;
   }
   if (a === "talk") return openTalk();
+  if (a === "deck") return moveDeck(Number(el.dataset.dir));
   if (a === "unlock") return unlock();
   if (a === "resend") {
     try {
