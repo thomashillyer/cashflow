@@ -40,6 +40,7 @@ export type AppOptions = {
   askClient?: Anthropic;           // tests inject a stub; live Ask otherwise builds a client from ANTHROPIC_API_KEY
   askLive?: AskLiveOptions;        // timeout and hourly cap for live Ask (NERI_ASK_LIVE_MAX_PER_HOUR)
   askCacheDirs?: { intent?: string; voice?: string }; // tests point the live cache at a temp dir
+  askModel?: string;               // model for live Ask calls on a cache miss (NERI_ASK_MODEL); default ASK_LIVE_MODEL
   staticDir?: string;             // serve the app (same origin) when present
   // Public values for the served app/config.js (the anon key is public by design; never the service-role key).
   appConfig?: { supabaseUrl?: string; supabaseAnonKey?: string };
@@ -56,6 +57,7 @@ export type Deps = Required<Pick<AppOptions, "store" | "blobs" | "demoMode" | "d
   askGuard: AskLiveGuard;
   askClient?: Anthropic;
   askCacheDirs?: { intent?: string; voice?: string };
+  askModel?: string;
   schemaStatus?: SchemaStatusFn;
   sandboxes: SandboxStore;         // per-visitor copies of the synthetic samples (demo mode)
   sourceAccess?: SourceAccessFn;   // tokens for Zoho / Outlook pulls (api/sourceAccess.ts); none = "not connected"
@@ -116,6 +118,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     askGuard: new AskLiveGuard(opts.askLive),
     ...(opts.askClient ? { askClient: opts.askClient } : {}),
     ...(opts.askCacheDirs ? { askCacheDirs: opts.askCacheDirs } : {}),
+    ...(opts.askModel ? { askModel: opts.askModel } : {}),
     now: opts.now ?? (() => new Date()),
     allowReset: opts.allowReset ?? false,
     sandboxes: opts.sandboxes ?? new SandboxStore(),

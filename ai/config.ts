@@ -30,6 +30,9 @@ export const INTENT_PROMPT_VERSION = "read_intent@1";
 export const CFO_VOICE_MODEL = "claude-opus-5-5";
 export const CFO_VOICE_PROMPT_VERSION = "cfo_voice@2";
 
+// Live ask calls on a cache miss; the cache lookup keeps the recorded model (INTENT_MODEL / CFO_VOICE_MODEL).
+export const ASK_LIVE_MODEL = "claude-sonnet-5-5";
+
 // Anthropic client options shared by every call. A user-level key (sk-ant-usr-...) is not scoped to a workspace,
 // so the API requires the workspace in a header: set ANTHROPIC_WORKSPACE_ID (wrkspc_...) for those keys.
 export function anthropicOptions(): { defaultHeaders?: Record<string, string> } {

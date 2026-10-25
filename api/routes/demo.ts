@@ -52,6 +52,7 @@ export const demoRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       mode: live.mode,
       ...(live.client ? { client: live.client } : {}),
       ...(deps.askCacheDirs ? { cacheDirs: deps.askCacheDirs } : {}),
+      ...(deps.askModel ? { liveModel: deps.askModel } : {}),
       persistProposal: async (p) => {
         const id = `ask-${randomUUID().slice(0, 8)}`;
         if (p.kind === "rule") {
