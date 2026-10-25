@@ -6,26 +6,11 @@
 import type { Candidate, Check, ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
 import type { CashEvent, Commitment, Direction, Records } from "../schema/records";
+import { addDays } from "./dates";
 
 // Design 07 default when a payable has no confirmed `flexibility` rule. Move to the profile when the
 // schema gains a field for it.
 export const DEFAULT_DEFER_DAYS = 10;
-
-const DAY_MS = 86_400_000;
-
-function toMs(date: string): number {
-  const [y, m, d] = date.split("-").map(Number);
-  return Date.UTC(y!, m! - 1, d!);
-}
-
-export function addDays(date: string, days: number): string {
-  return new Date(toMs(date) + days * DAY_MS).toISOString().slice(0, 10);
-}
-
-// Whole calendar days from `from` to `to` (negative when `to` is earlier).
-export function daysBetween(from: string, to: string): number {
-  return Math.round((toMs(to) - toMs(from)) / DAY_MS);
-}
 
 const minDate = (a: string, b: string) => (a < b ? a : b);
 const maxDate = (a: string, b: string) => (a > b ? a : b);

@@ -2,7 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
-  BalanceSnapshot, CashEvent, Commitment, Evidence, Party, Records, Rule, Settlement, Signal,
+  BalanceSnapshot, CashEvent, Commitment, Evidence, Party, Records, Rule, Settlement, Signal, WorkItem,
 } from "../schema/records";
 import type { ChangeProposal, ConfirmationResult, IntakeCandidate } from "../schema/intake";
 import { TABLES, fromRow, toRow, type Row } from "./rows";
@@ -99,6 +99,58 @@ export const upsertIntakeCandidates = (db: SupabaseClient, b: string, r: IntakeC
   upsert(db, "intake_candidates", b, r);
 export const upsertChangeProposals = (db: SupabaseClient, b: string, r: ChangeProposal[]) =>
   upsert(db, "change_proposals", b, r);
+
+export type LoadedWorkItems = {
+  items: WorkItem[];
+  // ForecastRun.inputsHash of the run they were ranked from. Undefined when nothing was saved or the
+  // rows disagree; compare with the current run's inputsHash and re-rank when it differs.
+  inputsHash?: string;
+};
+
+// Work items (engine/rank.ts output), best first. Pass their id/state back to buildBrief as
+// `prior` so done and dismissed items stay that way across reruns.
+export async function loadWorkItems(db: SupabaseClient, businessId: string): Promise<LoadedWorkItems> {
+  const { data, error } = await db.from("work_items").select("*").eq("business_id", businessId)
+    .order("score", { ascending: false }).order("id");
+  if (error) throw toStoreError(`load work items ${businessId}`, error);
+  const rows = (data as Row[]).map((r) => fromRow<WorkItem & { inputsHash?: string }>(r, "work_items"));
+  const hashes = new Set(rows.map((r) => r.inputsHash));
+  return {
+    items: rows.map(({ inputsHash: _hash, ...item }) => item),
+    ...(hashes.size === 1 && rows[0]!.inputsHash ? { inputsHash: rows[0]!.inputsHash } : {}),
+  };
+}
+
+// Service-role only: save a fresh ranking from the run with `inputsHash`. `state` is never written
+// here: new rows take the column default ('open') and existing rows keep theirs, so a recompute can't
+// undo an owner's tick-off. Open items the new ranking no longer produces are removed; done and
+// dismissed items are kept and restamped, so every row names the run it was last checked against.
+export async function saveWorkItems(
+  db: SupabaseClient, businessId: string, items: WorkItem[], inputsHash: string,
+): Promise<void> {
+  await upsert(db, "work_items", businessId, items.map(({ state: _state, ...rest }) => ({ ...rest, inputsHash })));
+  let stale = db.from("work_items").delete().eq("business_id", businessId).eq("state", "open");
+  if (items.length) {
+    const quoted = items.map((i) => `"${i.id.replace(/[\\"]/g, "\\$&")}"`);
+    stale = stale.not("id", "in", `(${quoted.join(",")})`);
+  }
+  const { error } = await stale;
+  if (error) throw toStoreError(`prune work items ${businessId}`, error);
+  const { error: stampError } = await db.from("work_items").update({ inputs_hash: inputsHash })
+    .eq("business_id", businessId);
+  if (stampError) throw toStoreError(`stamp work items ${businessId}`, stampError);
+}
+
+// Service-role only: the owner ticks an item off or dismisses it. Changes work-item state only;
+// never sends or pays. Throws NOT_FOUND when no row was updated (wrong id, or RLS blocked it).
+export async function setWorkItemState(
+  db: SupabaseClient, businessId: string, id: string, state: WorkItem["state"],
+): Promise<void> {
+  const { data, error } = await db.from("work_items").update({ state })
+    .eq("business_id", businessId).eq("id", id).select("id");
+  if (error) throw toStoreError(`set work item ${id}`, error);
+  if (!data?.length) throw new StoreError("NOT_FOUND", 404, `set work item ${id}: no such work item`);
+}
 
 // Atomic confirm through the confirm_change_proposal RPC (one transaction). Throws StoreError
 // with code STALE_REVIEW / IDEMPOTENCY_CONFLICT / PROPOSAL_NOT_PENDING / PROPOSAL_UNRESOLVED (409),

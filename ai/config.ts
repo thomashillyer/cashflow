@@ -12,8 +12,8 @@ export const BRIEF_MODEL = "claude-opus-5-5";
 export const DRAFT_MODEL = "claude-opus-5-5";
 
 // Bump whenever ai/prompts/write_brief.md / draft_message.md or their output schemas change; part of the cache key.
-export const BRIEF_PROMPT_VERSION = "write_brief@1";
-export const DRAFT_PROMPT_VERSION = "draft_message@1";
+export const BRIEF_PROMPT_VERSION = "write_brief@2";
+export const DRAFT_PROMPT_VERSION = "draft_message@2";
 
 // Bump whenever ai/prompts/extract_signal.md or the SignalExtraction schema changes (part of the cache key).
 export const SIGNAL_PROMPT_VERSION = "extract_signal@1";

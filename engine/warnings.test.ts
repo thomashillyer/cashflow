@@ -3,7 +3,8 @@ import type { ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
 import type { CashEvent, Commitment, Lever, Records } from "../schema/records";
 import { rank, type SimulateLevers } from "./rank";
-import { addDays, daysBetween, runChecks } from "./warnings";
+import { addDays } from "./dates";
+import { runChecks } from "./warnings";
 
 // The legacy daily fixture from docs/TECHNICAL_PLAN.md section 10: opening $15,000 on 2026-10-25,
 // supplier bill -$20,000 Oct 29, customer receipt +$12,000 and tentative loan +$40,000 Oct 30,
@@ -122,14 +123,6 @@ function simulator(base: ForecastRun, records: Records): SimulateLevers {
     return { lowPointDelta: forecastOf(events, base.openingBalance).lowPoint.amount - base.lowPoint.amount };
   };
 }
-
-describe("date helpers", () => {
-  it("counts UTC calendar days across month ends", () => {
-    expect(addDays("2026-10-29", 10)).toBe("2026-11-08");
-    expect(daysBetween("2026-10-25", "2026-11-01")).toBe(7);
-    expect(daysBetween("2026-11-01", "2026-10-25")).toBe(-7);
-  });
-});
 
 describe("warnings on the legacy fixture", () => {
   const { records, events } = fixture();

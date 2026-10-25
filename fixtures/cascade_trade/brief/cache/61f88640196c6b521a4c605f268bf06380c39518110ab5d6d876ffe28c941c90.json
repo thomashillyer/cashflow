@@ -1,0 +1,10 @@
+{
+  "key": "61f88640196c6b521a4c605f268bf06380c39518110ab5d6d876ffe28c941c90",
+  "promptVersion": "draft_message@2",
+  "model": "claude-opus-5-5",
+  "source": "live",
+  "output": {
+    "subject": "PO-2302: request for 10 extra days",
+    "body": "Hello Jaipur Textiles team,\n\nI'm writing about PO-2302 for ₹2,000,000, which currently has payments of ₹1,000,000 planned for Dec 1 and ₹1,000,000 for Dec 15. Would it be possible to have 10 extra days on the payment terms for this PO? If so, could you confirm the revised dates that would work on your side?\n\nWe value working with you and are happy to discuss whatever suits you best.\n\nThank you,\nCascade Trade Co."
+  }
+}

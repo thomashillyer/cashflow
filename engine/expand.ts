@@ -246,7 +246,7 @@ function expandRecurring(records: Records, profile: Profile, asOf: string, horiz
   return events;
 }
 
-const SALES_HISTORY_DAYS = 28;
+export const SALES_HISTORY_DAYS = 28;
 
 // Daily-sales revenue model: average daily sales from the last 28 days of actual "sales" receipts, shaped by the
 // profile's weekday weights (index 0 = Monday). Dates that already have actual sales are not forecast again.

@@ -59,15 +59,31 @@ describe("applyProposal", () => {
     expect(out.commitments.find((c) => c.id === "bill-SC-0042")?.evidenceIds).toEqual([]);
   });
 
-  it("counts a PO and its partial invoice once: 4,000 invoiced + 6,000 remaining", () => {
+  it("links a partial invoice to its PO without touching the PO's amount or outstanding (the engine computes coverage)", () => {
     const r = withPo();
-    const out = applyProposal(r, propose(inv1203(), r, ctx), opts).records;
-    expect(poRemaining(out, "po-HH-PO-552")).toBe(600000);
-    const po = out.commitments.find((c) => c.id === "po-HH-PO-552")!;
-    const inv = out.commitments.find((c) => c.id === "inv-INV-1203")!;
-    expect(po.outstanding).toBe(600000);
-    expect((po.outstanding ?? po.amount) + (inv.outstanding ?? inv.amount)).toBe(1000000);
+    const poBefore = structuredClone(r.commitments.find((c) => c.id === "po-HH-PO-552")!);
+    const out = applyProposal(r, propose(inv1203(), r, ctx), opts);
+    const po = out.records.commitments.find((c) => c.id === "po-HH-PO-552")!;
+    const inv = out.records.commitments.find((c) => c.id === "inv-INV-1203")!;
+    expect(po.amount).toBe(1000000);
+    expect(po.outstanding).toBe(poBefore.outstanding);
+    expect(po.outstanding).toBe(1000000);
+    expect(po.linkedCommitmentIds).toEqual(["inv-INV-1203"]);
+    expect({ ...po, linkedCommitmentIds: undefined }).toEqual({ ...poBefore, linkedCommitmentIds: undefined });
+    expect(inv).toMatchObject({ amount: 400000, outstanding: 400000 });
     expect(inv.linkedCommitmentIds).toEqual(["po-HH-PO-552"]);
+    // The read helper still reports the uninvoiced remainder for Review display.
+    expect(poRemaining(out.records, "po-HH-PO-552")).toBe(600000);
+    expect(out.affectedRecordIds).toContain("po-HH-PO-552");
+  });
+
+  it("records each PO link once even when the proposal is applied twice", () => {
+    const r = withPo();
+    const p = propose(inv1203(), r, ctx);
+    const once = applyProposal(r, p, opts).records;
+    const twice = applyProposal(once, p, opts).records;
+    expect(twice).toEqual(once);
+    expect(twice.commitments.find((c) => c.id === "po-HH-PO-552")!.linkedCommitmentIds).toEqual(["inv-INV-1203"]);
   });
 
   it("refuses an invoice that would over-allocate the PO", () => {

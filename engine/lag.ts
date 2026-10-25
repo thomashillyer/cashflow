@@ -49,14 +49,11 @@ export function lagSamples(records: Records, partyId: string): number[] {
   return samples.slice(-MAX_SAMPLES).map((s) => s.late);
 }
 
+// The party's own confirmed rule wins over a global one, whatever order the rules arrive in.
 export function confirmedLagRule(rules: Rule[], partyId: string | undefined): Rule | undefined {
-  return rules.find(
-    (r) =>
-      r.kind === "lag_offset" &&
-      r.state === "confirmed" &&
-      (("all" in r.scope && r.scope.all) || ("partyId" in r.scope && r.scope.partyId === partyId)) &&
-      typeof r.params.offsetDays === "number",
-  );
+  const usable = (r: Rule) => r.kind === "lag_offset" && r.state === "confirmed" && typeof r.params.offsetDays === "number";
+  const own = partyId === undefined ? undefined : rules.find((r) => usable(r) && "partyId" in r.scope && r.scope.partyId === partyId);
+  return own ?? rules.find((r) => usable(r) && "all" in r.scope && r.scope.all);
 }
 
 export function partyLag(records: Records, profile: Profile, partyId?: string): Lag {

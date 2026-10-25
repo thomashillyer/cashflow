@@ -11,6 +11,7 @@ import {
 } from "./brief";
 import { BRIEF_CACHE_DIR, readCache, writeCache } from "./cache";
 import { BRIEF_MODEL } from "./config";
+import { extractAmounts, extractDates } from "./number_check";
 
 const fx = loadBriefFixture();
 const tmp = () => mkdtempSync(join(tmpdir(), "neri-brief-test-"));
@@ -96,7 +97,7 @@ describe("writeBrief with the committed demo cache", () => {
     expect(out.usedFallback).toEqual([chase.id]);
     expect(out.items[0]!.title).toBe("Chase Evergreen Home on INV-1187");
     expect(out.items[0]!.why).toBe(
-      "Collecting $28,000 by Dec 18 lifts your lowest point from −$5,500 (week of Dec 21) to $14,000.");
+      "INV-1187 for $28,000 is due Dec 10. Payment is expected Dec 26, after your lowest point. Collecting it by Dec 18 lifts your lowest point from −$5,500 (week of Dec 21) to $14,000.");
     expect(out.items[0]!.why).not.toContain("30,000");
     expect(out.items[1]!.why).toContain("$12,000"); // untouched stand-in
     expect(out.items[0]!.cashEffect).toBe(chase.cashEffect);
@@ -244,14 +245,14 @@ describe("fallback text", () => {
   it("matches the documented example", () => {
     const b = fallbackBrief(facts(chase));
     expect(b.title).toBe("Chase Evergreen Home on INV-1187");
-    expect(b.why).toMatch(/^Collecting \$28,000 by Dec 18 lifts your lowest point from −\$5,500/);
+    expect(b.why).toMatch(/^INV-1187 for \$28,000 is due Dec 10\. Payment is expected Dec 26, after your lowest point\. Collecting it by Dec 18 lifts your lowest point from −\$5,500/);
   });
 
   it("formats money from integer minor units", () => {
-    expect(fmtMoney(2800000, "USD", "USD")).toBe("$28,000");
-    expect(fmtMoney(-550000, "USD", "USD")).toBe("−$5,500");
-    expect(fmtMoney(123456, "USD", "USD")).toBe("$1,234.56");
-    expect(fmtMoney(100000000, "INR", "USD")).toBe("INR 1,000,000");
+    expect(fmtMoney(2800000, "USD")).toBe("$28,000");
+    expect(fmtMoney(-550000, "USD")).toBe("−$5,500");
+    expect(fmtMoney(123456, "USD")).toBe("$1,234.56");
+    expect(fmtMoney(100000000, "INR")).toBe("₹1,000,000");
   });
 });
 
@@ -384,7 +385,8 @@ describe("validation gaps found in review", () => {
     expect(checkDraftText("Timing", ok, defer, f)).toBeUndefined();
     expect(checkDraftText("Timing", "Our cash dips to −$5,500 in the week of Dec 21.", defer, f)).toMatch(/not in the facts/);
     expect(checkDraftText("Timing", "We sit below our $35,000 safety line.", defer, f)).toMatch(/not in the facts/);
-    expect(checkDraftText("Timing", "Please pay $12,000 now.", defer, f)).toBeUndefined(); // an amount on the PO's own schedule
+    expect(checkDraftText("Timing", "Please pay ₹1,000,000 now.", defer, f)).toBeUndefined(); // an amount on the PO's own schedule, in its own currency
+    expect(checkDraftText("Timing", "Please pay $12,000 now.", defer, f)).toMatch(/not in the facts/); // the converted figure is ours, not the supplier's
     expect(checkDraftText("Timing", "Please pay $6,500 now.", defer, f)).toMatch(/not in the facts/);
     // The draft model is not even shown the low point, safety line, or lever effect.
     expect(JSON.stringify(draftFacts(f))).not.toMatch(/lowPoint|safetyLine|amountAfterLever|cashEffect/);
@@ -419,5 +421,193 @@ describe("validation gaps found in review", () => {
     const out = buildFacts(chase, { run, records: fx.records, profile: fx.profile });
     expect(JSON.stringify(out)).not.toContain("2026-11-30");
     expect(allowedFromFacts(out).dates).not.toContain("2026-11-30");
+  });
+});
+
+describe("wording: tense, needed-by, lowest point, currency (P4.18)", () => {
+  const asOfFacts = (it: WorkItem, asOf: string, records: Records = fx.records) =>
+    buildFacts(it, { run: { ...fx.run, asOf }, records, profile: fx.profile });
+  const dayCount = (iso: string) => Date.parse(iso) / 86_400_000;
+
+  it("the facts carry asOf and a code-computed relation for each date", () => {
+    const f = facts(chase);
+    expect(f.asOf).toBe("2026-11-16");
+    expect(f.commitment!.dueStatus).toBe("not yet due");
+    expect(f.neededByStatus).toBe("upcoming");
+    expect(f.expected[0]).toMatchObject({ date: "2026-12-26", againstLowPoint: "after" });
+    expect(asOfFacts(chase, "2026-12-10").commitment!.dueStatus).toBe("due today");
+    const late = asOfFacts(chase, "2026-12-14").commitment!;
+    expect(late.dueStatus).toBe("overdue by 4 days");
+    expect(late.daysOverdue).toBe(4);
+    expect(asOfFacts(chase, "2026-12-19").neededByStatus).toBe("passed");
+    // A settled invoice is not "overdue".
+    const paid: Records = JSON.parse(JSON.stringify(fx.records));
+    Object.assign(paid.commitments.find((c) => c.id === "inv-INV-1187")!, { settlement: "paid" });
+    expect(asOfFacts(chase, "2026-12-14", paid).commitment!.dueStatus).toBeUndefined();
+  });
+
+  it("an invoice that is not yet due never reads \"was due\" in fallback text", async () => {
+    const f = facts(chase);
+    const b = fallbackBrief(f);
+    const d = fallbackDraft(f, BRIEF_BUSINESS.name);
+    expect(b.why).toContain("is due Dec 10");
+    expect(d.body).toContain("is due Dec 10");
+    for (const t of [b.why, d.body]) expect(t).not.toMatch(/was due|overdue|past due/i);
+    // Through the real fallback path, with nothing cached.
+    const out = await writeBrief([chase], cached({ cacheDir: tmp() }));
+    expect(out.usedFallback).toEqual([chase.id]);
+    expect(out.items[0]!.why).not.toMatch(/was due/);
+  });
+
+  it("a model text that says \"was due\" for a not-yet-due invoice is rejected, in briefs and drafts", () => {
+    const f = facts(chase);
+    const why = "Evergreen Home's $28,000 on INV-1187 was due Dec 10 but is expected Dec 26, after your lowest point. Getting it by Dec 18 lifts your lowest point from −$5,500 to $14,000.";
+    expect(checkBriefText("Chase Evergreen Home on INV-1187", why, chase, f)).toMatch(/was due or overdue/);
+    expect(checkBriefText("Chase Evergreen Home on INV-1187", why.replace("was due", "is due"), chase, f)).toBeUndefined();
+    expect(checkBriefText("Chase Evergreen Home on INV-1187", "INV-1187 is overdue, so chase it to lift your lowest point to $14,000.", chase, f)).toMatch(/was due or overdue/);
+    const body = "Hello,\n\nInvoice INV-1187 for $28,000 was due Dec 10. Could you confirm payment?\n\nThank you,\nCascade Trade Co.";
+    expect(checkDraftText("Invoice INV-1187", body, chase, f)).toMatch(/was due or overdue/);
+    expect(checkDraftText("Invoice INV-1187", body.replace("was due", "is due"), chase, f)).toBeUndefined();
+  });
+
+  it("when the invoice is overdue or due today the text says so, and the check works the other way too", () => {
+    const f = asOfFacts(chase, "2026-12-14");
+    const b = fallbackBrief(f);
+    expect(b.why).toContain("is overdue by 4 days (due Dec 10)");
+    expect(checkBriefText(b.title, b.why, chase, f)).toBeUndefined();
+    const d = fallbackDraft(f, BRIEF_BUSINESS.name);
+    expect(d.body).toContain("was due Dec 10");
+    expect(d.body).toContain("Payment by Dec 18");
+    expect(checkDraftText(d.subject, d.body, chase, f)).toBeUndefined();
+    expect(checkBriefText(b.title, "INV-1187 is due Dec 10. Collecting it by Dec 18 lifts your lowest point to $14,000.", chase, f)).toMatch(/is overdue by 4 days/);
+    expect(checkBriefText(b.title, "INV-1187 was due Dec 10 and is overdue by 9 days.", chase, f)).toMatch(/9 days/);
+    const today = asOfFacts(chase, "2026-12-10");
+    expect(fallbackBrief(today).why).toContain("is due today");
+    expect(fallbackDraft(today, BRIEF_BUSINESS.name).body).toMatch(/is due today.*Payment today/s);
+  });
+
+  it("an expected date is \"after your lowest point\", never \"after your lowest week\"", () => {
+    const f = facts(chase);
+    expect(fallbackBrief(f).why).toContain("expected Dec 26, after your lowest point");
+    const why = "Evergreen Home's $28,000 is expected Dec 26, after your lowest week. Getting it by Dec 18 lifts your lowest point from −$5,500 to $14,000.";
+    expect(checkBriefText("Chase Evergreen Home on INV-1187", why, chase, f)).toMatch(/lowest point/);
+    expect(checkBriefText("Chase Evergreen Home on INV-1187", why.replace("lowest week", "lowest point"), chase, f)).toBeUndefined();
+  });
+
+  it("neededBy is phrased as ask by / act by, and \"settled by\" is rejected", () => {
+    expect(fallbackBrief(facts(defer)).why).toMatch(/Ask by Dec 12\.$/);
+    expect(fallbackBrief(facts(advance)).why).toMatch(/Ask by Nov 23\.$/);
+    const split = { ...defer, lever: { kind: "split", commitmentId: "po-PO-2302", shares: [0.5, 0.5] } as Lever };
+    expect(fallbackBrief(facts(split)).why).toMatch(/Act by Dec 12\.$/);
+    const early = { ...chase, lever: { kind: "pay_early", commitmentId: "inv-INV-1187" } as Lever };
+    expect(fallbackBrief(facts(early)).why).toMatch(/Act by Dec 18\.$/);
+    for (const it of fx.items) expect(fallbackBrief(facts(it)).why).not.toMatch(/settled|settle by/i);
+    expect(fallbackBrief(asOfFacts(defer, "2026-12-12")).why).toMatch(/Ask today\.$/);
+    expect(fallbackBrief(asOfFacts(defer, "2026-12-13")).why).toMatch(/Ask now; this was needed by Dec 12\.$/);
+    const why = "Your ₹2,000,000 PO-2302 with Jaipur Textiles lifts your lowest point from −$5,500 to $6,500 if the ask is settled by Dec 12.";
+    expect(checkBriefText("Ask Jaipur Textiles to push PO-2302 back", why, defer, facts(defer))).toMatch(/settled by/);
+    expect(checkBriefText("Ask Jaipur Textiles to push PO-2302 back", why.replace("settled", "made"), defer, facts(defer))).toBeUndefined();
+  });
+
+  it("a foreign-currency fallback shows the commitment currency and the converted figure, marked", () => {
+    const f = facts(defer);
+    expect(f.commitment!.display).toBe("₹2,000,000 (about $24,000 at today's rate)");
+    expect(f.commitment!.converted).toEqual({ amountBase: 2400000, rate: 0.012 });
+    expect(f.expected[0]).toMatchObject({ amount: 100000000, currency: "INR", amountBase: 1200000, converted: true, display: "₹1,000,000 (about $12,000 at today's rate)" });
+    const b = fallbackBrief(f);
+    expect(b.why).toContain("PO-2302 for ₹2,000,000 (about $24,000 at today's rate)");
+    expect(checkBriefText(b.title, b.why, defer, f)).toBeUndefined();
+    // number_check validates both figures: each must be in the allowed set.
+    const ok = "Jaipur Textiles' ₹1,000,000 (about $12,000 at today's rate) balance falls due Dec 15. Moving it back 10 days lifts your lowest point from −$5,500 to $6,500. Ask by Dec 12.";
+    expect(checkBriefText("Ask Jaipur Textiles for 10 more days", ok, defer, f)).toBeUndefined();
+    expect(checkBriefText("Ask Jaipur Textiles for 10 more days", ok.replace("₹1,000,000", "₹1,500,000"), defer, f)).toMatch(/₹1,500,000/);
+    expect(checkBriefText("Ask Jaipur Textiles for 10 more days", ok.replace("$12,000", "$15,000"), defer, f)).toMatch(/\$15,000/);
+    // A base-currency commitment carries no conversion.
+    expect(facts(chase).commitment).toMatchObject({ display: "$28,000" });
+    expect(facts(chase).commitment!.converted).toBeUndefined();
+  });
+
+  it("a foreign-currency invoice chase: both figures in the brief, the document's own currency in the draft", () => {
+    const records: Records = JSON.parse(JSON.stringify(fx.records));
+    Object.assign(records.commitments.find((c) => c.id === "inv-INV-1187")!, { amount: 100000000, outstanding: 100000000, currency: "INR" });
+    const run = JSON.parse(JSON.stringify(fx.run));
+    Object.assign(run.events.find((e: any) => e.commitmentId === "inv-INV-1187"), { amount: 100000000, currency: "INR", amountBase: 1200000 });
+    const f = buildFacts(chase, { run, records, profile: fx.profile });
+    const b = fallbackBrief(f);
+    expect(b.why).toContain("INV-1187 for ₹1,000,000 (about $12,000 at today's rate) is due Dec 10");
+    expect(checkBriefText(b.title, b.why, chase, f)).toBeUndefined();
+    const d = fallbackDraft(f, BRIEF_BUSINESS.name);
+    expect(d.subject).toBe("Invoice INV-1187: ₹1,000,000");
+    expect(d.body).toContain("for ₹1,000,000, which is due Dec 10");
+    expect(d.body).not.toMatch(/about|\$|today's rate/);
+    expect(checkDraftText(d.subject, d.body, chase, f)).toBeUndefined();
+    // The draft model is not given the converted figure, and may not state it.
+    expect(JSON.stringify(draftFacts(f))).not.toMatch(/converted|amountBase|at today's rate/);
+    expect(checkDraftText("Invoice", "Hello,\n\nInvoice INV-1187 for $12,000 is due Dec 10.\n\nThank you,\nCascade Trade Co.", chase, f)).toMatch(/\$12,000/);
+  });
+
+  it("one formatter: symbol when number_check can read it back, else the ISO code; it round-trips", () => {
+    expect(fmtMoney(2800000, "USD")).toBe("$28,000");
+    expect(fmtMoney(100000000, "INR")).toBe("₹1,000,000");
+    expect(fmtMoney(123456, "EUR")).toBe("€1,234.56");
+    expect(fmtMoney(5000, "GBP")).toBe("£50");
+    expect(fmtMoney(1000, "JPY")).toBe("¥1,000");
+    expect(fmtMoney(100000, "CHF")).toBe("CHF 1,000");
+    expect(fmtMoney(100000, "CAD")).toBe("CAD 1,000");
+    expect(fmtMoney(-100000, "SEK")).toBe("−SEK 1,000");
+    for (const [minor, cur] of [[2800000, "USD"], [100000000, "INR"], [123456, "EUR"], [5000, "GBP"], [1000, "JPY"], [100000, "CHF"], [100000, "CAD"], [-550000, "USD"]] as const) {
+      const [a] = extractAmounts(fmtMoney(minor, cur), { currency: "USD" });
+      expect(a!.minor, `${cur} ${minor}`).toBe(minor);
+    }
+  });
+
+  it("a chase draft for an invoice that is not yet due asks for the due date or earlier, never a later date", async () => {
+    const f = facts(chase);
+    expect(draftFacts(f).payBy).toBe("2026-12-10");
+    const shown = JSON.stringify(draftFacts(f));
+    expect(shown).not.toMatch(/2026-12-18|2026-12-26|assumeDate|neededBy|lowPoint/);
+    // The engine assumes Dec 18, after the Dec 10 due date: the fallback still asks for Dec 10.
+    const d = fallbackDraft(f, BRIEF_BUSINESS.name);
+    expect(d.body).toContain("Payment by Dec 10");
+    expect(d.body).not.toContain("Dec 18");
+    // An earlier assumed date is fine.
+    const early = { ...chase, lever: { kind: "chase", commitmentId: "inv-INV-1187", assumeDate: "2026-12-01" } as Lever };
+    expect(draftFacts(facts(early)).payBy).toBe("2026-12-01");
+    expect(fallbackDraft(facts(early), BRIEF_BUSINESS.name).body).toContain("Payment by Dec 1 ");
+    // Every date in the cached and fallback drafts is on or before the due date.
+    for (const cacheDir of [BRIEF_CACHE_DIR, tmp()]) {
+      const draft = await draftMessage(chase, cached({ cacheDir }));
+      const dates = extractDates(draft.body, { asOf: f.asOf }).map((x) => x.date);
+      expect(dates.length).toBeGreaterThan(0);
+      for (const x of dates) expect(dayCount(x)).toBeLessThanOrEqual(dayCount("2026-12-10"));
+    }
+    // A model draft that asks for a later date is rejected and falls back; the request never showed that date.
+    const later = { subject: "Invoice INV-1187: $28,000", body: "Hello Evergreen Home team,\n\nInvoice INV-1187 for $28,000 is due Dec 10. Could you pay it by Dec 18 at the latest?\n\nThank you,\nCascade Trade Co." };
+    expect(checkDraftText(later.subject, later.body, chase, f)).toMatch(/Dec 18/);
+    const { client, requests } = fakeClient([later, later]);
+    const out = await draftMessage(chase, { ...fx, mode: "live", client, cacheDir: tmp() });
+    expect(out.usedFallback).toBe(true);
+    expect(out.body).not.toContain("Dec 18");
+    expect(requests[0].messages[0].content).not.toContain("2026-12-18");
+    // The rule itself, with a later date that is otherwise allowed (the run date).
+    const g = { ...f, asOf: "2026-12-18" };
+    expect(checkDraftText(later.subject, later.body, chase, { ...g, commitment: { ...g.commitment!, dueStatus: "not yet due" } })).toMatch(/after the due date/);
+  });
+
+  it("the committed stand-ins are marked as stand-ins and are cache hits for the current prompts", () => {
+    const files = readdirSync(BRIEF_CACHE_DIR);
+    expect(files).toHaveLength(6);
+    for (const f of files) expect(JSON.parse(readFileSync(join(BRIEF_CACHE_DIR, f), "utf8")).source).toMatch(/^(stand-in|live|live-edited)$/);
+    for (const it of fx.items) {
+      expect(readCache(BRIEF_CACHE_DIR, briefCacheKey(it, fx))).toBeDefined();
+      expect(readCache(BRIEF_CACHE_DIR, draftCacheKey(it, fx))).toBeDefined();
+    }
+  });
+
+  it("the prompts state the rules", () => {
+    const brief = readFileSync(join(import.meta.dirname, "prompts/write_brief.md"), "utf8");
+    const draft = readFileSync(join(import.meta.dirname, "prompts/draft_message.md"), "utf8");
+    for (const re of [/not yet due/, /never "was due"/, /after your lowest point/, /ask by Dec 12/, /never "settled by"/, /about \$12,000 at today's rate/]) expect(brief).toMatch(re);
+    for (const re of [/not yet due/, /never "was due"/, /payBy/, /grace period/, /Never convert/]) expect(draft).toMatch(re);
   });
 });

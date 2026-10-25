@@ -49,7 +49,10 @@ export function poAllocated(records: Records, po: Commitment): number {
   const byId = new Map(records.commitments.map((c) => [c.id, c]));
   return (po.linkedCommitmentIds ?? [])
     .map((id) => byId.get(id))
-    .filter((c): c is Commitment => !!c && (c.type === "invoice" || c.type === "bill"))
+    // Same rule as the engine's coveredByLinked: same-direction invoices/bills that are not cancelled or credited.
+    .filter((c): c is Commitment => !!c && (c.type === "invoice" || c.type === "bill") &&
+      c.settlement !== "cancelled" && c.settlement !== "credited" &&
+      (commitmentDirection(c) ?? "out") === (po.direction ?? "out"))
     .reduce((sum, c) => sum + c.amount, 0);
 }
 

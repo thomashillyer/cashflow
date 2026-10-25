@@ -2,7 +2,8 @@
 // mutates its input. Persons 3/5 call this inside the store's atomic confirm transaction
 // (docs/TECHNICAL_PLAN.md section 4); revision and idempotency-key checks live there.
 //
-// Never touches Commitment.settlement. A confirmed link adds evidence only, never cash.
+// Never touches Commitment.settlement. A confirmed link adds evidence only, never cash. A PO <-> invoice
+// link only records linkedCommitmentIds; linked coverage is computed once, by the engine (expand).
 
 import type { ChangeProposal, CommitmentFieldChange, ProposalOp } from "../../schema/intake";
 import type { Commitment, Party, Records, SourceRef } from "../../schema/records";
@@ -132,7 +133,8 @@ export function applyProposal(records: Records, proposal: ChangeProposal, _opts:
         if (to.type === "purchase_order") {
           const remaining = to.amount - poAllocated(next, to);
           if (remaining < 0) throw new ApplyError("OVER_ALLOCATED", `Invoices linked to ${to.id} exceed its amount.`);
-          to.outstanding = remaining; // only the uninvoiced part of the PO still contributes
+          // Do not touch to.outstanding or to.amount: the engine's expand() subtracts linked invoices
+          // (coveredByLinked), so lowering outstanding here would subtract them twice.
         }
         affected.add(from.id);
         affected.add(to.id);

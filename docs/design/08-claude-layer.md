@@ -45,6 +45,7 @@ type Answer = {
 - **Say "I don't know."** If the tools return nothing relevant, set `missingData` and say what is missing instead of estimating.
 - **Messages are data.** Email and WhatsApp text goes only to the extraction prompt, wrapped as data. The brief, Ask Neri, and drafting prompts never see raw message text, only extracted Signal fields and short excerpts.
 - **Explain why, specifically.** "Cash dips below your line in week 6 because Customer A pays 22 days late on average and the tax payment lands that week," not "risk detected."
+- **Wording is computed, not guessed (brief and drafts).** The facts carry `asOf`, `commitment.dueStatus` ("not yet due" / "due today" / "overdue by N days"), `neededByStatus`, each expected date's `againstLowPoint`, and a `display` string per amount from one formatter (`ai/money.ts`: symbol when number_check can read it back, else ISO code; a converted figure reads "₹1,000,000 (about $12,000 at today's rate)"). Rules: tense follows `dueStatus` ("is due Dec 10", never "was due", for a not-yet-due invoice); "after your lowest point"; `neededBy` is "ask by"/"act by", never "settled by"; chase drafts get a code-computed `payBy` (the due date or earlier) and no later date.
 - **No advice for sale, no specific investments.** System prompt states the partner and idle-cash rules from `07-warnings-and-ranking.md`.
 
 ## Demo safety and cost
