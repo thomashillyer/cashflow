@@ -334,6 +334,16 @@ describe("import -> review -> confirm (INV-1187)", () => {
     expect(Object.keys(APPLY_ERROR_STATUS).sort()).toEqual(["NOTHING_TO_APPLY", "NOT_PROPOSED", "OVER_ALLOCATED", "STALE_REVIEW", "UNKNOWN_TARGET"]);
   });
 
+  it("a day-first chat posted to the whatsapp route is read day first (inferred, or from the body)", async () => {
+    const text = "[25/11/26, 9:14:02 AM] Mei: Reminder.\n[03/12/26, 9:31:47 AM] Dana: We will pay on 05/12.\n";
+    const date = async (payload: Record<string, unknown>) => {
+      const res = (await app.inject({ method: "POST", url: "/import/whatsapp", headers: OTHER, payload })).json();
+      return res.evidence.find((e: { channel: string }) => e.channel === "whatsapp").receivedAt as string;
+    };
+    expect(await date({ text })).toMatch(/^2026-12-03T/);
+    expect(await date({ text: "[03/12/26, 9:31:47 AM] Dana: hi\n", dateOrder: "DMY" })).toMatch(/^2026-12-03T/);
+  });
+
   it("a pasted owner message about INV-104 becomes a proposed signal, not a change", async () => {
     const text = readFileSync(join(import.meta.dirname, "../fixtures/cascade_trade/intake/owner-message-inv104.txt"), "utf8");
     const res = (await app.inject({ method: "POST", url: "/import/paste", headers: OTHER, payload: { text, receivedAt: "2026-10-25T16:00:00Z" } })).json();

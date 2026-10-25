@@ -41,6 +41,21 @@ export function normalizeChat(raw: string): string {
   }).join("\n");
 }
 
+// Day first or month first, from a normalized chat's message headers: a first part over 12 means day
+// first, a second part over 12 means month first. Both at once is inconsistent (conflict, order unset).
+// `ambiguous`: some header could be read either way.
+export function inferWhatsAppDateOrder(raw: string): { order?: "MDY" | "DMY"; conflict: boolean; ambiguous: boolean } {
+  let dayFirst = false, monthFirst = false, ambiguous = false;
+  for (const l of raw.split("\n")) {
+    const m = /^\u200e?\[(\d{1,2})\/(\d{1,2})\//.exec(l);
+    if (!m) continue;
+    const [x, y] = [Number(m[1]), Number(m[2])];
+    if (x > 12) dayFirst = true; else if (y > 12) monthFirst = true; else if (x !== y) ambiguous = true;
+  }
+  const conflict = dayFirst && monthFirst;
+  return { ...(!conflict && dayFirst ? { order: "DMY" as const } : !conflict && monthFirst ? { order: "MDY" as const } : {}), conflict, ambiguous };
+}
+
 export function referencedFiles(text: string): string[] {
   const names = new Set<string>();
   const normalized = normalizeChat(text);
@@ -107,21 +122,14 @@ export async function importWhatsAppExport(input: WhatsAppExportInput): Promise<
   }
 
   const raw = normalizeChat(chatText);
-  const messageCount = raw.split("\n").filter((l) => /^\[\d/.test(l)).length;
+  const messageCount = raw.split("\n").filter((l) => /^\u200e?\[\d/.test(l)).length;
   if (messageCount === 0) return fail("No WhatsApp messages were found in this file.", "Check that it is a chat exported from WhatsApp, or paste the messages.", now, evidenceId);
 
-  // Day-first or month-first: an explicit order wins; otherwise a header date with a first part over 12
-  // means day first, and one with a second part over 12 means month first. Both at once is inconsistent
-  // data, so the default stays. With no evidence either way every date is ambiguous: say so.
-  let dayFirst = false, monthFirst = false, ambiguous = false;
-  for (const l of raw.split("\n")) {
-    const m = /^\[(\d{1,2})\/(\d{1,2})\//.exec(l);
-    if (!m) continue;
-    const [x, y] = [Number(m[1]), Number(m[2])];
-    if (x > 12) dayFirst = true; else if (y > 12) monthFirst = true; else if (x !== y) ambiguous = true;
-  }
-  const dateOrder: "MDY" | "DMY" | undefined = input.dateOrder ?? (dayFirst && !monthFirst ? "DMY" : monthFirst && !dayFirst ? "MDY" : undefined);
-  if (!input.dateOrder && !dayFirst && !monthFirst && ambiguous) {
+  // An explicit order wins; otherwise infer it from the header dates. No evidence either way: warn.
+  const inferred = inferWhatsAppDateOrder(raw);
+  const dateOrder = input.dateOrder ?? inferred.order;
+  if (!input.dateOrder && inferred.conflict) warnings.push("This chat mixes day-first and month-first dates; export it again from one phone, or paste the messages.");
+  else if (!input.dateOrder && !inferred.order && inferred.ambiguous) {
     warnings.push("Some dates, like 03/04/26, could be read as March 4 or April 3. Neri reads them month first; check any payment date the chat mentions.");
   }
 

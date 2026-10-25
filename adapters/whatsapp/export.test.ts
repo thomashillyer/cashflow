@@ -4,7 +4,7 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { parseWhatsApp } from "../../ai/extract/message";
-import { importWhatsAppExport, normalizeChat, referencedFiles } from "./export";
+import { importWhatsAppExport, inferWhatsAppDateOrder, normalizeChat, referencedFiles } from "./export";
 
 const root = join(__dirname, "..", "..");
 const AT = "2026-10-25T18:00:00Z";
@@ -107,6 +107,12 @@ describe("WhatsApp export", () => {
     expect(mdy.input!.dateOrder).toBe("MDY");
     const mixed = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[25/11/26, 9:14 AM] A: x\n[11/28/26, 9:15 AM] B: y\n"), receivedAt: AT });
     expect(mixed.input!.dateOrder).toBeUndefined();
+  });
+
+  it("conflicting headers leave the order unset and say why", async () => {
+    const r = await importWhatsAppExport({ fileName: "c.txt", bytes: enc("[25/11/26, 9:14 AM] A: x\n[11/28/26, 9:15 AM] B: y\n"), receivedAt: AT });
+    expect(r.diagnostics.warnings).toEqual(["This chat mixes day-first and month-first dates; export it again from one phone, or paste the messages."]);
+    expect(inferWhatsAppDateOrder("‎[25/11/26, 9:14 AM] A: x\n[11/28/26, 9:15 AM] B: y")).toEqual({ conflict: true, ambiguous: false });
   });
 
   it("an all-ambiguous chat still warns and sets no order; an explicit order wins and silences the warning", async () => {

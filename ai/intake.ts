@@ -467,7 +467,7 @@ async function readMessage(env: Env, input: Extract<IntakeInput, { kind: "email"
   if (!hasAttachment && bundle.text.trim() !== "") {
     const ids = [parent.id, ...linkIds];
     const segments: SourceSegment[] = [{ evidenceId: parent.id, text: bundle.text }];
-    const extracted = await extractDocument(segments, extractOpts(env, `cand-${parent.id}`, ids));
+    const extracted = await extractDocument(segments, { ...extractOpts(env, `cand-${parent.id}`, ids), ...(input.kind === "whatsapp" && input.dateOrder === "DMY" ? { dayFirst: true } : {}) });
     let cand: IntakeCandidate | undefined = bodyCandidate(env, extracted, bundle);
     if (cand) {
       cand = withCounterparty(cand, ctx.records, [bundle.text], headerEmails(bundle));
