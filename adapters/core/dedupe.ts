@@ -17,11 +17,16 @@ export function dedupeEvidence(existing: Evidence[], incoming: Evidence[]): Dedu
   const result: DedupeResult = { fresh: [], unchanged: [], superseded: [] };
 
   for (const e of incoming) {
-    const sameRef = byRef.get(refKey(e));
+    const key = refKey(e);
+    const sameRef = byRef.get(key);
     if (sameRef) {
-      if (Date.parse(e.receivedAt) > Date.parse(sameRef.receivedAt) && e.fileHash !== sameRef.fileHash) {
+      const newer = Date.parse(e.receivedAt) > Date.parse(sameRef.receivedAt);
+      const sameKnownFile = e.fileHash !== undefined && e.fileHash === sameRef.fileHash;
+      if (newer && !sameKnownFile) {
         result.superseded.push({ old: sameRef, next: e });
         result.fresh.push(e);
+        byRef.set(key, e);
+        if (e.fileHash) byHash.set(e.fileHash, e);
       } else {
         result.unchanged.push(sameRef);
       }

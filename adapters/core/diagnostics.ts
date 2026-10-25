@@ -40,7 +40,9 @@ export type ImportDiagnostics = {
 
 export function summarize(d: Omit<ImportDiagnostics, "completeness" | "rowsRejected">): ImportDiagnostics {
   const considered = d.rowsRead - d.rowsDuplicate;
-  const rowsRejected = new Set(d.errors.map((e) => `${e.sheet ?? ""}#${e.row}`)).size;
+  const rowsRejected = new Set(
+    d.errors.filter((e) => e.code !== "unmapped_column").map((e) => `${e.sheet ?? ""}#${e.row}`),
+  ).size;
   return {
     ...d,
     rowsRejected,

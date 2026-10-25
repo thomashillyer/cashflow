@@ -24,10 +24,15 @@ describe("hash and ids", () => {
 
   it("derives stable ids from the source", () => {
     expect(recordEvidenceId("zoho_books", "INV-1187")).toBe("ev-zoho_books-INV-1187");
-    expect(recordEvidenceId("upload", " a b/c ")).toBe("ev-upload-a-b-c");
-    expect(fileEvidenceId("upload", "deadbeefcafe")).toBe("ev-upload-deadbeef");
+    expect(recordEvidenceId("upload", " a b/c ")).toBe(`ev-upload-a-b-c~${sha256Hex(" a b/c ").slice(0, 16)}`);
+    expect(fileEvidenceId("upload", "deadbeefcafe0123")).toBe("ev-upload-deadbeefcafe0123");
+    expect(fileEvidenceId("upload", "deadbeefcafe012345")).toHaveLength("ev-upload-".length + 16);
     expect(childEvidenceId("ev-upload-deadbeef", 2)).toBe("ev-upload-deadbeef-2");
     expect(() => recordEvidenceId("upload", "  ")).toThrow();
+  });
+
+  it("keeps distinct provider records distinct when slug normalization is lossy", () => {
+    expect(recordEvidenceId("upload", "a b")).not.toBe(recordEvidenceId("upload", "a-b"));
   });
 });
 
@@ -51,6 +56,23 @@ describe("dedupeEvidence", () => {
     const next = ev("r1", "2026-10-05T00:00:00Z", "h2");
     const r = dedupeEvidence([old], [next]);
     expect(r.fresh).toEqual([next]);
+    expect(r.superseded).toEqual([{ old, next }]);
+  });
+
+  it("lets a newer provider record win when file hashes are unavailable", () => {
+    const old = ev("r1", "2026-10-01T00:00:00Z");
+    const next = ev("r1", "2026-10-05T00:00:00Z");
+    const r = dedupeEvidence([old], [next]);
+    expect(r.fresh).toEqual([next]);
+    expect(r.superseded).toEqual([{ old, next }]);
+  });
+
+  it("returns a repeated newer version only once per batch", () => {
+    const old = ev("r1", "2026-10-01T00:00:00Z", "h1");
+    const next = ev("r1", "2026-10-05T00:00:00Z", "h2");
+    const r = dedupeEvidence([old], [next, next]);
+    expect(r.fresh).toEqual([next]);
+    expect(r.unchanged).toEqual([next]);
     expect(r.superseded).toEqual([{ old, next }]);
   });
 
@@ -96,5 +118,19 @@ describe("import diagnostics", () => {
   it("is complete when everything was already known", () => {
     const d = summarize({ ...base, rowsRead: 3, rowsImported: 0, rowsDuplicate: 3, errors: [] });
     expect(d.completeness).toBe(1);
+  });
+
+  it("does not count column-mapping errors as rejected rows", () => {
+    const d = summarize({
+      ...base,
+      rowsRead: 2,
+      rowsImported: 1,
+      rowsDuplicate: 0,
+      errors: [
+        { row: 1, column: "Other", code: "unmapped_column", message: "Unknown column", nextStep: "Map it" },
+        { row: 2, code: "missing_amount", message: "No amount", nextStep: "Enter the amount" },
+      ],
+    });
+    expect(d.rowsRejected).toBe(1);
   });
 });
