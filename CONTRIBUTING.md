@@ -2,7 +2,7 @@
 
 An action-first cash-flow copilot for small businesses: **what needs attention, by when, and why?** It reads the books, bank, and outside signals (email, WhatsApp, owner notes), projects cash 13 weeks ahead with daily detail, and shows the owner "three things to do today," each with its dollar effect and a drafted action.
 
-This repository contains the design and contributor checklists. The application is not implemented yet.
+The live app is at [neri-cash.fly.dev](https://neri-cash.fly.dev). Create an account or sign in, open your private business, then use Sources to sync an available connection or upload/paste records. Imported documents wait in Review. Enter a real opening bank balance when requested; missing data stays visible. Production has no sample-business mode.
 
 ## Start here
 
@@ -45,9 +45,9 @@ The schema lives in `supabase/migrations/` and mirrors `schema/records.ts`; `db/
 - **Local:** `npx supabase start` (needs Docker), then `npx supabase db reset` to apply migrations. `npx supabase status` prints the local URL and keys.
 - **Shared hosted project:** `npx supabase link --project-ref <ref>`, then `npx supabase db push` to apply new migrations. Get the URL and anon key from Project Settings → API.
 - **Schema changes:** add a new file with `npx supabase migration new <name>`; never edit an applied migration.
-- **Confirming a review item** goes through the `confirm_change_proposal` RPC (`confirmChangeProposal` in `db/records.ts`): one transaction that checks the business and candidate revisions and the idempotency key. Applying the proposal's ops inside it is still TODO (persons 3/5): until then it rejects any proposal with ops (`NOT_IMPLEMENTED`, HTTP 501). Errors are `StoreError`s whose `status` is the HTTP status (409 stale/conflict/unresolved, 404, 501).
-- **Reading** uses `loadRecords`, one `load_records` RPC snapshot (no row limit) returning `{ records, storeRevision }`. **Direct writes** (`upsertRecords`, fixtures, adapter imports) need the service-role client and bump the business revision.
+- **Review:** document imports create pending proposals and signals; confirm or dismiss them in Review. The API uses revision checks and atomic decisions before changing accepted financial records.
+- **Reading** uses `loadRecords`, one `load_records` RPC snapshot returning `{ records, storeRevision }`. Server writes use a business-scoped service-role client.
 
-The row level security policies are hackathon-only: the anon/authenticated keys can only **read** rows of businesses with `is_synthetic = true` (default `false`; fixture seeding sets it to `true` explicitly), and can only write through the `confirm_change_proposal` RPC. Creating businesses and bulk writes need the service-role key, which stays server-side. Per-session isolation of the public preview (TECHNICAL_PLAN section 9) is still TODO. Keep real data out of the hosted project until these are replaced with per-user policies.
+Tenant RLS permits authenticated members to read only their private businesses. Anonymous access is limited to synthetic database rows; production API requests require sign-in and reject synthetic businesses. Connector credentials stay server-side and are bound to one private business with `NERI_CONNECTOR_BUSINESS_ID`. See [API configuration](api/README.md) for Outlook and optional Zoho Books. Public demos and fixtures remain synthetic.
 
 The earlier [seven-hour plan](docs/HACKATHON_PLAN.md) is superseded by `docs/design/`, but keeps the duplicate-evidence demo story and its daily fixture arithmetic.
