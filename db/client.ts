@@ -7,6 +7,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 export type ClientOptions = { serviceRole?: boolean };
 
 export function getSupabase({ serviceRole = false }: ClientOptions = {}): SupabaseClient {
+  if (serviceRole && typeof window !== "undefined") {
+    throw new Error("The service-role client bypasses row level security and must never run in a browser.");
+  }
   const url = process.env.SUPABASE_URL;
   const keyName = serviceRole ? "SUPABASE_SERVICE_ROLE_KEY" : "SUPABASE_ANON_KEY";
   const key = process.env[keyName];

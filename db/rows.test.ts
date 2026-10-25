@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CashEvent, Commitment, Evidence } from "../schema/records";
-import { fromRow, toRow } from "./rows";
+import type { ChangeProposal } from "../schema/intake";
+import { fromRow, toRow, type Row } from "./rows";
 
 describe("row mappers", () => {
   it("round-trips a Commitment", () => {
@@ -69,7 +70,7 @@ describe("row mappers", () => {
       id: "ev-email-evg-1126#att-1",
       channel: "email",
       format: "pdf",
-      receivedAt: "2026-11-27T00:42:10Z",
+      receivedAt: "2026-11-27T00:42:10.123Z",
       parentId: "ev-email-evg-1126",
       fileName: "inv1187.pdf",
       mime: "application/pdf",
@@ -83,7 +84,32 @@ describe("row mappers", () => {
     expect(row).toMatchObject({ file_name: "inv1187.pdf", storage_key: ev.storageKey, parent_id: ev.parentId });
     const fromDb = {
       ...row, url: null, created_at: "2026-10-25T18:00:00+00:00", source_system: "email", source_record: "x",
+      received_at: "2026-11-27T00:42:10.123456+00:00",  // what PostgREST returns for timestamptz
     };
     expect(fromRow<Evidence>(fromDb)).toEqual(ev);
+  });
+
+  it("keeps created_at on change_proposals (ChangeProposal.createdAt) and normalizes timestamps", () => {
+    const cp: ChangeProposal = {
+      id: "cp-1",
+      action: "link",
+      ops: [],
+      expectedStoreRevision: 3,
+      evidenceIds: ["ev-1"],
+      reasons: ["same party, reference, currency"],
+      conflicts: [],
+      state: "confirmed",
+      createdAt: "2026-11-26T00:00:00.000Z",
+      decidedAt: "2026-11-26T01:02:03.456Z",
+    };
+    const row = toRow(cp, "cascade_trade");
+    expect(row).toMatchObject({ expected_store_revision: 3, created_at: cp.createdAt });
+    const fromDb = {
+      ...row, candidate_id: null, target_commitment_id: null, source_ref: null,
+      created_at: "2026-11-26T00:00:00+00:00", decided_at: "2026-11-26T01:02:03.456+00:00",
+    };
+    expect(fromRow<ChangeProposal>(fromDb, "change_proposals")).toEqual(cp);
+    // Other tables still treat created_at as database bookkeeping.
+    expect(fromRow<Row>({ id: "x", created_at: "2026-11-26T00:00:00+00:00" }, "parties")).toEqual({ id: "x" });
   });
 });
