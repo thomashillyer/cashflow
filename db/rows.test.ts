@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CashEvent, Commitment, Evidence } from "../schema/records";
+import type { CashEvent, Commitment, Evidence, WorkItem } from "../schema/records";
 import type { ChangeProposal } from "../schema/intake";
 import { fromRow, toRow, type Row } from "./rows";
 
@@ -111,5 +111,22 @@ describe("row mappers", () => {
     expect(fromRow<ChangeProposal>(fromDb, "change_proposals")).toEqual(cp);
     // Other tables still treat created_at as database bookkeeping.
     expect(fromRow<Row>({ id: "x", created_at: "2026-11-26T00:00:00+00:00" }, "parties")).toEqual({ id: "x" });
+  });
+});
+
+describe("work item rows", () => {
+  it("round-trips a WorkItem from engine/rank.ts", () => {
+    const w: WorkItem = {
+      id: "wi-projected_cash_gap-chase-inv-INV-1187", warning: "projected_cash_gap",
+      title: "Chase Evergreen Home about INV-1187", why: "Collecting it by 2026-12-10 raises your low point by $19,500.",
+      lever: { kind: "chase", commitmentId: "inv-INV-1187", assumeDate: "2026-12-10" },
+      cashEffect: 1950000, neededBy: "2026-12-12", confidence: 0.6, score: 262360,
+      evidenceRefs: ["inv-INV-1187"], actions: [{ kind: "draft_email" }, { kind: "mark_done" }], state: "open",
+    };
+    const row = toRow(w, "cascade_trade");
+    expect(row).toMatchObject({ cash_effect: 1950000, needed_by: "2026-12-12", evidence_refs: ["inv-INV-1187"],
+      lever: { kind: "chase", commitmentId: "inv-INV-1187", assumeDate: "2026-12-10" } });
+    const fromDb = { ...row, partner_action: null, created_at: "2026-11-16T18:00:00+00:00" };
+    expect(fromRow<WorkItem>(fromDb, "work_items")).toEqual(w);
   });
 });
