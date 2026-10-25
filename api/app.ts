@@ -128,8 +128,10 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     // The committed app/config.js stays empty (the static preview publishes it). When this server serves the app,
     // serve it live instead: same-origin API, plus the public Supabase values so sign-in works.
     const configPath = join(opts.staticDir, "config.js");
-    if (existsSync(configPath)) {
-      const served = servedConfig(readFileSync(configPath, "utf8"), opts.appConfig ?? {});
+    if (opts.appConfig && existsSync(configPath)) {
+      if (opts.appConfig.supabaseAnonKey && isSecretKey(opts.appConfig.supabaseAnonKey))
+        app.log.error("SUPABASE_ANON_KEY holds a secret/service-role key; sign-in stays off and the key is not served");
+      const served = servedConfig(readFileSync(configPath, "utf8"), opts.appConfig);
       app.get("/config.js", async (_req, reply) =>
         reply.type("application/javascript; charset=utf-8").header("cache-control", "no-cache").send(served));
     }
@@ -143,9 +145,20 @@ export function servedConfig(committed: string, cfg: { supabaseUrl?: string; sup
   const set = (src: string, name: string, value: string) =>
     src.replace(new RegExp(`^window\\.${name}\\s*=.*$`, "m"), `window.${name} = ${JSON.stringify(value)};`);
   let out = set(committed, "NERI_API_BASE", "same-origin");
-  if (cfg.supabaseUrl && cfg.supabaseAnonKey) {
+  if (cfg.supabaseUrl && cfg.supabaseAnonKey && !isSecretKey(cfg.supabaseAnonKey)) {
     out = set(out, "NERI_SUPABASE_URL", cfg.supabaseUrl);
     out = set(out, "NERI_SUPABASE_ANON_KEY", cfg.supabaseAnonKey);
   }
   return out;
+}
+
+// A service-role or secret key must never reach the browser, even if it lands in SUPABASE_ANON_KEY by mistake.
+export function isSecretKey(key: string): boolean {
+  if (key.startsWith("sb_secret_")) return true;
+  try {
+    const payload = JSON.parse(Buffer.from(key.split(".")[1] ?? "", "base64url").toString("utf8")) as { role?: string };
+    return payload.role === "service_role";
+  } catch {
+    return false;
+  }
 }

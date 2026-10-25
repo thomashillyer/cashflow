@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { buildApp, servedConfig, type Verifier } from "./app";
+import { buildApp, isSecretKey, servedConfig, type Verifier } from "./app";
 import { loadSample, loadSamples } from "./demo";
 import { MemoryStore } from "./store";
 import { APPLY_ERROR_STATUS } from "./routes/review";
@@ -483,5 +483,27 @@ describe("served app/config.js", () => {
     expect(out).toContain('window.NERI_API_BASE = "same-origin";');
     expect(out).toContain('window.NERI_SUPABASE_URL = "";');
     expect(readFileSync(join(appDir, "config.js"), "utf8")).toBe(committed);
+  });
+});
+
+describe("sample guards", () => {
+  it("never serves a service-role key as the anon key", () => {
+    const body = Buffer.from(JSON.stringify({ role: "service_role" })).toString("base64url");
+    const served = servedConfig(readFileSync(join(import.meta.dirname, "../app/config.js"), "utf8"),
+      { supabaseUrl: "https://example.supabase.co", supabaseAnonKey: `x.${body}.y` });
+    expect(served).toContain('window.NERI_SUPABASE_ANON_KEY = "";');
+    expect(isSecretKey("sb_secret_abc")).toBe(true);
+    expect(isSecretKey(`x.${Buffer.from(JSON.stringify({ role: "anon" })).toString("base64url")}.y`)).toBe(false);
+  });
+});
+
+describe("public demo uploads", () => {
+  it("refuses a signed-in user's upload into a shared sample in demo mode", async () => {
+    const store = new MemoryStore();
+    for (const s of loadSamples()) await store.resetBusiness(s, s.records);
+    const demo = await buildApp({ store, verify: async (t) => (t === "ok" ? { id: "u-1" } : null), demoMode: true });
+    const res = await demo.inject({ method: "POST", url: "/import/paste", headers: { authorization: "Bearer ok", "x-neri-business": "cascade_trade" }, payload: { text: "hello" } });
+    expect(res.statusCode).toBe(403);
+    await demo.close();
   });
 });
