@@ -1,0 +1,872 @@
+{
+  "parties": [
+    {
+      "id": "party-evergreen-home",
+      "name": "Evergreen Home",
+      "kind": "customer",
+      "tags": [
+        "slow_payer"
+      ],
+      "notes": [
+        "They always pay about two weeks late"
+      ]
+    },
+    {
+      "id": "party-puget-market",
+      "name": "Puget Market",
+      "kind": "customer",
+      "tags": [
+        "reliable"
+      ],
+      "notes": [
+        "Usually pays a week early"
+      ]
+    },
+    {
+      "id": "party-harbor-hearth",
+      "name": "Harbor and Hearth",
+      "kind": "customer",
+      "tags": [
+        "reliable"
+      ],
+      "notes": [
+        "On time, except holiday delays in December"
+      ]
+    },
+    {
+      "id": "party-shenzhen-ceramics",
+      "name": "Shenzhen Ceramics Co.",
+      "kind": "supplier",
+      "tags": [
+        "preferred",
+        "reliable"
+      ],
+      "notes": [
+        "Best quality; slow around Lunar New Year"
+      ]
+    },
+    {
+      "id": "party-jaipur-textiles",
+      "name": "Jaipur Textiles",
+      "kind": "supplier",
+      "tags": [
+        "preferred"
+      ],
+      "notes": [
+        "Good partner; prices in rupees"
+      ]
+    },
+    {
+      "id": "party-ningbo-pack",
+      "name": "Ningbo Pack",
+      "kind": "supplier",
+      "tags": [
+        "avoid"
+      ],
+      "notes": [
+        "Quality issues last year"
+      ]
+    }
+  ],
+  "commitments": [
+    {
+      "id": "inv-EG-01",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "EG-01",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-02-10"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-EG-01"
+      }
+    },
+    {
+      "id": "inv-EG-02",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "EG-02",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-03-12"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-EG-02"
+      }
+    },
+    {
+      "id": "inv-EG-03",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "EG-03",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-04-11"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-EG-03"
+      }
+    },
+    {
+      "id": "inv-EG-04",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "EG-04",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-05-11"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-EG-04"
+      }
+    },
+    {
+      "id": "inv-EG-05",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "EG-05",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-06-10"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-EG-05"
+      }
+    },
+    {
+      "id": "inv-EG-06",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "EG-06",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-07-10"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-EG-06"
+      }
+    },
+    {
+      "id": "inv-EG-07",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "EG-07",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-08-09"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-EG-07"
+      }
+    },
+    {
+      "id": "inv-EG-08",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "EG-08",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-09-08"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-EG-08"
+      }
+    },
+    {
+      "id": "inv-PM-01",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "PM-01",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-02-15"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-PM-01"
+      }
+    },
+    {
+      "id": "inv-PM-02",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "PM-02",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-03-17"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-PM-02"
+      }
+    },
+    {
+      "id": "inv-PM-03",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "PM-03",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-04-16"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-PM-03"
+      }
+    },
+    {
+      "id": "inv-PM-04",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "PM-04",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-05-16"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-PM-04"
+      }
+    },
+    {
+      "id": "inv-PM-05",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "PM-05",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-06-15"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-PM-05"
+      }
+    },
+    {
+      "id": "inv-PM-06",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "PM-06",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-07-15"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-PM-06"
+      }
+    },
+    {
+      "id": "inv-PM-07",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "PM-07",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-08-14"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-PM-07"
+      }
+    },
+    {
+      "id": "inv-PM-08",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "PM-08",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-09-13"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-PM-08"
+      }
+    },
+    {
+      "id": "inv-HH-01",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "HH-01",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-07-20"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-HH-01"
+      }
+    },
+    {
+      "id": "inv-HH-02",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "HH-02",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-08-19"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-HH-02"
+      }
+    },
+    {
+      "id": "inv-HH-03",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "HH-03",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-09-18"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-HH-03"
+      }
+    },
+    {
+      "id": "inv-HH-04",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "HH-04",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-10-18"
+      },
+      "status": "committed",
+      "settlement": "paid",
+      "outstanding": 0,
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "inv-HH-04"
+      }
+    },
+    {
+      "id": "inv-INV-1187",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "INV-1187",
+      "partyId": "party-evergreen-home",
+      "amount": 2800000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-10",
+        "due": "2026-12-10"
+      },
+      "status": "committed",
+      "outstanding": 2800000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1187"
+      }
+    },
+    {
+      "id": "inv-INV-1203",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "INV-1203",
+      "partyId": "party-harbor-hearth",
+      "amount": 1200000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-11-20",
+        "due": "2026-12-20"
+      },
+      "status": "committed",
+      "outstanding": 1200000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1203"
+      }
+    },
+    {
+      "id": "inv-INV-1215",
+      "type": "invoice",
+      "direction": "in",
+      "reference": "INV-1215",
+      "partyId": "party-puget-market",
+      "amount": 11500000,
+      "currency": "USD",
+      "anchors": {
+        "invoice": "2026-12-13",
+        "due": "2027-01-12"
+      },
+      "status": "committed",
+      "outstanding": 11500000,
+      "settlement": "open",
+      "sourceRef": {
+        "system": "zoho_books",
+        "record": "INV-1215"
+      }
+    },
+    {
+      "id": "po-PO-2291",
+      "type": "purchase_order",
+      "direction": "out",
+      "reference": "PO-2291",
+      "partyId": "party-shenzhen-ceramics",
+      "amount": 6000000,
+      "currency": "USD",
+      "anchors": {
+        "order": "2026-11-20",
+        "ship": "2026-12-14"
+      },
+      "patternId": "supplier_30_70",
+      "status": "committed",
+      "settlement": "open",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2291.pdf"
+      }
+    },
+    {
+      "id": "po-PO-2302",
+      "type": "purchase_order",
+      "direction": "out",
+      "reference": "PO-2302",
+      "partyId": "party-jaipur-textiles",
+      "amount": 200000000,
+      "currency": "INR",
+      "anchors": {
+        "order": "2026-12-01",
+        "ship": "2026-12-15"
+      },
+      "patternId": "supplier_50_50",
+      "status": "committed",
+      "settlement": "open",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2302.xlsx"
+      }
+    },
+    {
+      "id": "bill-duties-2291",
+      "type": "bill",
+      "direction": "out",
+      "reference": "DUTIES-2291",
+      "category": "duties",
+      "amount": 900000,
+      "currency": "USD",
+      "anchors": {
+        "due": "2026-12-18"
+      },
+      "status": "likely",
+      "settlement": "open",
+      "sourceRef": {
+        "system": "generic_file",
+        "record": "po-2291.pdf"
+      }
+    },
+    {
+      "id": "rfq-harbor-spring",
+      "type": "sales_deal",
+      "direction": "in",
+      "reference": "RFQ-77",
+      "partyId": "party-harbor-hearth",
+      "amount": 6000000,
+      "currency": "USD",
+      "anchors": {
+        "order": "2026-12-05",
+        "delivery": "2027-02-01"
+      },
+      "status": "possible",
+      "probability": 0.4,
+      "sourceRef": {
+        "system": "email",
+        "record": "rfq-77"
+      }
+    }
+  ],
+  "events": [],
+  "signals": [
+    {
+      "id": "sig-evergreen-jan",
+      "channel": "email",
+      "receivedAt": "2026-11-16T09:00:00Z",
+      "partyId": "party-evergreen-home",
+      "commitmentId": "inv-INV-1187",
+      "claim": {
+        "kind": "date_change",
+        "newDate": "2027-01-08"
+      },
+      "confidence": 0.9,
+      "state": "proposed",
+      "sourceRef": {
+        "system": "email",
+        "record": "msg-evergreen-1",
+        "excerpt": {
+          "start": 0,
+          "end": 60,
+          "text": "We'll pay once our customer pays us, early January."
+        }
+      }
+    }
+  ],
+  "rules": [],
+  "settlements": [
+    {
+      "id": "set-inv-EG-01",
+      "commitmentId": "inv-EG-01",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "date": "2026-02-23",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-EG-01"
+      }
+    },
+    {
+      "id": "set-inv-EG-02",
+      "commitmentId": "inv-EG-02",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "date": "2026-03-27",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-EG-02"
+      }
+    },
+    {
+      "id": "set-inv-EG-03",
+      "commitmentId": "inv-EG-03",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "date": "2026-04-25",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-EG-03"
+      }
+    },
+    {
+      "id": "set-inv-EG-04",
+      "commitmentId": "inv-EG-04",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "date": "2026-05-25",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-EG-04"
+      }
+    },
+    {
+      "id": "set-inv-EG-05",
+      "commitmentId": "inv-EG-05",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "date": "2026-06-26",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-EG-05"
+      }
+    },
+    {
+      "id": "set-inv-EG-06",
+      "commitmentId": "inv-EG-06",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "date": "2026-07-23",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-EG-06"
+      }
+    },
+    {
+      "id": "set-inv-EG-07",
+      "commitmentId": "inv-EG-07",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "date": "2026-08-23",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-EG-07"
+      }
+    },
+    {
+      "id": "set-inv-EG-08",
+      "commitmentId": "inv-EG-08",
+      "partyId": "party-evergreen-home",
+      "amount": 2000000,
+      "currency": "USD",
+      "date": "2026-09-23",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-EG-08"
+      }
+    },
+    {
+      "id": "set-inv-PM-01",
+      "commitmentId": "inv-PM-01",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "date": "2026-02-08",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-PM-01"
+      }
+    },
+    {
+      "id": "set-inv-PM-02",
+      "commitmentId": "inv-PM-02",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "date": "2026-03-09",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-PM-02"
+      }
+    },
+    {
+      "id": "set-inv-PM-03",
+      "commitmentId": "inv-PM-03",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "date": "2026-04-10",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-PM-03"
+      }
+    },
+    {
+      "id": "set-inv-PM-04",
+      "commitmentId": "inv-PM-04",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "date": "2026-05-09",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-PM-04"
+      }
+    },
+    {
+      "id": "set-inv-PM-05",
+      "commitmentId": "inv-PM-05",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "date": "2026-06-08",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-PM-05"
+      }
+    },
+    {
+      "id": "set-inv-PM-06",
+      "commitmentId": "inv-PM-06",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "date": "2026-07-06",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-PM-06"
+      }
+    },
+    {
+      "id": "set-inv-PM-07",
+      "commitmentId": "inv-PM-07",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "date": "2026-08-08",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-PM-07"
+      }
+    },
+    {
+      "id": "set-inv-PM-08",
+      "commitmentId": "inv-PM-08",
+      "partyId": "party-puget-market",
+      "amount": 1500000,
+      "currency": "USD",
+      "date": "2026-09-06",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-PM-08"
+      }
+    },
+    {
+      "id": "set-inv-HH-01",
+      "commitmentId": "inv-HH-01",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "date": "2026-07-20",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-HH-01"
+      }
+    },
+    {
+      "id": "set-inv-HH-02",
+      "commitmentId": "inv-HH-02",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "date": "2026-08-20",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-HH-02"
+      }
+    },
+    {
+      "id": "set-inv-HH-03",
+      "commitmentId": "inv-HH-03",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "date": "2026-09-18",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-HH-03"
+      }
+    },
+    {
+      "id": "set-inv-HH-04",
+      "commitmentId": "inv-HH-04",
+      "partyId": "party-harbor-hearth",
+      "amount": 1000000,
+      "currency": "USD",
+      "date": "2026-10-18",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "set-inv-HH-04"
+      }
+    }
+  ],
+  "balances": [
+    {
+      "id": "bal-cascade",
+      "account": "operating",
+      "amount": 14500000,
+      "currency": "USD",
+      "asOf": "2026-11-16",
+      "sourceRef": {
+        "system": "bank_csv",
+        "record": "bal-cascade"
+      }
+    }
+  ],
+  "evidence": []
+}

@@ -7,7 +7,7 @@ This repository contains the design and contributor checklists. The application 
 ## Start here
 
 1. Read [`CLAUDE.md`](CLAUDE.md) for the rules and conventions, then the [design](docs/design/01-overview-and-architecture.md) and [technical implementation plan](docs/TECHNICAL_PLAN.md).
-2. Claim a role in the [task board](tasks/README.md); lane ownership is in [09-api-repo-lanes](docs/design/09-api-repo-lanes.md#five-people).
+2. Find your assigned role in the [task board](tasks/README.md); lane ownership is in [09-api-repo-lanes](docs/design/09-api-repo-lanes.md#five-people).
 3. Freeze [`schema/records.ts`](docs/design/03-data-model.md) at 11:00 and commit fixture records so every lane builds against the same data.
 4. Integrate at 1:00, freeze features at 3:00, submit by 5:30 ([timeline](docs/design/11-plan-demo-risks.md)).
 
@@ -15,11 +15,11 @@ This repository contains the design and contributor checklists. The application 
 
 | Person | Lane | Task list |
 |---|---|---|
-| 1 | Data and adapters: Zoho/CSV, bank, XLSX, email/WhatsApp paste, invoice links, evidence storage | [Tasks](tasks/01-data-and-source-adapters.md) |
-| 2 | Engine: expand, payment lag, forecast, simulate, golden tests | [Tasks](tasks/02-cashflow-engine.md) |
-| 3 | App: home screen, forecast chart, Review, onboarding/profile editor | [Tasks](tasks/03-product-ui-and-onboarding.md) |
-| 4 | AI: signal/document extraction, reconciliation proposals, brief text, Ask Neri, drafts | [Tasks](tasks/04-document-understanding-and-reconciliation.md) |
-| 5 | Warnings and ranking, integration, deployment, demo, submission | [Tasks](tasks/05-actions-integration-and-demo.md) |
+| Niru (1) | Data ingestion and adapters: Zoho/CSV, bank, XLSX, email/WhatsApp paste, invoice links, evidence storage | [Tasks](tasks/01-data-and-source-adapters.md) |
+| Thomas (2) | Engine: expand, payment lag, forecast, simulate, golden tests | [Tasks](tasks/02-cashflow-engine.md) |
+| SilverBeck (3) | UI and UX: home screen, forecast chart, Review, onboarding/profile editor | [Tasks](tasks/03-product-ui-and-onboarding.md) |
+| Andras (4) | AI ingestion and normalization: signal/document extraction, reconciliation proposals, brief text, Ask Neri, drafts | [Tasks](tasks/04-document-understanding-and-reconciliation.md) |
+| Kiana (5) | Actions/recommendations, warnings and ranking, integration, deployment, demo, submission | [Tasks](tasks/05-actions-integration-and-demo.md) |
 
 ## Principles
 
@@ -37,7 +37,7 @@ Public demos and committed fixtures must be synthetic. Real exports live in `dat
 
 ## Database (Supabase)
 
-The schema lives in `supabase/migrations/` and mirrors `schema/records.ts`; `db/` has the typed client (`getSupabase`, `loadRecords`, `upsert*`). Copy `.env.example` to `.env` for keys.
+The schema lives in `supabase/migrations/` and mirrors `schema/records.ts`; `db/` has the typed client (`getSupabase`, `loadRecords`, `upsert*`). Copy `.env.example` to `.env`, paste the Supabase values the team lead shared, then run `npm run setup:supabase` to validate them and check connectivity (`-- --from-cli` fetches keys instead, if you are logged in to the Supabase org).
 
 - **Local:** `npx supabase start` (needs Docker), then `npx supabase db reset` to apply migrations. `npx supabase status` prints the local URL and keys.
 - **Shared hosted project:** `npx supabase link --project-ref <ref>`, then `npx supabase db push` to apply new migrations. Get the URL and anon key from Project Settings → API.

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "tsc --noEmit && vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "setup:supabase": "node scripts/setup-supabase.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

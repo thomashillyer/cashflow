@@ -1,6 +1,6 @@
 # Person 3: Product UI and onboarding
 
-Owner: unassigned. Claim this role in [tracking issue #3](https://github.com/thomashillyer/cashflow/issues/3).
+Owner: SilverBeck. Track progress in [tracking issue #3](https://github.com/thomashillyer/cashflow/issues/3).
 
 ## Outcome
 

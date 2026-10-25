@@ -1,0 +1,6 @@
+{
+  "note": "Restaurant: daily card sales, weekly payroll, no receivables. Zero code changes versus cascade_trade; only the profile differs.",
+  "noReceivableEvents": true,
+  "hasDailySales": true,
+  "lowPoint": { "scenario": "base", "date": "2026-11-20", "amount": 1738058, "tolerance": 50000 }
+}
