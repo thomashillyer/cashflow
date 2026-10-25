@@ -59,7 +59,8 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
     const profile: StoredProfile = {
       ...starter,
       recurring: [],
-      ...(reserve !== undefined ? { safetyLine: { kind: "fixed", amount: reserve } } : {}),
+      // A template's example reserve is not the owner's preference. No reserve is assumed until set.
+      safetyLine: { kind: "fixed", amount: reserve ?? 0 },
       account: { owner: ownerNameFrom(email), email, kind, connections, ownerUserId: user.id, createdAt },
     };
     // One business per owner for now: setting up again updates it (notes and import notes are kept).

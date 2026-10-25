@@ -25,7 +25,7 @@ export type AppOptions = {
   store: Store;
   verify: Verifier;
   demoMode?: boolean;              // DEMO_MODE=1: unauthenticated requests may use synthetic businesses
-  defaultBusiness?: string;        // sample opened when the caller has no business of their own
+  defaultBusiness?: string;        // sample opened only in explicitly enabled demo mode
   aiMode?: AiMode;
   staticDir?: string;              // serve the app (same origin) when present
   // Public values for the served app/config.js (the anon key is public by design; never the service-role key).
@@ -63,7 +63,7 @@ const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals", "/rules",
-  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides"];
+  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides", "/connections"];
 
 const isApiPath = (url: string) => {
   const path = url.split("?")[0]!;
@@ -157,18 +157,21 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     }
 
     const path = req.url.split("?")[0]!;
+    if (path === "/demo/reset" && !deps.demoMode) throw new HttpError(403, "FORBIDDEN", "Sample resets are not available on this server.");
     if (NO_BUSINESS.has(path)) return;
 
     // Which business: an explicit X-Neri-Business header (or ?business=), else the caller's own
-    // business, else the default sample.
+    // business. Only explicit demo mode can fall back to a synthetic sample.
     const q = (req.query ?? {}) as Record<string, unknown>;
     const asked = (req.headers["x-neri-business"] as string | undefined) ?? (typeof q.business === "string" ? q.business : undefined);
     if (asked !== undefined && !BUSINESS_ID.test(asked)) throw new HttpError(404, "NOT_FOUND", "We couldn't find that business.");
-    const id = asked ?? (r.user ? await deps.store.findUserBusiness(r.user.id) : null) ?? deps.defaultBusiness;
+    const id = asked ?? (r.user ? await deps.store.findUserBusiness(r.user.id) : null) ?? (deps.demoMode ? deps.defaultBusiness : null);
+    if (!id) throw new HttpError(404, "NO_BUSINESS", "Set up your business before adding sources or viewing your numbers.");
     const business = await deps.store.getBusiness(id);
     // Same answer for "doesn't exist" and "not yours", so ids can't be probed.
     const notFound = new HttpError(404, "NOT_FOUND", "We couldn't find that business. Sign in with the email you set it up with.");
     if (!business) throw notFound;
+    if (business.isSynthetic && !deps.demoMode) throw notFound;
     if (!business.isSynthetic && !(r.user && await deps.store.isMember(business.id, r.user.id))) throw notFound;
     r.business = business;
     // Demo samples are shared, so a visitor works on a private copy; the real store is never written.
@@ -194,10 +197,10 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     // The committed app/config.js stays empty (the static preview publishes it). When this server serves the app,
     // serve it live instead: same-origin API, plus the public Supabase values so sign-in works.
     const configPath = join(opts.staticDir, "config.js");
-    if (opts.appConfig && existsSync(configPath)) {
-      if (opts.appConfig.supabaseAnonKey && isSecretKey(opts.appConfig.supabaseAnonKey))
+    if (existsSync(configPath)) {
+      if (opts.appConfig?.supabaseAnonKey && isSecretKey(opts.appConfig.supabaseAnonKey))
         app.log.error("SUPABASE_ANON_KEY holds a secret/service-role key; sign-in stays off and the key is not served");
-      const served = servedConfig(readFileSync(configPath, "utf8"), opts.appConfig);
+      const served = servedConfig(readFileSync(configPath, "utf8"), opts.appConfig ?? {}, deps.demoMode);
       app.get("/config.js", async (_req, reply) =>
         reply.type("application/javascript; charset=utf-8").header("cache-control", "no-cache").send(served));
     }
@@ -207,10 +210,14 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
 }
 
 // app/config.js with the live values set; every other line (comments, lock minutes) is kept.
-export function servedConfig(committed: string, cfg: { supabaseUrl?: string; supabaseAnonKey?: string }): string {
+export function servedConfig(committed: string, cfg: { supabaseUrl?: string; supabaseAnonKey?: string }, demoMode = false): string {
   const set = (src: string, name: string, value: string) =>
     src.replace(new RegExp(`^window\\.${name}\\s*=.*$`, "m"), `window.${name} = ${JSON.stringify(value)};`);
   let out = set(committed, "NERI_API_BASE", "same-origin");
+  const demoFlag = `window.NERI_DEMO_MODE = ${JSON.stringify(demoMode)};`;
+  out = /^window\.NERI_DEMO_MODE\s*=.*$/m.test(out)
+    ? out.replace(/^window\.NERI_DEMO_MODE\s*=.*$/m, demoFlag)
+    : `${out}\n${demoFlag}\n`;
   if (cfg.supabaseUrl && cfg.supabaseAnonKey && !isSecretKey(cfg.supabaseAnonKey)) {
     out = set(out, "NERI_SUPABASE_URL", cfg.supabaseUrl);
     out = set(out, "NERI_SUPABASE_ANON_KEY", cfg.supabaseAnonKey);

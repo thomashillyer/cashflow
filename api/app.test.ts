@@ -22,9 +22,15 @@ const OTHER = { authorization: "Bearer tok-other" };
 let store: MemoryStore;
 let app: FastifyInstance;
 
-async function setup(opts: { demoMode?: boolean } = {}) {
+async function setup(opts: { demoMode?: boolean; privateFixtures?: boolean } = {}) {
   store = new MemoryStore();
-  for (const s of loadSamples()) await store.resetBusiness(s, s.records);
+  for (const s of loadSamples()) {
+    if (!opts.demoMode && opts.privateFixtures !== false) {
+      // Route tests exercise authenticated private tenants; samples require explicit demo mode.
+      await store.createBusiness({ ...s, isSynthetic: false, ownerUserId: "u-other" });
+      await store.upsertRecords(s.id, s.records);
+    } else await store.resetBusiness(s, s.records);
+  }
   app = await buildApp({ store, verify, demoMode: opts.demoMode ?? false, allowReset: true, now: () => new Date("2026-11-16T17:00:00Z") });
 }
 
@@ -39,7 +45,7 @@ async function privateBusiness(): Promise<string> {
 const pdfBase64 = (name: string) => readFileSync(join(import.meta.dirname, "../fixtures/cascade_trade/intake", name)).toString("base64");
 
 describe("auth and tenant scope", () => {
-  beforeEach(() => setup());
+  beforeEach(() => setup({ privateFixtures: false }));
 
   it("health needs no token", async () => {
     const res = await app.inject({ method: "GET", url: "/health" });
@@ -73,8 +79,10 @@ describe("auth and tenant scope", () => {
     const theirs = await app.inject({ method: "GET", url: "/brief", headers: { ...OTHER, "x-neri-business": id } });
     expect(theirs.statusCode).toBe(404);
     expect((await app.inject({ method: "GET", url: "/context", headers: { ...OTHER, "x-neri-business": "nope" } })).statusCode).toBe(404);
-    // Signed-in non-members still get the synthetic sample by default.
-    expect((await app.inject({ method: "GET", url: "/context", headers: OTHER })).json().business.id).toBe("cascade_trade");
+    // A signed-in newcomer is sent to onboarding, never into the shared samples.
+    const newcomer = await app.inject({ method: "GET", url: "/context", headers: OTHER });
+    expect(newcomer.statusCode).toBe(404);
+    expect(newcomer.json().error.code).toBe("NO_BUSINESS");
   });
 });
 
@@ -272,11 +280,12 @@ describe("routes return what app/api.js expects", () => {
     }
   });
 
-  it("POST /demo/reset reseeds samples", async () => {
-    await app.inject({ method: "POST", url: "/plans", headers: OTHER, payload: { amount: 100000, date: "2026-12-01", note: "x" } });
+  it("POST /demo/reset reseeds samples only in explicit demo mode", async () => {
+    await setup({ demoMode: true });
+    const sample = (await store.getBusiness("cascade_trade"))!;
+    await store.saveProfile(sample.id, { ...sample.profile, account: { ...sample.profile.account, owner: "Changed locally" } });
     expect((await app.inject({ method: "POST", url: "/demo/reset", headers: OTHER })).json()).toEqual({ reset: ["cascade_trade", "pike_noodle"] });
-    const { records } = await store.load("cascade_trade");
-    expect(records.signals.every((s) => s.channel !== "owner")).toBe(true);
+    expect((await store.getBusiness("cascade_trade"))!.profile.account?.owner).toBe("Dana");
   });
 });
 

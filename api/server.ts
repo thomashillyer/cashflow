@@ -1,6 +1,6 @@
 // Entry point: `npm run dev` (tsx, port 8787) or `npm start`. Serves the API and, when app/ exists,
-// the app on the same origin. With DEMO_MODE=1 or the Supabase values set, /config.js is served live
-// (same-origin API, plus sign-in when both public Supabase values are set); otherwise the committed preview config.
+// the app on the same origin. /config.js is always served live, including the explicit demo capability.
+// Missing production configuration fails startup; it never falls back to fixture data.
 // Env: see api/README.md. Secrets come from .env only.
 
 import { join } from "node:path";
@@ -15,16 +15,23 @@ import { isBehind, supabaseSchemaStatus } from "./schema-status";
 const env = process.env;
 const demoMode = env.DEMO_MODE === "1";
 const port = Number(env.PORT ?? 8787);
+const useMemory = env.NERI_STORE === "memory";
+const production = env.NODE_ENV === "production";
+if (env.NERI_STORE && !["memory", "supabase"].includes(env.NERI_STORE)) throw new Error("NERI_STORE must be supabase or memory.");
+if (production && (demoMode || useMemory)) throw new Error("Production requires private Supabase storage with DEMO_MODE off; memory and fixture demos are local only.");
+if (!useMemory) {
+  const missing = ["SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY"].filter((name) => !env[name]);
+  if (missing.length) throw new Error(`Missing server configuration: ${missing.join(", ")}. Configure Supabase, or explicitly use NERI_STORE=memory DEMO_MODE=1 for a local fixture demo.`);
+}
 
 async function memoryStore(): Promise<Store> {
   const store = new MemoryStore();
-  for (const s of loadSamples()) await store.resetBusiness(s, s.records);
+  if (demoMode) for (const s of loadSamples()) await store.resetBusiness(s, s.records);
   return store;
 }
 
-const useMemory = env.NERI_STORE === "memory";
 const sb = useMemory ? null : getSupabase({ serviceRole: true });
-const store: Store = sb ? new SupabaseStore(sb) : await memoryStore();
+const store: Store = useMemory ? await memoryStore() : new SupabaseStore(sb!);
 // The Dockerfile copies the whole repo, so supabase/migrations is in the image.
 const schemaStatus = sb ? supabaseSchemaStatus(sb, join(import.meta.dirname, "../supabase/migrations")) : undefined;
 
@@ -46,10 +53,8 @@ const app = await buildApp({
   // Live Claude only with a key, and never by default on the public demo (anonymous callers could spend it).
   aiMode: env.ANTHROPIC_API_KEY && (env.NERI_AI_MODE === "live" || (!demoMode && env.NERI_AI_MODE !== "cache_only")) ? "live" : "cache_only",
   staticDir: env.NERI_STATIC_DIR ?? join(import.meta.dirname, "../app"),
-  ...(demoMode || (env.SUPABASE_URL && env.SUPABASE_ANON_KEY)
-    ? { appConfig: { supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY } }
-    : {}),
-  allowReset: env.NERI_ALLOW_RESET === "1",
+  appConfig: { supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY },
+  allowReset: demoMode && !production && env.NERI_ALLOW_RESET === "1",
   logger: true,
   ...(schemaStatus ? { schemaStatus } : {}),
 });
