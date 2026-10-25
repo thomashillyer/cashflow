@@ -104,8 +104,12 @@ describe("forecast checks in the owner brief", () => {
     expect(output.summary.tone).toBe("short");
     expect(output.summary.headline).toContain("below your line");
     expect(output.html).toContain('href="#/review"');
-    expect(output.spoken.join(" ")).toContain("A payment date needs your OK.");
-    expect(output.summary.take).not.toContain("timing problem");
+    // Since #251 the check items live once, in the fold-out under today's things: the spoken brief and the
+    // take point there instead of repeating them.
+    expect(output.html).toContain("A payment date needs your OK.");
+    expect(output.spoken.join(" ")).toContain("Check the forecast items");
+    expect(output.spoken.join(" ")).not.toContain("A payment date needs your OK.");
+    expect(output.summary.take ?? "").not.toContain("A payment date needs your OK.");
   });
 
   it("escapes source-derived reason text", () => {
