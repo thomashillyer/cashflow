@@ -81,7 +81,8 @@ Owner notes and plans go in as **applied** owner Signals: the owner's own words,
 
 Forecast runs include `days[].pipeline` for the chart's separate probability-weighted possible-deals line; each week's `pipelineClosing` matches its last day's pipeline value. Possible deals never change the main cash balance.
 
+Confirm, dismiss and signal apply/dismiss are one atomic `Store.commitDecision` (records + proposals + revision + stored response; compare-and-set on the revision the request loaded; SQL: `commit_review_decision`). Send an `Idempotency-Key` header to make a retry replay the first response (same key, different body: 409 `IDEMPOTENCY_CONFLICT`). Without the header the request is still atomic and race-safe but cannot be replayed.
+
 ## Not served yet
 
-- Confirm is not one database transaction (the RPC can't apply ops yet); the revision check narrows the window.
 - Owner notes, the account details and import notes live in `businesses.profile.account` (no migration needed).
