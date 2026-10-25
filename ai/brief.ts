@@ -297,7 +297,10 @@ export function fallbackBrief(f: Facts): { title: string; why: string } {
     }
     case "defer":
       return {
-        title: `Ask ${partyName(f, "the supplier")} for ${f.lever?.days} more days`,
+        // Name the document, so two open bills from one supplier never read the same; the why gives the days.
+        title: cm?.reference
+          ? `Ask ${partyName(f, "the supplier")} to move ${cm.reference}`
+          : `Ask ${partyName(f, "the supplier")} for ${f.lever?.days} more days`,
         why: join(docLine(f), `Moving the ${docRef(f)} payment back ${f.lever?.days} days ${lift}.`, actBy(f, "Ask")),
       };
     case "ask_advance":
