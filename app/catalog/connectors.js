@@ -2,7 +2,7 @@
 // has a no-setup fallback: export a file, upload it, or paste text.
 //
 // availability:
-//   "live"    — working in the Neri prototype today (Zoho OAuth, Microsoft Graph, WhatsApp Cloud API)
+//   "live"    — an adapter or file format exists; hosted sync requires server-reported capability
 //   "next"    — next to build (locked in the Neri roadmap)
 //   "planned" — on the list; file import works now
 // reads: what Neri takes from it, in the owner's words. Always read-only.
@@ -68,7 +68,7 @@ export const CONNECTORS = [
   { id: "ramp", name: "Ramp", category: "spend", availability: "planned", reads: "Card spend, bills, statement dates" },
 
   // Comms
-  { id: "m365", name: "Microsoft 365", mark: "MS", category: "comms", availability: "live", reads: "Outlook mail, Teams chats, calendar" },
+  { id: "m365", name: "Outlook email", mark: "MS", category: "comms", availability: "live", reads: "Email messages and attachments" },
   { id: "whatsapp", name: "WhatsApp Business", mark: "WA", category: "comms", availability: "live", reads: "Customer and supplier messages" },
   { id: "google", name: "Gmail and Google Calendar", mark: "G", category: "comms", availability: "next", reads: "Mail and calendar" },
   { id: "slack", name: "Slack", category: "comms", availability: "planned", reads: "Channel and DM messages you choose" },
@@ -84,7 +84,7 @@ export const CONNECTORS = [
 ];
 
 export const AVAILABILITY_LABEL = {
-  live: "Ready",
+  live: "Import available",
   next: "Coming next",
   planned: "Planned",
 };

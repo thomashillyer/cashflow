@@ -64,3 +64,13 @@ show the same revision.
 - **Tenant isolation** (separate PR, `supabase/migrations/*_tenant_access.sql`): with a user's token, the database returns only businesses that user is a member of, plus the synthetic sample businesses. Reads the server makes with the service-role key bypass this, so the API must check the token (or pass it through) before real data goes in. Invites are a follow-up.
 - **Screen lock:** numbers blur after `NERI_LOCK_MINUTES` (default 15) without activity or in the background; with real sign-in, unlocking checks the session is still valid.
 - **Sign out everywhere** (Settings) revokes every refresh token; other devices are signed out once their current access token expires (about an hour by default).
+
+## Real owner data and source imports
+
+A live API defaults to production behavior: `window.NERI_DEMO_MODE` must explicitly be `true` to expose sample businesses. Production hides sample entry points and switching, drops cached preview accounts, and never sends sample routing headers. A saved owner session restores its private business; a new owner continues setup. Home and Details show an import-first state until the forecast has opening cash and source records. No placeholder cash chart or suggested actions are shown before then.
+
+Source choices during setup are preferences, not connections. `GET /connections` reports the sources available to this particular business. Only an `available: true` response shows **Sync now**; `POST /connections/:id/sync` performs the real server-side read. Outlook email uses the `outlook` provider ID. Other sources offer exports and pasted text without promising OAuth, Teams or calendar access.
+
+File uploads call `POST /import/upload`; pasted source text calls `POST /import/paste`. Review loads `GET /review/proposals` alongside matched signals, shows extracted fields and reasons, and confirms resolved proposals through revision-checked `POST /review/:id/confirm` with an idempotency key. Unresolved items remain visible and cannot be applied until their missing information is resolved; they can be dismissed. Failed syncs and imports report an error instead of showing a success state.
+
+Missing opening cash can be supplied through **Add your current bank balance** on Home or Sources. The owner types the actual signed amount and balance date; `PUT /balance` stores it as an owner-entered balance snapshot in the profile currency. Blank, malformed or over-precision amounts are rejected before any request. The balance is not turned into a note or a forecast commitment.

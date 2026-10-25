@@ -949,3 +949,12 @@ body.locked .talk { display: none; }
 input, textarea { caret-color: var(--accent); }
 html { scrollbar-color: color-mix(in srgb, var(--ink-faint) 45%, transparent) transparent; }
 a { text-underline-offset: 0.18em; }
+
+.source-paste label { display: block; font-weight: 600; margin-bottom: 10px; }
+.source-paste textarea { display: block; width: 100%; min-height: 120px; margin-bottom: 12px; }
+
+.bank-balance label { display: block; margin-top: 12px; margin-bottom: 6px; }
+.bank-balance input { display: block; width: 100%; max-width: 360px; margin-bottom: 14px; }
+
+.source-paste textarea, .bank-balance input { border: 1px solid var(--rule); border-radius: var(--radius-sm); background: var(--surface); padding: 12px; line-height: 1.5; }
+.source-paste textarea::placeholder, .bank-balance input::placeholder { color: var(--ink-faint); }
