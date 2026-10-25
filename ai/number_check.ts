@@ -10,6 +10,7 @@
 // through float arithmetic.
 
 import type { Answer } from "../schema/forecast";
+import { minorUnitDigits } from "./normalize";
 
 export type CheckOpts = { currency: string; asOf: string };
 
@@ -33,13 +34,8 @@ export type GuardResult = { answer: Answer; attempts: number; usedFallback: bool
 
 // ---------------------------------------------------------------- minor units
 
-export const minorUnitDigits = (currency: string): number => {
-  try {
-    return new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions().maximumFractionDigits ?? 2;
-  } catch {
-    return 2;
-  }
-};
+// minorUnitDigits comes from ai/normalize.ts. parseAmount is not reused: it has no K/M scaling and
+// does not report the stated precision the rounding rule needs.
 
 // Decimal string ("6,200.50", "1.2") times 10^exp, in minor units, by integer math. Rounds half up.
 // `precision` is the size of the last stated digit in minor units.
