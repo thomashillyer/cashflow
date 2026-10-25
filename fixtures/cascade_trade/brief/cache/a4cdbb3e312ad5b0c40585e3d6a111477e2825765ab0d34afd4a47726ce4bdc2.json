@@ -2,9 +2,9 @@
   "key": "a4cdbb3e312ad5b0c40585e3d6a111477e2825765ab0d34afd4a47726ce4bdc2",
   "promptVersion": "write_brief@2",
   "model": "claude-opus-5-5",
-  "source": "stand-in",
+  "source": "live",
   "output": {
-    "title": "Ask Jaipur Textiles for 10 more days",
-    "why": "Jaipur Textiles' ₹1,000,000 (about $12,000 at today's rate) balance falls due Dec 15. Moving it back 10 days lifts your lowest point from −$5,500 to $6,500. Ask by Dec 12."
+    "title": "Ask Jaipur Textiles to push PO-2302",
+    "why": "Jaipur Textiles' PO-2302 payments of ₹1,000,000 (about $12,000 at today's rate) each are expected Dec 1 and Dec 15, both before your lowest point. Asking for 10 more days lifts your lowest point from -$5,500 to $6,500; ask by Dec 12."
   }
 }
