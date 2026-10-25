@@ -18,7 +18,7 @@ describe.skipIf(!process.env.NERI_LOCAL_DB || !url || !key)("SupabaseStore.commi
     const id = await store.createBusiness({ name: "Local test", profile: {} as never, isSynthetic: true, id: `biz-local-${Date.now()}` });
     try {
       const { storeRevision } = await store.load(id);
-      const party: Party = { id: "p-1", name: "Acme", kind: "customer", sourceRef: { system: "test", record: "p-1" } } as Party;
+      const party: Party = { id: "p-1", name: "Acme", kind: "customer", tags: [], notes: [], sourceRef: { system: "test", record: "p-1" } } as unknown as Party;
       const proposal = { id: "cp-1", state: "confirmed", action: "link", ops: [], evidenceIds: [], expectedStoreRevision: storeRevision, createdAt: "2026-11-16T00:00:00.000Z" } as unknown as ChangeProposal;
       const d = { expectedRevision: storeRevision, idempotencyKey: "k1", requestHash: "h1", records: { parties: [party] }, proposals: [proposal], response: { done: true } };
 
