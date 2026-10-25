@@ -49,3 +49,8 @@ export function dateRange(startInclusive: string, endExclusive: string): string[
   for (let d = startInclusive; d < endExclusive; d = addDays(d, 1)) out.push(d);
   return out;
 }
+
+// Day of week with Monday = 0 ... Sunday = 6, matching profile weekday indexes.
+export function dowOf(date: string): number {
+  return (new Date(toMs(date)).getUTCDay() + 6) % 7;
+}

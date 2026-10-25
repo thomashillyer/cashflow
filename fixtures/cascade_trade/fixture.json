@@ -1,0 +1,8 @@
+{
+  "name": "cascade_trade",
+  "profile": "profiles/trading.json",
+  "asOf": "2026-11-16",
+  "fxRates": {
+    "INR": 0.012
+  }
+}

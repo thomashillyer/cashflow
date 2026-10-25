@@ -3,7 +3,7 @@
 
 import type { CashEvent, Commitment, Direction, Records, Signal } from "../schema/records";
 import type { Anchor, PaymentPattern, Profile } from "../schema/profile";
-import { addDays, addMonthsClamped, endOfMonth } from "./dates";
+import { addDays, addMonthsClamped, dateRange, dowOf, endOfMonth } from "./dates";
 import { partyLag } from "./lag";
 
 export type Expanded = { events: CashEvent[]; commitments: Commitment[]; warnings: string[] };
@@ -246,6 +246,50 @@ function expandRecurring(records: Records, profile: Profile, asOf: string, horiz
   return events;
 }
 
+const SALES_HISTORY_DAYS = 28;
+
+// Daily-sales revenue model: average daily sales from the last 28 days of actual "sales" receipts, shaped by the
+// profile's weekday weights (index 0 = Monday). Dates that already have actual sales are not forecast again.
+function expandDailySales(records: Records, profile: Profile, asOf: string, horizonEnd: string, warnings: string[]): CashEvent[] {
+  if (profile.revenueModel.kind !== "dailySales") return [];
+  const weights = profile.revenueModel.weekdayWeights;
+  const meanW = weights.reduce((a, b) => a + b, 0) / (weights.length || 1);
+  const from = addDays(asOf, -SALES_HISTORY_DAYS);
+  const history = records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date >= from && e.date < asOf);
+  if (weights.length !== 7 || meanW <= 0) {
+    warnings.push("Daily-sales model needs seven positive weekday weights; no sales forecast.");
+    return [];
+  }
+  if (history.length === 0) {
+    warnings.push(`No sales receipts in the ${SALES_HISTORY_DAYS} days before ${asOf}; daily sales are not forecast.`);
+    return [];
+  }
+  const avg = history.reduce((a, e) => a + (toBase(e.amount, e.currency, profile, { [profile.baseCurrency]: 1 }) ?? 0), 0) / SALES_HISTORY_DAYS;
+  const booked = new Set(records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date >= asOf).map((e) => e.date));
+  const out: CashEvent[] = [];
+  dateRange(asOf, horizonEnd).forEach((date, i) => {
+    if (booked.has(date)) return;
+    const w = weights[dowOf(date)]!;
+    const amount = Math.round((avg * w) / meanW);
+    out.push({
+      id: `evt-daily-sales-${date}`,
+      commitmentId: "daily-sales",
+      legIndex: i,
+      date,
+      amount,
+      currency: profile.baseCurrency,
+      amountBase: amount,
+      direction: "in",
+      status: "likely",
+      confidence: 0.6,
+      basis: `daily sales: ${money(Math.round(avg), profile.baseCurrency)} average over the last ${SALES_HISTORY_DAYS} days x weekday weight ${w}/${Math.round(meanW * 100) / 100}`,
+      category: "sales",
+      sourceRef: { system: "profile", record: "revenueModel.dailySales" },
+    });
+  });
+  return out;
+}
+
 // A sales deal's `linkedCosts` become virtual outflow commitments. A cost is suppressed only when a real linked
 // outflow commitment already covers it (same patternId, or same type as the cost pattern); linked invoices never suppress it.
 function linkedCostCommitments(deal: Commitment, profile: Profile, byId: Map<string, Commitment>, amount: number): Commitment[] {
@@ -289,5 +333,6 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
   }
   for (const c of all) events.push(...expandCommitment(c, records, profile, fx, byId, amountSignals.get(c.id), warnings));
   events.push(...expandRecurring(records, profile, asOf, horizonEnd, warnings));
+  events.push(...expandDailySales(records, profile, asOf, horizonEnd, warnings));
   return { events, commitments: all, warnings };
 }

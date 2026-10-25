@@ -1,0 +1,66 @@
+{
+  "id": "trading",
+  "displayName": "Trading and import",
+  "baseCurrency": "USD",
+  "horizonWeeks": 13,
+  "freeCashLookaheadWeeks": 6,
+  "defaultLagDays": 20,
+  "lagShrinkageK": 3,
+  "safetyLine": { "kind": "fixed", "amount": 3500000 },
+  "paymentPatterns": [
+    {
+      "id": "supplier_30_70",
+      "appliesTo": "purchase_order",
+      "isDefault": true,
+      "legs": [
+        { "share": 0.3, "anchor": "order", "offsetDays": 0, "direction": "out" },
+        { "share": 0.7, "anchor": "ship", "offsetDays": 0, "direction": "out" }
+      ]
+    },
+    {
+      "id": "supplier_50_50",
+      "appliesTo": "purchase_order",
+      "legs": [
+        { "share": 0.5, "anchor": "order", "offsetDays": 0, "direction": "out" },
+        { "share": 0.5, "anchor": "ship", "offsetDays": 0, "direction": "out" }
+      ]
+    },
+    {
+      "id": "freight_and_duties",
+      "appliesTo": "purchase_order",
+      "legs": [{ "share": 1, "anchor": "delivery", "offsetDays": -7, "direction": "out" }]
+    },
+    {
+      "id": "customer_advance_net60",
+      "appliesTo": "sales_deal",
+      "isDefault": true,
+      "legs": [
+        { "share": 0.3, "anchor": "order", "offsetDays": 0, "direction": "in" },
+        { "share": 0.7, "anchor": "delivery", "offsetDays": 60, "direction": "in" }
+      ],
+      "linkedCosts": [
+        { "patternId": "supplier_30_70", "share": 0.55 },
+        { "patternId": "freight_and_duties", "share": 0.1 }
+      ]
+    }
+  ],
+  "revenueModel": { "kind": "deals" },
+  "recurring": [
+    { "id": "rec-payroll", "name": "Payroll", "amount": 1400000, "cadence": "biweekly", "anchor": "2026-11-13", "category": "payroll", "nonDeferrable": true },
+    { "id": "rec-rent", "name": "Rent", "amount": 650000, "cadence": "monthly", "anchor": "2026-12-01", "category": "rent" },
+    { "id": "rec-est-tax", "name": "Quarterly estimated taxes", "amount": 900000, "cadence": "quarterly", "anchor": "2026-12-15", "category": "tax", "nonDeferrable": true }
+  ],
+  "leadTimes": { "transitDays": 28, "productionDays": 30 },
+  "thresholds": {
+    "idleBalanceOver": { "amount": 5000000, "minWeeks": 4 },
+    "arConcentrationPct": 30,
+    "signalAutoApplyConfidence": 0.85,
+    "rankFloor": 0.1,
+    "relationshipPenalty": { "preferred": 0.5, "strategic": 0.5, "avoid": 1.5 },
+    "staleAfterHours": 72,
+    "stressDelayDays": 7
+  },
+  "actionLeadDays": { "chase": 3, "defer": 3, "split": 5, "pay_early": 1, "ask_advance": 5 },
+  "signalSources": ["email", "whatsapp", "crm", "owner"],
+  "vocabulary": { "deal": "order", "quote": "RFQ", "purchase_order": "PO", "landed_cost": "landed cost" }
+}
