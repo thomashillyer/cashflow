@@ -115,8 +115,10 @@ export const ownerRoutes = (deps: Deps) => async (app: FastifyInstance) => {
       throw new HttpError(400, "INVALID_ARGUMENT", "Use an account name of 1 to 64 characters, without line breaks.", { fieldIssues: [{ field: "account", issue: "1 to 64 printable characters" }] });
     const key = createHash("sha256").update(`${account}\0${asOf}`).digest("hex").slice(0, 24);
     const { records } = await storeFor(req).load(b.id);
+    if (records.balances.some((balance) => balance.account === account && balance.currency !== b.profile.baseCurrency))
+      throw new HttpError(422, "INVALID_ARGUMENT", "That account uses another currency. Choose an account in your business currency.", { fieldIssues: [{ field: "account", issue: "account currency must match the business" }] });
     // Correct an imported snapshot in place so equal-date balances cannot compete in the forecast.
-    const id = records.balances.find((balance) => balance.account === account && balance.asOf === asOf)?.id ?? `balance-owner-${key}`;
+    const id = records.balances.find((balance) => balance.account === account && balance.asOf === asOf && balance.currency === b.profile.baseCurrency)?.id ?? `balance-owner-${key}`;
     const balance: BalanceSnapshot = { id, account, amount: body.amount, currency: b.profile.baseCurrency, asOf, sourceRef: { system: "owner", record: id } };
     const storeRevision = await storeFor(req).upsertRecords(b.id, { balances: [balance] });
     const latest = await storeFor(req).load(b.id);

@@ -51,12 +51,22 @@ describe.each(names)("brief for fixture %s", (name) => {
     for (const w of brief.all) if (w.lever?.kind === "defer") expect(fixed).not.toContain(w.lever.commitmentId);
   });
 
-  it("keeps a done item done on the next run", () => {
+  it("keeps a done item done, and on today's list, on the next run", () => {
     const first = brief.today[0];
     if (!first) return;
     const again = buildBrief({ ...input, prior: [{ id: first.id, state: "done" }] }).brief;
-    expect(again.today.map((w) => w.id)).not.toContain(first.id);
+    expect(again.today.find((w) => w.id === first.id)?.state).toBe("done");   // stays, ticked off
     expect(again.all.find((w) => w.id === first.id)?.state).toBe("done");
+  });
+
+  it("done items never push an open item off today's list", () => {
+    const eligibleOpen = (b: typeof brief, doneIds: Set<string>) => b.all
+      .filter((w) => w.lever && w.score >= input.profile.thresholds.rankFloor && !doneIds.has(w.id)).slice(0, 3);
+    const doneIds = new Set(brief.today.map((w) => w.id));   // tick off everything on today's list
+    const again = buildBrief({ ...input, prior: [...doneIds].map((id) => ({ id, state: "done" as const })) }).brief;
+    const openToday = again.today.filter((w) => w.state === "open").map((w) => w.id);
+    expect(openToday).toEqual(eligibleOpen(again, doneIds).map((w) => w.id));
+    for (const id of doneIds) expect(again.today.find((w) => w.id === id)?.state).toBe("done");
   });
 });
 

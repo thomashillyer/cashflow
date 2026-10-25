@@ -105,6 +105,14 @@ export class SupabaseStore implements Store {
     return row.request_hash === requestHash ? { kind: "replay", response: row.response } : { kind: "conflict" };
   }
 
+  async deleteEvents(id: string, eventIds: string[]): Promise<number> {
+    for (let i = 0; i < eventIds.length; i += 200) {
+      const { error } = await this.db.from("cash_events").delete().eq("business_id", id).in("id", eventIds.slice(i, i + 200));
+      if (error) throw toStoreError(`delete events ${id}`, error);
+    }
+    return this.bumpRevision(id);
+  }
+
   async bumpRevision(id: string): Promise<number> {
     const { data, error } = await this.db.rpc("bump_store_revision", { p_business_id: id });
     if (error) throw toStoreError(`bump revision ${id}`, error);

@@ -77,6 +77,15 @@ describe("owner-confirmed bank balance", () => {
     expect((await app.inject({ url: "/forecast", headers })).json().openingBalance).toBe(25000);
   });
 
+  it("rejects correcting an existing foreign-currency account without changing its snapshot", async () => {
+    await store.upsertRecords(businessId, { balances: [{ id: "books-euro", account: "Checking", amount: 10000, currency: "EUR", asOf: today, sourceRef: { system: "zoho_books", record: "bank-euro" } }] });
+    const before = await store.load(businessId);
+    const response = await put({ amount: 25000, asOf: today, account: "Checking" });
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.code).toBe("INVALID_ARGUMENT");
+    expect(await store.load(businessId)).toEqual(before);
+  });
+
   it.each([
     {}, { amount: "100", asOf: today }, { amount: 1.5, asOf: today }, { amount: Number.MAX_SAFE_INTEGER + 1, asOf: today },
     { amount: 100, asOf: "2026-02-30" }, { amount: 100, asOf: "2026-11-17" }, { amount: 100, asOf: "16/11/2026" },

@@ -782,9 +782,10 @@ function viewSources() {
         const source = imported.get(c.id) ?? imported.get(connectorId(c.id));
         const connection = capabilities.get(connectorId(c.id));
         const hasRecords = source?.state === "ok";
+        const needsAttention = connection?.state === "error" || source?.state === "error";
         const syncing = app.syncing === connection?.id;
         return `<div class="conn">${logoTile(c)}<b>${esc(c.name)}</b>
-          <div class="state ${hasRecords ? "on" : ""}">${hasRecords ? `<span>Records imported</span>` : `<span>${source ? "Waiting for data" : "No data yet"}</span>`}</div>
+          <div class="state ${hasRecords ? "on" : ""}">${needsAttention ? `<span class="conn-status"><i class="dot bad"></i>Needs attention</span>` : hasRecords ? `<span class="conn-status"><i class="dot"></i>Records imported</span>` : `<span>${source ? "Waiting for data" : "No data yet"}</span>`}</div>
           <p class="reads">${esc(connection?.state === "error" ? connection.message : source?.detail || connection?.message || c.reads)}</p>
           ${connection?.available === true ? `<button class="btn" data-action="connection-sync" data-id="${esc(connection.id)}" ${app.syncing ? "disabled" : ""}>${syncing ? "Syncing…" : "Sync now"}</button>` : `<button class="btn" data-action="connect" data-id="${esc(c.id)}">Import options</button>`}
         </div>`;

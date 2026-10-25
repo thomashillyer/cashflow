@@ -155,7 +155,8 @@ describe("routes return what app/api.js expects", () => {
 
     expect((await app.inject({ method: "POST", url: `/work-items/${item.id}/approve`, headers: OTHER })).json()).toEqual({ id: item.id, state: "done" });
     const after = (await app.inject({ method: "GET", url: "/brief", headers: OTHER })).json();
-    expect(after.three.map((i: { id: string }) => i.id)).not.toContain(item.id);
+    // Done stays on today's list, ticked off (docs/DEMO_SCRIPT.md: "The action shows Done").
+    expect(after.three.find((i: { id: string }) => i.id === item.id)?.state).toBe("done");
   });
 
   it("GET /records/:id", async () => {
@@ -788,6 +789,138 @@ describe("atomic, idempotent decisions (#191)", () => {
     const [a, b] = await Promise.all([1, 2].map(() => app.inject({ method: "POST", url: `/review/${id}/dismiss`, headers: OTHER })));
     expect([a!.statusCode, b!.statusCode].sort()).toEqual([200, 409]);
     expect((await store.listProposals("cascade_trade")).find((p) => p.id === id)!.state).toBe("dismissed");
+  });
+});
+
+describe("bank statement import (/import/bank)", () => {
+  beforeEach(() => setup());
+  const stmt = readFileSync(join(import.meta.dirname, "../fixtures/bank/statement-signed-clean.csv"));
+  const post = (adapter: string, payload: Record<string, unknown>, headers: Record<string, string> = OTHER) =>
+    app.inject({ method: "POST", url: `/import/${adapter}`, headers, payload });
+  const payload = { base64: stmt.toString("base64"), fileName: "statement-signed.csv" };   // the clean variant: no unreadable rows, so a balance is taken
+
+  it("a statement becomes bank history and today's balance, with diagnostics and recurring proposals, and changes no commitment", async () => {
+    const before = await store.load("cascade_trade");
+    const res = await post("bank", payload);
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body).toMatchObject({ repeat: false, written: true, unallocated: 17, preview: { events: 17, balances: 1, recurring: 2 } });
+    expect(body.diagnostics).toMatchObject({ rowsRead: 17, rowsImported: 17, rowsRejected: 0, source: "bank_csv" });
+    for (const e of body.diagnostics.errors) expect(e.nextStep).not.toBe("");
+    expect(body.balance).toMatchObject({ amount: 5387200, asOf: "2026-10-24", account: "bank" });
+    expect(body.recurring.map((p: { cadence: string }) => p.cadence).sort()).toEqual(["biweekly", "monthly"]);
+
+    const after = await store.load("cascade_trade");
+    expect(after.records.events.length - before.records.events.length).toBe(17);
+    expect(after.records.balances.length - before.records.balances.length).toBe(1);
+    expect(after.records.commitments).toEqual(before.records.commitments);
+    expect(after.records.settlements).toEqual(before.records.settlements);
+    const stored = after.records.events.filter((e) => e.sourceRef.system === "bank_csv");
+    expect(stored).toHaveLength(17);
+    expect(stored.every((e) => e.status === "actual" && e.commitmentId === undefined)).toBe(true);
+    const ev = after.records.evidence.find((e) => e.fileName === "statement-signed.csv")!;
+    expect(ev).toMatchObject({ channel: "bank_csv", format: "csv" });
+    expect(ev.fileHash).toHaveLength(64);
+    // Recurring proposals are only offered: nothing applied, nothing queued as a proposal or signal.
+    expect(await store.listProposals("cascade_trade")).toEqual([]);
+    expect(after.records.rules).toEqual(before.records.rules);
+    expect(after.storeRevision).toBeGreaterThan(before.storeRevision);
+  });
+
+  it("warns when the books already hold a balance under another account name, since both would be added", async () => {
+    const existing = (await store.load("cascade_trade")).records.balances.map((x) => x.account);
+    expect(existing.length).toBeGreaterThan(0);
+    const body = (await post("bank", payload)).json();
+    expect(body.diagnostics.warnings.join(" ")).toMatch(/already have a balance for .*saved as the account "bank".*import the statement again and give that account's name/);
+    // Naming the account the books already use removes the warning (fresh store: the first import above added "bank").
+    await setup();
+    const same = (await post("bank", { ...payload, account: existing[0] })).json();
+    expect(same.diagnostics.warnings.join(" ")).not.toMatch(/already have a balance/);
+    expect(same.balance.account).toBe(existing[0]);
+  });
+
+  it("uploading the same statement again is a repeat that writes nothing", async () => {
+    await post("bank", payload);
+    const mid = await store.load("cascade_trade");
+    const again = (await post("bank", { ...payload, fileName: "renamed.csv" })).json();
+    expect(again).toMatchObject({ repeat: true, written: false, repeatOf: expect.stringMatching(/^ev-bank_csv-/), preview: { events: 0, balances: 0, recurring: 0 } });
+    expect(again.diagnostics).toMatchObject({ rowsImported: 0, rowsDuplicate: 17 });
+    const end = await store.load("cascade_trade");
+    expect(end.records.events).toHaveLength(mid.records.events.length);
+    expect(end.storeRevision).toBe(mid.storeRevision);
+  });
+
+  it("an owner's corrected mapping is read again; an unreadable layout writes nothing and asks for the mapping", async () => {
+    const odd = "When,Who,How much\n2026-10-01,Landlord,-1000.00\n2026-10-02,Customer,250.00\n";
+    const before = (await store.load("cascade_trade")).records.events.length;
+    const first = (await post("bank", { text: odd })).json();
+    expect(first).toMatchObject({ written: false, preview: { events: 0 } });
+    expect(first.diagnostics.errors[0]).toMatchObject({ code: "unmapped_column" });
+    expect((await store.load("cascade_trade")).records.events).toHaveLength(before);
+    const fixed = (await post("bank", { text: odd, columnMapping: { date: 0, description: 1, amount: 2 }, headerRow: 1, currency: "USD" })).json();
+    expect(fixed).toMatchObject({ written: true, preview: { events: 2, balances: 0 } });
+    expect(fixed.diagnostics.warnings.join(" ")).toMatch(/Enter your current bank balance yourself/);
+    // The same bytes with the same correction are a fresh read, not "already imported" (corrections always retry).
+    expect((await post("bank", { text: odd, columnMapping: { date: 0, description: 1, amount: 2 }, headerRow: 1 })).json().repeat).toBe(false);
+  });
+
+  it("ignores a mapping with unknown columns or bad indexes instead of trusting it", async () => {
+    const res = await post("bank", { text: "Date,Description,Amount\n2026-10-01,Rent,-5.00\n", columnMapping: { date: -1, secret: 3, amount: 1.5 } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().preview.events).toBe(1);   // headers are read as usual
+  });
+
+  it("a damaged or unsupported file is a plain 422 with the next step; nothing is written", async () => {
+    const before = (await store.load("cascade_trade")).records.evidence.length;
+    const broken = await post("bank", { base64: Buffer.from([1, 2, 3]).toString("base64"), fileName: "s.xlsx" });
+    expect(broken.statusCode).toBe(422);
+    expect(broken.json().error.message).toMatch(/could not be opened.*Download the statement again/);
+    const pdf = await post("bank", { base64: Buffer.from("%PDF").toString("base64"), fileName: "s.pdf" });
+    expect(pdf.statusCode).toBe(422);
+    expect(pdf.json().error.message).toMatch(/CSV or Excel/);
+    expect((await post("bank", {})).statusCode).toBe(400);
+    expect((await store.load("cascade_trade")).records.evidence).toHaveLength(before);
+  });
+
+  it("upload never routes a CSV to the bank path: the owner picks 'bank statement'", async () => {
+    const res = await post("upload", payload);
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.recurring).toBeUndefined();
+    expect(Array.isArray(body.candidates)).toBe(true);
+    expect((await store.load("cascade_trade")).records.events.some((e) => e.sourceRef.system === "bank_csv")).toBe(false);
+  });
+
+  it("a statement that runs up to today still sets today's cash, and today's lines (already inside that balance) are left out", async () => {
+    const text = "Date,Description,Amount,Balance\n2026-11-14,SHOP,-10.00,990.00\n2026-11-16,SHOP,-10.00,980.00\n";
+    const res = (await post("bank", { text, fileName: "today.csv", currency: "USD" })).json();
+    expect(res.balance).toMatchObject({ amount: 98000, asOf: "2026-11-16" });
+    expect(res.preview).toMatchObject({ events: 1, balances: 1 });
+    expect(res.diagnostics.warnings.join(" ")).toMatch(/runs up to today.*left out 1 line dated today/);
+    const { records } = await store.load("cascade_trade");
+    expect(records.events.filter((e) => e.sourceRef.system === "bank_csv").map((e) => e.date)).toEqual(["2026-11-14"]);
+    expect(records.balances.find((b) => b.sourceRef.system === "bank_csv")).toMatchObject({ asOf: "2026-11-16" });
+  });
+
+  it("a corrected re-import (day-first dates) replaces the earlier read of the same file instead of adding to it", async () => {
+    const text = "Date,Description,Amount,Balance\n03/04/2026,RENT HARBOR,-1000.00,9000.00\n05/04/2026,PAYROLL NORTHWIND,-2000.00,7000.00\n";
+    const bankEvents = async () => (await store.load("cascade_trade")).records.events.filter((e) => e.sourceRef.system === "bank_csv");
+    await post("bank", { text, fileName: "s.csv", currency: "USD" });
+    const first = (await bankEvents()).map((e) => e.date).sort();
+    expect(first).toEqual(["2026-03-04", "2026-05-04"]);
+    const fixed = (await post("bank", { text, fileName: "s.csv", currency: "USD", dayFirst: true })).json();
+    expect(fixed.repeat).toBe(false);
+    expect((await bankEvents()).map((e) => e.date).sort()).toEqual(["2026-04-03", "2026-04-05"]);   // no ghost March/May lines
+  });
+
+  it("is refused for anonymous visitors of the public demo, like every other import", async () => {
+    await setup({ demoMode: true });
+    expect((await app.inject({ method: "POST", url: "/import/bank", payload })).statusCode).toBe(401);
+  });
+
+  it("a signed-in visitor on the public demo's shared sample cannot publish a statement either", async () => {
+    await setup({ demoMode: true });
+    expect((await post("bank", payload)).statusCode).toBe(403);
   });
 });
 

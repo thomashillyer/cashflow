@@ -19,7 +19,7 @@ import { pendingEventsByCommitment, receivableShares, sumBase } from "./warnings
 export type SimulateLevers = (levers: Lever[]) => { lowPointDelta: number };
 
 export type Brief = {
-  today: WorkItem[];   // at most three open lever items above profile.thresholds.rankFloor; never padded
+  today: WorkItem[];   // the top three open lever items above rankFloor, plus done ones ranked among them (ticked off); never padded
   all: WorkItem[];     // everything, best first
 };
 
@@ -175,8 +175,13 @@ export function rank(
   }
 
   const all = [...byId.values()].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
-  const today = all
-    .filter((w) => w.state === "open" && w.lever && w.score >= profile.thresholds.rankFloor)
-    .slice(0, 3);
+  // Today is the top three open lever items. A done item that ranks among them stays on the list,
+  // ticked off (done records the owner's follow-up, not that cash arrived), but never takes an open
+  // item's place. Dismissed items leave.
+  const eligible = all.filter((w) => w.lever && w.score >= profile.thresholds.rankFloor);
+  const open = eligible.filter((w) => w.state === "open").slice(0, 3);
+  const cutoff = open.length === 3 ? open[2]!.score : -Infinity;
+  const done = eligible.filter((w) => w.state === "done" && w.score >= cutoff).slice(0, 3);
+  const today = [...open, ...done].sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
   return { today, all };
 }
