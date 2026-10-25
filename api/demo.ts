@@ -37,4 +37,18 @@ export function loadSample(id: string): Sample | null {
   return { id, name: meta.name, profile, records };
 }
 
-export const loadSamples = (): Sample[] => SAMPLES.map((s) => loadSample(s.id)!);
+const DAY = 86_400_000;
+const dayNum = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / DAY;
+
+// Shift every ISO date and timestamp in the sample by whole days, so a private business sees the sample
+// around its own today. Order and gaps between dates are unchanged.
+export function shiftSample(sample: Sample, today: string): Sample {
+  const days = Math.round(dayNum(today) - dayNum(sample.profile.account!.asOf!));
+  if (!days) return structuredClone(sample);
+  const shift = (d: string) => new Date((dayNum(d) + days) * DAY).toISOString().slice(0, 10);
+  const re = /\b(\d{4}-\d{2}-\d{2})(?=$|[T"\s,.)])/g;
+  const records = JSON.parse(JSON.stringify(sample.records).replace(re, (m, d: string) => (Number.isNaN(Date.parse(d)) ? m : shift(d)))) as Records;
+  return { ...sample, records };
+}
+
+export const loadSamples =(): Sample[] => SAMPLES.map((s) => loadSample(s.id)!);

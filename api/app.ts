@@ -18,6 +18,7 @@ import { reviewRoutes } from "./routes/review";
 import { ownerRoutes } from "./routes/owner";
 import { workRoutes } from "./routes/work";
 import { demoRoutes } from "./routes/demo";
+import { sampleRoutes } from "./routes/samples";
 import { overrideRoutes } from "./routes/overrides";
 import { sourceRoutes } from "./routes/sources";
 import type { Fetch } from "../adapters/connector";
@@ -88,7 +89,7 @@ const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals", "/rules",
-  "/notes", "/plans", "/balance", "/work-items", "/records", "/demo", "/ask", "/overrides", "/overdue-decision", "/connections", "/sources", "/evidence"];
+  "/notes", "/plans", "/balance", "/work-items", "/records", "/demo", "/ask", "/overrides", "/overdue-decision", "/connections", "/sources", "/evidence", "/samples/load", "/samples/clear"];
 
 const isApiPath = (url: string) => {
   const path = url.split("?")[0]!;
@@ -224,6 +225,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(ownerRoutes(deps));
   await app.register(workRoutes(deps));
   await app.register(demoRoutes(deps));
+  await app.register(sampleRoutes(deps));
   await app.register(overrideRoutes(deps));
   await app.register(connectionRoutes({ connections: opts.connections ?? buildConnectionService({}), now: deps.now }));
   await app.register(sourceRoutes(deps));

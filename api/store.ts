@@ -45,7 +45,8 @@ export type Account = {
   createdAt?: string;
   thoughts?: Thought[];                // owner notes (parked thoughts)
   intakeNotes?: IntakeNote[];          // import notes Review needs (e.g. "owner must confirm the date")
-  maskNames?: boolean;                 // mask party names and contact details in every API response (api/mask.ts)
+  sampleLoaded?: boolean;              // the fictional Cascade Trade sample was loaded by POST /samples/load
+  maskNames?: boolean;                // mask party names and contact details in every API response (api/mask.ts)
   maskAliases?: Record<string, string>; // real name -> stage name; the rest get Customer A, Supplier A, ...
 };
 
@@ -119,6 +120,9 @@ export interface Store {
   saveOverrides(id: string, overrides: Override[]): Promise<void>;
   // Demo reset: delete every record of a synthetic business, then write these.
   resetBusiness(b: { id: string; name: string; profile: StoredProfile }, records: Records): Promise<void>;
+  // Private-business safe: delete every record, proposal, candidate, work item and override; keep the business
+  // row, name, profile and membership. Bumps the revision.
+  clearRecords(id: string): Promise<number>;
 }
 
 const empty = (): Records => ({
@@ -283,6 +287,12 @@ export class MemoryStore implements Store {
   async saveOverrides(id: string, overrides: Override[]) {
     const b = this.need(id);
     b.overrides = structuredClone(validateOverrides(overrides));
+  }
+  async clearRecords(id: string) {
+    const b = this.need(id);
+    b.records = empty(); b.proposals = new Map(); b.candidates = new Map(); b.workItems = new Map(); b.workItemsHash = undefined;
+    b.overrides = []; b.decisions = new Map();
+    return ++b.storeRevision;
   }
   async resetBusiness(b: { id: string; name: string; profile: StoredProfile }, records: Records) {
     this.biz.delete(b.id);
