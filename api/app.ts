@@ -15,6 +15,9 @@ import { ownerRoutes } from "./routes/owner";
 import { workRoutes } from "./routes/work";
 import { demoRoutes } from "./routes/demo";
 import { overrideRoutes } from "./routes/overrides";
+import { sourceRoutes } from "./routes/sources";
+import type { Fetch } from "../adapters/connector";
+import type { SourceAccessFn } from "./sourceAccess";
 import { isBehind, type SchemaStatus, type SchemaStatusFn } from "./schema-status";
 
 // Verifies a Supabase access token. Returns null for an invalid or expired token.
@@ -33,9 +36,11 @@ export type AppOptions = {
   allowReset?: boolean;            // POST /demo/reset (synthetic businesses only)
   logger?: boolean | { stream: NodeJS.WritableStream }; // tests pass a stream to capture log lines
   schemaStatus?: SchemaStatusFn;   // GET /ready: repo vs database migration version (Supabase store only)
+  sourceAccess?: SourceAccessFn;   // per-business tokens for Zoho / Outlook pulls (api/sourceAccess.ts); none = "not connected"
+  sourceFetch?: Fetch;             // tests inject a fake provider
 };
 
-export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">> & { schemaStatus?: SchemaStatusFn };
+export type Deps = Required<Pick<AppOptions, "store" | "demoMode" | "defaultBusiness" | "aiMode" | "now" | "allowReset">> & { schemaStatus?: SchemaStatusFn; sourceAccess?: SourceAccessFn; sourceFetch?: Fetch };
 
 const READY_CACHE_MS = 30_000;
 
@@ -58,7 +63,7 @@ const NO_BUSINESS = new Set(["/setup", "/demo/reset"]);
 
 // Paths the API owns. Anything else falls through to the static app.
 const API_PREFIXES = ["/context", "/brief", "/forecast", "/simulate", "/setup", "/profile", "/review", "/import", "/signals", "/rules",
-  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides"];
+  "/notes", "/plans", "/work-items", "/records", "/demo", "/ask", "/overrides", "/sources"];
 
 const isApiPath = (url: string) => {
   const path = url.split("?")[0]!;
@@ -83,6 +88,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     now: opts.now ?? (() => new Date()),
     allowReset: opts.allowReset ?? false,
     ...(opts.schemaStatus ? { schemaStatus: opts.schemaStatus } : {}),
+    ...(opts.sourceAccess ? { sourceAccess: opts.sourceAccess } : {}),
+    ...(opts.sourceFetch ? { sourceFetch: opts.sourceFetch } : {}),
   };
   // disableRequestLogging: the onResponse hook below writes the one structured line per request.
   const app = Fastify({ logger: opts.logger ?? false, logController: new LogController({ disableRequestLogging: true }), bodyLimit: 12 * 1024 * 1024 });
@@ -136,7 +143,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       r.user = user;
     } else if (!deps.demoMode) {
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to see your numbers.");
-    } else if (req.url.startsWith("/import")) {
+    } else if (req.url.startsWith("/import") || req.url.startsWith("/sources")) {
       // Demo samples are shared and public: anonymous uploads would publish the file to every visitor.
       throw new HttpError(401, "UNAUTHENTICATED", "Sign in to upload your own files. The sample already has its documents.");
     }
@@ -164,6 +171,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(workRoutes(deps));
   await app.register(demoRoutes(deps));
   await app.register(overrideRoutes(deps));
+  await app.register(sourceRoutes(deps));
 
   if (opts.staticDir && existsSync(opts.staticDir)) {
     // The committed app/config.js stays empty (the static preview publishes it). When this server serves the app,
