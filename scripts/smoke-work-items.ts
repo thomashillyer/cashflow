@@ -1,6 +1,6 @@
 // Smoke test for the work-item store helpers against the hosted Supabase project (they are
 // otherwise only unit-tested against a mock). Needs the migrations through
-// 20261025140000_work_items_atomic.sql applied and SUPABASE_URL plus SUPABASE_SERVICE_ROLE_KEY in the
+// 20261025150000_work_items_atomic.sql applied and SUPABASE_URL plus SUPABASE_SERVICE_ROLE_KEY in the
 // repo-root .env (SUPABASE_ANON_KEY is optional and adds an access check). Keys are never printed.
 //
 //   npx tsx scripts/smoke-work-items.ts
