@@ -60,6 +60,14 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
   let renewing: Promise<string> | undefined;
   let errorMessage: string | undefined;
   let syncing: Promise<ConnectionSyncResult> | undefined;
+  // Both providers replace the saved profile after reading it. Serialize them so their
+  // connection state survives simultaneous Books/CRM requests; repeats still coalesce below.
+  let zohoQueue: Promise<unknown> = Promise.resolve();
+  function enqueue(work: () => Promise<ConnectionSyncResult>): Promise<ConnectionSyncResult> {
+    const next = zohoQueue.then(work);
+    zohoQueue = next.catch(() => undefined);
+    return next;
+  }
 
   const bound = (b: Business) => !b.isSynthetic && Boolean(businessId) && b.id === businessId;
   function status(b: Business): ConnectionStatus {
@@ -155,16 +163,18 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
   const crm = { id: "zoho_crm", name: "Zoho CRM" } as const;
   const crmMissing = "Zoho CRM isn't configured for this business. Ask your team to connect it, or upload a CRM export.";
   const crmFailed = "Zoho CRM couldn't be read. Check that the connection allows CRM read access and try again, or upload a CRM export.";
+  const crmAttention = "Some deals need a check or could not be read. Check CRM stage mappings, probabilities and closing dates, including deals already invoiced, then sync again or upload a CRM export.";
   const crmPull = options.crmPull ?? pullZohoCrm;
   let crmError: string | undefined;
   let crmSyncing: Promise<ConnectionSyncResult> | undefined;
   function crmStatus(b: Business): ConnectionStatus {
     if (!bound(b) || !configured) return { ...crm, available: false, state: "waiting", message: crmMissing };
     const prior = b.profile.account?.connections?.find((c) => c.id === crm.id);
-    const lastSyncedAt = prior?.state === "ok" ? prior.syncedAt : undefined;
+    const lastSyncedAt = prior?.syncedAt;
+    const problem = crmError ?? (prior?.state === "error" ? crmAttention : undefined);
     return {
-      ...crm, available: true, state: crmError ? "error" : lastSyncedAt ? "ok" : "waiting", ...(lastSyncedAt ? { lastSyncedAt } : {}),
-      message: crmError ?? (lastSyncedAt ? "Deals and RFQs were read. Sync again to check for changes." : "Ready to read your open deals and RFQs. Nothing has been imported yet."),
+      ...crm, available: true, state: problem ? "error" : lastSyncedAt ? "ok" : "waiting", ...(lastSyncedAt ? { lastSyncedAt } : {}),
+      message: problem ?? (lastSyncedAt ? "Deals and RFQs were read. Sync again to check for changes." : "Ready to read your open deals and RFQs. Nothing has been imported yet."),
     };
   }
   async function performCrm(b: Business, store: Store, now: () => Date): Promise<ConnectionSyncResult> {
@@ -181,7 +191,13 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
         throw new HttpError(502, "CONNECTOR_UNAVAILABLE", crmFailed, { retryable: true });
       }
       const data = result.data;
-      const summary = await persistImport(store, b.id, { parties: data.parties, commitments: data.commitments, settlements: [], evidence: data.evidence });
+      // A lost/already-invoiced deal must stop contributing cash. Only retire explicit
+      // skips: absence from a paginated or partial read is not proof a deal disappeared.
+      const skipped = new Set(data.skipped.map((deal) => deal.dealId));
+      const latest = await store.load(b.id);
+      const retired = latest.records.commitments.filter((c) => c.type === "sales_deal" && c.sourceRef.system === "crm" && skipped.has(c.sourceRef.record))
+        .map((c) => ({ ...c, settlement: "cancelled" as const }));
+      const summary = await persistImport(store, b.id, { parties: data.parties, commitments: [...data.commitments, ...retired], settlements: [], evidence: data.evidence });
       if (summary.written) {
         const latest = await store.load(b.id);
         await refreshPending(store, b.id, latest.records, latest.storeRevision, at);
@@ -189,19 +205,21 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
       const latestBusiness = await store.getBusiness(b.id);
       if (!latestBusiness || !bound(latestBusiness)) throw new HttpError(403, "FORBIDDEN", crmMissing);
       const account = latestBusiness.profile.account ?? {};
+      const needsAttention = data.diagnostics.rowsRejected > 0 || data.diagnostics.warnings.length > 0;
+      const connection: ConnectionStatus = { ...crm, available: true, state: needsAttention ? "error" : "ok", lastSyncedAt: at, ...(needsAttention ? { message: crmAttention } : {}) };
       await store.saveProfile(b.id, {
         ...latestBusiness.profile, account: {
-          ...account, connections: [...(account.connections ?? []).filter((c) => c.id !== crm.id), { id: crm.id, name: crm.name, state: "ok" as const, syncedAt: at }],
+          ...account, connections: [...(account.connections ?? []).filter((c) => c.id !== crm.id), { ...crm, state: connection.state, syncedAt: at }],
         },
       });
-      crmError = undefined;
+      crmError = needsAttention ? crmAttention : undefined;
       return {
-        connection: { ...crm, available: true, state: "ok", lastSyncedAt: at },
+        connection,
         counts: { parties: data.parties.length, commitments: data.commitments.length, settlements: 0, evidence: data.evidence.length, rejected: data.diagnostics.rowsRejected },
         summary, storeRevision: summary.storeRevision,
       };
     } catch (error) {
-      crmError = error instanceof HttpError && error.code === "CONNECTOR_AUTH" ? authFailed : crmFailed;
+      crmError = crmFailed;
       throw new HttpError(502, "CONNECTOR_UNAVAILABLE", crmError, { retryable: true });
     }
   }
@@ -213,13 +231,13 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
       if (provider === "zoho_crm") {
         if (!configured || !bound(b)) throw new HttpError(503, "CONNECTOR_NOT_CONFIGURED", crmMissing);
         if (crmSyncing) return crmSyncing;
-        crmSyncing = performCrm(b, store, now);
+        crmSyncing = enqueue(() => performCrm(b, store, now));
         try { return await crmSyncing; } finally { crmSyncing = undefined; }
       }
       if (!configured || !bound(b)) throw new HttpError(503, "CONNECTOR_NOT_CONFIGURED", unavailable);
       // One in-flight pull per configured company prevents duplicate revision bumps on double-click.
       if (syncing) return syncing;
-      syncing = perform(b, store, now);
+      syncing = enqueue(() => perform(b, store, now));
       try { return await syncing; } finally { syncing = undefined; }
     },
   };
