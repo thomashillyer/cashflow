@@ -270,6 +270,64 @@ describe("recurrence, overdue, possible, signals", () => {
   });
 });
 
+describe("review regressions", () => {
+  const dealProfile: Profile = {
+    ...profile,
+    paymentPatterns: [
+      ...profile.paymentPatterns,
+      { id: "supplier_cost", appliesTo: "purchase_order", legs: [{ share: 1, anchor: "due", offsetDays: 0, direction: "out" }] },
+      { id: "deal", appliesTo: "sales_deal", isDefault: true, legs: [{ share: 1, anchor: "due", offsetDays: 0, direction: "in" }], linkedCosts: [{ patternId: "supplier_cost", share: 0.6 }] },
+    ],
+  };
+  const deal = (o: Partial<Commitment> = {}) => com("deal1", { type: "sales_deal", amount: $(1000), anchors: { due: "2026-11-10" }, ...o });
+  const run = (cs: Commitment[], extra: Partial<Records> = {}) => {
+    const r = { ...empty(), balances: [bal($(100))], commitments: cs, ...extra };
+    return forecast(r, dealProfile, base, "2026-10-25", {});
+  };
+  const costOut = (r: ReturnType<typeof run>) => r.events.filter((e) => e.direction === "out").reduce((a, e) => a + e.amount, 0);
+
+  it("linked supplier cost is in the forecast and stops when the deal is cancelled or paid", () => {
+    expect(costOut(run([deal()]))).toBe($(600));
+    expect(costOut(run([deal({ settlement: "cancelled" })]))).toBe(0);
+    expect(costOut(run([deal({ settlement: "paid" })]))).toBe(0);
+  });
+
+  it("an applied cancel signal drops the deal and its linked cost", () => {
+    const signals: Records["signals"] = [{ id: "s", channel: "owner", receivedAt: "2026-10-25T00:00:00Z", commitmentId: "deal1", claim: { kind: "cancel" }, confidence: 1, state: "applied", sourceRef: src }];
+    expect(run([deal()], { signals }).events).toEqual([]);
+  });
+
+  it("an amount_change signal rescales the linked cost too", () => {
+    const signals: Records["signals"] = [{ id: "s", channel: "owner", receivedAt: "2026-10-25T00:00:00Z", commitmentId: "deal1", claim: { kind: "amount_change", newAmount: $(500) }, confidence: 1, state: "applied", sourceRef: src }];
+    expect(costOut(run([deal()], { signals }))).toBe($(300));
+  });
+
+  it("a linked invoice does not erase the supplier cost; a linked PO does", () => {
+    const inv = com("inv1", { type: "invoice", amount: $(400), anchors: { due: "2026-11-10" } });
+    expect(costOut(run([deal({ linkedCommitmentIds: ["inv1"] }), inv]))).toBe($(600));
+    const po = com("po1", { type: "purchase_order", patternId: "supplier_cost", direction: "out", amount: $(600), anchors: { due: "2026-11-05" } });
+    expect(costOut(run([deal({ linkedCommitmentIds: ["po1"] }), po]))).toBe($(600)); // only the real PO, not a second virtual one
+  });
+
+  it("input order of signals, rules and settlements does not change the run", () => {
+    const mk = (id: string, newDate: string, at: string): Records["signals"][number] => ({ id, channel: "owner", receivedAt: at, commitmentId: "inv", claim: { kind: "date_change", newDate }, confidence: 1, state: "applied", sourceRef: src });
+    const a = mk("a", "2026-11-12", "2026-10-25T01:00:00Z");
+    const b = mk("b", "2026-11-20", "2026-10-25T02:00:00Z");
+    const r1 = { ...empty(), balances: [bal(0)], commitments: [com("inv", { type: "invoice", amount: $(10), anchors: { due: "2026-10-30" } })], signals: [a, b] };
+    const r2 = { ...r1, signals: [b, a] };
+    const x = forecast(r1, profile, base, "2026-10-25", {});
+    const y = forecast(r2, profile, base, "2026-10-25", {});
+    expect(x).toEqual(y);
+    expect(x.events[0]?.date).toBe("2026-11-20"); // the later message wins
+  });
+
+  it("stress delay comes from the profile", () => {
+    const { records, profile: p } = demo();
+    const run10 = forecast(records, { ...p, thresholds: { ...p.thresholds, stressDelayDays: 10 } }, stress, "2026-10-25", {});
+    expect(run10.events.find((e) => e.commitmentId === "inv-customer")?.date).toBe("2026-11-09");
+  });
+});
+
 describe("horizon and weeks", () => {
   it("buckets Monday-Sunday with a partial first week and a Monday + 13*7 end", () => {
     const r = empty();

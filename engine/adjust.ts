@@ -6,12 +6,16 @@ import type { Profile } from "../schema/profile";
 import { addDays, diffDays } from "./dates";
 import { money, toBase } from "./expand";
 
-export const STRESS_DELAY_DAYS = 7;
+export const DEFAULT_STRESS_DELAY_DAYS = 7;
 
 type Ctx = { records: Records; profile: Profile; asOf: string; fx: Record<string, number>; commitments: Commitment[]; warnings: string[] };
 
+// A deal's virtual linked costs (id `deal~pattern`) follow it when it is excluded, so cancelling a deal drops its supplier payments too.
 function matches(e: CashEvent, o: Override): boolean {
-  return e.commitmentId === o.target.commitmentId && (o.target.legIndex === undefined || o.target.legIndex === e.legIndex);
+  const id = o.target.commitmentId;
+  const own = e.commitmentId === id && (o.target.legIndex === undefined || o.target.legIndex === e.legIndex);
+  const child = o.change.exclude === true && o.target.legIndex === undefined && !!e.commitmentId?.startsWith(`${id}~`);
+  return own || child;
 }
 
 function tag(e: CashEvent, id: string, note: string): CashEvent {
@@ -53,7 +57,7 @@ function applyOverride(events: CashEvent[], o: Override, ctx: Ctx): CashEvent[] 
     }
     if (newAmounts.has(e.id)) {
       out = setAmount(out, newAmounts.get(e.id)!, ctx);
-      notes.push(`amount -> ${money(out.amount)}`);
+      notes.push(`amount -> ${money(out.amount, out.currency)}`);
     }
     return tag(out, o.id, `${o.origin} override ${o.id}: ${notes.join(", ")}`);
   });
@@ -134,12 +138,13 @@ export function adjust(events: CashEvent[], scenario: Scenario, ctx: Ctx): CashE
   }
 
   if (scenario.kind === "stress") {
+    const delay = ctx.profile.thresholds.stressDelayDays ?? DEFAULT_STRESS_DELAY_DAYS;
     const funding = new Set(ctx.commitments.filter((c) => c.funding).map((c) => c.id));
     out = out
       .filter((e) => !(e.commitmentId && funding.has(e.commitmentId) && e.status === "likely"))
       .map((e) =>
         e.direction === "in" && e.status !== "actual" && !(e.commitmentId && funding.has(e.commitmentId))
-          ? tag({ ...e, date: addDays(e.date, STRESS_DELAY_DAYS) }, "stress", `stress: receipt delayed ${STRESS_DELAY_DAYS} days`)
+          ? tag({ ...e, date: addDays(e.date, delay) }, "stress", `stress: receipt delayed ${delay} days`)
           : e,
       );
   }

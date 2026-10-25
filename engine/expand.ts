@@ -15,10 +15,9 @@ const STATUS_CONFIDENCE = { actual: 1, committed: 0.95, likely: 0.7, possible: 0
 // Anchors that mean "wait for the customer to pay", so the party's lag applies. `order` and `ship` are our own dates.
 const LAGGED_ANCHORS: Anchor[] = ["due", "invoice", "delivery", "month_end"];
 
-export function money(n: number): string {
-  const sign = n < 0 ? "-" : "";
-  const abs = Math.abs(n);
-  return `${sign}$${Math.floor(abs / 100).toLocaleString("en-US")}.${String(abs % 100).padStart(2, "0")}`;
+// Display only; assumes a 2-decimal currency. Never used in arithmetic.
+export function money(n: number, currency = "USD"): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(n / 100);
 }
 
 export function toBase(amount: number, currency: string, profile: Profile, fx: Record<string, number>): number | undefined {
@@ -95,7 +94,7 @@ function coveredByLinked(c: Commitment, byId: Map<string, Commitment>, warnings:
     if (l.settlement === "cancelled" || l.settlement === "credited") continue;
     covered += l.amount;
   }
-  if (covered > c.amount) warnings.push(`${c.reference ?? c.id}: linked invoices (${money(covered)}) exceed the amount (${money(c.amount)}); check the allocation`);
+  if (covered > c.amount) warnings.push(`${c.reference ?? c.id}: linked invoices (${money(covered, c.currency)}) exceed the amount (${money(c.amount, c.currency)}); check the allocation`);
   return covered;
 }
 
@@ -247,19 +246,23 @@ function expandRecurring(records: Records, profile: Profile, asOf: string, horiz
   return events;
 }
 
-// A sales deal's `linkedCosts` become virtual outflow commitments, unless real linked commitments already exist.
-function linkedCostCommitments(deal: Commitment, profile: Profile): Commitment[] {
-  if (deal.linkedCommitmentIds?.length) return [];
+// A sales deal's `linkedCosts` become virtual outflow commitments. A cost is suppressed only when a real linked
+// outflow commitment already covers it (same patternId, or same type as the cost pattern); linked invoices never suppress it.
+function linkedCostCommitments(deal: Commitment, profile: Profile, byId: Map<string, Commitment>, amount: number): Commitment[] {
+  if (deal.settlement === "paid" || deal.settlement === "cancelled" || deal.settlement === "credited") return [];
+  const linked = (deal.linkedCommitmentIds ?? []).map((id) => byId.get(id)).filter((l): l is Commitment => !!l);
   const pattern = pickPattern(deal, profile);
   const out: Commitment[] = [];
   for (const lc of pattern?.linkedCosts ?? []) {
     const costPattern = profile.paymentPatterns.find((p) => p.id === lc.patternId);
     if (!costPattern) continue;
+    const covered = linked.some((l) => l.patternId === lc.patternId || (l.type === costPattern.appliesTo && defaultDirection(l) === "out"));
+    if (covered) continue;
     out.push({
       id: `${deal.id}~${lc.patternId}`,
       type: costPattern.appliesTo,
       direction: "out",
-      amount: Math.round(deal.amount * lc.share),
+      amount: Math.round(amount * lc.share),
       currency: deal.currency,
       anchors: deal.anchors,
       patternId: lc.patternId,
@@ -280,7 +283,9 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
   const all: Commitment[] = [];
   for (const c of commitments) {
     all.push(c);
-    for (const virt of linkedCostCommitments(c, profile)) all.push(virt);
+    const sig = amountSignals.get(c.id)?.claim;
+    const dealAmount = sig?.kind === "amount_change" ? sig.newAmount : c.amount;
+    for (const virt of linkedCostCommitments(c, profile, byId, dealAmount)) all.push(virt);
   }
   for (const c of all) events.push(...expandCommitment(c, records, profile, fx, byId, amountSignals.get(c.id), warnings));
   events.push(...expandRecurring(records, profile, asOf, horizonEnd, warnings));

@@ -72,7 +72,7 @@ function openingBalance(records: Records, profile: Profile, asOf: string, fx: Re
     else total += base;
     if (b.asOf > snapDate) snapDate = b.asOf;
   }
-  if (new Set([...latest.values()].map((b) => b.asOf)).size > 1) warnings.push("Account balances have different as-of dates; actuals since the latest snapshot are rolled forward for all accounts.");
+  if (new Set([...latest.values()].map((b) => b.asOf)).size > 1) warnings.push("Account balances have different as-of dates; only actuals since the latest snapshot are rolled forward, so older accounts may be missing recent movements.");
   const staleHours = profile.thresholds.staleAfterHours;
   if (staleHours !== undefined && diffDays(asOf, snapDate) * 24 > staleHours) warnings.push(`Bank balance is from ${snapDate}, older than ${staleHours} hours; refresh before relying on this.`);
   for (const e of records.events) {
@@ -106,7 +106,23 @@ function safetyLine(profile: Profile, fixedOutflow: number, horizonDays: number)
 
 const sign = (e: CashEvent) => (e.direction === "in" ? e.amountBase : -e.amountBase);
 
-export function forecast(records: Records, profile: Profile, scenario: Scenario, asOf: string, fxRates: Record<string, number>): ForecastRun {
+// Order-sensitive inputs (signals, rules, settlements) are sorted so the same set of inputs always gives the same run,
+// matching the sort used for inputsHash.
+function normalize(r: Records): Records {
+  return {
+    ...r,
+    parties: sortedById(r.parties),
+    commitments: sortedById(r.commitments),
+    events: sortedById(r.events),
+    rules: sortedById(r.rules),
+    settlements: sortedById(r.settlements),
+    balances: sortedById(r.balances),
+    signals: [...r.signals].sort((a, b) => (a.receivedAt < b.receivedAt ? -1 : a.receivedAt > b.receivedAt ? 1 : a.id < b.id ? -1 : 1)),
+  };
+}
+
+export function forecast(input: Records, profile: Profile, scenario: Scenario, asOf: string, fxRates: Record<string, number>): ForecastRun {
+  const records = normalize(input);
   const end = horizonEnd(profile, asOf);
   const horizonDays = diffDays(end, asOf);
   const warnings: string[] = [];
@@ -134,7 +150,7 @@ export function forecast(records: Records, profile: Profile, scenario: Scenario,
 
   for (const e of events) {
     if (e.date < asOf && e.status !== "actual" && e.status !== "possible") {
-      warnings.push(`Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase)} ${e.direction === "in" ? "receipt" : "payment"} dated ${e.date} is before ${asOf}; kept at its date, not moved to today (needs review).`);
+      warnings.push(`Overdue: ${e.basis.split(";")[0]} -> ${money(e.amountBase, profile.baseCurrency)} ${e.direction === "in" ? "receipt" : "payment"} dated ${e.date} is before ${asOf}; kept at its date, not moved to today (needs review).`);
     }
   }
 

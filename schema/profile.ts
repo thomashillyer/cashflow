@@ -39,6 +39,7 @@ export type Profile = {
     rankFloor: number;
     relationshipPenalty: Record<string, number>;   // tag -> multiplier, e.g. { "preferred": 0.5 }
     staleAfterHours?: number;         // source freshness warning
+    stressDelayDays?: number;         // stress scenario: delay unsettled receipts by this many days (default 7)
   };
   actionLeadDays?: Partial<Record<Lever["kind"], number>>;  // e.g. { chase: 3, defer: 3 }
   signalSources: ("email" | "whatsapp" | "crm" | "owner")[];
