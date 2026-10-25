@@ -154,20 +154,41 @@ type Payments = {
 // lags: per-run memo of partyLag by partyId (the lag depends only on records, profile and party), so a run with
 // thousands of receivables does not rescan payment history for each one.
 // settings: engineSettings(profile), resolved once per run (expand() fills it in; absent means resolve from the profile).
-export type PaymentContext = { snapDate: string; horizonEnd: string; countedActuals?: Set<string>; byId: Map<string, Commitment>; lags?: Map<string | undefined, Lag>; settings?: EngineSettings };
+// payments: settlements and tagged bank lines grouped by commitmentId once per run (indexPayments), so matching a
+// commitment's payments does not rescan every record; absent means scan the records.
+export type PaymentContext = { snapDate: string; horizonEnd: string; countedActuals?: Set<string>; byId: Map<string, Commitment>; lags?: Map<string | undefined, Lag>; settings?: EngineSettings; payments?: PaymentIndex };
+
+// Settlements and tagged events by commitmentId, each list in record order (so matching is unchanged).
+export type PaymentIndex = { settlements: Map<string, Settlement[]>; events: Map<string, CashEvent[]> };
+export function indexPayments(records: Records): PaymentIndex {
+  const settlements = new Map<string, Settlement[]>();
+  for (const s of records.settlements) {
+    const list = settlements.get(s.commitmentId);
+    if (list) list.push(s);
+    else settlements.set(s.commitmentId, [s]);
+  }
+  const events = new Map<string, CashEvent[]>();
+  for (const e of records.events) {
+    if (e.commitmentId === undefined) continue;
+    const list = events.get(e.commitmentId);
+    if (list) list.push(e);
+    else events.set(e.commitmentId, [e]);
+  }
+  return { settlements, events };
+}
 
 // The payment identity rule (TECHNICAL_PLAN 6 opening-cash boundary: a Settlement and its bank line count once).
 // Candidate pairs share amount and currency and lie within `matchDays` (profile engine.settlementMatchDays); they are matched greedily by date
 // distance, then settlement id, then actual id, so each side is used at most once and the result is deterministic.
 // Tagged actuals the run counts are payments on any date before the (exclusive) horizon end, including future-dated
 // (scheduled) bank payments. Actuals in the other direction (refunds) are not payments toward the commitment.
-export function matchPayments(c: Commitment, records: Records, horizonEnd: string, warnings: Notes | string[], countedActuals?: Set<string>, matchDays: number = SETTLEMENT_MATCH_DAYS): Payments {
+export function matchPayments(c: Commitment, records: Records, horizonEnd: string, warnings: Notes | string[], countedActuals?: Set<string>, matchDays: number = SETTLEMENT_MATCH_DAYS, index?: PaymentIndex): Payments {
   // Exported for tests and callers that only want strings; inside a run it gets the Notes collector.
   const flag = (code: string, msg: string, refs: string[]) => (warnings instanceof Notes ? warnings.review(code, msg, refs) : warnings.push(msg));
   const label = c.reference ?? c.id;
   const dir = defaultDirection(c);
   const settlements: Settlement[] = [];
-  for (const s of records.settlements) {
+  for (const s of index ? (index.settlements.get(c.id) ?? []) : records.settlements) {
     if (s.commitmentId !== c.id) continue;
     if (s.currency !== c.currency) {
       flag("missing_fx", `${label}: settlement ${s.id} is in ${s.currency}, not ${c.currency}; not deducted from what is outstanding (needs review)`, [c.id, s.id]);
@@ -176,7 +197,7 @@ export function matchPayments(c: Commitment, records: Records, horizonEnd: strin
     settlements.push(s);
   }
   const actuals: CashEvent[] = [];
-  for (const e of records.events) {
+  for (const e of index ? (index.events.get(c.id) ?? []) : records.events) {
     if (e.commitmentId !== c.id || e.direction !== dir || e.date >= horizonEnd) continue;
     if (countedActuals && !countedActuals.has(e.id)) continue; // not in the run's cash, so not proof of payment here
     if (e.currency !== c.currency) {
@@ -229,7 +250,7 @@ function paidSoFar(
 ): { total: number; paid: number; counted: Set<string> } {
   const label = c.reference ?? c.id;
   const counted = new Set<string>();
-  const pay = matchPayments(c, records, ctx.horizonEnd, warnings, ctx.countedActuals, ctx.settings?.settlementMatchDays);
+  const pay = matchPayments(c, records, ctx.horizonEnd, warnings, ctx.countedActuals, ctx.settings?.settlementMatchDays, ctx.payments);
   const pairsSum = pay.pairs.reduce((a, p) => a + p.actual.amount, 0);
   for (const p of pay.pairs) counted.add(p.settlement.id);
   const bankIds = pay.actuals.map((e) => e.id).join(", ");
@@ -311,7 +332,7 @@ function expandCommitment(
   };
   // 1. Paid money consumes pattern legs: explicit Settlement.legIndex first, then legs in order.
   let consume = paid;
-  if (counted.size > 0) for (const s of records.settlements) {
+  if (counted.size > 0) for (const s of ctx.payments ? (ctx.payments.settlements.get(c.id) ?? []) : records.settlements) {
     if (!counted.has(s.id) || s.legIndex === undefined || legAmounts[s.legIndex] === undefined) continue;
     consume -= take(s.legIndex, Math.min(s.amount, consume));
   }
@@ -511,22 +532,30 @@ function expandRecurring(
 export const SALES_HISTORY_DAYS = ENGINE_DEFAULTS.salesHistoryDays;
 // commitmentId of the events emitted by the daily-sales revenue model.
 export const DAILY_SALES_ID = "daily-sales";
+// legIndex of the daily-sales event for a sale date: its day number since 1970-01-01 (UTC). Stable across runs.
+export const dailySalesLegIndex = (saleDate: string): number => diffDays(saleDate, "1970-01-01");
+
+function validWeekdayWeights(w: unknown): w is number[] {
+  return Array.isArray(w) && w.length === 7 && w.every((x) => typeof x === "number" && Number.isFinite(x) && x >= 0) && w.some((x) => x > 0);
+}
 
 // Daily-sales revenue model: average daily sales from the last salesHistoryDays (profile engine.salesHistoryDays, default 28) days of actual "sales" receipts, shaped by the
 // profile's weekday weights (index 0 = Monday). With `settleLagDays` (card settlement), each sale day's money lands
 // that many days later. Settlement dates that already have actual sales receipts are not forecast again.
 function expandDailySales(records: Records, profile: Profile, asOf: string, horizonEnd: string, fx: Record<string, number>, warnings: Notes, tun: EngineSettings = engineSettings(profile)): CashEvent[] {
   if (profile.revenueModel.kind !== "dailySales") return [];
-  const weights = profile.revenueModel.weekdayWeights;
+  const weights: unknown = profile.revenueModel.weekdayWeights;
+  // Exactly seven weights (Mon..Sun), each a finite number >= 0 (0 = closed that day), at least one > 0. Anything else
+  // (a negative weight would forecast negative sales) skips the model with a needs-review reason.
+  if (!validWeekdayWeights(weights)) {
+    warnings.review("invalid_profile", "Daily-sales model needs exactly seven weekday weights, each a number >= 0 and at least one > 0; no sales forecast.", [DAILY_SALES_ID]);
+    return [];
+  }
   const lag = Math.max(0, Math.round(profile.revenueModel.settleLagDays ?? 0));
-  const meanW = weights.reduce((a, b) => a + b, 0) / (weights.length || 1);
+  const meanW = weights.reduce((a, b) => a + b, 0) / weights.length;
   const { salesHistoryDays: historyDays, dailySalesConfidence } = tun;
   const from = addDays(asOf, -historyDays);
   const history = records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date >= from && e.date < asOf);
-  if (weights.length !== 7 || meanW <= 0) {
-    warnings.review("invalid_profile", "Daily-sales model needs seven positive weekday weights; no sales forecast.", [DAILY_SALES_ID]);
-    return [];
-  }
   if (history.length === 0) {
     warnings.review("no_sales_history", `No sales receipts in the ${historyDays} days before ${asOf}; daily sales are not forecast.`);
     return [];
@@ -560,16 +589,20 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
   const out: CashEvent[] = [];
   // Sale dates from asOf - lag, so every settlement in [asOf, horizonEnd) is covered; a settlement date that already
   // has an actual sales receipt is not forecast again.
-  dateRange(addDays(asOf, -lag), addDays(horizonEnd, -lag)).forEach((sale, i) => {
+  // legIndex is the sale date's day number (days since 1970-01-01 UTC), so an owner override on
+  // { commitmentId: "daily-sales", legIndex } keeps targeting the same sale day when asOf moves (one event per sale day,
+  // so it is unique within the run).
+  for (const sale of dateRange(addDays(asOf, -lag), addDays(horizonEnd, -lag))) {
     const date = addDays(sale, lag);
-    if (booked.has(date)) return;
+    if (booked.has(date)) continue;
     const w = weights[dowOf(sale)]!;
     const amount = Math.round((avg * w) / meanW);
+    if (amount <= 0) continue; // closed day (weight 0) or nothing to forecast: no $0 events
     const settles = lag ? `; sales of ${sale} settle ${lag} days later` : "";
     out.push({
       id: `evt-daily-sales-${date}`,
       commitmentId: DAILY_SALES_ID,
-      legIndex: i,
+      legIndex: dailySalesLegIndex(sale),
       date,
       amount,
       currency: profile.baseCurrency,
@@ -581,7 +614,7 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
       category: "sales",
       sourceRef: { system: "profile", record: "revenueModel.dailySales" },
     });
-  });
+  }
   return out;
 }
 
@@ -619,6 +652,24 @@ function linkedCostCommitments(deal: Commitment, profile: Profile, byId: Map<str
   return out;
 }
 
+// A cancelled or credited sales deal drops its receipt and virtual costs, but a real linked outflow (a supplier PO or
+// bill) that is still open stays in the forecast: it is owed to the supplier regardless. The owner should know, since
+// it may be cancellable too, so each such link raises a needs-review reason naming the deal and the PO.
+function flagLinkedCostsAfterCancel(deal: Commitment, byId: Map<string, Commitment>, warnings: Notes): void {
+  if (deal.type !== "sales_deal" || (deal.settlement !== "cancelled" && deal.settlement !== "credited")) return;
+  const label = deal.reference ?? deal.id;
+  for (const id of deal.linkedCommitmentIds ?? []) {
+    const l = byId.get(id);
+    if (!l || defaultDirection(l) !== "out") continue;
+    if (l.settlement === "paid" || l.settlement === "cancelled" || l.settlement === "credited") continue;
+    warnings.review(
+      "linked_po_after_cancel",
+      `${label}: deal is ${deal.settlement} but linked ${l.reference ?? l.id} (${money(l.outstanding ?? l.amount, l.currency)}) is still open and stays in the forecast as owed; cancel it with the supplier or confirm it (needs review)`,
+      [deal.id, l.id],
+    );
+  }
+}
+
 // countedActuals: see PaymentContext; forecast() passes countedActualIds so uncounted bank lines never cancel a bill.
 export function expand(records: Records, profile: Profile, asOf: string, horizonEnd: string, fx: Record<string, number>, countedActuals?: Set<string>): Expanded {
   const warnings = new Notes();
@@ -631,6 +682,7 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
     const sig = amountSignals.get(c.id)?.claim;
     const dealAmount = sig?.kind === "amount_change" ? sig.newAmount : c.amount;
     for (const virt of linkedCostCommitments(c, profile, byId, dealAmount)) all.push(virt);
+    flagLinkedCostsAfterCancel(c, byId, warnings);
   }
   // Settlements dated before the latest start-of-day snapshot are already inside opening cash (same boundary as
   // forecast.ts openingBalance); without a snapshot, as-of is the boundary.
@@ -638,7 +690,7 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
   for (const b of records.balances) if (b.asOf <= asOf && b.asOf > snapDate) snapDate = b.asOf;
   if (!snapDate) snapDate = asOf;
   const settings = engineSettings(profile);
-  const ctx: PaymentContext = { snapDate, horizonEnd, countedActuals, byId, lags: new Map(), settings };
+  const ctx: PaymentContext = { snapDate, horizonEnd, countedActuals, byId, lags: new Map(), settings, payments: indexPayments(records) };
   const recurringIds = new Set(profile.recurring.map((r) => r.id));
   for (const c of all) {
     if (recurringIds.has(c.id)) continue; // overrides the profile recurring item of the same id (expandRecurring)
