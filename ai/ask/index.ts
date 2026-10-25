@@ -95,11 +95,11 @@ function scenarioFor(d: Decision, ctx: AskContext, question: string): AskResult[
   return { label, run };
 }
 
-function planProposal(d: Decision, question: string, id?: string): PlanProposal | undefined {
+function planProposal(d: Decision, question: string, baseCurrency: string, id?: string): PlanProposal | undefined {
   const draft = d.proposal?.kind === "commitment" ? d.proposal.draft : undefined;
   const synthetic: Commitment | undefined = !draft && d.intent !== "tell" ? d.scenarioInputs?.commitments?.find((c) => c.type === "plan") : undefined;
   const src: CommitmentDraft | Commitment | undefined = draft ?? synthetic;
-  if (!src) return undefined;
+  if (!src || src.currency !== baseCurrency) return undefined; // the app adds plans in base-currency minor units
   const date = src.anchors.due ?? src.anchors.order ?? src.anchors.invoice;
   if (!date) return undefined;
   const direction = src.direction ?? "out";
@@ -138,11 +138,11 @@ export async function askNeri(question: string, ctx: AskContext): Promise<AskRes
     }
     const scenario = scenarioFor(decision, ctx, question);
     if (scenario) out.scenario = scenario;
-    const plan = planProposal(decision, question, proposalId);
+    const plan = planProposal(decision, question, ctx.profile.baseCurrency, proposalId);
     if (plan) out.proposal = plan;
     return out;
-  } catch (err) {
-    return failure(`I couldn't finish working that out (${err instanceof Error ? err.message : String(err)}).`);
+  } catch {
+    return failure("I could not finish working that out.");
   }
 }
 
@@ -159,6 +159,7 @@ export async function handleAsk(
   if (typeof b.question !== "string" || b.question.trim() === "") {
     return { status: 400, body: { error: "Ask a question about your cash, for example: \"Can I afford a $40K deposit in December?\"" } };
   }
+  if (b.question.length > 500) return { status: 400, body: { error: "That question is too long. Ask it in a sentence or two." } };
   if (b.via !== undefined && b.via !== "text" && b.via !== "voice") {
     return { status: 400, body: { error: "via must be \"text\" or \"voice\"." } };
   }
