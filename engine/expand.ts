@@ -196,11 +196,15 @@ function expandCommitment(
 type Recurring = Profile["recurring"][number];
 type Occurrence = { date: string; index: number };
 
-// Occurrences of a profile recurring item inside [from, until). The anchor is a phase, not a start: occurrences are
-// projected backward and forward from it, so an anchor after asOf still yields the earlier ones. `index` counts from
-// the anchor (0 = anchor, negative = before it; semimonthly uses 2n for the anchor's day and 2n+1 for secondDay in
-// month n), so overrides keep a stable legIndex across runs. `startDate` and `endDate` (both inclusive) bound it.
-function occurrences(r: Recurring, anchor: string, from: string, until: string, warnings: string[]): Occurrence[] {
+const monthIdx = (d: string) => Number(d.slice(0, 4)) * 12 + Number(d.slice(5, 7)) - 1;
+
+// Occurrences of a profile recurring item inside [from, until). `phase` (the profile anchor, or a matched commitment's
+// due date) sets the day of month / weekday; it is not a start, so occurrences are projected backward and forward
+// from it. `index` always counts from the profile's own `r.anchor` (0 = anchor's period, negative before it), so a
+// re-import that moves the commitment's due date never retargets an owner override's legIndex:
+// weekly/biweekly = round(days from r.anchor / step); monthly = months from r.anchor's month; quarterly = that / 3;
+// semimonthly = 2n for the phase day and 2n+1 for secondDay in month n. `startDate`/`endDate` (inclusive) bound it.
+function occurrences(r: Recurring, phase: string, from: string, until: string, warnings: string[]): Occurrence[] {
   const out: Occurrence[] = [];
   const lo = r.startDate && r.startDate > from ? r.startDate : from;
   const stop = r.endDate && r.endDate < until ? addDays(r.endDate, 1) : until; // exclusive
@@ -208,40 +212,43 @@ function occurrences(r: Recurring, anchor: string, from: string, until: string, 
   const push = (date: string, index: number) => {
     if (date >= lo && date < stop) out.push({ date, index });
   };
-  const day = Number(anchor.slice(8, 10));
-  const monthsFrom = (d: string) => Number(d.slice(0, 4)) * 12 + Number(d.slice(5, 7)) - (Number(anchor.slice(0, 4)) * 12 + Number(anchor.slice(5, 7)));
+  const day = Number(phase.slice(8, 10));
+  const monthsFromAnchor = (d: string) => monthIdx(d) - monthIdx(r.anchor);
   if (r.cadence === "weekly" || r.cadence === "biweekly") {
     const step = r.cadence === "weekly" ? 7 : 14;
-    for (let n = Math.ceil(diffDays(lo, anchor) / step); ; n++) {
-      const d = addDays(anchor, n * step);
+    for (let n = Math.ceil(diffDays(lo, phase) / step); ; n++) {
+      const d = addDays(phase, n * step);
       if (d >= stop) break;
-      push(d, n);
+      push(d, Math.round(diffDays(d, r.anchor) / step));
     }
   } else if (r.cadence === "monthly" || r.cadence === "quarterly") {
     const step = r.cadence === "monthly" ? 1 : 3;
-    for (let n = Math.floor(monthsFrom(lo) / step) - 1; ; n++) {
-      const d = addMonthsClamped(anchor, n * step, day);
+    for (let n = Math.floor((monthIdx(lo) - monthIdx(phase)) / step) - 1; ; n++) {
+      const d = addMonthsClamped(phase, n * step, day);
       if (d >= stop) break;
-      push(d, n);
+      push(d, Math.round(monthsFromAnchor(d) / step));
     }
   } else {
     if (r.secondDay === undefined) warnings.push(`recurring ${r.name}: semimonthly needs secondDay; treating as monthly`);
-    for (let n = monthsFrom(lo) - 1; ; n++) {
-      const a = addMonthsClamped(anchor, n, day);
-      const b = r.secondDay === undefined ? undefined : addMonthsClamped(anchor, n, r.secondDay);
+    for (let n = monthIdx(lo) - monthIdx(phase) - 1; ; n++) {
+      const a = addMonthsClamped(phase, n, day);
+      const b = r.secondDay === undefined ? undefined : addMonthsClamped(phase, n, r.secondDay);
       if (a >= stop && (!b || b >= stop)) break;
-      push(a, r.secondDay === undefined ? n : 2 * n);
-      if (b) push(b, 2 * n + 1);
+      const m = monthsFromAnchor(a);
+      push(a, r.secondDay === undefined ? m : 2 * m);
+      if (b) push(b, 2 * m + 1);
     }
     out.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : x.index - y.index));
   }
   return out;
 }
 
-// A commitment whose id matches a profile recurring item overrides its amount (and its anchor, when the commitment has
+// A commitment whose id matches a profile recurring item overrides its amount (and its phase, when the commitment has
 // anchors.due) but keeps the profile cadence, so a confirmed rent or payroll is never forecast as a one-off.
+// Settlement of the matched commitment: paid/credited drops only the occurrence on its due date (the bank actual
+// covers it); cancelled ends the series from its due date (needs review). An "actual" commitment's future
+// occurrences are only "committed".
 function expandRecurring(
-  records: Records,
   commitments: Commitment[],
   amountSignals: Map<string, Signal>,
   profile: Profile,
@@ -254,22 +261,37 @@ function expandRecurring(
   const byId = new Map(commitments.map((c) => [c.id, c]));
   for (const r of profile.recurring) {
     const c = byId.get(r.id);
+    const label = c?.reference ?? r.id;
+    const due = c?.anchors.due;
     const sig = c ? amountSignals.get(c.id) : undefined;
     const amount = sig?.claim.kind === "amount_change" ? sig.claim.newAmount : (c?.amount ?? r.amount);
     const currency = c?.currency ?? profile.baseCurrency;
-    const anchor = c?.anchors.due ?? r.anchor;
+    const phase = due ?? r.anchor;
     const amountBase = toBase(amount, currency, profile, fx);
     if (amountBase === undefined) {
-      warnings.push(`${c?.reference ?? r.id}: no FX rate for ${currency}; recurring ${r.name} excluded from the forecast`);
+      warnings.push(`${label}: no FX rate for ${currency}; recurring ${r.name} excluded from the forecast`);
       continue;
     }
+    let until = horizonEnd;
+    let skip: string | undefined;
+    let note = "";
+    if (c?.settlement === "cancelled") {
+      const end = due ?? asOf;
+      if (end < until) until = end;
+      note = `; cancelled from ${end}`;
+      warnings.push(`${label}: recurring ${r.name} is cancelled from ${end}; later occurrences dropped (needs review)`);
+    } else if (c && (c.settlement === "paid" || c.settlement === "credited") && due) {
+      skip = due;
+      note = `; ${due} ${c.settlement}`;
+    }
     const dir = c ? defaultDirection(c) : (r.direction ?? "out");
-    const status = c?.status ?? "committed";
+    const status = !c || c.status === "actual" ? "committed" : c.status;
     const conf = status === "possible" ? (c?.probability ?? STATUS_CONFIDENCE.possible) : STATUS_CONFIDENCE[status];
-    const via = c ? `; amount${c.anchors.due ? " and anchor" : ""} from commitment ${c.reference ?? c.id}` : "";
+    const via = c ? `; amount${due ? " and phase" : ""} from commitment ${label}` : "";
     const span = `${r.startDate ? `, starts ${r.startDate}` : ""}${r.endDate ? `, ends ${r.endDate}` : ""}`;
-    const found = occurrences(r, anchor, asOf, horizonEnd, warnings);
-    if (c && found.length === 0) warnings.push(`${c.reference ?? c.id}: recurring commitment yields no payments in the horizon (needs review)`);
+    const found = occurrences(r, phase, asOf, until, warnings).filter((o) => o.date !== skip);
+    if (c && found.length === 0 && c.settlement !== "cancelled")
+      warnings.push(`${label}: recurring commitment yields no payments in the horizon (needs review)`);
     for (const { date, index } of found) {
       events.push({
         id: `evt-${r.id}-${index}`,
@@ -282,7 +304,7 @@ function expandRecurring(
         direction: dir,
         status,
         confidence: conf,
-        basis: `recurring ${r.cadence}: ${r.name}, anchored on ${anchor}${span}${via}`,
+        basis: `recurring ${r.cadence}: ${r.name}, anchored on ${phase}${span}${via}${note}`,
         category: c?.category ?? r.category,
         sourceRef: c?.sourceRef ?? { system: "profile", record: r.id },
         ...(sig ? { overriddenBy: [sig.id] } : {}),
@@ -310,11 +332,14 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
     warnings.push(`No sales receipts in the ${SALES_HISTORY_DAYS} days before ${asOf}; daily sales are not forecast.`);
     return [];
   }
-  // Divide by the days of history the bank data actually covers, so a new business is not averaged over empty days.
+  // Average over the days the bank data actually covers (first receipt to asOf, capped), weighting each covered day
+  // by its weekday so a short history of busy days is not scaled up again. Full 4-week coverage: weight sum = 28.
   const first = records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date < asOf).reduce((m, e) => (e.date < m ? e.date : m), asOf);
   const days = Math.max(1, Math.min(SALES_HISTORY_DAYS, diffDays(asOf, first)));
   if (days < SALES_HISTORY_DAYS) warnings.push(`Sales history covers only ${days} days before ${asOf} (want ${SALES_HISTORY_DAYS}); the daily-sales average is less reliable (needs review).`);
-  const avg = history.reduce((a, e) => a + (toBase(e.amount, e.currency, profile, { [profile.baseCurrency]: 1 }) ?? 0), 0) / days;
+  const weightDays = dateRange(addDays(asOf, -days), asOf).reduce((a, d) => a + weights[dowOf(d)]! / meanW, 0);
+  const total = history.reduce((a, e) => a + (toBase(e.amount, e.currency, profile, { [profile.baseCurrency]: 1 }) ?? 0), 0);
+  const avg = weightDays > 0 ? total / weightDays : 0;
   const booked = new Set(records.events.filter((e) => e.direction === "in" && e.category === "sales" && e.date >= asOf).map((e) => e.date));
   const out: CashEvent[] = [];
   dateRange(asOf, horizonEnd).forEach((date, i) => {
@@ -383,18 +408,17 @@ export function expand(records: Records, profile: Profile, asOf: string, horizon
   }
   const recurringIds = new Set(profile.recurring.map((r) => r.id));
   for (const c of all) {
-    if (unknownPattern(c, profile)) {
+    if (recurringIds.has(c.id)) continue; // overrides the profile recurring item of the same id (expandRecurring)
+    const open = c.settlement !== "paid" && c.settlement !== "cancelled" && c.settlement !== "credited";
+    if (open && unknownPattern(c, profile)) {
       const fallback = pickPattern(c, profile);
       warnings.push(`${c.reference ?? c.id}: unknown payment pattern ${c.patternId}; used ${fallback ? `the ${c.type} default ${fallback.id}` : "a single due-date leg"} (needs review)`);
     }
-    if (recurringIds.has(c.id)) continue; // overrides the profile recurring item of the same id (expandRecurring)
-    const out = expandCommitment(c, records, profile, fx, byId, amountSignals.get(c.id), warnings);
-    const settled = c.settlement === "paid" || c.settlement === "cancelled" || c.settlement === "credited";
-    if (c.type === "recurring" && out.length === 0 && !settled)
+    if (open && c.type === "recurring" && !c.anchors.due)
       warnings.push(`${c.reference ?? c.id}: recurring commitment has no due date and matches no profile recurring item; not scheduled (needs review)`);
-    events.push(...out);
+    events.push(...expandCommitment(c, records, profile, fx, byId, amountSignals.get(c.id), warnings));
   }
-  events.push(...expandRecurring(records, commitments, amountSignals, profile, fx, asOf, horizonEnd, warnings));
+  events.push(...expandRecurring(commitments, amountSignals, profile, fx, asOf, horizonEnd, warnings));
   events.push(...expandDailySales(records, profile, asOf, horizonEnd, warnings));
   return { events, commitments: all, warnings };
 }
