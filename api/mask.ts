@@ -1,12 +1,15 @@
 // Masking at the edge (docs/design/04-adapters.md): a per-business alias table swaps real party names for stage
-// names in API responses, so a real account can be shown on a screen or in a demo. Presentation only: ids,
-// numbers, dates and links are never changed, so the app keeps working. Applied when the request asks
+// names in API responses, so a real account can be shown on a screen or in a demo. Presentation only: record
+// ids, numbers, dates and links are never changed, so the app keeps working. Applied when the request asks
 // (x-neri-mask: 1 or ?mask=1) or the business has masking switched on.
 //
-//  - party names (and their other names, and a distinctive first word) -> Customer A, Supplier A, ...
-//  - the business's own name -> "Your business"
+//  - party names, their other names and the name without "Pvt Ltd" -> Customer A, Supplier A, ...
+//  - the business's own name -> "Your business"; the owner's name -> "Owner"
 //  - email addresses -> contact@example.com
-//  - inside free text only: international phone numbers and long digit runs (bank accounts) are blanked
+//  - phone numbers (international format) and long digit runs (bank accounts) -> blanked, in every string
+//
+// WHAT IT CANNOT KNOW: a real name that is not a party record (a bank payee with no matching party, a name
+// inside an owner note or a CRM text) is not masked. Check a real account's screens before showing them.
 
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { nameTokens } from "../ai/reconcile/parties";
@@ -16,65 +19,100 @@ import { businessOf, HttpError, type NeriRequest } from "./http";
 import type { Business } from "./store";
 
 const LABEL: Record<Party["kind"], string> = { customer: "Customer", supplier: "Supplier", agency: "Agency", employee: "Employee", other: "Party" };
-// Words too generic to stand for one company on their own.
-const GENERIC = new Set(["packaging", "supply", "supplies", "trading", "trade", "group", "foods", "food", "market", "home", "industries", "international", "solutions", "services", "global", "logistics", "sales"]);
+// Design default: words too generic to stand for one company on their own (used by the first-word rule only).
+const GENERIC = new Set(["packaging", "supply", "supplies", "trading", "trade", "group", "foods", "food", "market", "home", "industries", "international", "solutions", "services", "global", "logistics", "sales", "first", "best", "new", "pacific", "atlantic", "national", "american", "united", "general"]);
 
+const SEP = "[\\s\\-_.&]+";
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const letters = (i: number): string => (i >= 26 ? letters(Math.floor(i / 26) - 1) : "") + String.fromCharCode(65 + (i % 26));
+const words = (s: string) => s.normalize("NFKC").split(new RegExp(SEP)).filter(Boolean);
+const norm = (s: string) => words(s).join(" ").toLowerCase();
 
-export type Mask = { names: { re: RegExp; to: string }[] };
+// Whole-word boundaries that understand letters beyond ASCII ("Müller").
+const BEFORE = "(?<![\\p{L}\\p{N}])";
+const AFTER = "(?![\\p{L}\\p{N}])";
 
-export function buildMask(parties: Pick<Party, "name" | "kind" | "aliases">[], business: { name: string; aliases?: string[] }, explicit: Record<string, string> = {}): Mask {
+export type Mask = {
+  loose: Map<string, string>;       // multi-word names: matched ignoring case, spacing and punctuation
+  exact: Map<string, string>;       // single words: matched with their own capitalisation only
+  looseRe: RegExp | null;
+  exactRe: RegExp | null;
+};
+
+export function buildMask(
+  parties: Pick<Party, "name" | "kind" | "aliases">[],
+  business: { name: string; aliases?: string[]; owner?: string },
+  explicit: Record<string, string> = {},
+): Mask {
   const counters: Record<string, number> = {};
   const sorted = [...parties].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));   // stable across requests
-  const phrases: { phrase: string; to: string }[] = [];
-  const firstWordOwners = new Map<string, number>();
-  for (const p of sorted) { const w = nameTokens(p.name)[0]; if (w) firstWordOwners.set(w, (firstWordOwners.get(w) ?? 0) + 1); }
+  const entries: { phrase: string; to: string }[] = [];
+
+  const firstOwners = new Map<string, number>();
+  for (const p of sorted) { const w = nameTokens(p.name)[0]; if (w) firstOwners.set(w, (firstOwners.get(w) ?? 0) + 1); }
+  const firstWords: { word: string; to: string }[] = [];
 
   for (const p of sorted) {
     const own = Object.hasOwn(explicit, p.name) ? explicit[p.name]! : `${LABEL[p.kind] ?? "Party"} ${letters((counters[p.kind] = (counters[p.kind] ?? -1) + 1))}`;
-    const names = new Set([p.name, ...(p.aliases ?? []), nameTokens(p.name).join(" ")].filter((n) => n.trim().length > 1));
-    const first = nameTokens(p.name)[0];
-    if (first && first.length >= 4 && !GENERIC.has(first) && firstWordOwners.get(first) === 1 && nameTokens(p.name).length > 1) names.add(first);
-    for (const n of names) phrases.push({ phrase: n, to: own });
+    for (const n of new Set([p.name, ...(p.aliases ?? []), nameTokens(p.name).join(" ")])) if (n.trim().length > 1) entries.push({ phrase: n, to: own });
+    // A distinctive capitalised first word ("Carry" for "Carry Well Packaging"), only when it is unique among
+    // parties and not an everyday word, so ordinary words in labels and warnings are left alone.
+    const toks = nameTokens(p.name);
+    const first = words(p.name).find((w) => w.toLowerCase() === toks[0]);
+    if (first && toks.length > 1 && first.length >= 5 && /^\p{Lu}/u.test(first) && !GENERIC.has(first.toLowerCase()) && firstOwners.get(toks[0]!) === 1) firstWords.push({ word: first, to: own });
   }
-  for (const n of [business.name, ...(business.aliases ?? [])]) if (n.trim().length > 1) phrases.push({ phrase: n, to: "Your business" });
-  for (const [real, stage] of Object.entries(explicit)) if (real.trim().length > 1) phrases.push({ phrase: real, to: stage });
+  for (const n of [business.name, ...(business.aliases ?? [])]) if (n.trim().length > 1) entries.push({ phrase: n, to: "Your business" });
+  if (business.owner && business.owner.trim().length > 2) entries.push({ phrase: business.owner, to: "Owner" });
+  for (const [real, stage] of Object.entries(explicit)) if (real.trim().length > 1) entries.push({ phrase: real, to: stage });
 
-  phrases.sort((a, b) => b.phrase.length - a.phrase.length);   // longest first: "Carry Well Packaging" before "Carry"
+  const loose = new Map<string, string>();
+  const exact = new Map<string, string>();
+  for (const { phrase, to } of entries) {
+    const w = words(phrase);
+    if (w.length === 0) continue;
+    if (w.length === 1) { if (w[0]!.length >= 3) exact.set(w[0]!, to); } else if (!loose.has(norm(phrase))) loose.set(norm(phrase), to);
+  }
+  for (const { word, to } of firstWords) if (!exact.has(word) && !loose.has(norm(word))) exact.set(word, to);
+
+  // One pattern per group, longest first: a mask for a thousand parties is still one pass over each string.
+  const looseKeys = [...loose.keys()].sort((a, b) => b.length - a.length);
+  const exactKeys = [...exact.keys()].sort((a, b) => b.length - a.length);
   return {
-    names: phrases.map(({ phrase, to }) => ({
-      re: new RegExp(`(?<![A-Za-z0-9])${escapeRe(phrase.trim()).replace(/\s+/g, "\\s+")}(?![A-Za-z0-9])`, "gi"), to,
-    })),
+    loose, exact,
+    looseRe: looseKeys.length ? new RegExp(`${BEFORE}(?:${looseKeys.map((p) => p.split(" ").map(escapeRe).join(SEP)).join("|")})${AFTER}`, "giu") : null,
+    exactRe: exactKeys.length ? new RegExp(`${BEFORE}(?:${exactKeys.map(escapeRe).join("|")})${AFTER}`, "gu") : null,
   };
 }
 
-// Keys whose values are identifiers or links the app uses: never touched.
+// Keys and strings that are record ids or links: never rewritten, so the app can follow them.
 const ID_KEY = /^(id|record|fileHash|hash|storageKey|url|invoiceUrl|paymentUrl|parentId|system|channel|format|currency|state|status|kind|type)$|(Id|Ids|_id)$/;
-// Keys that hold free text, where phone numbers and long digit runs are also blanked.
-const FREE_TEXT = /^(text|excerpt|note|notes|message|quote|description|basis|body|subject|summary|title|label|headline|detail|reason|reasons|draft|content|words|instructions)$/i;
-
-// A string that looks like a record id (party-evergreen-home, inv-INV-1187, ev-email-ab12~cd34) is never rewritten,
-// even under a key we do not know: the app follows these to other calls.
-const ID_LIKE = /^[a-z]+(?:_[a-z]+)?-[A-Za-z0-9._~:-]+$/;
-
+const ID_PREFIX = /^(?:party|inv|bill|deal|ev|evt|cand|cp|sig|rule|wi|set|unalloc|plan|thought)-[A-Za-z0-9._~:-]+$/;
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
 const PHONE = /\+\d[\d\s().-]{8,}\d/g;
 const LONG_DIGITS = /(?<![\d.,])\d{9,}(?![\d.,])/g;
 
-function maskString(s: string, mask: Mask, freeText: boolean): string {
-  let out = s;
-  for (const { re, to } of mask.names) out = out.replace(re, to);
-  out = out.replace(EMAIL, "contact@example.com");
-  if (freeText) out = out.replace(PHONE, "+•• •••• ••••").replace(LONG_DIGITS, (d) => `••••${d.slice(-4)}`);
+function maskNames(s: string, mask: Mask): string {
+  let out = s.normalize("NFKC");
+  if (mask.looseRe) out = out.replace(mask.looseRe, (m) => mask.loose.get(norm(m)) ?? m);
+  if (mask.exactRe) out = out.replace(mask.exactRe, (m) => mask.exact.get(m) ?? m);
   return out;
 }
 
-export function maskJson(value: unknown, mask: Mask, key = "", free = false): unknown {
-  if (typeof value === "string") return ID_KEY.test(key) || ID_LIKE.test(value) ? value : maskString(value, mask, free || FREE_TEXT.test(key));
-  if (Array.isArray(value)) return value.map((v) => maskJson(v, mask, key, free));
+function maskString(s: string, mask: Mask): string {
+  return maskNames(s, mask)
+    .replace(EMAIL, "contact@example.com")
+    .replace(PHONE, "+•• •••• ••••")
+    .replace(LONG_DIGITS, (d) => `••••${d.slice(-4)}`);
+}
+
+export function maskJson(value: unknown, mask: Mask, key = ""): unknown {
+  if (typeof value === "string") {
+    if (ID_PREFIX.test(value) || (ID_KEY.test(key) && !/\s/.test(value))) return value;
+    return maskString(value, mask);
+  }
+  if (Array.isArray(value)) return value.map((v) => maskJson(v, mask, key));
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, maskJson(v, mask, k, free)]));
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([k, v]) => [ID_PREFIX.test(k) ? k : maskNames(k, mask), maskJson(v, mask, k)]));
   }
   return value;
 }
@@ -84,18 +122,34 @@ const maskRequested = (req: FastifyRequest, b: Business): boolean => {
   return req.headers["x-neri-mask"] === "1" || q.mask === "1" || b.profile.account?.maskNames === true;
 };
 
+const CACHE_MS = 30_000;
+
 export function installMask(app: FastifyInstance, deps: Deps): void {
+  const cache = new Map<string, { at: number; fingerprint: string; mask: Mask }>();
   app.addHook("onSend", async (req, reply, payload) => {
     const b = (req as NeriRequest).business;
-    if (!b || typeof payload !== "string" || reply.statusCode >= 400 || !maskRequested(req, b)) return payload;
+    if (!b || typeof payload !== "string") return payload;
     if (!String(reply.getHeader("content-type") ?? "").includes("application/json")) return payload;
+    reply.header("vary", [String(reply.getHeader("vary") ?? ""), "x-neri-mask"].filter(Boolean).join(", "));   // the body depends on this header
+    if (!maskRequested(req, b)) return payload;
     let json: unknown;
     try { json = JSON.parse(payload); } catch { return payload; }
-    const { records } = await deps.store.load(b.id);
-    const mask = buildMask(records.parties, { name: b.name, ...(b.profile.account?.aliases ? { aliases: b.profile.account.aliases } : {}) }, b.profile.account?.maskAliases);
+
+    const acc = b.profile.account;
+    const fingerprint = JSON.stringify([b.name, acc?.owner, acc?.aliases, acc?.maskAliases]);
+    const now = deps.now().getTime();
+    let hit = cache.get(b.id);
+    if (!hit || hit.fingerprint !== fingerprint || now - hit.at > CACHE_MS) {
+      const { records } = await deps.store.load(b.id);
+      hit = {
+        at: now, fingerprint,
+        mask: buildMask(records.parties, { name: b.name, ...(acc?.aliases ? { aliases: acc.aliases } : {}), ...(acc?.owner ? { owner: acc.owner } : {}) }, acc?.maskAliases),
+      };
+      cache.set(b.id, hit);
+    }
     reply.removeHeader("content-length");
     reply.header("x-neri-masked", "1");
-    return JSON.stringify(maskJson(json, mask));
+    return JSON.stringify(maskJson(json, hit.mask));
   });
 }
 

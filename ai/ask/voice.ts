@@ -157,6 +157,14 @@ function leadHeadline(d: Decision, r: Rec | undefined): string | undefined {
   const l = d.lead;
   const f0 = d.headlineFacts[0];
   if (!l) return undefined;
+  if (l.kind === "can_pay" && l.pay) {
+    const p = l.pay;
+    const when = `${l.subject ?? p.name} on ${date(d, p.date)}`;
+    const line = money(d, d.context.safetyLine ?? 0);
+    if (p.answer === "no") return `No: ${when} takes you to ${money(d, p.closing)}, ${money(d, p.shortfall)} under your ${line} line.`;
+    if (p.answer === "tight") return `Yes, but it's tight: after ${when} you have ${money(d, p.closing)}, ${money(d, p.shortfall)} under your ${line} line.`;
+    return `Yes: after ${when} you still have ${money(d, p.closing)}.`;
+  }
   if (l.kind === "short_before" && d.context.shortfall !== undefined) {
     const low = d.context.baseLowPoint;
     const head = `Not yet: you're already ${money(d, d.context.shortfall)} below your safety line${low ? ` on ${date(d, low.date)}` : ""} without it.`;
@@ -338,6 +346,11 @@ function leadProblem(headline: string, d: Decision): string | undefined {
   if (!l) return undefined;
   const has = (amount: number | undefined) =>
     amount !== undefined && extractAmounts(headline, { currency: d.currency }).some((a) => amountMatches(a, [amount], headline));
+  if (l.kind === "can_pay" && l.pay) {
+    const want = l.pay.answer === "no" ? /^\W*no\b/i : /^\W*yes\b/i;
+    if (!want.test(headline)) return `the question was whether they can make it: the headline must open with "${l.pay.answer === "no" ? "No" : "Yes"}" and state ${money(d, l.pay.closing)} after the payment on ${date(d, l.pay.date)}`;
+    if (!has(l.pay.closing)) return `the headline must state the cash after the payment (${money(d, l.pay.closing)})`;
+  }
   if (l.kind === "short_before") {
     if (!/^\W*(?:not\s+yet|no)\b/i.test(headline)) return 'the question was whether they can afford it: the headline must open with "Not yet" (or "No"), because cash is already below the safety line without it';
     if (d.context.shortfall !== undefined && !has(d.context.shortfall)) return `the headline must say how far below the safety line cash already is (${money(d, d.context.shortfall)}) without it`;

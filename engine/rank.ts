@@ -9,6 +9,7 @@
 import type { Candidate, ForecastRun } from "../schema/forecast";
 import type { Profile } from "../schema/profile";
 import type { CashEvent, Commitment, Lever, Records, WorkItem } from "../schema/records";
+import { fmtDate } from "../ai/labels";
 import { diffDays } from "./dates";
 import { engineSettings } from "./settings";
 import { pendingEventsByCommitment, receivableShares, sumBase } from "./warnings";
@@ -55,20 +56,20 @@ function describe(
 ): { title: string; why: string } {
   const partyOf = (id?: string) => records.parties.find((p) => p.id === id)?.name ?? "this party";
   // A lever on one leg of a multi-leg commitment names that leg, so two legs never read the same.
-  const ref = (commitment?.reference ?? commitment?.id ?? "") + (leg ? ` (${money(leg.amountBase)} due ${leg.date})` : "");
+  const ref = (commitment?.reference ?? commitment?.id ?? "") + (leg ? ` (${money(leg.amountBase)} due ${fmtDate(leg.date, run.asOf)})` : "");
   const named = records.parties.find((p) => p.id === commitment?.partyId)?.name;
   const lever = c.lever;
 
   switch (lever?.kind) {
     case "chase":
       return { title: named ? `Chase ${named} about ${ref}` : `Chase payment of ${ref}`,
-        why: `Collecting it by ${lever.assumeDate} raises your low point by ${money(value)}.` };
+        why: `Collecting it by ${fmtDate(lever.assumeDate, run.asOf)} raises your low point by ${money(value)}.` };
     case "defer":
       return { title: named ? `Ask ${named} to move ${ref} by ${lever.days} days` : `Move ${ref} by ${lever.days} days`,
         why: `If ${named ? "they agree" : "it can wait"}, your low point rises by ${money(value)}.` };
     case "pay_early":
       return { title: `Pay ${ref} early to keep the discount`,
-        why: `Paying by ${c.neededBy} saves ${money(value)}.` };
+        why: `Paying by ${fmtDate(c.neededBy, run.asOf)} saves ${money(value)}.` };
     case "ask_advance":
       if (c.upfront) {
         return { title: `Ask ${named ?? "the customer"} for ${pct(c.upfront.share)} upfront on ${ref}`,
@@ -94,7 +95,7 @@ function describe(
   if (c.warning === "idle_balance_over") {
     const w = run.freeCash.find((f) => f.week === c.neededBy);
     return { title: "Cash is sitting above your safety line",
-      why: w ? `About ${money(w.amount)} stays free for ${w.weeksFree} weeks from ${w.week}.` : "" };
+      why: w ? `About ${money(w.amount)} stays free for ${w.weeksFree} weeks from ${fmtDate(w.week, run.asOf)}.` : "" };
   }
   if (c.warning === "ar_concentration_risk") {
     const partyId = c.evidenceRefs[0]!;
@@ -107,7 +108,7 @@ function describe(
     const signal = records.signals.find((s) => s.id === c.evidenceRefs[0]);
     const moved = records.commitments.find((x) => x.id === signal?.commitmentId);
     const newDate = signal?.claim.kind === "date_change" ? signal.claim.newDate : "";
-    return { title: `${partyOf(moved?.partyId)} moved ${moved?.reference ?? moved?.id ?? ""} to ${newDate}`,
+    return { title: `${partyOf(moved?.partyId)} moved ${moved?.reference ?? moved?.id ?? ""} to ${newDate ? fmtDate(newDate, run.asOf) : "a new date"}`,
       why: "The forecast and today's list have been updated." };
   }
   return { title: c.warning, why: "" };

@@ -171,7 +171,7 @@ describe("opening cash with several accounts", () => {
     ];
     const out = run(r);
     expect(out.openingBalance).toBe($(1100 - 30 + 4));
-    expect(out.warnings.join(" ")).toMatch(/3 actuals with no account dated 2026-10-18 to before 2026-10-22.*net \$5\.00 in.*outflows \(\$30\.00\) are counted.*inflows \(\$35\.00\) left out.*needs review/);
+    expect(out.warnings.join(" ")).toMatch(/3 actuals with no account dated Oct 18 to before Oct 22.*net \$5\.00 in.*outflows \(\$30\.00\) are counted.*inflows \(\$35\.00\) left out.*needs review/);
     const ids = countedActualIds(r, profile, "2026-10-25", {});
     expect([...ids].sort()).toEqual(["amb-out", "new", "old"]);
   });
@@ -197,7 +197,7 @@ describe("opening cash with several accounts", () => {
     expect(out.events.some((e) => e.id.startsWith("card"))).toBe(false);
     const w = out.warnings.filter((x) => /account card/.test(x));
     expect(w).toHaveLength(1);
-    expect(w[0]).toMatch(/^3 actuals tagged to account card, which has no balance on or before 2026-10-25 \(net \$26\.00 out\).*needs review/);
+    expect(w[0]).toMatch(/^3 actuals tagged to account card, which has no balance on or before Oct 25 \(net \$26\.00 out\).*needs review/);
     expect(countedActualIds(r, profile, "2026-10-25", {}).size).toBe(0);
   });
 
@@ -209,7 +209,7 @@ describe("opening cash with several accounts", () => {
   it("stale balances are checked per account", () => {
     const r = { ...empty(), balances: [snap("checking", $(100), "2026-10-24"), snap("savings", $(100), "2026-09-01")] };
     const w = forecast(r, { ...profile, thresholds: { ...profile.thresholds, staleAfterHours: 48 } }, base, "2026-10-25", {}).warnings;
-    expect(w.filter((x) => /older than 48 hours/.test(x))).toEqual(["Bank balance for savings is from 2026-09-01, older than 48 hours; refresh before relying on this."]);
+    expect(w.filter((x) => /older than 48 hours/.test(x))).toEqual(["Bank balance for savings is from Sep 1, older than 48 hours; refresh before relying on this."]);
   });
 
   it("countedActualIds: in-snapshot, rolled and main-line actuals count; no-FX and orphan ones do not", () => {
@@ -283,7 +283,7 @@ describe("settlements, linked overlap, and currency (#45 #63 #64 #67)", () => {
     r.settlements = [settle($(20), { date: "2026-10-26" })];
     const run = forecast(r, profile, base, "2026-10-25", {});
     expect(closing(run, "2026-10-28")).toBe($(150)); // $100 + $50 still expected, the $20 is not lost
-    expect(run.warnings.join(" ")).toMatch(/payment of \$20\.00 recorded on 2026-10-26 but not seen in the bank; still forecast as expected \(needs reconciliation\)/);
+    expect(run.warnings.join(" ")).toMatch(/payment of \$20\.00 recorded on Oct 26 but not seen in the bank; still forecast as expected \(needs reconciliation\)/);
   });
 
   it("a settlement before the snapshot is inside opening cash and reduces what is expected", () => {
@@ -513,7 +513,7 @@ describe("recurrence, overdue, possible, signals", () => {
     const e = run.events.find((x) => x.commitmentId === "bill-old")!;
     expect(e.date).toBe("2026-10-26");
     expect(e.basis).toMatch(/overdue since 2026-10-20, assumed payable now/);
-    expect(run.warnings.join(" ")).toMatch(/Overdue: .*payment dated 2026-10-20/);
+    expect(run.warnings.join(" ")).toMatch(/Overdue: .*payment dated Oct 20/);
     // Safety ($5,000) is breached on day one once the bill is a little bigger.
     r.commitments = [com("bill-old", { type: "bill", amount: $(96000), anchors: { due: "2026-10-20" } })];
     expect(forecast(r, profile, base, "2026-10-26", {}).firstBelowSafety).toBe("2026-10-26");
@@ -759,7 +759,7 @@ describe("levers act on one leg, in the right direction", () => {
     const none = sim(r, [{ kind: "chase", commitmentId: "deal", assumeDate: "2026-12-01" }]);
     expect(dates(none.run, "deal")).toEqual(["0:2026-10-28", "1:2026-11-20"]);
     expect(none.lowPointDelta).toBe(0);
-    expect(none.run.warnings.join(" ")).toMatch(/no remaining receipt later than 2026-12-01/);
+    expect(none.run.warnings.join(" ")).toMatch(/no remaining receipt later than Dec 1/);
   });
 
   it("a legIndex that matches nothing warns and changes nothing", () => {
@@ -887,7 +887,7 @@ describe("recurring items, pattern fallback, daily-sales coverage (#62 #75 #66 #
     r.commitments = [com("rent", { type: "recurring", amount: $(1000), category: "rent", anchors: { due: "2026-12-01" }, settlement: "cancelled" })];
     const run = forecast(r, { ...profile, recurring: [rent] }, base, "2026-10-25", {});
     expect(rentOf(run)).toEqual([`-1:2026-11-01:${$(1000)}`]);
-    expect(run.warnings.join(" ")).toMatch(/rent: recurring Rent is cancelled from 2026-12-01.*needs review/);
+    expect(run.warnings.join(" ")).toMatch(/rent: recurring Rent is cancelled from Dec 1.*needs review/);
   });
 
   it("#62 an actual matched commitment projects committed occurrences", () => {

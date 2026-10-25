@@ -8,6 +8,7 @@
 
 import type { ChangeProposal, CommitmentFieldChange, ProposalOp } from "../../schema/intake";
 import type { Commitment, Party, Records, SourceRef } from "../../schema/records";
+import { fmtDate, humanizeId } from "../labels";
 import { normalizeRef, poAllocated } from "./match";
 
 export type ApplyErrorCode = "NOT_PROPOSED" | "NOTHING_TO_APPLY" | "STALE_REVIEW" | "UNKNOWN_TARGET" | "OVER_ALLOCATED";
@@ -98,7 +99,7 @@ export function applyProposal(records: Records, proposal: ChangeProposal, opts: 
         const existing = next.commitments.find((c) => sameRef(c) && c.evidenceIds?.some((e) => draft.evidenceIds?.includes(e)));
         if (existing) {
           temp.set(op.tempId, existing.id);
-          warnings.push(`Evidence already belongs to ${existing.id}; no new commitment created.`);
+          warnings.push(`Evidence already belongs to ${existing.reference ?? humanizeId(existing.id)}; no new commitment created.`);
           return;
         }
         const partyId = draft.partyId ? resolve(draft.partyId) : undefined;
@@ -163,34 +164,34 @@ export function applyProposal(records: Records, proposal: ChangeProposal, opts: 
         affected.add(id);
         if (target.outstanding === undefined) {
           // The engine derives the remainder from amount minus settlements; setting it here would count it twice.
-          warnings.push(`Payment recorded for ${s.commitmentId}; the remaining amount is derived from settlements.`);
+          warnings.push(`Payment recorded for ${target.reference ?? humanizeId(target.id)}; the remaining amount is derived from settlements.`);
         } else if (s.currency !== target.currency) {
-          warnings.push(`Payment in ${s.currency} recorded for ${s.commitmentId}, which is in ${target.currency}; outstanding left unchanged (needs review).`);
+          warnings.push(`Payment in ${s.currency} recorded for ${target.reference ?? humanizeId(target.id)}, which is in ${target.currency}; outstanding left unchanged (needs review).`);
         } else if (
           // Same rule as the engine's unset path: a payment on/after the latest balance snapshot with no bank line yet
           // is not in opening cash, so it stays expected until the bank shows it.
           s.date >= latestSnapshot(next, opts.now) && !next.events.some((e) => e.commitmentId === target.id)
         ) {
-          warnings.push(`Payment recorded for ${s.commitmentId} dated ${s.date}, after the latest balance and not yet in the bank; outstanding left unchanged until it appears (needs reconciliation).`);
+          warnings.push(`Payment recorded for ${target.reference ?? humanizeId(target.id)} dated ${fmtDate(s.date, "")}, after the latest balance and not yet in the bank; outstanding left unchanged until it appears (needs reconciliation).`);
         } else if (
           // An importer may already have lowered outstanding for this payment; decrementing again would hide a
           // double count (the engine's own warning would go quiet) or wrongly mark the invoice paid.
           target.outstanding + priorSettled(next, target, id) < target.amount
         ) {
-          warnings.push(`Payment recorded for ${s.commitmentId}, but its outstanding amount is already below the invoice total; left unchanged. Check whether this payment is already in the books (needs review).`);
+          warnings.push(`Payment recorded for ${target.reference ?? humanizeId(target.id)}, but its outstanding amount is already below the invoice total; left unchanged. Check whether this payment is already in the books (needs review).`);
         } else {
           // Outstanding is authoritative in the engine, so keep it consistent with the payment. Idempotent: a repeat
           // of the same settlement returned above. A confirmed settlement is identified payment evidence, so this is
           // the one place settlement state moves.
           if (s.amount > target.outstanding) {
-            warnings.push(`Payment of ${s.amount} exceeds the ${target.outstanding} outstanding on ${s.commitmentId}; outstanding set to 0 (needs review).`);
+            warnings.push(`Payment of ${s.amount} exceeds the ${target.outstanding} outstanding on ${target.reference ?? humanizeId(target.id)}; outstanding set to 0 (needs review).`);
           }
           target.outstanding = Math.max(0, target.outstanding - s.amount);
           if (target.settlement !== "cancelled" && target.settlement !== "credited") {
             target.settlement = target.outstanding === 0 ? "paid" : "partial";
           }
           affected.add(target.id);
-          warnings.push(`Payment recorded for ${s.commitmentId}; outstanding is now ${target.outstanding}.`);
+          warnings.push(`Payment recorded for ${target.reference ?? humanizeId(target.id)}; outstanding is now ${target.outstanding}.`);
         }
         return;
       }

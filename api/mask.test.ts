@@ -23,18 +23,38 @@ describe("maskJson", () => {
     expect(maskJson("Evergreen Home / Puget Market", shuffled)).toBe("Customer A / Customer B");
   });
 
-  it("masks a distinctive first word but not a generic or ambiguous one", () => {
-    expect(m("Carry reminded us")).toBe("Supplier A reminded us");   // the first word of exactly one party
+  it("masks a distinctive capitalised first word, but not everyday words, generic words, or lowercase uses", () => {
+    expect(m("Carry reminded us")).toBe("Supplier A reminded us");
     expect(m("Evergreen sent the PO")).toBe("Customer A sent the PO");
-    expect(m("a packaging invoice")).toBe("a packaging invoice");   // generic word shared by two suppliers
-    expect(m("Evergreens are trees")).toBe("Evergreens are trees");  // whole-word only
+    expect(m("we carry on")).toBe("we carry on");
+    expect(m("a packaging invoice")).toBe("a packaging invoice");
+    expect(m("Evergreens are trees")).toBe("Evergreens are trees");
+    const odd = buildMask([{ name: "First Harvest Ltd", kind: "supplier" }, { name: "Pacific Fresh", kind: "supplier" }], { name: "Silverbeck LLC" });
+    expect(maskJson("First, check the Pacific route", odd)).toBe("First, check the Pacific route");
+    expect(maskJson("First Harvest Ltd called", odd)).toBe("Supplier A called");
   });
 
-  it("masks the business's own name and emails everywhere, but phones and long digit runs only in free text", () => {
+  it("still masks names written as slugs or with other punctuation, spacing, case or accents", () => {
+    expect(m("evergreen-home and ningbo_supply_co")).toBe("Customer A and Supplier C");
+    expect(m("Carry-Well Packaging, carry & well packaging")).toBe("Supplier A, Supplier A");
+    const accents = buildMask([{ name: "Müller Verpackung GmbH", kind: "supplier" }], { name: "Silverbeck LLC" });
+    expect(maskJson("Mu\u0308ller Verpackung and Müller-Verpackung", accents)).toBe("Supplier A and Supplier A");
+    expect(m("evergreen-home")).not.toMatch(/evergreen/i);
+  });
+
+  it("masks the owner's name, and names in object keys", () => {
+    const x = buildMask(parties, { name: "Silverbeck LLC", owner: "Rama Nunakani" });
+    expect(maskJson("Rama Nunakani asked", x)).toBe("Owner asked");
+    expect(maskJson({ "Evergreen Home": 5, byName: { "Puget Market": 1 } }, x)).toEqual({ "Customer A": 5, byName: { "Customer B": 1 } });
+  });
+
+  it("masks the business's own name and emails everywhere, and blanks phones and long digit runs", () => {
     expect(m("Silver Beck / Silverbeck LLC")).toBe("Your business / Your business");
     expect(m("write to maria@carrywellpackaging.com")).toBe("write to contact@example.com");
     expect(m("+91-8595624830 acct 2306265048076000", "text")).toBe("+•• •••• •••• acct ••••6000");
-    expect(m("+91-8595624830", "name")).toBe("+91-8595624830");
+    // Any key, not a fixed list: bank-line fields like memo or payee carry account numbers too.
+    expect(m({ memo: "acct 2306265048076000", payee: "+91 8595624830", narration: "ref 8410491000001453004" })).toEqual({ memo: "acct ••••6000", payee: "+•• •••• ••••", narration: "ref ••••3004" });
+    expect(m({ amount: 3213000, date: "2026-10-25T18:00:00.123456789Z", total: "1,500,000.00" })).toEqual({ amount: 3213000, date: "2026-10-25T18:00:00.123456789Z", total: "1,500,000.00" });
   });
 
   it("leaves ids, links, numbers, dates and structure alone", () => {
@@ -68,6 +88,11 @@ describe("masking through the API", () => {
     app = await buildApp({ store, verify, demoMode: false, allowReset: true, now: () => new Date("2026-11-16T17:00:00Z") });
   });
   const ctx = (headers: Record<string, string>, url = "/context") => app.inject({ method: "GET", url, headers: { ...OWNER, "x-neri-business": id, ...headers } });
+
+  it("says the body depends on the mask header, masked or not", async () => {
+    expect(String((await ctx({})).headers.vary)).toMatch(/x-neri-mask/);
+    expect(String((await ctx({ "x-neri-mask": "1" })).headers.vary)).toMatch(/x-neri-mask/);
+  });
 
   it("changes nothing unless asked", async () => {
     const r = await ctx({});

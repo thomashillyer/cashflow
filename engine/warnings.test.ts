@@ -238,7 +238,7 @@ describe("rank", () => {
     expect(chase).toMatchObject({ cashEffect: 1_200_000, confidence: 0.8, score: 840_000 });
     // defer: low point -> $15,000; 2,000,000 × 0.875 × 0.9 × 0.5 (preferred supplier)
     expect(defer).toMatchObject({ cashEffect: 2_000_000, confidence: 0.9, score: 787_500 });
-    expect(chase.why).toBe("Collecting it by 2026-10-28 raises your low point by $12,000.");
+    expect(chase.why).toBe("Collecting it by Oct 28 raises your low point by $12,000.");
   });
 
   it("shows only lever items above the floor in today's list, best first, without padding", () => {
@@ -248,7 +248,7 @@ describe("rank", () => {
     ]);
     expect(brief.all).toHaveLength(5);
     expect(brief.all.find((w) => w.warning === "idle_balance_over")?.why)
-      .toBe("About $24,000 stays free for 2 weeks from 2026-11-02.");
+      .toBe("About $24,000 stays free for 2 weeks from Nov 2.");
   });
 
   it("keeps completed items done across reruns", () => {
@@ -261,7 +261,7 @@ describe("rank", () => {
   it("formats amounts in the profile's base currency and keeps the idle item id stable", () => {
     const eur = rank(candidates, run, records, { ...profile, baseCurrency: "EUR" }, simulator(run, records));
     expect(eur.all.find((w) => w.lever?.kind === "chase")?.why)
-      .toBe("Collecting it by 2026-10-28 raises your low point by €12,000.");
+      .toBe("Collecting it by Oct 28 raises your low point by €12,000.");
     expect(eur.all.find((w) => w.warning === "idle_balance_over")?.id).toBe("wi-idle_balance_over");
   });
 
