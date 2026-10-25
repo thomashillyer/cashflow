@@ -79,16 +79,17 @@ write("work_items.json", items);
 // ---- stand-ins, checked against the facts they were written from
 const fx = loadBriefFixture();
 const ctx = { ...fx };
-const SOURCE = "hand-authored stand-in; replace with a live run (scripts/refresh-brief-cache.ts)";
+// Marks an entry as hand-authored. scripts/refresh-brief-cache.ts replaces it with a live one under the same key.
+const SOURCE = "stand-in";
 
 const brief = {
   items: [
     { id: "wi-chase-INV-1187", title: "Chase Evergreen Home on INV-1187",
-      why: "Evergreen Home's $28,000 is expected Dec 26, after your lowest week. Getting it by Dec 18 lifts your lowest point from −$5,500 to $14,000." },
+      why: "Evergreen Home's $28,000 is due Dec 10 but is expected Dec 26, after your lowest point. Getting it by Dec 18 lifts your lowest point from −$5,500 to $14,000." },
     { id: "wi-defer-PO-2302", title: "Ask Jaipur Textiles for 10 more days",
-      why: "Jaipur Textiles' $12,000 balance falls due Dec 15. Moving it back 10 days lifts your lowest point from −$5,500 to $6,500, but the ask needs to go out by Dec 12." },
+      why: "Jaipur Textiles' ₹1,000,000 (about $12,000 at today's rate) balance falls due Dec 15. Moving it back 10 days lifts your lowest point from −$5,500 to $6,500. Ask by Dec 12." },
     { id: "wi-advance-HH-PO-552", title: "Ask Harbor and Hearth for a 40% advance",
-      why: "Harbor and Hearth's PO HH-PO-552 is for $10,000. Asking for 40% up front lifts your lowest point from −$5,500 to −$1,500, which is still below your $35,000 safety line." },
+      why: "Harbor and Hearth's PO HH-PO-552 is for $10,000. Asking for 40% up front lifts your lowest point from −$5,500 to −$1,500, which is still below your $35,000 safety line. Ask by Nov 23." },
   ],
 };
 for (const [i, it] of fx.items.entries()) {
@@ -106,11 +107,11 @@ for (const [i, it] of fx.items.entries()) {
 const drafts: Record<string, { subject: string; body: string }> = {
   "wi-chase-INV-1187": {
     subject: "Invoice INV-1187: $28,000",
-    body: "Hello Evergreen Home team,\n\nOur records show invoice INV-1187 for $28,000 is due Dec 10. Could you let me know when we can expect payment? If you can pay it by Dec 18 at the latest, it would help us a great deal with our year-end commitments.\n\nIf anything is holding it up, please tell me and I will help sort it out.\n\nThank you,\nCascade Trade Co.",
+    body: "Hello Evergreen Home team,\n\nOur records show invoice INV-1187 for $28,000 is due Dec 10. Could you let me know when we can expect payment? If you can pay it by the due date, Dec 10, it would help us a great deal with our year-end commitments.\n\nIf anything is holding it up, please tell me and I will help sort it out.\n\nThank you,\nCascade Trade Co.",
   },
   "wi-defer-PO-2302": {
     subject: "Payment timing for PO-2302",
-    body: "Hello Jaipur Textiles team,\n\nThank you for your continued partnership. We would like to ask whether you could allow 10 more days on PO-2302 for the balance that falls due Dec 15. It would help us manage our cash through the year-end period, and we would be grateful for any flexibility you can offer.\n\nPlease let me know what is possible.\n\nThank you,\nCascade Trade Co.",
+    body: "Hello Jaipur Textiles team,\n\nThank you for your continued partnership. We would like to ask whether you could allow 10 more days on PO-2302 (₹2,000,000 in total) for the balance that falls due Dec 15. It would help us manage our cash through the year-end period, and we would be grateful for any flexibility you can offer.\n\nPlease let me know what is possible.\n\nThank you,\nCascade Trade Co.",
   },
   "wi-advance-HH-PO-552": {
     subject: "Advance on PO HH-PO-552",

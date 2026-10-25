@@ -1,0 +1,10 @@
+{
+  "key": "2f20ee501a4ac209925cfb6e666957dd7b405e1222ae9c3147a5d658943187b3",
+  "promptVersion": "draft_message@2",
+  "model": "claude-opus-5-5",
+  "source": "stand-in",
+  "output": {
+    "subject": "Invoice INV-1187: $28,000",
+    "body": "Hello Evergreen Home team,\n\nOur records show invoice INV-1187 for $28,000 is due Dec 10. Could you let me know when we can expect payment? If you can pay it by the due date, Dec 10, it would help us a great deal with our year-end commitments.\n\nIf anything is holding it up, please tell me and I will help sort it out.\n\nThank you,\nCascade Trade Co."
+  }
+}
