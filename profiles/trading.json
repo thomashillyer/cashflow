@@ -58,7 +58,8 @@
     "rankFloor": 0.1,
     "relationshipPenalty": { "preferred": 0.5, "strategic": 0.5, "avoid": 1.5 },
     "staleAfterHours": 72,
-    "stressDelayDays": 7
+    "stressDelayDays": 7,
+    "splitIntervalDays": 30
   },
   "actionLeadDays": { "chase": 3, "defer": 3, "split": 5, "pay_early": 1, "ask_advance": 5 },
   "signalSources": ["email", "whatsapp", "crm", "owner"],

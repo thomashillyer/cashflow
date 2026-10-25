@@ -111,7 +111,7 @@ export type Rule = {
 export type Lever =
   | { kind: "chase"; commitmentId: string; assumeDate: string; legIndex?: number }   // legIndex omitted: the earliest remaining receipt
   | { kind: "defer"; commitmentId: string; days: number; legIndex?: number }          // legIndex omitted: the earliest remaining payment
-  | { kind: "split"; commitmentId: string; shares: number[] }
+  | { kind: "split"; commitmentId: string; shares: number[]; legIndex?: number }      // shares > 0, sum 1; spaced profile.thresholds.splitIntervalDays (default 30)
   | { kind: "pay_early"; commitmentId: string }
   | { kind: "ask_advance"; commitmentId: string; share: number };
 

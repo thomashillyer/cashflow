@@ -117,7 +117,7 @@ export type Rule = {
 export type Lever =
   | { kind: "chase"; commitmentId: string; assumeDate: string }
   | { kind: "defer"; commitmentId: string; days: number }
-  | { kind: "split"; commitmentId: string; shares: number[] }
+  | { kind: "split"; commitmentId: string; shares: number[]; legIndex?: number }   // next remaining leg -> installments every thresholds.splitIntervalDays (default 30)
   | { kind: "pay_early"; commitmentId: string }
   | { kind: "ask_advance"; commitmentId: string; share: number };
 

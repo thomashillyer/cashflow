@@ -4,9 +4,10 @@
 import type { CashEvent, Commitment, Lever, Override, Records, Scenario } from "../schema/records";
 import type { Profile } from "../schema/profile";
 import { addDays, diffDays } from "./dates";
-import { DAILY_SALES_ID, money, toBase } from "./expand";
+import { DAILY_SALES_ID, defaultDirection, money, toBase } from "./expand";
 
 export const DEFAULT_STRESS_DELAY_DAYS = 7;
+export const DEFAULT_SPLIT_INTERVAL_DAYS = 30;
 
 type Ctx = { records: Records; profile: Profile; asOf: string; fx: Record<string, number>; commitments: Commitment[]; warnings: string[] };
 
@@ -118,10 +119,8 @@ function leverOverrides(l: Lever, events: CashEvent[], ctx: Ctx): Override[] {
       }));
     }
     case "ask_advance":
-      return []; // splits events, so adjust() handles it in applyAdvance
     case "split":
-      ctx.warnings.push(`lever split on ${l.commitmentId} is not modeled yet; events unchanged`);
-      return [];
+      return []; // these replace events, so adjust() handles them in applyAdvance / applySplit
   }
 }
 
@@ -139,6 +138,47 @@ function applyAdvance(events: CashEvent[], l: Extract<Lever, { kind: "ask_advanc
     if (later > 0) out.push(tag(setAmount(e, later, ctx), id, `lever ${id}: remaining ${Math.round((1 - l.share) * 100)}% stays`));
   }
   return out;
+}
+
+// Split the next remaining leg (payables: outflow, receivables: inflow) into installments by `shares`, spaced
+// profile.thresholds.splitIntervalDays apart from the leg's date (from asOf when the leg is overdue).
+// Cents are exact: floor each installment, remainder on the last. Anything invalid warns and changes nothing.
+function applySplit(events: CashEvent[], l: Extract<Lever, { kind: "split" }>, ctx: Ctx): CashEvent[] {
+  const id = `lever-split-${l.commitmentId}`;
+  const skip = (why: string) => {
+    ctx.warnings.push(`lever split on ${l.commitmentId} skipped: ${why}; nothing changed`);
+    return events;
+  };
+  const sum = l.shares.reduce((a, x) => a + x, 0);
+  if (l.shares.length === 0 || l.shares.some((x) => !Number.isFinite(x) || x <= 0) || Math.abs(sum - 1) > 1e-9) {
+    return skip(`shares must be positive and sum to 1 (got [${l.shares.join(", ")}])`);
+  }
+  const c = ctx.commitments.find((x) => x.id === l.commitmentId);
+  const cat = c?.category ?? events.find((e) => e.commitmentId === l.commitmentId)?.category;
+  // Splitting pays part of it later, which is a deferral; fixed obligations (payroll, taxes) are never deferred.
+  if (isNonDeferrable(ctx.profile, l.commitmentId, cat)) return skip("marked nonDeferrable in the profile");
+  const dir = c ? defaultDirection(c) : events.find((e) => e.commitmentId === l.commitmentId && e.status !== "actual")?.direction;
+  if (!dir) return skip("no remaining leg");
+  const e = targetLeg(l, dir, events, (x) => x.status !== "actual");
+  if (!e) return skip(`no remaining ${dir === "out" ? "payment" : "receipt"}`);
+  if (l.shares.length === 1) return events;
+
+  const interval = ctx.profile.thresholds.splitIntervalDays ?? DEFAULT_SPLIT_INTERVAL_DAYS;
+  const start = e.date < ctx.asOf ? ctx.asOf : e.date;
+  const n = l.shares.length;
+  // amount and amountBase are each allocated exactly, so the installments sum to the original in both currencies.
+  let left = e.amount;
+  let leftBase = e.amountBase;
+  const parts = l.shares.map((share, i) => {
+    const last = i === n - 1;
+    const amount = last ? left : Math.floor(e.amount * share);
+    const amountBase = last ? leftBase : Math.floor(e.amountBase * share);
+    left -= amount;
+    leftBase -= amountBase;
+    const date = addDays(start, i * interval);
+    return tag({ ...e, amount, amountBase, id: `${e.id}-split${i}`, date }, id, `lever ${id}: installment ${i + 1} of ${n} (${Math.round(share * 1000) / 10}%) on ${date}`);
+  });
+  return events.flatMap((x) => (x === e ? parts : [x]));
 }
 
 export function adjust(events: CashEvent[], scenario: Scenario, ctx: Ctx): CashEvent[] {
@@ -173,6 +213,10 @@ export function adjust(events: CashEvent[], scenario: Scenario, ctx: Ctx): CashE
   for (const l of scenario.levers ?? []) {
     if (l.kind === "ask_advance") {
       out = applyAdvance(out, l, ctx);
+      continue;
+    }
+    if (l.kind === "split") {
+      out = applySplit(out, l, ctx);
       continue;
     }
     for (const o of leverOverrides(l, out, ctx)) out = applyOverride(out, o, ctx);

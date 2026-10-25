@@ -64,6 +64,7 @@ type Profile = {
     signalAutoApplyConfidence: number;
     rankFloor: number;
     relationshipPenalty: Record<string, number>;   // tag -> multiplier, e.g. { "preferred": 0.5 }
+    splitIntervalDays?: number;       // split lever: days between installments (default 30)
   };
   signalSources: ("email" | "whatsapp" | "crm" | "owner")[];
   vocabulary: Record<string, string>;

@@ -907,3 +907,97 @@ describe("overdue outflows: what rolls to asOf and what does not", () => {
     expect(run.events.filter((e) => e.commitmentId === "bill2").map((e) => e.date).sort()).toEqual(["2026-11-20", "2026-12-01"]);
   });
 });
+
+describe("split lever (#39)", () => {
+  const p: Profile = {
+    ...profile,
+    thresholds: { ...profile.thresholds, splitIntervalDays: 14 },
+    recurring: [{ id: "rec-payroll", name: "Payroll", amount: $(1000), cadence: "weekly", anchor: "2026-10-30", category: "payroll", nonDeferrable: true }],
+  };
+  const asOf = "2026-10-25";
+  const sim = (records: Records, levers: Parameters<typeof simulate>[3], prof: Profile = p) => simulate(records, prof, [], levers, asOf, {});
+  const legs = (run: { events: CashEvent[] }, id: string) => run.events.filter((e) => e.commitmentId === id).map((e) => [e.id, e.date, e.amount] as const);
+  const bill = (due = "2026-10-29", amount = 10001) => {
+    const r = empty();
+    r.balances = [bal($(15000))];
+    r.commitments = [com("bill", { type: "bill", amount, anchors: { due } })];
+    return r;
+  };
+
+  it("installments sum exactly to the leg, are spaced by the profile interval, and keep their source", () => {
+    const s = sim(bill(), [{ kind: "split", commitmentId: "bill", shares: [1 / 3, 1 / 3, 1 / 3] }]);
+    const orig = s.base.events.find((e) => e.commitmentId === "bill")!.id;
+    const out = s.run.events.filter((e) => e.commitmentId === "bill");
+    expect(out.map((e) => [e.id, e.date, e.amount])).toEqual([
+      [`${orig}-split0`, "2026-10-29", 3333],
+      [`${orig}-split1`, "2026-11-12", 3333],
+      [`${orig}-split2`, "2026-11-26", 3335],
+    ]);
+    expect(out.reduce((a, e) => a + e.amount, 0)).toBe(10001);
+    expect(out.reduce((a, e) => a + e.amountBase, 0)).toBe(10001);
+    for (const e of out) {
+      expect(e.overriddenBy).toContain("lever-split-bill");
+      expect(e.basis).toMatch(/installment \d of 3/);
+      expect(e.sourceRef).toEqual(src);
+    }
+  });
+
+  it("uses 30 days when the profile has no splitIntervalDays", () => {
+    const { run } = sim(bill(), [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }], { ...p, thresholds: profile.thresholds });
+    expect(legs(run, "bill").map((x) => x[1])).toEqual(["2026-10-29", "2026-11-28"]);
+  });
+
+  it("splitting a payable raises the low point, and simulate reports it", () => {
+    const r = bill("2026-10-29", $(20000));
+    r.commitments.push(com("inv", { type: "invoice", amount: $(12000), anchors: { due: "2026-11-05" } }));
+    const s = sim(r, [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }], { ...p, recurring: [] });
+    expect(s.base.lowPoint.amount).toBe(-$(5000));
+    expect(s.run.lowPoint.amount).toBe($(5000));
+    expect(s.lowPointDelta).toBe($(10000));
+    expect(s.lowPointDelta).toBeGreaterThan(0);
+    expect(legs(s.base, "bill")).toHaveLength(1);
+  });
+
+  it("invalid shares warn and change nothing", () => {
+    for (const shares of [[0.5, 0.4], [1.2, -0.2], [], [0.5, 0.5 + 1e-6]]) {
+      const s = sim(bill(), [{ kind: "split", commitmentId: "bill", shares }]);
+      expect(legs(s.run, "bill")).toEqual(legs(s.base, "bill"));
+      expect(s.lowPointDelta).toBe(0);
+      expect(s.run.warnings.join(" ")).toMatch(/lever split on bill skipped: shares must be positive and sum to 1/);
+    }
+    const ok = sim(bill(), [{ kind: "split", commitmentId: "bill", shares: [0.1, 0.2, 0.7] }]);
+    expect(legs(ok.run, "bill")).toHaveLength(3);
+  });
+
+  it("nonDeferrable items are never split", () => {
+    const s = sim(empty(), [{ kind: "split", commitmentId: "rec-payroll", shares: [0.5, 0.5] }]);
+    expect(s.lowPointDelta).toBe(0);
+    expect(legs(s.run, "rec-payroll")).toEqual(legs(s.base, "rec-payroll"));
+    expect(s.run.warnings.join(" ")).toMatch(/lever split on rec-payroll skipped: marked nonDeferrable/);
+  });
+
+  it("a receivable splits its next receipt only, never an outflow", () => {
+    const r = empty();
+    r.balances = [bal(0)];
+    r.commitments = [com("inv", { type: "invoice", amount: $(9000), anchors: { due: "2026-11-02" } })];
+    const { run } = sim(r, [{ kind: "split", commitmentId: "inv", shares: [0.25, 0.75] }]);
+    expect(legs(run, "inv").map((x) => [x[1], x[2]])).toEqual([["2026-11-02", $(2250)], ["2026-11-16", $(6750)]]);
+    expect(run.events.filter((e) => e.commitmentId === "inv").every((e) => e.direction === "in")).toBe(true);
+  });
+
+  it("splits only the earliest remaining leg by default, or the named legIndex", () => {
+    const r = empty();
+    r.balances = [bal($(100000))];
+    r.commitments = [com("po", { type: "purchase_order", patternId: "split_50_50", amount: $(10000), anchors: { order: "2026-10-28", ship: "2026-11-10" } })];
+    const first = sim(r, [{ kind: "split", commitmentId: "po", shares: [0.5, 0.5] }]);
+    expect(legs(first.run, "po").map((x) => [x[1], x[2]])).toEqual([["2026-10-28", $(2500)], ["2026-11-10", $(5000)], ["2026-11-11", $(2500)]]);
+    const second = sim(r, [{ kind: "split", commitmentId: "po", shares: [0.5, 0.5], legIndex: 1 }]);
+    expect(legs(second.run, "po").map((x) => [x[1], x[2]])).toEqual([["2026-10-28", $(5000)], ["2026-11-10", $(2500)], ["2026-11-24", $(2500)]]);
+  });
+
+  it("an overdue leg starts on asOf and the rest follow every interval from asOf", () => {
+    const { run } = sim(bill("2026-10-10", $(3000)), [{ kind: "split", commitmentId: "bill", shares: [0.5, 0.5] }]);
+    expect(legs(run, "bill").map((x) => [x[1], x[2]])).toEqual([[asOf, $(1500)], ["2026-11-08", $(1500)]]);
+    expect(closing(run, asOf)).toBe($(13500));
+  });
+});
