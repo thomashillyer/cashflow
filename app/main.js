@@ -134,12 +134,6 @@ function forecastReviewPanel(run = app.brief.run) {
   </section>`;
 }
 
-// One short line for the brief: how many items need a check, never the items themselves.
-function reviewLine(review) {
-  const n = review.reasons.length;
-  return n ? `${n === 1 ? "One item needs" : `${n} items need`} a check before you rely on these numbers.` : review.message;
-}
-
 // Home keeps the checks out of the way: one quiet line under today's things that opens the full list.
 function forecastChecksCompact(run = app.brief.run) {
   const review = forecastReview(run);
@@ -210,25 +204,32 @@ function summary() {
     const holdsUntil = addDays(run.firstBelowSafety, -1);
     // what causes the dip: the biggest outflows in the week up to the low point
     const window = run.events.filter((e) => e.direction === "out" && e.date <= low.date && e.date > addDays(low.date, -8));
-    const causes = window.sort((a, b2) => b2.amountBase - a.amountBase).slice(0, 2).map((e) => {
+    // Name each cause the way the owner knows it. Payments with no supplier name (from a note or a message)
+    // are grouped by where they came from, never shown as internal ids.
+    const named = [];
+    const unnamed = new Map();
+    for (const e of window.sort((a, b2) => b2.amountBase - a.amountBase).slice(0, 2)) {
       const rec = e.sourceRef?.record ?? "";
-      const pn = name(commitmentParty(e.commitmentId));
-      const c = app.ctx.profile?.recurring?.find((r) => r.id === rec)?.name?.toLowerCase() ?? humanizeId(rec);
-      return pn ? `${pn} (${money(e.amountBase)})` : `${c} (${money(e.amountBase)})`;
-    });
+      const label = name(commitmentParty(e.commitmentId)) ?? app.ctx.profile?.recurring?.find((r) => r.id === rec)?.name?.toLowerCase();
+      if (label) { named.push(`${label} (${money(e.amountBase)})`); continue; }
+      const sys = e.sourceRef?.system ?? "";
+      const from = sys === "owner" ? "from your notes" : ["email", "whatsapp", "crm"].includes(sys) ? "from your messages" : "you added";
+      unnamed.set(from, [...(unnamed.get(from) ?? []), money(e.amountBase)]);
+    }
+    const causes = [...named, ...[...unnamed].map(([from, amts]) => amts.length === 1 ? `a payment ${from} (${amts[0]})` : `${amts.length === 2 ? "two" : amts.length} payments ${from} (${amts.join(" and ")})`)];
     return {
       headline: holdsUntil <= run.asOf
         ? `Cash is ${money(short)} below your line right now.`
         : `Cash holds until ${shortDate(holdsUntil)}, then drops ${money(short)} below your line.`,
       sub: `Lowest point ${money(low.amount)} on ${dayDate(low.date)}${causes.length ? `, when ${causes.join(" and ")} go out` : ""}.`,
-      take: review ? reviewLine(review) : cfoTake(),
+      take: cfoTake(), // the check count lives once, in the fold-out under today's things
       tone: "short",
     };
   }
   if (review) return {
     headline: review.title,
     sub: `The current forecast shows a low point of ${money(low.amount)} on ${dayDate(low.date)}.`,
-    take: reviewLine(review),
+    take: null, // the headline already says it; the fold-out lists the items
     tone: "review",
   };
   const idle = b.watch.find((w) => w.warning === "idle_balance_over");
