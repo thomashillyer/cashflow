@@ -511,6 +511,8 @@ function expandRecurring(
 export const SALES_HISTORY_DAYS = ENGINE_DEFAULTS.salesHistoryDays;
 // commitmentId of the events emitted by the daily-sales revenue model.
 export const DAILY_SALES_ID = "daily-sales";
+// legIndex of the daily-sales event for a sale date: its day number since 1970-01-01 (UTC). Stable across runs.
+export const dailySalesLegIndex = (saleDate: string): number => diffDays(saleDate, "1970-01-01");
 
 // Daily-sales revenue model: average daily sales from the last salesHistoryDays (profile engine.salesHistoryDays, default 28) days of actual "sales" receipts, shaped by the
 // profile's weekday weights (index 0 = Monday). With `settleLagDays` (card settlement), each sale day's money lands
@@ -560,16 +562,19 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
   const out: CashEvent[] = [];
   // Sale dates from asOf - lag, so every settlement in [asOf, horizonEnd) is covered; a settlement date that already
   // has an actual sales receipt is not forecast again.
-  dateRange(addDays(asOf, -lag), addDays(horizonEnd, -lag)).forEach((sale, i) => {
+  // legIndex is the sale date's day number (days since 1970-01-01 UTC), so an owner override on
+  // { commitmentId: "daily-sales", legIndex } keeps targeting the same sale day when asOf moves (one event per sale day,
+  // so it is unique within the run).
+  for (const sale of dateRange(addDays(asOf, -lag), addDays(horizonEnd, -lag))) {
     const date = addDays(sale, lag);
-    if (booked.has(date)) return;
+    if (booked.has(date)) continue;
     const w = weights[dowOf(sale)]!;
     const amount = Math.round((avg * w) / meanW);
     const settles = lag ? `; sales of ${sale} settle ${lag} days later` : "";
     out.push({
       id: `evt-daily-sales-${date}`,
       commitmentId: DAILY_SALES_ID,
-      legIndex: i,
+      legIndex: dailySalesLegIndex(sale),
       date,
       amount,
       currency: profile.baseCurrency,
@@ -581,7 +586,7 @@ function expandDailySales(records: Records, profile: Profile, asOf: string, hori
       category: "sales",
       sourceRef: { system: "profile", record: "revenueModel.dailySales" },
     });
-  });
+  }
   return out;
 }
 

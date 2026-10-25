@@ -272,6 +272,31 @@ describe("daily-sales average with receipts in another currency (review of #32)"
   });
 });
 
+describe("daily-sales legIndex is the sale date's day number, stable across asOf (#118)", () => {
+  const p: Profile = { ...profile, revenueModel: { kind: "dailySales", weekdayWeights: [1, 1, 1, 1, 1, 1, 1], settleLagDays: 2 } };
+  const sale = (date: string): CashEvent => ({ id: `s-${date}`, legIndex: 0, date, amount: $(700), currency: "USD", amountBase: $(700), direction: "in", status: "actual", confidence: 1, basis: "bank", category: "sales", sourceRef: src });
+  // 28 days of $700 receipts before the earliest asOf, so the average is $700 in every run
+  const records = (): Records => ({ ...withBal(), events: Array.from({ length: 28 }, (_, i) => sale(addDays("2026-09-27", i))) });
+  // Sale day Nov 3 settles Nov 5 (lag 2). 2026-11-03 is day 20760 since 1970-01-01.
+  const saleDay = 20760;
+
+  it("an owner override on { daily-sales, legIndex } hits the same day when asOf moves", () => {
+    expect(addDays("1970-01-01", saleDay)).toBe("2026-11-03");
+    const owner: Scenario = { id: "base", kind: "base", overrides: [{ id: "ov-1", target: { commitmentId: "daily-sales", legIndex: saleDay }, change: { amount: $(1) }, origin: "owner" }] };
+    for (const asOf of ["2026-10-25", "2026-10-26", "2026-10-28"]) {
+      const r = { ...records(), balances: [bal(0, asOf)] };
+      const plain = forecast(r, p, base, asOf, {}).events.filter((e) => e.commitmentId === "daily-sales");
+      expect(plain.find((e) => e.legIndex === saleDay)?.date, asOf).toBe("2026-11-05");
+      expect(new Set(plain.map((e) => e.id)).size, `${asOf} unique ids`).toBe(plain.length);
+      expect(new Set(plain.map((e) => e.legIndex)).size, `${asOf} unique legIndex`).toBe(plain.length);
+      const run = forecast(r, p, owner, asOf, {});
+      const hit = run.events.filter((e) => e.overriddenBy?.includes("ov-1"));
+      expect(hit.map((e) => `${e.date}:${e.amount}`), asOf).toEqual([`2026-11-05:${$(1)}`]);
+      expect(run.review?.reasons.some((x) => x.code === "override_unmatched")).toBe(false);
+    }
+  });
+});
+
 describe("performance (docs/design/05-forecast-engine.md: a few thousand events in under 50 ms)", () => {
   // ~3,000 forecast events over 13 weeks: 1,500 open invoices from 50 customers with 12 paid invoices of history each
   // (so the lag model has real work), 1,500 open bills, plus the shipped trading profile's recurring items.
