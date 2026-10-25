@@ -108,10 +108,25 @@ const facts = (d: Decision, business: string, vocabulary: Record<string, string>
 const assumptionsLine = (d: Decision) => (d.assumptions.length ? `Assumptions: ${d.assumptions.map(stripEnd).join("; ")}.` : undefined);
 const join = (parts: (string | undefined)[]) => parts.filter((p): p is string => !!p).join(" ");
 
+// For afford (outbound) and what_if verdicts, headlineFacts[0] is the low point WITH the plan or what-if, while
+// context.baseLowPoint is the run without it (decide.ts). State the with-plan low point first.
+function withPlanLow(d: Decision): { date: string; amount: number } | undefined {
+  const f = d.headlineFacts[0];
+  if (!f || f.amount === undefined || f.date === undefined || !/lowest cash point/i.test(f.label)) return undefined;
+  const outboundAfford = d.intent === "afford" && d.headlineFacts.some((x) => /payment$/i.test(x.label));
+  if (d.intent !== "what_if" && !outboundAfford) return undefined;
+  return { date: f.date, amount: f.amount };
+}
+
 function lowPointLine(d: Decision): string | undefined {
   const b = d.context.baseLowPoint;
-  if (!b) return undefined;
+  const w = withPlanLow(d);
   const line = d.context.safetyLine !== undefined ? `, against a safety line of ${money(d, d.context.safetyLine)}` : "";
+  if (w) {
+    const base = b && (b.amount !== w.amount || b.date !== w.date) ? ` Without it, your lowest point is ${money(d, b.amount)} on ${date(d, b.date)}.` : "";
+    return `With this, your lowest cash point is ${money(d, w.amount)} on ${date(d, w.date)}${line}.${base}`;
+  }
+  if (!b) return undefined;
   const short = d.context.shortfall !== undefined && d.context.shortfall > 0 ? ` That is ${money(d, d.context.shortfall)} short.` : "";
   return `Your lowest cash point is ${money(d, b.amount)} on ${date(d, b.date)}${line}.${short}`;
 }

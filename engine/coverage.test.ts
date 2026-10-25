@@ -156,6 +156,27 @@ describe("cancelled overlap: a cancelled or credited link never offsets, and a c
     const run = forecast(r, p, base, AS_OF, {});
     expect(run.events.map((e) => `${e.commitmentId}:${e.date}:${e.amount}`)).toEqual([`po1:2026-11-05:${$(600)}`]);
     expect(run.days.at(-1)?.closing).toBe($(-500));
+    // #117: the owner is told the PO is still owed after the deal fell through
+    const flagged = run.review?.reasons.filter((x) => x.code === "linked_po_after_cancel") ?? [];
+    expect(flagged.map((x) => x.refs)).toEqual([["deal", "po1"]]);
+    expect(run.review?.needed).toBe(true);
+  });
+
+  it("linked_po_after_cancel: credited deals flag too; open deals and paid or cancelled POs do not", () => {
+    const p: Profile = { ...profile, paymentPatterns: [{ id: "deal", appliesTo: "sales_deal", isDefault: true, legs: [{ share: 1, anchor: "due", offsetDays: 0, direction: "in" }] }] };
+    const codes = (dealSettlement: Commitment["settlement"], poSettlement?: Commitment["settlement"]) => {
+      const r = withBal($(100));
+      r.commitments = [
+        com("deal", { type: "sales_deal", amount: $(1000), settlement: dealSettlement, linkedCommitmentIds: ["po1"], anchors: { due: "2026-11-10" } }),
+        com("po1", { type: "purchase_order", direction: "out", amount: $(600), settlement: poSettlement, anchors: { due: "2026-11-05" } }),
+      ];
+      return (forecast(r, p, base, AS_OF, {}).review?.reasons ?? []).filter((x) => x.code === "linked_po_after_cancel").length;
+    };
+    expect(codes("credited")).toBe(1);
+    expect(codes("open")).toBe(0);
+    expect(codes(undefined)).toBe(0);
+    expect(codes("cancelled", "paid")).toBe(0);
+    expect(codes("cancelled", "cancelled")).toBe(0);
   });
 });
 
@@ -251,6 +272,63 @@ describe("daily-sales average with receipts in another currency (review of #32)"
   });
 });
 
+describe("daily-sales weekday weights are validated; closed days emit nothing (#119)", () => {
+  const sale = (date: string): CashEvent => ({ id: `s-${date}`, legIndex: 0, date, amount: $(700), currency: "USD", amountBase: $(700), direction: "in", status: "actual", confidence: 1, basis: "bank", category: "sales", sourceRef: src });
+  // Oct 11-24: 14 days of $700 receipts before asOf (Sun Oct 25)
+  const records = (): Records => ({ ...withBal(), events: Array.from({ length: 14 }, (_, i) => sale(addDays("2026-10-11", i))) });
+  const run = (weekdayWeights: number[]) => forecast(records(), { ...profile, revenueModel: { kind: "dailySales", weekdayWeights } }, base, AS_OF, {});
+  const sales = (r: ReturnType<typeof forecast>) => r.events.filter((e) => e.commitmentId === "daily-sales");
+
+  it.each([
+    ["a negative weight", [1, 1, 1, 1, 1, 1, -1]],
+    ["all zero", [0, 0, 0, 0, 0, 0, 0]],
+    ["six weights", [1, 1, 1, 1, 1, 1]],
+    ["eight weights", [1, 1, 1, 1, 1, 1, 1, 1]],
+    ["NaN", [1, 1, 1, 1, 1, 1, Number.NaN]],
+    ["Infinity", [1, 1, 1, 1, 1, 1, Number.POSITIVE_INFINITY]],
+  ])("%s: invalid_profile and no daily sales", (_, w) => {
+    const r = run(w);
+    expect(sales(r)).toEqual([]);
+    expect(r.review?.reasons.find((x) => x.code === "invalid_profile")?.refs).toEqual(["daily-sales"]);
+  });
+
+  it("a closed day (weight 0) emits no event; open days carry the week's sales", () => {
+    // Closed Mondays: weights [0,1,1,1,1,1,1], mean 6/7. History Oct 11-24 has 2 Mondays (weight 0) and 12 open days:
+    // weight-days = 12 / (6/7) = 14, avg = 14 x $700 / 14 = $700; an open day = 700 x 1 / (6/7) = $816.67 -> 81667 cents.
+    const r = run([0, 1, 1, 1, 1, 1, 1]);
+    const ev = sales(r);
+    expect(ev.length).toBeGreaterThan(0);
+    expect(ev.some((e) => new Date(`${e.date}T00:00:00Z`).getUTCDay() === 1)).toBe(false); // no Monday events
+    expect(ev.every((e) => e.amount === 81667)).toBe(true);
+    expect(r.review?.reasons.some((x) => x.code === "invalid_profile")).toBe(false);
+  });
+});
+
+describe("daily-sales legIndex is the sale date's day number, stable across asOf (#118)", () => {
+  const p: Profile = { ...profile, revenueModel: { kind: "dailySales", weekdayWeights: [1, 1, 1, 1, 1, 1, 1], settleLagDays: 2 } };
+  const sale = (date: string): CashEvent => ({ id: `s-${date}`, legIndex: 0, date, amount: $(700), currency: "USD", amountBase: $(700), direction: "in", status: "actual", confidence: 1, basis: "bank", category: "sales", sourceRef: src });
+  // 28 days of $700 receipts before the earliest asOf, so the average is $700 in every run
+  const records = (): Records => ({ ...withBal(), events: Array.from({ length: 28 }, (_, i) => sale(addDays("2026-09-27", i))) });
+  // Sale day Nov 3 settles Nov 5 (lag 2). 2026-11-03 is day 20760 since 1970-01-01.
+  const saleDay = 20760;
+
+  it("an owner override on { daily-sales, legIndex } hits the same day when asOf moves", () => {
+    expect(addDays("1970-01-01", saleDay)).toBe("2026-11-03");
+    const owner: Scenario = { id: "base", kind: "base", overrides: [{ id: "ov-1", target: { commitmentId: "daily-sales", legIndex: saleDay }, change: { amount: $(1) }, origin: "owner" }] };
+    for (const asOf of ["2026-10-25", "2026-10-26", "2026-10-28"]) {
+      const r = { ...records(), balances: [bal(0, asOf)] };
+      const plain = forecast(r, p, base, asOf, {}).events.filter((e) => e.commitmentId === "daily-sales");
+      expect(plain.find((e) => e.legIndex === saleDay)?.date, asOf).toBe("2026-11-05");
+      expect(new Set(plain.map((e) => e.id)).size, `${asOf} unique ids`).toBe(plain.length);
+      expect(new Set(plain.map((e) => e.legIndex)).size, `${asOf} unique legIndex`).toBe(plain.length);
+      const run = forecast(r, p, owner, asOf, {});
+      const hit = run.events.filter((e) => e.overriddenBy?.includes("ov-1"));
+      expect(hit.map((e) => `${e.date}:${e.amount}`), asOf).toEqual([`2026-11-05:${$(1)}`]);
+      expect(run.review?.reasons.some((x) => x.code === "override_unmatched")).toBe(false);
+    }
+  });
+});
+
 describe("performance (docs/design/05-forecast-engine.md: a few thousand events in under 50 ms)", () => {
   // ~3,000 forecast events over 13 weeks: 1,500 open invoices from 50 customers with 12 paid invoices of history each
   // (so the lag model has real work), 1,500 open bills, plus the shipped trading profile's recurring items.
@@ -267,6 +345,14 @@ describe("performance (docs/design/05-forecast-engine.md: a few thousand events 
       r.commitments.push(com(`inv-${i}`, { type: "invoice", partyId: `cust-${i % 50}`, amount: $(500) + i, anchors: { due: addDays("2026-11-16", i % 80) }, sourceRef: { system: "test", record: `inv-${i}` } }));
       r.commitments.push(com(`bill-${i}`, { type: "bill", partyId: `vend-${i % 30}`, amount: $(400) + i, anchors: { due: addDays("2026-11-16", (i * 7) % 85) }, sourceRef: { system: "test", record: `bill-${i}` } }));
     }
+    // #120: partial payments on open items, so matchPayments has real work. 300 invoices each have a $100 settlement and
+    // its matching bank line (one payment); 300 bills each have a $50 bank-only payment.
+    const line = (id: string, commitmentId: string, date: string, amount: number, direction: "in" | "out"): CashEvent => ({ id, commitmentId, legIndex: 0, date, amount, currency: "USD", amountBase: amount, direction, status: "actual", confidence: 1, basis: "bank", sourceRef: src });
+    for (let i = 0; i < 300; i++) {
+      r.settlements.push({ id: `set-inv-${i}`, commitmentId: `inv-${i}`, partyId: `cust-${i % 50}`, amount: $(100), currency: "USD", date: "2026-11-10", sourceRef: src });
+      r.events.push(line(`bank-inv-${i}`, `inv-${i}`, "2026-11-11", $(100), "in"));
+      r.events.push(line(`bank-bill-${i}`, `bill-${i}`, "2026-11-12", $(50), "out"));
+    }
     return r;
   }
 
@@ -278,7 +364,11 @@ describe("performance (docs/design/05-forecast-engine.md: a few thousand events 
     const trading = (await import("../profiles/trading.json")).default as Profile;
     const r = big();
     const run = () => forecast(r, trading, base, "2026-11-16", {});
-    expect(run().events.length).toBeGreaterThanOrEqual(3000); // the size this test claims
+    const first = run();
+    expect(first.events.filter((e) => e.status !== "actual").length).toBeGreaterThanOrEqual(3000); // the size this test claims
+    // the partial payments were matched and deducted: inv-0 $500 - $100, bill-0 $400 - $50
+    expect(first.events.filter((e) => e.commitmentId === "inv-0" && e.status !== "actual").map((e) => e.amount)).toEqual([$(400)]);
+    expect(first.events.filter((e) => e.commitmentId === "bill-0" && e.status !== "actual").map((e) => e.amount)).toEqual([$(350)]);
     for (let i = 0; i < 3; i++) run(); // warm up the JIT: the target is for reruns on every slider move
     const times: number[] = [];
     for (let i = 0; i < 7; i++) {
