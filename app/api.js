@@ -160,6 +160,7 @@ async function http(path, init) {
   const headers = { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (res.status === 401) {
+    await auth.signOut().catch(() => {});
     writeAccount(null);
     location.hash = "#/welcome";
     throw new Error("Your session ended. Sign in again with a new code.");

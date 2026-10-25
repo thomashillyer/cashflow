@@ -54,6 +54,6 @@ show the same revision.
 
 - **Sign-in:** one-time code to the business email through Supabase Auth (`app/ui/auth.js`). Set `NERI_SUPABASE_URL` and `NERI_SUPABASE_ANON_KEY` in `app/config.js`; without them the app runs the preview sign-up, which never leaves the browser. No passwords are stored. The service-role key never goes in the browser.
 - **API calls** carry the user's session token (`Authorization: Bearer …`). A 401 sends the owner back to sign-in.
-- **Tenant isolation** is enforced by the database: see `supabase/migrations/*_tenant_access.sql` (separate PR). A signed-in user can read only businesses they are a member of.
+- **Tenant isolation** (separate PR, `supabase/migrations/*_tenant_access.sql`): with a user's token, the database returns only businesses that user is a member of, plus the synthetic sample businesses. Reads the server makes with the service-role key bypass this, so the API must check the token (or pass it through) before real data goes in. Invites are a follow-up.
 - **Screen lock:** numbers blur after `NERI_LOCK_MINUTES` (default 15) without activity or in the background; with real sign-in, unlocking checks the session is still valid.
-- **Sign out everywhere** (Settings) ends every session for the user.
+- **Sign out everywhere** (Settings) revokes every refresh token; other devices are signed out once their current access token expires (about an hour by default).

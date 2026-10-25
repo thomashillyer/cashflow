@@ -7,7 +7,8 @@
 // Turn on by setting window.NERI_SUPABASE_URL and window.NERI_SUPABASE_ANON_KEY in app/config.js.
 // Without them the app runs the preview sign-up, which never leaves this browser.
 
-const CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js";
+// TODO before real data: add an integrity (SRI) hash for this file, or bundle supabase-js with the app.
+const CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
 
 export const authConfigured = Boolean(window.NERI_SUPABASE_URL && window.NERI_SUPABASE_ANON_KEY);
 
@@ -18,6 +19,7 @@ async function sb() {
     await new Promise((resolve, reject) => {
       const s = document.createElement("script");
       s.src = CDN;
+      s.crossOrigin = "anonymous";
       s.onload = resolve;
       s.onerror = () => reject(new Error("Couldn't reach the sign-in service. Check your connection and try again."));
       document.head.append(s);

@@ -655,8 +655,8 @@ function viewSettings() {
     <p class="section-note">How your business's data is protected.</p>
     <div class="setting"><h3>Sign-in</h3><p>${authLive ? "One-time codes to your business email. No passwords are stored." : "Preview sign-up. On a Neri server, sign-in uses one-time codes to your business email."}</p>
       ${authLive && !app.account?.sample ? `<button class="btn small control" data-action="signout-all">Sign out everywhere</button>` : ""}</div>
-    <div class="setting"><h3>Who can see your numbers</h3><p>Only people you invite to ${esc(app.account?.businessName || "your business")}. The database checks this on every request, not just the app.</p></div>
-    <div class="setting"><h3>Your connected apps</h3><p>Read-only. Neri never writes back, sends or pays. Disconnect any source in Sources and Neri stops reading it.</p></div>
+    <div class="setting"><h3>Who can see your numbers</h3><p>Only members of ${esc(app.account?.businessName || "your business")}. You're the owner from sign-up; inviting teammates is coming.</p></div>
+    <div class="setting"><h3>Your connected apps</h3><p>Read-only. Neri never writes back, sends or pays.</p></div>
     <div class="setting"><h3>Screen lock</h3><p>${LOCK_MS ? `Numbers hide after ${Math.round(LOCK_MS / 60000)} minutes away.` : "Off."}</p></div>
     <div class="setting"><h3>Sample data</h3><p>Switch between the fictional businesses this preview runs on.</p>
       <select class="biz control" data-change="biz" aria-label="Sample business">${SANDBOXES.map((x) => `<option value="${x.id}" ${x.id === app.bizId ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>
@@ -701,7 +701,7 @@ function viewWelcome() {
       ${err}
       <button class="btn primary big" type="submit">Continue</button>
     </form>
-    <p class="portal-fine">No password to remember or leak: we email you a one-time code. Your business's data is visible only to people you invite.</p>
+    <p class="portal-fine">No password to remember or leak: we email you a one-time code.</p>
     <p class="portal-fine"><button class="linklike" data-action="sample">Look around with a sample business first</button></p>
   </div>`;
 }
@@ -746,7 +746,9 @@ function lockScreen() {
   document.body.classList.add("locked");
 }
 async function unlock() {
-  if (authLive && !(await currentSession())) {
+  let session = true;
+  if (authLive) session = await currentSession().catch(() => null);
+  if (!session) {
     document.querySelector(".lock")?.remove();
     document.body.classList.remove("locked");
     await api.signOut();
@@ -1175,7 +1177,7 @@ document.addEventListener("click", async (ev) => {
     app.askLog = [];
     location.hash = "#/welcome";
     await load();
-    toast("Signed out everywhere", "Every device needs a new code to get back in.");
+    toast("Signed out everywhere", "Other devices are signed out within the hour.");
     return;
   }
   if (a === "talk-stop") return app.stopListen?.();
