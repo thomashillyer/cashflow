@@ -329,6 +329,14 @@ const live = {
   async reviewProposals() {
     return http("/review/proposals");
   },
+  // The owner's saved overrides; the app lists its own overdue choices from them so each can be undone.
+  async overrides() {
+    return http("/overrides");
+  },
+  // decision: "done" (paid / done), "open" (still open) or "clear" (undo). Needs the revision the screen was built from.
+  async overdueDecision(commitmentId, legIndex, decision, expectedRevision) {
+    return http("/overdue-decision", { method: "POST", body: JSON.stringify({ commitmentId, legIndex, decision, expectedRevision }) });
+  },
   async decideProposal(id, decision, expectedRevision) {
     return http(`/review/${encodeURIComponent(id)}/${decision === "confirm" ? "confirm" : "dismiss"}`, {
       method: "POST", headers: { "Idempotency-Key": crypto.randomUUID() }, body: JSON.stringify({ expectedRevision }),

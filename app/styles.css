@@ -1008,3 +1008,8 @@ a { text-underline-offset: 0.18em; }
 .card-tag { margin-left: auto; font-style: normal; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
   color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); align-self: center; }
 .card.sales .card-effect b { color: var(--ink-soft); }
+.forecast-review.quiet { border-inline-start-color: var(--line, #ddd); }
+.assumed-paid { margin-top: 12px; font-size: 14px; }
+.assumed-paid summary { cursor: pointer; color: var(--ink); }
+.overdue-actions { display: inline-flex; gap: 6px; margin-inline-start: 8px; vertical-align: middle; }
+.linklike { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }

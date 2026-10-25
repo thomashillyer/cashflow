@@ -20,8 +20,10 @@ const change = z.object({
   shiftDays: z.number().int().min(-3660).max(3660).refine((n) => n !== 0, "not zero").optional(),
   amount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),   // integer minor units
   exclude: z.literal(true).optional(),
-}).strict().refine((c) => Object.keys(c).length > 0, "say what changes: date, shiftDays, amount or exclude")
-  .refine((c) => !(c.date !== undefined && c.shiftDays !== undefined), "either a date or a shift, not both");
+  stillOpen: z.literal(true).optional(),
+}).strict().refine((c) => Object.keys(c).length > 0, "say what changes: date, shiftDays, amount, exclude or stillOpen")
+  .refine((c) => !(c.date !== undefined && c.shiftDays !== undefined), "either a date or a shift, not both")
+  .refine((c) => !c.stillOpen || Object.keys(c).length === 1, "stillOpen stands alone");
 
 export const overrideSchema = z.object({
   id: z.string().regex(OVERRIDE_ID),

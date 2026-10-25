@@ -545,6 +545,53 @@ describe("saved owner overrides (#40)", () => {
     expect((await app.inject({ method: "DELETE", url: `/overrides/ov-1187?expectedRevision=${await rev(id)}`, headers: H(id) })).statusCode).toBe(404);
   });
 
+  it("overdue decisions: done removes the item and its flag, undo restores it, still open keeps it unflagged, stale revision is 409", async () => {
+    const id = await privateBusiness();
+    const { records } = await store.load(id);
+    const mk = (cid: string, due: string) => ({ id: cid, type: "bill" as const, direction: "out" as const, amount: 90000000, currency: "USD", anchors: { due }, status: "committed" as const, settlement: "open" as const, sourceRef: { system: "zoho_books", record: cid } });
+    await store.upsertRecords(id, { ...records, commitments: [...records.commitments, mk("bill-late", "2026-11-12"), mk("bill-ancient", "2026-10-01")] });
+    const get = async () => (await app.inject({ method: "GET", url: "/forecast?scenario=base", headers: H(id) })).json();
+    const flags = (r: { review?: { reasons: { code: string; refs: string[] }[] } }) => (r.review?.reasons ?? []).filter((x) => x.code === "overdue_payment").flatMap((x) => x.refs);
+    const decide = async (commitmentId: string, decision: string, expectedRevision?: number) =>
+      app.inject({ method: "POST", url: "/overdue-decision", headers: H(id), payload: { commitmentId, decision, expectedRevision: expectedRevision ?? (await rev(id)) } });
+
+    const r0 = await get();
+    expect(flags(r0)).toContain("bill-late");
+    expect(flags(r0)).not.toContain("bill-ancient");
+    expect(r0.assumedPaid.map((a: { commitmentId: string }) => a.commitmentId)).toEqual(["bill-ancient"]);
+
+    const stale = await rev(id);
+    const done = await decide("bill-late", "done");
+    expect(done.statusCode).toBe(200);
+    expect(done.json().override).toMatchObject({ origin: "owner", change: { exclude: true } });
+    const r1 = await get();
+    expect(flags(r1)).not.toContain("bill-late");
+    expect(r1.lowPoint.amount).toBeGreaterThan(r0.lowPoint.amount);
+    expect(r1.events.some((e: { commitmentId?: string }) => e.commitmentId === "bill-late")).toBe(false);
+
+    expect((await decide("bill-late", "clear", stale)).statusCode).toBe(409);
+    expect((await decide("bill-late", "clear")).statusCode).toBe(200);
+    const r2 = await get();
+    expect(flags(r2)).toContain("bill-late");
+    expect(r2.lowPoint).toEqual(r0.lowPoint);
+    expect(await store.loadOverrides(id)).toHaveLength(0);
+
+    // Still open: stays in the forecast, unflagged; the ancient item comes back too; switching to done replaces it.
+    expect((await decide("bill-late", "open")).statusCode).toBe(200);
+    expect((await decide("bill-ancient", "open")).statusCode).toBe(200);
+    const r3 = await get();
+    expect(flags(r3)).toEqual(expect.not.arrayContaining(["bill-late", "bill-ancient"]));
+    expect(r3.events.some((e: { commitmentId?: string }) => e.commitmentId === "bill-late")).toBe(true);
+    expect(r3.assumedPaid).toBeUndefined();
+    expect(r3.lowPoint.amount).toBeLessThan(r0.lowPoint.amount);
+    expect((await decide("bill-late", "done")).statusCode).toBe(200);
+    expect((await store.loadOverrides(id)).filter((o) => o.target.commitmentId === "bill-late")).toHaveLength(1);
+
+    expect((await decide("nope", "done")).statusCode).toBe(400);
+    expect((await decide("bill-late", "maybe")).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: "/overdue-decision", headers: H(id), payload: { commitmentId: "bill-late", decision: "done" } })).statusCode).toBe(400);
+  });
+
   it("concurrent writes from the same revision: one 200, one 409, nothing lost", async () => {
     const id = await privateBusiness();
     const r0 = await rev(id);
