@@ -1,6 +1,6 @@
 # Person 2: Cash-flow engine
 
-Owner: unassigned. Claim this role in [tracking issue #2](https://github.com/thomashillyer/cashflow/issues/2).
+Owner: Thomas. Track progress in [tracking issue #2](https://github.com/thomashillyer/cashflow/issues/2).
 
 ## Outcome
 
