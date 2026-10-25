@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabase } from "../db/client";
 import { buildApp, type Verifier } from "./app";
 import { loadSamples } from "./demo";
+import { MemoryBlobs, SupabaseBlobs, type Blobs } from "./blobs";
 import { MemoryStore, type Store } from "./store";
 import { SupabaseStore } from "./supabase-store";
 import { isBehind, supabaseSchemaStatus } from "./schema-status";
@@ -25,6 +26,7 @@ async function memoryStore(): Promise<Store> {
 const useMemory = env.NERI_STORE === "memory";
 const sb = useMemory ? null : getSupabase({ serviceRole: true });
 const store: Store = sb ? new SupabaseStore(sb) : await memoryStore();
+const blobs: Blobs = sb ? new SupabaseBlobs(sb) : new MemoryBlobs();   // originals: private bucket, service role only
 // The Dockerfile copies the whole repo, so supabase/migrations is in the image.
 const schemaStatus = sb ? supabaseSchemaStatus(sb, join(import.meta.dirname, "../supabase/migrations")) : undefined;
 
@@ -40,11 +42,16 @@ const verify: Verifier = env.SUPABASE_URL && env.SUPABASE_ANON_KEY
 
 const app = await buildApp({
   store,
+  blobs,
   verify,
   demoMode,
   defaultBusiness: env.NERI_DEFAULT_BUSINESS ?? "cascade_trade",
   // Live Claude only with a key, and never by default on the public demo (anonymous callers could spend it).
   aiMode: env.ANTHROPIC_API_KEY && (env.NERI_AI_MODE === "live" || (!demoMode && env.NERI_AI_MODE !== "cache_only")) ? "live" : "cache_only",
+  // Ask Neri alone may use live Claude on the demo (cache first, capped per hour):
+  // fly secrets set ANTHROPIC_API_KEY=... NERI_ASK_MODE=live
+  ...(env.ANTHROPIC_API_KEY && env.NERI_ASK_MODE === "live" ? { askMode: "live" as const } : {}),
+  askLive: { maxPerHour: Number(env.NERI_ASK_LIVE_MAX_PER_HOUR) > 0 ? Number(env.NERI_ASK_LIVE_MAX_PER_HOUR) : 200 },
   staticDir: env.NERI_STATIC_DIR ?? join(import.meta.dirname, "../app"),
   ...(demoMode || (env.SUPABASE_URL && env.SUPABASE_ANON_KEY)
     ? { appConfig: { supabaseUrl: env.SUPABASE_URL, supabaseAnonKey: env.SUPABASE_ANON_KEY } }

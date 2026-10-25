@@ -1,5 +1,6 @@
 # Neri Cash live demo on Fly.io: API + app on one origin. Deploy: `fly deploy` (or the fly-deploy workflow on main).
 # Secrets: fly secrets set SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=... [ANTHROPIC_API_KEY=...]
+# Live Ask Neri on the demo (brief, drafts, intake stay cached): fly secrets set ANTHROPIC_API_KEY=... NERI_ASK_MODE=live  [NERI_ASK_LIVE_MAX_PER_HOUR=200]
 app = "neri-cash"
 primary_region = "sjc"
 

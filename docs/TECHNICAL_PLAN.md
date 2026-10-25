@@ -101,6 +101,7 @@ One table/collection per accepted core record type, plus the operational state b
 | Store area | State and constraints |
 |---|---|
 | Core records | Business-scoped accepted Parties, Commitments, actual CashEvents, Signals, Rules, Settlements, Balances, Evidence; supporting overrides/scenarios. |
+| Original files (`Evidence.storageKey`) | The uploaded file, pasted text, or attachment bytes in a private Supabase Storage bucket (`evidence-originals`), key `<business>/evidence/<sha256>-<safe name>` (same bytes = one object). Read and written only by server code with the service role after the membership check; no client policy and never a public URL. A failed save never fails the import (`api/blobs.ts`, `api/originals.ts`). |
 | `intake_candidates` / `change_proposals` | Candidate payload, issues, evidence, revision, proposed/applied/dismissed state. |
 | `provider_links` / `record_evidence` | Unique business/provider/entity/source mapping; many evidence items per commitment. New payload hashes are source revisions, not new commitments. |
 | `po_invoice_allocations` | PO, invoice, allocated amount/currency, confirmation provenance; prevent over-allocation and full PO plus full invoice double counting. |
