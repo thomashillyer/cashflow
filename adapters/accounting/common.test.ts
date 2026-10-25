@@ -66,4 +66,31 @@ describe("buildAccounting", () => {
     expect(r.settlements).toHaveLength(2);
     expect(r.paymentHistory).toEqual([expect.objectContaining({ invoiceId: "inv-INV-1", paid: "2026-10-05" })]);
   });
+
+  it("keeps a payment that applied to no document as an unallocated payment, never matched by guess", () => {
+    const r = buildAccounting({
+      system: "zoho_books", now: NOW, docs: [],
+      payments: [
+        { providerId: "adv1", date: "2026-06-03", kind: "bill", amount: 9639, currency: "USD", partyId: "v9", partyName: "Carry Well Packaging", applied: [] },
+        { providerId: "adv2", date: "2026-07-01", kind: "bill", amount: "22491.00", currency: "USD", partyId: "v9", partyName: "Carry Well Packaging", applied: [] },
+      ],
+    });
+    expect(r.settlements).toEqual([]);
+    expect(r.unallocatedPayments).toEqual([
+      expect.objectContaining({ providerId: "adv1", direction: "out", date: "2026-06-03", amount: 963900, currency: "USD", partyName: "Carry Well Packaging" }),
+      expect.objectContaining({ providerId: "adv2", amount: 2249100 }),
+    ]);
+  });
+
+  it("a partly applied payment leaves only the remainder unallocated; a fully applied one leaves none", () => {
+    const docs = [doc({ providerId: "b1", number: "B-1", total: 100, balance: 0, status: "paid" })];
+    const r = buildAccounting({
+      system: "xero", now: NOW, docs,
+      payments: [
+        { providerId: "p1", date: "2026-10-01", kind: "bill", amount: 100, currency: "USD", applied: [{ kind: "bill", docProviderId: "b1", amount: 60 }] },
+        { providerId: "p2", date: "2026-10-02", kind: "bill", amount: 100, currency: "USD", applied: [{ kind: "bill", docProviderId: "b1", amount: 100 }] },
+      ],
+    });
+    expect(r.unallocatedPayments.map((u) => [u.providerId, u.amount])).toEqual([["p1", 4000]]);
+  });
 });

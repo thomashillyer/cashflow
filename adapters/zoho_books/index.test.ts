@@ -17,12 +17,18 @@ const invoices = [
   { invoice_id: "9006", invoice_number: "INV-1301", customer_id: "c1", customer_name: "Evergreen Home", date: "2026-10-06", total: 100, balance: 100, currency_code: "USD", status: "sent" },
 ];
 const bills = [{ bill_id: "7001", bill_number: "BILL-0042", vendor_id: "v1", vendor_name: "Ningbo Supply", date: "2026-10-01", due_date: "2026-11-20", total: 15000, balance: 15000, currency_code: "USD", status: "open" }];
+const vendorpayments = [
+  { payment_id: "va1", date: "2026-06-03", amount: 9639, currency_code: "USD", vendor_id: "v9", vendor_name: "Carry Well Packaging" },
+  { payment_id: "va2", date: "2026-07-01", amount: 22491, currency_code: "USD", vendor_id: "v9", vendor_name: "Carry Well Packaging" },
+];
 const customerpayments = [
   { payment_id: "p1", date: "2026-09-27", amount: 12000 },
   { payment_id: "p2", date: "2026-10-20", amount: 4000 },
 ];
 const paymentDetail: Record<string, unknown> = {
   p1: { invoices: [{ invoice_id: "9002", invoice_number: "INV-104", amount_applied: 12000 }] },
+  va1: { amount: 9639, bills: [] },
+  va2: { amount: 22491, bills: [] },
   p2: { invoices: [{ invoice_id: "9003", invoice_number: "INV-1190", amount_applied: 4000 }, { invoice_id: "nope", invoice_number: "INV-X", amount_applied: 1 }] },
 };
 
@@ -42,8 +48,8 @@ function fakeZoho(over: { status?: number; orgs?: unknown[]; pages?: boolean; in
     if (path === "invoices") return ok({ invoices: over.pages ? [{ ...invoices[0], invoice_id: `x${page}`, invoice_number: `N${page}` }] : over.invoices ?? invoices, page_context: { has_more_page: !!over.pages } });
     if (path === "bills") return ok({ bills, page_context: { has_more_page: false } });
     if (path === "customerpayments") return ok({ customerpayments, page_context: { has_more_page: false } });
-    if (path === "vendorpayments") return ok({ vendorpayments: [], page_context: { has_more_page: false } });
-    const m = path.match(/^customerpayments\/(.+)$/);
+    if (path === "vendorpayments") return ok({ vendorpayments, page_context: { has_more_page: false } });
+    const m = path.match(/^(?:customer|vendor)payments\/(.+)$/);
     if (m) return ok({ payment: paymentDetail[m[1]!] });
     return { status: 404, json: async () => ({}) };
   };
@@ -100,6 +106,16 @@ describe("pullZoho", () => {
       expect.objectContaining({ id: "set-zoho_books-p2-inv-INV-1190", commitmentId: "inv-INV-1190", amount: 400000, date: "2026-10-20" }),
     ]);
     expect(r.data.paymentHistory).toEqual([expect.objectContaining({ invoiceId: "inv-INV-104", due: "2026-09-30", paid: "2026-09-27" })]);
+  });
+
+  it("vendor advances applied to no bill come back as unallocated payments with their dates", async () => {
+    const r = await pullZoho({ region: "com", token, now: NOW, fetch: fakeZoho().fetch });
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.data.unallocatedPayments.map((u) => [u.partyName, u.direction, u.date, u.amount])).toEqual([
+      ["Carry Well Packaging", "out", "2026-06-03", 963900],
+      ["Carry Well Packaging", "out", "2026-07-01", 2249100],
+    ]);
+    expect(r.data.settlements.some((s) => s.sourceRef.record.startsWith("va"))).toBe(false);
   });
 
   it("a repeat pull is unchanged evidence, and an edited invoice supersedes", async () => {

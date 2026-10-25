@@ -34,6 +34,11 @@ export type AccountingDoc = {
 export type AccountingPayment = {
   providerId: string;
   date: string;                    // YYYY-MM-DD, actual paid date
+  kind?: DocKind;                  // which side, when the payment applied to nothing
+  amount?: unknown;                // the payment's full amount, when the provider states it
+  currency?: string;
+  partyId?: string;
+  partyName?: string;
   applied: { kind: DocKind; docProviderId?: string; docNumber?: string; amount: unknown }[];
 };
 
@@ -46,12 +51,28 @@ export type AccountingBuildInput = {
   existingEvidence?: Evidence[];
 };
 
+// Money that left or arrived but is not applied to any document yet (a vendor advance, an unapplied
+// customer payment). It is proof of a payment, never a guess at which invoice it settles: matching
+// it to a PO or invoice is a proposal for the owner.
+export type UnallocatedPayment = {
+  id: string;
+  system: AccountingBuildInput["system"];
+  providerId: string;
+  direction: "in" | "out";
+  date: string;
+  amount: number;                  // minor units, the part not applied to any document
+  currency: string;
+  partyId?: string;
+  partyName?: string;
+};
+
 export type AccountingImport = {
   parties: Party[];
   commitments: Commitment[];
   settlements: Settlement[];
   evidence: Evidence[];
   paymentHistory: { partyId: string; invoiceId: string; due: string; paid: string }[];
+  unallocatedPayments: UnallocatedPayment[];
   diagnostics: ImportDiagnostics;
 };
 
@@ -156,8 +177,22 @@ export function buildAccounting(input: AccountingBuildInput): AccountingImport {
   if (skippedDrafts) warnings.push(`${skippedDrafts} draft document${skippedDrafts === 1 ? "" : "s"} skipped; drafts are not owed yet.`);
 
   const settlements: Settlement[] = [];
+  const unallocatedPayments: UnallocatedPayment[] = [];
   const history = new Map<string, AccountingImport["paymentHistory"][number]>();   // one row per invoice: the date it was fully paid
   for (const p of input.payments) {
+    // Whatever a payment did not apply to a document stays visible as an unallocated payment.
+    if (p.amount !== undefined && p.currency) {
+      const total = toMinor(p.amount, p.currency);
+      const applied = p.applied.reduce((n, a) => n + (toMinor(a.amount, p.currency!) ?? 0), 0);
+      const kind = p.applied[0]?.kind ?? p.kind;
+      if (total !== undefined && total - applied > 0 && kind) {
+        unallocatedPayments.push({
+          id: `unalloc-${system}-${segment(p.providerId)}`, system, providerId: p.providerId, direction: kind === "invoice" ? "in" : "out",
+          date: p.date, amount: total - applied, currency: p.currency,
+          ...(p.partyId ? { partyId: `party-${system}-${segment(p.partyId)}` } : {}), ...(p.partyName ? { partyName: p.partyName } : {}),
+        });
+      }
+    }
     for (const a of p.applied) {
       const target = byProviderId.get(`${a.kind}:${a.docProviderId ?? ""}`) ?? byProviderId.get(`${a.kind}:${a.docNumber ?? ""}`);
       if (!target) continue;
@@ -182,5 +217,5 @@ export function buildAccounting(input: AccountingBuildInput): AccountingImport {
     evidenceId: system, source: system, startedAt: input.now, rowsRead: input.docs.length,
     rowsImported: commitments.length - rowsDuplicate, rowsDuplicate, errors, warnings, syncedAt: input.now,
   });
-  return { parties: [...parties.values()], commitments, settlements, evidence, paymentHistory, diagnostics };
+  return { parties: [...parties.values()], commitments, settlements, evidence, paymentHistory, unallocatedPayments, diagnostics };
 }
