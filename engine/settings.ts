@@ -7,7 +7,7 @@
 // definition), median and the 0.25/0.75 quartiles of the lag model, round-half-up of lag days, the basis-point grid
 // (10000) of the affordability search, and the three items of "three things to do today" (the product promise).
 
-import type { Anchor, Profile } from "../schema/profile";
+import type { Anchor, EngineTunables, Profile } from "../schema/profile";
 import type { CommitmentType } from "../schema/records";
 
 export type EngineSettings = {
@@ -47,34 +47,70 @@ export const ENGINE_DEFAULTS: EngineSettings = Object.freeze({
   splitIntervalDays: 30,
 }) as EngineSettings;
 
-export function engineSettings(profile: Pick<Profile, "engine" | "thresholds">): EngineSettings {
-  const e = profile.engine ?? {};
+const ANCHORS: readonly Anchor[] = ["order", "ship", "delivery", "invoice", "due", "month_end", "weekday"];
+const TYPES: readonly CommitmentType[] = ["invoice", "bill", "recurring", "sales_deal", "purchase_order", "plan"];
+
+type Checker = (x: unknown) => boolean;
+const isNum = (x: unknown): x is number => typeof x === "number" && Number.isFinite(x);
+const days: Checker = (x) => isNum(x) && Number.isInteger(x) && x > 0;
+const daysOrZero: Checker = (x) => isNum(x) && Number.isInteger(x) && x >= 0;
+const unit: Checker = (x) => isNum(x) && x >= 0 && x <= 1;
+const positive: Checker = (x) => isNum(x) && x > 0;
+const step: Checker = (x) => isNum(x) && x > 0 && x <= 1;
+const listOf = (allowed: readonly string[]): Checker => (x) =>
+  Array.isArray(x) && x.length > 0 && x.every((v) => typeof v === "string" && allowed.includes(v));
+
+// Profiles stored outside profiles/ (the DB) skip schema/profiles.test.ts, so every value is checked here: anything
+// missing keeps its default silently; anything non-finite or out of range keeps its default and is reported.
+function resolve(profile: Pick<Profile, "engine" | "thresholds">): { settings: EngineSettings; issues: string[] } {
+  const e = (profile.engine ?? {}) as Record<string, unknown> & EngineTunables;
+  const sc = (e.statusConfidence ?? {}) as Record<string, unknown>;
+  const lag = (e.lag ?? {}) as Record<string, unknown>;
+  const th = (profile.thresholds ?? {}) as Record<string, unknown>;
   const d = ENGINE_DEFAULTS;
-  const sc = e.statusConfidence ?? {};
-  const lag = e.lag ?? {};
-  return {
+  const issues: string[] = [];
+  const pick = <T>(path: string, value: unknown, ok: Checker, fallback: T, rule: string): T => {
+    if (value === undefined) return fallback;
+    if (ok(value)) return value as T;
+    issues.push(`${path} = ${JSON.stringify(value) ?? String(value)} is invalid (${rule}); using the default ${JSON.stringify(fallback)}`);
+    return fallback;
+  };
+  const DAYS = "a whole number of days > 0";
+  const UNIT = "a number from 0 to 1";
+  const settings: EngineSettings = {
     statusConfidence: {
       actual: 1,
-      committed: sc.committed ?? d.statusConfidence.committed,
-      likely: sc.likely ?? d.statusConfidence.likely,
-      possible: sc.possible ?? d.statusConfidence.possible,
+      committed: pick("engine.statusConfidence.committed", sc.committed, unit, d.statusConfidence.committed, UNIT),
+      likely: pick("engine.statusConfidence.likely", sc.likely, unit, d.statusConfidence.likely, UNIT),
+      possible: pick("engine.statusConfidence.possible", sc.possible, unit, d.statusConfidence.possible, UNIT),
     },
-    dailySalesConfidence: e.dailySalesConfidence ?? d.dailySalesConfidence,
-    salesHistoryDays: e.salesHistoryDays ?? d.salesHistoryDays,
+    dailySalesConfidence: pick("engine.dailySalesConfidence", e.dailySalesConfidence, unit, d.dailySalesConfidence, UNIT),
+    salesHistoryDays: pick("engine.salesHistoryDays", e.salesHistoryDays, days, d.salesHistoryDays, DAYS),
     lag: {
-      maxSamples: lag.maxSamples ?? d.lag.maxSamples,
-      noHistoryConfidence: lag.noHistoryConfidence ?? d.lag.noHistoryConfidence,
-      iqrScaleDays: lag.iqrScaleDays ?? d.lag.iqrScaleDays,
-      laggedAnchors: lag.laggedAnchors ?? d.lag.laggedAnchors,
-      laggedTypes: lag.laggedTypes ?? d.lag.laggedTypes,
+      maxSamples: pick("engine.lag.maxSamples", lag.maxSamples, days, d.lag.maxSamples, "a whole number > 0"),
+      noHistoryConfidence: pick("engine.lag.noHistoryConfidence", lag.noHistoryConfidence, unit, d.lag.noHistoryConfidence, UNIT),
+      iqrScaleDays: pick("engine.lag.iqrScaleDays", lag.iqrScaleDays, positive, d.lag.iqrScaleDays, "a number > 0"),
+      laggedAnchors: pick("engine.lag.laggedAnchors", lag.laggedAnchors, listOf(ANCHORS), d.lag.laggedAnchors, `a non-empty list of ${ANCHORS.join(", ")}`),
+      laggedTypes: pick("engine.lag.laggedTypes", lag.laggedTypes, listOf(TYPES), d.lag.laggedTypes, `a non-empty list of ${TYPES.join(", ")}`),
     },
-    settlementMatchDays: e.settlementMatchDays ?? d.settlementMatchDays,
-    staleFallbackDays: e.staleFallbackDays ?? d.staleFallbackDays,
-    noSnapshotLookbackDays: e.noSnapshotLookbackDays ?? d.noSnapshotLookbackDays,
-    deferDays: e.deferDays ?? d.deferDays,
-    affordabilityStep: e.affordabilityStep ?? d.affordabilityStep,
-    urgencyScaleDays: e.urgencyScaleDays ?? d.urgencyScaleDays,
-    stressDelayDays: profile.thresholds?.stressDelayDays ?? d.stressDelayDays,
-    splitIntervalDays: profile.thresholds?.splitIntervalDays ?? d.splitIntervalDays,
+    settlementMatchDays: pick("engine.settlementMatchDays", e.settlementMatchDays, daysOrZero, d.settlementMatchDays, "a whole number of days >= 0"),
+    staleFallbackDays: pick("engine.staleFallbackDays", e.staleFallbackDays, days, d.staleFallbackDays, DAYS),
+    noSnapshotLookbackDays: pick("engine.noSnapshotLookbackDays", e.noSnapshotLookbackDays, days, d.noSnapshotLookbackDays, DAYS),
+    deferDays: pick("engine.deferDays", e.deferDays, days, d.deferDays, DAYS),
+    affordabilityStep: pick("engine.affordabilityStep", e.affordabilityStep, step, d.affordabilityStep, "a number in (0, 1]"),
+    urgencyScaleDays: pick("engine.urgencyScaleDays", e.urgencyScaleDays, positive, d.urgencyScaleDays, "a number > 0"),
+    stressDelayDays: pick("thresholds.stressDelayDays", th.stressDelayDays, days, d.stressDelayDays, DAYS),
+    splitIntervalDays: pick("thresholds.splitIntervalDays", th.splitIntervalDays, days, d.splitIntervalDays, DAYS),
   };
+  return { settings, issues };
+}
+
+// Every engine tunable with its default; invalid values fall back to the default (see engineSettingsIssues).
+export function engineSettings(profile: Pick<Profile, "engine" | "thresholds">): EngineSettings {
+  return resolve(profile).settings;
+}
+
+// One message per invalid tunable; forecast() reports each as an `invalid_profile` review reason.
+export function engineSettingsIssues(profile: Pick<Profile, "engine" | "thresholds">): string[] {
+  return resolve(profile).issues;
 }

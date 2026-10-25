@@ -87,7 +87,7 @@ Validation: the shares of a pattern's legs must sum to 1.0.
 
 ## Engine tunables (`engine`, optional)
 
-Every number the engine uses that depends on the business reads from the profile. The optional `engine` group holds the ones that do not already live in `thresholds` (`stressDelayDays`, `splitIntervalDays`, `staleAfterHours` stay there). Omit any field for its default; the defaults reproduce the engine's behavior before the group existed. Code reads them only through `engineSettings(profile)` in `engine/settings.ts`.
+Every number the engine uses that depends on the business reads from the profile. The optional `engine` group holds the ones that do not already live in `thresholds` (`stressDelayDays`, `splitIntervalDays`, `staleAfterHours` stay there). Omit any field for its default; the defaults reproduce the engine's behavior before the group existed. Code reads them only through `engineSettings(profile)` in `engine/settings.ts`. A value that is not finite or is out of range (day counts must be whole numbers > 0, `settlementMatchDays` >= 0; confidences 0..1; `iqrScaleDays` and `urgencyScaleDays` > 0; `affordabilityStep` in (0, 1]; anchor/type lists non-empty and known) falls back to its default, and the forecast carries an `invalid_profile` review reason for it (profiles stored in the database skip the file checks in `schema/profiles.test.ts`).
 
 | Field | Controls | Default |
 |---|---|---|

@@ -9,7 +9,7 @@ import { addDays, dateRange, diffDays, mondayOf } from "./dates";
 import { expand, money, toBase } from "./expand";
 import { adjust } from "./adjust";
 import { Notes } from "./review";
-import { engineSettings } from "./settings";
+import { engineSettings, engineSettingsIssues } from "./settings";
 
 export const ENGINE_VERSION = "engine-1";
 
@@ -261,6 +261,8 @@ export function forecast(input: Records, profile: Profile, scenario: Scenario, a
   const end = horizonEnd(profile, asOf);
   const horizonDays = diffDays(end, asOf);
   const warnings = new Notes();
+  // Invalid engine tunables fall back to their defaults (engineSettings); the owner still needs to know.
+  for (const issue of engineSettingsIssues(profile)) warnings.review("invalid_profile", `Profile ${profile.id}: ${issue} (needs review).`, [profile.id]);
   const fx = { [profile.baseCurrency]: 1, ...fxRates };
 
   const cash = openingCash(records, profile, asOf, fx, warnings);

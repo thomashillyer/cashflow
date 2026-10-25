@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import type { Commitment, Records, Scenario, Settlement, CashEvent } from "../schema/records";
 import type { EngineTunables, Profile } from "../schema/profile";
-import { ENGINE_DEFAULTS, engineSettings } from "./settings";
+import { ENGINE_DEFAULTS, engineSettings, engineSettingsIssues } from "./settings";
 import { expand, matchPayments, SALES_HISTORY_DAYS, SETTLEMENT_MATCH_DAYS } from "./expand";
 import { partyLag } from "./lag";
 import { forecast, horizonEnd } from "./forecast";
@@ -247,5 +247,67 @@ describe("each profile engine field changes behavior", () => {
     };
     expect(score(profile)).toBe(Math.round(($(1000) / (1 + 14 / 7)) * 0.95));
     expect(score(withEngine({ urgencyScaleDays: 14 }))).toBe(Math.round(($(1000) / (1 + 14 / 14)) * 0.95));
+  });
+});
+
+describe("invalid tunables fall back to the default and are reported", () => {
+  // [label, profile patch, settings path, default]. Profiles from the DB skip schema/profiles.test.ts.
+  const bad: [string, Partial<Profile>, (s: ReturnType<typeof engineSettings>) => unknown][] = [
+    ["statusConfidence.committed 1.5", { engine: { statusConfidence: { committed: 1.5 } } }, (s) => s.statusConfidence.committed],
+    ["statusConfidence.likely -0.1", { engine: { statusConfidence: { likely: -0.1 } } }, (s) => s.statusConfidence.likely],
+    ["statusConfidence.possible NaN", { engine: { statusConfidence: { possible: NaN } } }, (s) => s.statusConfidence.possible],
+    ["dailySalesConfidence 2", { engine: { dailySalesConfidence: 2 } }, (s) => s.dailySalesConfidence],
+    ["salesHistoryDays 0", { engine: { salesHistoryDays: 0 } }, (s) => s.salesHistoryDays],
+    ["salesHistoryDays 7.5", { engine: { salesHistoryDays: 7.5 } }, (s) => s.salesHistoryDays],
+    ["lag.maxSamples 0", { engine: { lag: { maxSamples: 0 } } }, (s) => s.lag.maxSamples],
+    ["lag.noHistoryConfidence Infinity", { engine: { lag: { noHistoryConfidence: Infinity } } }, (s) => s.lag.noHistoryConfidence],
+    ["lag.iqrScaleDays 0", { engine: { lag: { iqrScaleDays: 0 } } }, (s) => s.lag.iqrScaleDays],
+    ["lag.laggedAnchors []", { engine: { lag: { laggedAnchors: [] } } }, (s) => s.lag.laggedAnchors],
+    ["lag.laggedAnchors unknown", { engine: { lag: { laggedAnchors: ["due", "payday" as never] } } }, (s) => s.lag.laggedAnchors],
+    ["lag.laggedTypes []", { engine: { lag: { laggedTypes: [] } } }, (s) => s.lag.laggedTypes],
+    ["lag.laggedTypes unknown", { engine: { lag: { laggedTypes: ["loan" as never] } } }, (s) => s.lag.laggedTypes],
+    ["settlementMatchDays -1", { engine: { settlementMatchDays: -1 } }, (s) => s.settlementMatchDays],
+    ["staleFallbackDays 0", { engine: { staleFallbackDays: 0 } }, (s) => s.staleFallbackDays],
+    ["noSnapshotLookbackDays -3", { engine: { noSnapshotLookbackDays: -3 } }, (s) => s.noSnapshotLookbackDays],
+    ["deferDays -5", { engine: { deferDays: -5 } }, (s) => s.deferDays],
+    ["affordabilityStep 0", { engine: { affordabilityStep: 0 } }, (s) => s.affordabilityStep],
+    ["affordabilityStep 1.5", { engine: { affordabilityStep: 1.5 } }, (s) => s.affordabilityStep],
+    ["urgencyScaleDays 0", { engine: { urgencyScaleDays: 0 } }, (s) => s.urgencyScaleDays],
+    ["urgencyScaleDays string", { engine: { urgencyScaleDays: "7" as never } }, (s) => s.urgencyScaleDays],
+    ["thresholds.stressDelayDays 0", { thresholds: { ...profile.thresholds, stressDelayDays: 0 } }, (s) => s.stressDelayDays],
+    ["thresholds.splitIntervalDays -30", { thresholds: { ...profile.thresholds, splitIntervalDays: -30 } }, (s) => s.splitIntervalDays],
+  ];
+
+  it.each(bad)("%s", (_label, patch, get) => {
+    const p = { ...profile, ...patch };
+    expect(get(engineSettings(p))).toEqual(get(ENGINE_DEFAULTS));
+    expect(engineSettingsIssues(p)).toHaveLength(1);
+    const reasons = forecast(empty(), p, base, asOf, {}).review!.reasons.filter((x) => x.code === "invalid_profile");
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]!.refs).toEqual(["test"]);
+  });
+
+  it("valid values, including settlementMatchDays 0, raise nothing", () => {
+    const p = withEngine({ settlementMatchDays: 0, statusConfidence: { committed: 1, possible: 0 }, affordabilityStep: 1, lag: { laggedAnchors: ["due"], laggedTypes: ["invoice"] } });
+    expect(engineSettingsIssues(p)).toEqual([]);
+    expect(engineSettings(p).settlementMatchDays).toBe(0);
+    expect(forecast(empty(), p, base, asOf, {}).review?.reasons.some((x) => x.code === "invalid_profile") ?? false).toBe(false);
+  });
+
+  it("rank never sees NaN from bad urgency, lag or confidence values", () => {
+    const r = history([0, 10, 20, 30]);
+    r.balances = [bal($(1000))];
+    r.commitments.push(com("b", { type: "bill", partyId: "s", amount: $(100), anchors: { due: "2026-11-16" } }));
+    r.commitments.push(com("i", { type: "invoice", direction: "in", partyId: "p", amount: $(100), anchors: { due: "2026-11-10" } }));
+    const p = withEngine({ urgencyScaleDays: 0, lag: { iqrScaleDays: 0, noHistoryConfidence: NaN }, statusConfidence: { committed: 1.5 } });
+    const fr = forecast(r, p, base, asOf, {});
+    expect(fr.events.every((e) => Number.isFinite(e.confidence) && e.confidence >= 0 && e.confidence <= 1)).toBe(true);
+    const cands = [
+      { warning: "projected_cash_gap" as const, lever: { kind: "defer" as const, commitmentId: "b", days: 10 }, evidenceRefs: ["b"], neededBy: "2026-11-16" },
+      { warning: "projected_cash_gap" as const, lever: { kind: "chase" as const, commitmentId: "i", assumeDate: asOf }, evidenceRefs: ["i"], neededBy: "2026-11-05" },
+    ];
+    const all = rank(cands, fr, r, p, () => ({ lowPointDelta: $(1000) })).all;
+    expect(all).toHaveLength(2);
+    expect(all.every((w) => Number.isFinite(w.score) && Number.isFinite(w.confidence))).toBe(true);
   });
 });
