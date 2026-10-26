@@ -342,7 +342,7 @@ window.addEventListener("hashchange", () => {
 function waitingCount() {
   const priced = new Set(app.review.map((i) => i.signal.id));
   const unpriced = (app.reviewDocs.signals ?? []).filter((i) => !priced.has(i.signal.id)).length;
-  return app.review.length + app.reviewDocs.proposals.length + unpriced;
+  return app.review.length + app.reviewDocs.proposals.filter(needsOwner).length + unpriced;
 }
 function notesWaiting() {
   return app.notes.filter((n) => n.state === "new").length;
@@ -807,23 +807,42 @@ function messageLabel(item) {
   const sr = named?.sourceRef ?? {};
   const when = ev?.receivedAt ? dayOf(ev.receivedAt) : "";
   const byline = [sr.from ? `From ${sr.from}` : "", when].filter(Boolean).join(", ");
-  return { subject: sr.subject, from: sr.from, when, byline, title: sr.subject ?? (sr.from ? `Message from ${sr.from}` : "Imported document") };
+  return { subject: sr.subject, from: sr.from, when, byline, title: sr.subject ?? (sr.from ? `Message from ${sr.from}` : `${{ email: "Email", whatsapp: "WhatsApp message" }[ev?.sourceRef?.system] ?? "Imported file"}${when ? ` from ${when}` : ""}`) };
 }
 
-// Read successfully, and it holds no invoice, bill, PO or payment the forecast could use (or it is a plain update
-// handled as a signal): nothing for the owner to apply. An item that could not be read, or is only half read,
-// is NOT quiet: it still asks the owner for a clearer source.
-function isQuiet(item) {
+// An imported item the owner can act on has a resolved change to confirm. Two sources that disagree, or a document
+// with an amount or reference Neri could not match, also need the owner and keep their card (and the Review count).
+// Only items with nothing cash-related in them, or nothing readable, wait in the collapsed list.
+function canApply(item) {
+  const p = item.proposal;
+  return ["create", "link", "update"].includes(p.action) && !!p.ops?.length && !p.conflicts?.length;
+}
+function needsOwner(item) {
+  const p = item.proposal;
+  if (canApply(item) || p.action === "conflict" || p.conflicts?.length) return true;
   const c = item.candidate;
-  return !!c && c.extraction === "ok" && (c.kind === "none" || c.kind === "conversational_update") && !item.proposal.ops?.length && !item.proposal.conflicts?.length;
+  const f = c?.fields ?? {};
+  const cashy = !!c && c.kind !== "none" && c.kind !== "conversational_update";
+  return cashy && (f.amount?.state === "found" || f.reference?.state === "found");
+}
+const isQuiet = (item) => !needsOwner(item);
+
+// One plain sentence: drop one trailing mark, then add ours.
+const sentence = (t) => `${String(t).trim().replace(/[.!?]+$/, "")}.`;
+
+function quietReason(item) {
+  const c = item.candidate;
+  const note = (item.notes ?? [])[0];
+  if (c && c.extraction === "ok" && (c.kind === "none" || c.kind === "conversational_update")) return note ?? "No invoice, bill, PO or payment in it.";
+  if (c && c.extraction !== "ok" && c.extraction !== "partial") return "Neri could not read this file. Upload a text version if it matters.";
+  return `${sentence(item.proposal.reasons?.[0] ?? note ?? "Not enough to go on")} This needs more information before it can change your forecast.`;
 }
 
 function quietPanel(list) {
-  return `<details class="panel" style="margin-bottom:20px"><summary><b>${list.length} message${list.length === 1 ? "" : "s"} read, nothing to apply</b></summary>
+  return `<details class="panel" style="margin-bottom:20px"><summary><b>${list.length} imported item${list.length === 1 ? "" : "s"} can't change your forecast yet</b></summary>
     <ul style="list-style:none;padding:0;margin:12px 0 0">${list.map((item) => {
       const l = messageLabel(item);
-      const why = (item.notes ?? [])[0] ?? item.proposal.reasons?.[0] ?? "No invoice, bill, PO or payment in it.";
-      return `<li style="padding:10px 0;border-top:1px solid rgba(128,128,128,.25)"><b>${esc(l.title)}</b>${l.byline ? `<br><small>${esc(l.byline)}</small>` : ""}<br><span>${esc(why)}</span><br><button class="btn" data-action="proposal" data-id="${esc(item.proposal.id)}" data-d="dismiss" ${app.decidingProposal ? "disabled" : ""}>Dismiss</button></li>`;
+      return `<li style="padding:10px 0;border-top:1px solid rgba(128,128,128,.25)"><b>${esc(l.title)}</b>${l.byline ? `<br><small>${esc(l.byline)}</small>` : ""}<br><span>${esc(quietReason(item))}</span><br><button class="btn" data-action="proposal" data-id="${esc(item.proposal.id)}" data-d="dismiss" ${app.decidingProposal ? "disabled" : ""}>Dismiss</button></li>`;
     }).join("")}</ul></details>`;
 }
 
@@ -832,7 +851,7 @@ function proposalCard(item) {
   const fields = item.candidate?.fields ?? {};
   const found = (field) => fields[field]?.state === "found" ? fields[field].value : null;
   const labels = { create: "Add record", link: "Link source", update: "Update record" };
-  const canConfirm = Boolean(labels[p.action] && p.ops.length && !p.conflicts.length);
+  const canConfirm = Boolean(labels[p.action] && p.ops?.length && !p.conflicts?.length);
   const label = messageLabel(item);
   const reference = found("reference") ?? item.target?.reference ?? label.title;
   const amount = found("amount");
@@ -841,9 +860,9 @@ function proposalCard(item) {
     <h2>${esc(reference)}</h2>
     ${label.byline ? `<p class="fineprint" style="margin-top:-6px">${esc(label.byline)}</p>` : ""}
     ${amount != null ? `<p>${money(amount, { currency: found("currency") ?? app.ctx.profile.baseCurrency })}${due ? `, due ${dayDate(due)}` : ""}</p>` : ""}
-    <p>${esc(found("sellerName") ?? found("buyerName") ?? "Check the source before confirming.")}</p>
+    ${found("sellerName") ?? found("buyerName") ? `<p>${esc(found("sellerName") ?? found("buyerName"))}</p>` : ""}
     <ul>${[...p.reasons, ...(item.notes ?? [])].map((text) => `<li>${esc(text)}</li>`).join("")}</ul>
-    ${canConfirm ? `<button class="btn primary" data-action="proposal" data-id="${esc(p.id)}" data-d="confirm" ${app.decidingProposal ? "disabled" : ""}>${labels[p.action]}</button>` : `<p>This item needs more information before it can change your forecast. Upload a clearer source or ask your team to resolve the missing fields.</p>`}
+    ${canConfirm ? `<button class="btn primary" data-action="proposal" data-id="${esc(p.id)}" data-d="confirm" ${app.decidingProposal ? "disabled" : ""}>${labels[p.action]}</button>` : `<p>${esc(sentence(p.conflicts?.length || p.action === "conflict" ? (p.reasons?.[0] ?? "Your sources disagree") : (p.reasons?.[0] ?? (item.notes ?? [])[0] ?? "Neri could not match this to a record")))} ${p.action === "conflict" || p.conflicts?.length ? "Nothing changes until you resolve it." : "Nothing changes until it is matched."}</p>`}
     <button class="btn" data-action="proposal" data-id="${esc(p.id)}" data-d="dismiss" ${app.decidingProposal ? "disabled" : ""}>Dismiss</button>
   </article>`;
 }

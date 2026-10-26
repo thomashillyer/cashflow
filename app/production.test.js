@@ -171,23 +171,55 @@ describe("production uses the owner's data", () => {
     expect(html).not.toContain("Nothing to review");
   });
 
-  it("names an imported message by its subject and sender, and folds read-but-nothing-to-apply messages into one list", () => {
+  it("only items the owner can act on get a card; everything else waits in one collapsed list with a plain reason", () => {
     const html = screen(`app.reviewDocs = { storeRevision: 4, proposals: [
+      { proposal: { id: 'ok', action: 'create', ops: [{}], conflicts: [], reasons: ['Reference matched'] }, candidate: { kind: 'invoice', extraction: 'ok', fields: { reference: { state: 'found', value: 'INV-7' }, amount: { state: 'found', value: 120000 }, currency: { state: 'found', value: 'USD' } } }, evidence: [{ receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'i-1@x.example', subject: 'Invoice INV-7', from: 'Acme <accounts@acme.example>' } }], notes: [] },
       { proposal: { id: 'quote', action: 'review', ops: [], conflicts: [], reasons: [] }, candidate: { kind: 'none', extraction: 'ok', fields: {} }, evidence: [{ receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'q-1@x.example', subject: 'Quote for paper bags', from: 'Maria Santos <maria@harborfoods.example>' } }], notes: ['A price quotation, not an invoice.'] },
-      { proposal: { id: 'half', action: 'review', ops: [], conflicts: [], reasons: ['Missing amount'] }, candidate: { kind: 'invoice', extraction: 'partial', fields: {} }, evidence: [{ receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'h-1@x.example', subject: 'Invoice 77 from Acme', from: 'Acme Accounts <accounts@acme.example>' } }], notes: [] }
+      { proposal: { id: 'half', action: 'review', ops: [], conflicts: [], reasons: ['Missing amount'] }, candidate: { kind: 'invoice', extraction: 'partial', fields: {} }, evidence: [{ receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'h-1@x.example', subject: 'Invoice 77 from Acme', from: 'Acme Accounts <accounts@acme.example>' } }], notes: [] },
+      { proposal: { id: 'unread', action: 'review', ops: [], conflicts: [], reasons: [] }, candidate: { kind: 'none', extraction: 'unreadable', fields: {} }, evidence: [{ receivedAt: '2026-10-13T09:00:00Z', sourceRef: { system: 'email', record: 'u-1@x.example' } }], notes: [] }
     ] }; viewReview()`);
-    // The half-read invoice still asks for help, titled by its subject with the sender under it, never its message id.
-    expect(html).toContain("Invoice 77 from Acme");
-    expect(html).toContain("From Acme Accounts &lt;accounts@acme.example&gt;");
-    expect(html).toContain("needs more information");
-    expect(html).not.toContain("h-1@x.example");
-    // The read-and-nothing-to-apply quote sits in one collapsed list with its sender and the reason in plain words.
-    expect(html).toContain("1 message read, nothing to apply");
+    // The one item with a resolved change is a card with a confirm button, titled by what it is.
+    expect(html).toContain("INV-7");
+    expect(html).toContain('data-id="ok" data-d="confirm"');
+    // The other three are folded into one list, each named by subject and sender (never a message id), with its reason.
+    expect(html).toContain("3 imported items can't change your forecast yet");
     expect(html).toContain("Quote for paper bags");
     expect(html).toContain("maria@harborfoods.example");
     expect(html).toContain("A price quotation, not an invoice.");
-    expect(html).not.toContain("q-1@x.example");
+    expect(html).toContain("Invoice 77 from Acme");
+    expect(html).toContain("needs more information");
+    expect(html).toContain("could not read this file");
+    expect(html).toContain("Email from Oct 13");   // no subject or sender to show: say what it is and when it came
+    for (const id of ["i-1@x", "q-1@x", "h-1@x", "u-1@x"]) expect(html).not.toContain(id);
+    // None of the boilerplate that used to repeat on every card.
+    expect(html).not.toContain("Check the source before confirming");
+    expect(html).not.toContain("ask your team to resolve the missing fields");
+    expect(html).not.toContain("Imported document");
     expect(html).not.toContain("Nothing to review");
+  });
+
+  it("keeps a card for two sources that disagree, and for a real invoice Neri could not match", () => {
+    const html = screen(`app.reviewDocs = { storeRevision: 4, proposals: [
+      { proposal: { id: 'clash', action: 'conflict', ops: [], conflicts: [{}], reasons: ['The PDF says 12,000 and the books say 10,000.'] }, candidate: { kind: 'invoice', extraction: 'ok', fields: { reference: { state: 'found', value: 'INV-9' }, amount: { state: 'found', value: 1200000 } } }, evidence: [{ receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'c-1@x.example', subject: 'Invoice INV-9', from: 'Acme <a@acme.example>' } }], notes: [] },
+      { proposal: { id: 'nomatch', action: 'review', ops: [], conflicts: [], reasons: ['Several open invoices fit this amount'] }, candidate: { kind: 'invoice', extraction: 'ok', fields: { amount: { state: 'found', value: 550000 }, currency: { state: 'found', value: 'USD' } } }, evidence: [{ receivedAt: '2026-10-26T09:00:00Z', sourceRef: { system: 'email', record: 'n-1@x.example', subject: 'Payment for May order', from: 'Harbor <h@harbor.example>' } }], notes: [] }
+    ] }; viewReview()`);
+    expect(html).toContain("INV-9");
+    expect(html).toContain("The PDF says 12,000 and the books say 10,000. Nothing changes until you resolve it.");
+    expect(html).toContain("Payment for May order");
+    expect(html).toContain("Several open invoices fit this amount. Nothing changes until it is matched.");
+    expect(html).toContain('data-id="clash" data-d="dismiss"');
+    expect(html).not.toContain("can't change your forecast yet");
+    expect(html).not.toContain("c-1@x.example");
+  });
+
+  it("the Review count counts only what the owner can act on", () => {
+    const n = screen(`app.review = []; app.reviewDocs = { storeRevision: 1, signals: [], proposals: [
+      { proposal: { id: 'a', action: 'create', ops: [{}], conflicts: [], reasons: [] }, candidate: null, evidence: [], notes: [] },
+      { proposal: { id: 'b', action: 'review', ops: [], conflicts: [], reasons: [] }, candidate: null, evidence: [], notes: [] },
+      { proposal: { id: 'c', action: 'conflict', ops: [], conflicts: [{}], reasons: ['The PDF says 12,000 and the books say 10,000'] }, candidate: null, evidence: [], notes: [] },
+      { proposal: { id: 'd', action: 'review', ops: [], conflicts: [], reasons: [] }, candidate: { kind: 'invoice', extraction: 'ok', fields: { amount: { state: 'found', value: 55000 } } }, evidence: [], notes: [] }
+    ] }; waitingCount()`);
+    expect(n).toBe(3);   // the change to confirm, the two sources that disagree, and the real invoice Neri could not match; not the empty review item
   });
 
   it("finds the sender and subject even when an attachment's evidence comes first", () => {
