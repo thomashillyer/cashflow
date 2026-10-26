@@ -73,6 +73,7 @@ async function refresh() {
   const prevThree = new Set((app.brief?.three ?? []).map((i) => i.id + i.cashEffect));
   // Context too, so names for commitments added by Review, notes or plans (live partyByCommitment) stay current.
   [app.brief, app.review, app.notes, app.ctx] = await Promise.all([api.brief(), api.review(), api.notes(), api.context()]);
+  app.rfqs = api.mode === "live" && api.salesActions ? await api.salesActions().catch(() => []) : [];
   [app.connections, app.reviewDocs] = await Promise.all([
     api.mode === "live" && api.connections ? api.connections().catch(() => []) : [],
     api.mode === "live" && api.reviewProposals ? api.reviewProposals() : { proposals: [], storeRevision: null },
@@ -423,7 +424,8 @@ function viewToday() {
   const b = app.brief;
   const s = summary();
   const sales = forecastEmpty() ? [] : salesActions(3 - b.three.length);
-  const n = b.three.length + sales.length;
+  const rfqs = (app.rfqs ?? []).slice(0, Math.max(0, 3 - b.three.length - sales.length));
+  const n = b.three.length + sales.length + rfqs.length;
   const waitingRev = waitingCount();
   const waitingNotes = notesWaiting();
   const waiting = [waitingRev ? `${waitingRev} ${waitingRev === 1 ? "message" : "messages"}` : "", waitingNotes ? `${waitingNotes} ${waitingNotes === 1 ? "note" : "notes"}` : ""].filter(Boolean).join(" and ");
@@ -445,7 +447,7 @@ function viewToday() {
         <h2 class="section-title" id="today-h">${n ? (n === 1 ? "One thing today" : `${["", "One", "Two", "Three"][n]} things today`) : "Today"}</h2>
         ${n > 1 ? `<div class="deck-nav"><button class="deck-arrow" data-action="deck" data-dir="-1" aria-label="Previous">${arrow("left")}</button><button class="deck-arrow" data-action="deck" data-dir="1" aria-label="Next">${arrow("right")}</button></div>` : ""}
       </div>
-      ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}${sales.map((x, k) => salesCard(x, b.three.length + k, n)).join("")}</ol>
+      ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}${sales.map((x, k) => salesCard(x, b.three.length + k, n)).join("")}${rfqs.map((x, k) => rfqCard(x, b.three.length + sales.length + k, n)).join("")}</ol>
         ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${Array.from({ length: n }, (_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the flagged items below first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
       ${forecastChecksCompact()}
@@ -512,6 +514,20 @@ function salesCard(s, k, n) {
     <div class="card-actions">
       <span class="card-by">Expected <b>${shortDate(s.date)}</b></span>
       <button class="src" data-action="record" data-id="${esc(s.ref)}" title="Open the deal">${esc(s.deal)}</button>
+    </div>
+  </li>`;
+}
+
+// An RFQ in play from the CRM: who, which stage and for how long, and the next step the team wrote down.
+function rfqCard(r, k, n) {
+  const overdue = r.nextActionDate && r.nextActionDate < app.ctx.business.asOf;
+  return `
+  <li class="card sales" aria-label="Thing ${k + 1} of ${n}">
+    <p class="card-effect"><b>${esc(r.stage)}</b>${r.daysInStage != null ? `<span>for ${r.daysInStage} day${r.daysInStage === 1 ? "" : "s"}</span>` : ""}<em class="card-tag">Sales</em></p>
+    <h3 class="card-title">Move ${esc(r.title)} forward${r.customer ? ` with ${esc(r.customer)}` : ""}</h3>
+    <p class="card-why">${r.nextAction ? `Next step: ${esc(r.nextAction)}` : "No next step is written down in the CRM."}${r.quoteSent ? ` Quote sent ${shortDate(r.quoteSent)}.` : ""}${r.quoteValidUntil ? ` Quote valid until ${shortDate(r.quoteValidUntil)}.` : ""} The CRM has no quote value on this RFQ yet, so it adds nothing to your forecast.</p>
+    <div class="card-actions">
+      ${r.nextActionDate ? `<span class="card-by">${overdue ? "Was due" : "Next step by"} <b>${shortDate(r.nextActionDate)}</b></span>` : ""}
     </div>
   </li>`;
 }

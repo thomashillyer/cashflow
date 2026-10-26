@@ -3,6 +3,7 @@
 import { pullZoho } from "../adapters/zoho_books";
 import { pullOutlook } from "../adapters/outlook";
 import { pullZohoCrm } from "../adapters/zoho_crm";
+import { ZohoCrmClient } from "../adapters/zoho_crm/client";
 import { ingest } from "../ai/intake";
 import type { AiMode } from "./engine";
 import { ZOHO_REGIONS, type ZohoRegion } from "../adapters/zoho_books/client";
@@ -30,7 +31,10 @@ export type ConnectionSyncResult = {
 export interface ConnectionService {
   list(business: Business): ConnectionList;
   sync(business: Business, store: Store, now: () => Date, provider?: ConnectionId): Promise<ConnectionSyncResult>;
+  salesActions?(business: Business, now: () => Date): Promise<SalesAction[]>;
 }
+// An open pipeline record (an RFQ in play) that needs a follow-up. Read-only; no amounts are invented.
+export type SalesAction = { id: string; title: string; customer?: string; stage: string; daysInStage?: number; nextAction?: string; nextActionDate?: string; quoteSent?: string; quoteValidUntil?: string };
 export type ConnectionOptions = { pull?: typeof pullZoho; crmPull?: typeof pullZohoCrm; fetch?: typeof fetch; outlookPull?: typeof pullOutlook; ingest?: typeof ingest; aiMode?: AiMode };
 
 const identity = { id: "zoho_books", name: "Zoho Books" } as const;
@@ -224,7 +228,38 @@ function buildZohoConnectionService(env: NodeJS.ProcessEnv, options: ConnectionO
     }
   }
 
+  // Open RFQs (or any custom pipeline module) as sales follow-ups, ranked by the profile's actionStages
+  // (closest to money first), then longest in stage. Read-only; only header fields, never invented amounts.
+  async function salesActions(b: Business, now: () => Date): Promise<SalesAction[]> {
+    if (!configured || !bound(b)) return [];
+    const m = b.profile.crm ?? {};
+    const client = new ZohoCrmClient({ region: region!, token, fetch: (url, init) => fetchImpl(url, { ...init, redirect: "error" }) });
+    const { records } = await client.records(m.rfqModule ?? "RFQs", ["Name", "Status", "Existing_Account", "Next_Action", "Next_Action_Date", "Quote_Sent_Date", "Quote_Valid_Until", "Stage_Entered_On"]);
+    const str = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+    const order = m.actionStages ?? [];
+    const today = now().toISOString().slice(0, 10);
+    const days = (d?: string) => (d ? Math.max(0, Math.round((Date.parse(today) - Date.parse(d)) / 86_400_000)) : undefined);
+    const out: SalesAction[] = [];
+    for (const r of records) {
+      const stage = str(r.Status);
+      if (!stage || (order.length ? !order.includes(stage) : /^(lost|won|closed)/i.test(stage))) continue;
+      const acct = r.Existing_Account as { name?: unknown } | null;
+      const customer = str(acct?.name);
+      const a: SalesAction = { id: String(r.id ?? ""), title: str(r.Name) ?? "RFQ", stage };
+      if (customer) a.customer = customer;
+      const dis = days(str(r.Stage_Entered_On)); if (dis !== undefined) a.daysInStage = dis;
+      const na = str(r.Next_Action); if (na) a.nextAction = na.slice(0, 200);
+      const nad = str(r.Next_Action_Date); if (nad) a.nextActionDate = nad;
+      const qs = str(r.Quote_Sent_Date); if (qs) a.quoteSent = qs;
+      const qv = str(r.Quote_Valid_Until); if (qv) a.quoteValidUntil = qv;
+      out.push(a);
+    }
+    const rank = (a: SalesAction) => (order.length ? order.indexOf(a.stage) : 0);
+    return out.sort((x, y) => rank(x) - rank(y) || (y.daysInStage ?? 0) - (x.daysInStage ?? 0)).slice(0, 10);
+  }
+
   return {
+    salesActions,
     list: (b) => ({ connections: [status(b), crmStatus(b)] }),
     async sync(b, store, now, provider = "zoho_books") {
       if (b.isSynthetic || (businessId && b.id !== businessId)) throw new HttpError(403, "FORBIDDEN", "This business cannot use that connection.");
@@ -346,6 +381,7 @@ export function buildConnectionService(env: NodeJS.ProcessEnv, options: Connecti
     } catch { errorMessage = failed; throw new HttpError(502, "CONNECTOR_UNAVAILABLE", failed, { retryable: true }); }
   }
   return {
+    ...(zoho.salesActions ? { salesActions: zoho.salesActions } : {}),
     list: (b) => ({ connections: [...zoho.list(b).connections, status(b)] }),
     async sync(b, store, now, provider = "zoho_books") {
       if (provider === "zoho_books" || provider === "zoho_crm") return zoho.sync(b, store, now, provider);
