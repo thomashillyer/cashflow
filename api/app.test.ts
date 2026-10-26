@@ -233,6 +233,12 @@ describe("routes return what app/api.js expects", () => {
     expect((await app.inject({ method: "POST", url: `/notes/${vague.id}/remove`, headers: OTHER })).json().state).toBe("removed");
   });
 
+  it("notes: 'I just made 50,000' reads amount, direction and today's date so Add to forecast is possible", async () => {
+    const n = (await app.inject({ method: "POST", url: "/notes", headers: OTHER, payload: { text: "I just made 50,000" } })).json();
+    expect(n.reading).toMatchObject({ direction: "in", amount: 5000000, date: "2026-11-16", received: true, missing: [] });
+    expect((await app.inject({ method: "POST", url: `/notes/${n.id}/add`, headers: OTHER })).json().state).toBe("added");
+  });
+
   it("POST /plans adds an owner plan to the forecast", async () => {
     const before = (await app.inject({ method: "GET", url: "/forecast", headers: OTHER })).json();
     const res = await app.inject({ method: "POST", url: "/plans", headers: OTHER, payload: { kind: "plan", amount: 4000000, date: "2026-12-01", note: "supplier deposit" } });

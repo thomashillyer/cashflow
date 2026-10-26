@@ -23,7 +23,7 @@ const incoming = [
 describe("owner cash direction", () => {
   it.each(incoming)("reads the screenshot's incoming cash: %s", (text, amount) => {
     const reading = readThought(text, empty, asOf);
-    expect(reading).toMatchObject({ direction: "in", amount, date: "2026-11-01", missing: [] });
+    expect(reading).toMatchObject({ direction: "in", amount, date: "2026-10-26", missing: [] });
     expect(reading.kind).not.toBe("note");
     const signal = ownerSignal("receipt", { text, createdAt: asOf }, reading, profile, "applied")!;
     expect(signal.claim).toMatchObject({ kind: "plan", draft: { type: "plan", direction: "in", amount } });

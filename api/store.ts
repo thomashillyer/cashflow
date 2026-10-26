@@ -28,6 +28,8 @@ export type ThoughtReading = {
   date: string | null;
   partyId?: string;
   invoiceId?: string;
+  /** Money the owner says has already arrived ("just made", "won"); shown as Received. */
+  received?: boolean;
   missing: string[];
 };
 
