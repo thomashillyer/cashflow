@@ -768,7 +768,7 @@ function noteRow(n) {
           ${field("amount", "Amount", r.amount != null ? money(r.amount) : null, amountInput)}
           ${field("date", "When", r.date ? shortDate(r.date) : null, dateInput)}
           ${party ? field("party", "With", esc(party)) : ""}
-          ${r.status === "possible" ? field("p", "Chance", `${Math.round((r.probability ?? 0.4) * 100)}%`) : field("p", "Certainty", r.invoiceId ? "Promised" : "Planned")}
+          ${r.status === "possible" ? field("p", "Chance", `${Math.round((r.probability ?? 0.4) * 100)}%`) : field("p", "Certainty", r.invoiceId ? "Promised" : r.received ? "Received" : "Planned")}
         </dl>
         <p class="impact">${noteImpact(n)}</p>
         <div class="actions">
