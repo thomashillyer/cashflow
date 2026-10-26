@@ -299,7 +299,7 @@ const live = {
   },
   async salesActions() {
     const r = await http("/sales-actions");
-    return r.actions ?? [];
+    return Object.assign(r.actions ?? [], { reason: r.reason });
   },
   async connections() {
     const result = await http("/connections");

@@ -73,7 +73,7 @@ async function refresh() {
   const prevThree = new Set((app.brief?.three ?? []).map((i) => i.id + i.cashEffect));
   // Context too, so names for commitments added by Review, notes or plans (live partyByCommitment) stay current.
   [app.brief, app.review, app.notes, app.ctx] = await Promise.all([api.brief(), api.review(), api.notes(), api.context()]);
-  app.rfqs = api.mode === "live" && api.salesActions ? await api.salesActions().catch(() => []) : [];
+  app.rfqs = api.mode === "live" && api.salesActions ? await api.salesActions().catch((e) => Object.assign([], { reason: e.message })) : [];
   [app.connections, app.reviewDocs] = await Promise.all([
     api.mode === "live" && api.connections ? api.connections().catch(() => []) : [],
     api.mode === "live" && api.reviewProposals ? api.reviewProposals() : { proposals: [], storeRevision: null },
@@ -450,6 +450,7 @@ function viewToday() {
       ${n ? `<ol class="deck ${n === 1 ? "single" : ""}" id="deck" aria-label="Today's things" tabindex="0">${b.three.map((i, k) => homeCard(i, k, n)).join("")}${sales.map((x, k) => salesCard(x, b.three.length + k, n)).join("")}${rfqs.map((x, k) => rfqCard(x, b.three.length + sales.length + k, n)).join("")}</ol>
         ${n > 1 ? `<div class="deck-dots" aria-hidden="true">${Array.from({ length: n }, (_, k) => `<i class="${k === 0 ? "on" : ""}"></i>`).join("")}</div>` : ""}` : `<p class="calm">${forecastReview() ? (b.run.review ? "No cash actions are ranked yet. Check the flagged items below first." : "No cash actions are ranked yet. Forecast checks are unavailable.") : "Nothing needs you today. Neri will speak up if a payment moves."}</p>`}
       ${waiting ? `<a class="waiting" href="#/${waitingRev ? "review" : "notes"}"><span class="sunmark"></span>${waiting} waiting for your OK</a>` : ""}
+      ${api.mode === "live" && b.three.length < 3 && !(app.rfqs ?? []).length && app.rfqs?.reason ? `<p class="fineprint" style="margin-top:10px">Sales follow-ups: ${esc(app.rfqs.reason)}</p>` : ""}
       ${forecastChecksCompact()}
     </section>
 
