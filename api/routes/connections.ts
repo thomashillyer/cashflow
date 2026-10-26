@@ -7,6 +7,12 @@ export const connectionRoutes = (deps: { connections: ConnectionService; now: ()
     if (!userOf(req)) throw new HttpError(401, "UNAUTHENTICATED", "Sign in to see your connections.");
     return deps.connections.list(businessOf(req));
   });
+  // Open pipeline records (RFQs in play) that need a follow-up. Read-only; empty when no CRM is connected.
+  app.get("/sales-actions", async (req) => {
+    if (!userOf(req)) throw new HttpError(401, "UNAUTHENTICATED", "Sign in to see your sales follow-ups.");
+    if (!deps.connections.salesActions) return { actions: [] };
+    try { return { actions: await deps.connections.salesActions(businessOf(req), deps.now) }; } catch { return { actions: [], unavailable: true }; }
+  });
   app.post("/connections/:provider/sync", async (req) => {
     if (!userOf(req)) throw new HttpError(401, "UNAUTHENTICATED", "Sign in to sync your books.");
     if (Object.keys((req.query ?? {}) as object).length || (req.body != null && (typeof req.body !== "object" || Array.isArray(req.body) || Object.keys(req.body).length))) {

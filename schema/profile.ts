@@ -66,6 +66,8 @@ export type CrmMapping = {
   stageStatus?: Record<string, "skip" | "committed" | "likely" | "possible">;
   probabilityStatus?: { committedAt?: number; likelyAt?: number };   // on 0..1; defaults 1 and 0.6
   defaultCurrency?: string;           // when a deal names none (the profile base currency)
+  rfqModule?: string;                 // custom pipeline module read for sales follow-ups (e.g. "RFQs"); default "RFQs"
+  actionStages?: string[];            // pipeline stages that need a follow-up, closest to money first
 };
 
 // Engine tunables that depend on the business. Every field is optional; defaults live in engine/settings.ts

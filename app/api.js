@@ -297,6 +297,10 @@ const live = {
   async open(id) {
     openedBiz = demoAllowed ? id ?? null : null;
   },
+  async salesActions() {
+    const r = await http("/sales-actions");
+    return r.actions ?? [];
+  },
   async connections() {
     const result = await http("/connections");
     return result.connections ?? [];
